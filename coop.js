@@ -393,6 +393,21 @@ const right_wall = translate(
   [coop_len, 0, floor_stack]
 );
 
+// DEMONSTRATION: New Wall() primitive with visible stick-frame construction
+// This is a sample wall showing the new architecture primitive
+const demo_wall = Wall({
+  start: [-500, 500],
+  end: [-500, 2500],
+  height: wall_h,
+  construction: "stickFrame",
+  studSize: stud_sec,
+  studSpacing: stud_sp,
+  includeSheathing: false,  // No sheathing so you can see the studs clearly
+  sheathingThickness: 12
+});
+
+const demo_wall_positioned = translate(demo_wall, [0, 0, floor_stack]);
+
 // Nesting box support structure
 // Build a proper platform with posts directly under joists
 const nest_ledger_h = 48;  // Support frame height
@@ -471,12 +486,14 @@ const scaledRoof = withColor(scale(roof, DISPLAY_SCALE), ROOF_CHARCOAL);
 const scaledNestSupport = withColor(scale(nest_support_structure, DISPLAY_SCALE), WOOD_NATURAL);
 const scaledNestingBoxes = withColor(scale(nesting_box_array, DISPLAY_SCALE), NEST_BOX_WOOD);
 const scaledNestDoors = withColor(scale(nesting_box_doors, DISPLAY_SCALE), DOOR_WOOD);
+const scaledDemoWall = withColor(scale(demo_wall_positioned, DISPLAY_SCALE), WOOD_NATURAL);
 
 // Export as array of colored objects
 export const scene = [
   scaledFoundation,
   scaledSkirting,
   scaledFloor,
+  scaledDemoWall,  // New stick-frame wall demo
   scaledFrontWall,
   scaledBackWall,
   scaledLeftWall,
