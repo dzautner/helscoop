@@ -558,6 +558,57 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
       JS_ToFloat64(ctx, &params.thickness, thicknessVal);
     }
     JS_FreeValue(ctx, thicknessVal);
+
+    // Get construction type
+    JSValue constructionVal = JS_GetPropertyStr(ctx, argv[0], "construction");
+    if (!JS_IsUndefined(constructionVal) && JS_IsString(constructionVal)) {
+      const char* constructionStr = JS_ToCString(ctx, constructionVal);
+      if (constructionStr) {
+        std::string construction(constructionStr);
+        if (construction == "stickFrame" || construction == "STICK_FRAME") {
+          params.constructionType = dingcad::primitives::ConstructionType::STICK_FRAME;
+        } else if (construction == "solid" || construction == "SOLID") {
+          params.constructionType = dingcad::primitives::ConstructionType::SOLID;
+        }
+        JS_FreeCString(ctx, constructionStr);
+      }
+    }
+    JS_FreeValue(ctx, constructionVal);
+
+    // Get stick-frame parameters
+    JSValue studSizeVal = JS_GetPropertyStr(ctx, argv[0], "studSize");
+    if (!JS_IsUndefined(studSizeVal)) {
+      JSValue w = JS_GetPropertyUint32(ctx, studSizeVal, 0);
+      JSValue d = JS_GetPropertyUint32(ctx, studSizeVal, 1);
+      if (!JS_IsUndefined(w) && !JS_IsUndefined(d)) {
+        JS_ToFloat64(ctx, &params.studSize[0], w);
+        JS_ToFloat64(ctx, &params.studSize[1], d);
+      }
+      JS_FreeValue(ctx, w);
+      JS_FreeValue(ctx, d);
+    }
+    JS_FreeValue(ctx, studSizeVal);
+
+    JSValue studSpacingVal = JS_GetPropertyStr(ctx, argv[0], "studSpacing");
+    if (!JS_IsUndefined(studSpacingVal)) {
+      JS_ToFloat64(ctx, &params.studSpacing, studSpacingVal);
+    }
+    JS_FreeValue(ctx, studSpacingVal);
+
+    JSValue sheathingVal = JS_GetPropertyStr(ctx, argv[0], "includeSheathing");
+    if (!JS_IsUndefined(sheathingVal)) {
+      int sheathing = JS_ToBool(ctx, sheathingVal);
+      if (sheathing >= 0) {
+        params.includeSheathing = (sheathing == 1);
+      }
+    }
+    JS_FreeValue(ctx, sheathingVal);
+
+    JSValue sheathingThicknessVal = JS_GetPropertyStr(ctx, argv[0], "sheathingThickness");
+    if (!JS_IsUndefined(sheathingThicknessVal)) {
+      JS_ToFloat64(ctx, &params.sheathingThickness, sheathingThicknessVal);
+    }
+    JS_FreeValue(ctx, sheathingThicknessVal);
   }
 
   auto manifold = std::make_shared<manifold::Manifold>(dingcad::primitives::CreateWall(params));
