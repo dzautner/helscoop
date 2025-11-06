@@ -222,6 +222,20 @@ struct Vec3f {
   float z;
 };
 
+struct ColoredObject {
+  std::shared_ptr<manifold::Manifold> geometry;
+  Color color;
+};
+
+struct SceneData {
+  std::vector<ColoredObject> objects;
+};
+
+struct ModelWithColor {
+  Model model;
+  Color color;
+};
+
 struct ModuleLoaderData {
   std::filesystem::path baseDir;
   std::set<std::filesystem::path> dependencies;
@@ -314,7 +328,7 @@ void DestroyModel(Model &model) {
   model = Model{};
 }
 
-Model CreateRaylibModelFrom(const manifold::MeshGL &meshGL) {
+Model CreateRaylibModelFrom(const manifold::MeshGL &meshGL, Color baseColor = kBaseColor) {
   Model model = {0};
   const int vertexCount = meshGL.NumVert();
   const int triangleCount = meshGL.NumTri();
@@ -386,7 +400,7 @@ Model CreateRaylibModelFrom(const manifold::MeshGL &meshGL) {
     const float diffuse = 0.7f;
     float finalIntensity = Clamp(ambient + diffuse * toon, 0.0f, 1.0f);
 
-    const Color base = kBaseColor;
+    const Color base = baseColor;  // Use parameter instead of kBaseColor
     Color color = {0};
     color.r = static_cast<unsigned char>(
         Clamp(base.r * finalIntensity, 0.0f, 255.0f));
@@ -602,7 +616,7 @@ JSModuleDef *FilesystemModuleLoader(JSContext *ctx, const char *module_name, voi
 
 struct LoadResult {
   bool success = false;
-  std::shared_ptr<manifold::Manifold> manifold;
+  SceneData sceneData;
   std::string message;
   std::vector<std::filesystem::path> dependencies;
 };
@@ -694,36 +708,161 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     return result;
   }
 
-  auto sceneHandle = GetManifoldHandle(ctx, sceneVal);
-  if (!sceneHandle) {
+  // Parse scene - can be:
+  // 1. Single manifold (backward compat)
+  // 2. Array of manifolds (backward compat)
+  // 3. Array of colored objects: [{geometry: manifold, color: [r,g,b]}, ...]
+
+  auto parseColoredObject = [&](JSValue objVal) -> std::optional<ColoredObject> {
+    // Check if it's a plain manifold
+    auto manifoldHandle = GetManifoldHandle(ctx, objVal);
+    if (manifoldHandle) {
+      return ColoredObject{manifoldHandle, kBaseColor};
+    }
+
+    // Check if it's a colored object {geometry, color}
+    JSValue geomVal = JS_GetPropertyStr(ctx, objVal, "geometry");
+    JSValue colorVal = JS_GetPropertyStr(ctx, objVal, "color");
+
+    if (!JS_IsUndefined(geomVal) && !JS_IsUndefined(colorVal)) {
+      auto geom = GetManifoldHandle(ctx, geomVal);
+
+      // Parse color array manually
+      if (geom && JS_IsArray(colorVal)) {
+        std::array<double, 3> colorArray{};
+        bool colorOk = true;
+
+        for (uint32_t i = 0; i < 3; ++i) {
+          JSValue element = JS_GetPropertyUint32(ctx, colorVal, i);
+          if (JS_ToFloat64(ctx, &colorArray[i], element) < 0) {
+            colorOk = false;
+            JS_FreeValue(ctx, element);
+            break;
+          }
+          JS_FreeValue(ctx, element);
+        }
+
+        if (colorOk) {
+          Color color = {
+            static_cast<unsigned char>(Clamp(colorArray[0] * 255.0, 0.0, 255.0)),
+            static_cast<unsigned char>(Clamp(colorArray[1] * 255.0, 0.0, 255.0)),
+            static_cast<unsigned char>(Clamp(colorArray[2] * 255.0, 0.0, 255.0)),
+            255
+          };
+          TraceLog(LOG_INFO, "Parsed colored object: R=%d G=%d B=%d", color.r, color.g, color.b);
+          std::cout << "Parsed colored object: R=" << (int)color.r << " G=" << (int)color.g << " B=" << (int)color.b << std::endl;
+          JS_FreeValue(ctx, geomVal);
+          JS_FreeValue(ctx, colorVal);
+          return ColoredObject{geom, color};
+        }
+      }
+    }
+
+    JS_FreeValue(ctx, geomVal);
+    JS_FreeValue(ctx, colorVal);
+    return std::nullopt;
+  };
+
+  // Handle single object or array
+  if (JS_IsArray(sceneVal)) {
+    // Array of objects
+    JSValue lengthVal = JS_GetPropertyStr(ctx, sceneVal, "length");
+    uint32_t length = 0;
+    if (JS_ToUint32(ctx, &length, lengthVal) < 0) {
+      JS_FreeValue(ctx, lengthVal);
+      JS_FreeValue(ctx, sceneVal);
+      JS_FreeContext(ctx);
+      result.message = "Failed to get scene array length";
+      assignDependencies();
+      return result;
+    }
+    JS_FreeValue(ctx, lengthVal);
+
+    for (uint32_t i = 0; i < length; ++i) {
+      JSValue itemVal = JS_GetPropertyUint32(ctx, sceneVal, i);
+      auto obj = parseColoredObject(itemVal);
+      JS_FreeValue(ctx, itemVal);
+
+      if (obj) {
+        result.sceneData.objects.push_back(*obj);
+      } else {
+        JS_FreeValue(ctx, sceneVal);
+        JS_FreeContext(ctx);
+        result.message = "Scene array element " + std::to_string(i) + " is not a manifold or colored object";
+        assignDependencies();
+        return result;
+      }
+    }
+  } else {
+    // Single object
+    auto obj = parseColoredObject(sceneVal);
+    if (obj) {
+      result.sceneData.objects.push_back(*obj);
+    } else {
+      JS_FreeValue(ctx, sceneVal);
+      JS_FreeContext(ctx);
+      result.message = "Exported 'scene' is not a manifold or colored object";
+      assignDependencies();
+      return result;
+    }
+  }
+
+  if (result.sceneData.objects.empty()) {
     JS_FreeValue(ctx, sceneVal);
     JS_FreeContext(ctx);
-    result.message = "Exported 'scene' is not a manifold";
+    result.message = "Scene is empty";
     assignDependencies();
     return result;
   }
 
-  result.manifold = sceneHandle;
   result.success = true;
-  result.message = "Loaded " + absolutePath.string();
+  result.message = "Loaded " + absolutePath.string() + " (" +
+                   std::to_string(result.sceneData.objects.size()) + " object(s))";
   assignDependencies();
   JS_FreeValue(ctx, sceneVal);
   JS_FreeContext(ctx);
   return result;
 }
 
-bool ReplaceScene(Model &model,
-                  const std::shared_ptr<manifold::Manifold> &scene) {
-  if (!scene) return false;
-  Model newModel = CreateRaylibModelFrom(scene->GetMeshGL());
-  DestroyModel(model);
-  model = newModel;
-  return true;
+std::vector<ModelWithColor> CreateModelsFromScene(const SceneData &sceneData) {
+  std::vector<ModelWithColor> result;
+  result.reserve(sceneData.objects.size());
+
+  for (const auto &obj : sceneData.objects) {
+    if (obj.geometry) {
+      Model model = CreateRaylibModelFrom(obj.geometry->GetMeshGL(), obj.color);
+      result.push_back({model, obj.color});
+    }
+  }
+
+  return result;
+}
+
+void DestroyModels(std::vector<ModelWithColor> &models) {
+  for (auto &modelWithColor : models) {
+    DestroyModel(modelWithColor.model);
+  }
+  models.clear();
 }
 
 }  // namespace
 
-int main() {
+int main(int argc, char *argv[]) {
+  // Parse command-line arguments
+  bool renderMode = false;
+  std::string renderScenePath;
+  std::string renderOutputPath;
+
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "--render" && i + 2 < argc) {
+      renderMode = true;
+      renderScenePath = argv[i + 1];
+      renderOutputPath = argv[i + 2];
+      i += 2;
+    }
+  }
+
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
   InitWindow(1280, 720, "dingcad");
   SetTargetFPS(60);
@@ -756,11 +895,17 @@ int main() {
   EnsureManifoldClass(runtime);
   JS_SetModuleLoaderFunc(runtime, nullptr, FilesystemModuleLoader, &g_module_loader_data);
 
-  std::shared_ptr<manifold::Manifold> scene = nullptr;
+  SceneData sceneData;
   std::string statusMessage;
   std::filesystem::path scriptPath;
   std::unordered_map<std::filesystem::path, WatchedFile> watchedFiles;
-  auto defaultScript = FindDefaultScene();
+  std::optional<std::filesystem::path> defaultScript;
+
+  if (renderMode && !renderScenePath.empty()) {
+    defaultScript = std::filesystem::path(renderScenePath);
+  } else {
+    defaultScript = FindDefaultScene();
+  }
   auto reportStatus = [&](const std::string &message) {
     statusMessage = message;
     TraceLog(LOG_INFO, "%s", statusMessage.c_str());
@@ -783,7 +928,7 @@ int main() {
     scriptPath = std::filesystem::absolute(*defaultScript);
     auto load = LoadSceneFromFile(runtime, scriptPath);
     if (load.success) {
-      scene = load.manifold;
+      sceneData = load.sceneData;
       reportStatus(load.message);
     } else {
       reportStatus(load.message);
@@ -792,17 +937,20 @@ int main() {
       setWatchedFiles(load.dependencies);
     }
   }
-  if (!scene) {
+  if (sceneData.objects.empty()) {
     manifold::Manifold cube = manifold::Manifold::Cube({2.0, 2.0, 2.0}, true);
     manifold::Manifold sphere = manifold::Manifold::Sphere(1.2, 0);
     manifold::Manifold combo = cube + sphere.Translate({0.0, 0.8, 0.0});
-    scene = std::make_shared<manifold::Manifold>(combo);
+    sceneData.objects.push_back({
+      std::make_shared<manifold::Manifold>(combo),
+      kBaseColor
+    });
     if (statusMessage.empty()) {
       reportStatus("No scene.js found. Using built-in sample.");
     }
   }
 
-  Model model = CreateRaylibModelFrom(scene->GetMeshGL());
+  std::vector<ModelWithColor> models = CreateModelsFromScene(sceneData);
 
   Shader outlineShader = LoadShaderFromMemory(kOutlineVS, kOutlineFS);
   Shader toonShader = LoadShaderFromMemory(kToonVS, kToonFS);
@@ -811,7 +959,7 @@ int main() {
 
   if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0) {
     TraceLog(LOG_ERROR, "Failed to load one or more shaders.");
-    DestroyModel(model);
+    DestroyModels(models);
     if (brandingFontCustom) {
       UnloadFont(brandingFont);
     }
@@ -917,14 +1065,19 @@ int main() {
   const float zNear = 0.01f;
   const float zFar = 1000.0f;
 
+  int frameCount = 0;
+  bool screenshotTaken = false;
+
   while (!WindowShouldClose()) {
+    frameCount++;
     const Vector2 mouseDelta = GetMouseDelta();
 
     auto reloadScene = [&]() {
       auto load = LoadSceneFromFile(runtime, scriptPath);
       if (load.success) {
-        scene = load.manifold;
-        ReplaceScene(model, scene);
+        sceneData = load.sceneData;
+        DestroyModels(models);
+        models = CreateModelsFromScene(sceneData);
         reportStatus(load.message);
       } else {
         reportStatus(load.message);
@@ -993,28 +1146,43 @@ int main() {
     if (exportRequested) {
       TraceLog(LOG_INFO, "Export trigger detected");
       std::cout << "Export trigger detected" << std::endl;
-      if (scene) {
-        std::filesystem::path downloads;
-        if (const char *home = std::getenv("HOME")) {
-          downloads = std::filesystem::path(home) / "Downloads";
-        } else {
-          downloads = std::filesystem::current_path();
+      if (!sceneData.objects.empty()) {
+        // Combine all objects for export
+        std::vector<manifold::Manifold> allGeometry;
+        allGeometry.reserve(sceneData.objects.size());
+        for (const auto &obj : sceneData.objects) {
+          if (obj.geometry) {
+            allGeometry.push_back(*obj.geometry);
+          }
         }
 
-        std::error_code dirErr;
-        std::filesystem::create_directories(downloads, dirErr);
-        if (dirErr && !std::filesystem::exists(downloads)) {
-          reportStatus("Export failed: cannot access " + downloads.string());
-        } else {
-          std::filesystem::path savePath = downloads / "ding.stl";
-          std::string error;
-          const bool ok = WriteMeshAsBinaryStl(scene->GetMeshGL(), savePath, error);
-          TraceLog(LOG_INFO, "Export path: %s", savePath.string().c_str());
-          if (ok) {
-            reportStatus("Saved " + savePath.string());
+        if (!allGeometry.empty()) {
+          manifold::Manifold combined = manifold::Manifold::Compose(allGeometry);
+
+          std::filesystem::path downloads;
+          if (const char *home = std::getenv("HOME")) {
+            downloads = std::filesystem::path(home) / "Downloads";
           } else {
-            reportStatus(error);
+            downloads = std::filesystem::current_path();
           }
+
+          std::error_code dirErr;
+          std::filesystem::create_directories(downloads, dirErr);
+          if (dirErr && !std::filesystem::exists(downloads)) {
+            reportStatus("Export failed: cannot access " + downloads.string());
+          } else {
+            std::filesystem::path savePath = downloads / "ding.stl";
+            std::string error;
+            const bool ok = WriteMeshAsBinaryStl(combined.GetMeshGL(), savePath, error);
+            TraceLog(LOG_INFO, "Export path: %s", savePath.string().c_str());
+            if (ok) {
+              reportStatus("Saved " + savePath.string());
+            } else {
+              reportStatus(error);
+            }
+          }
+        } else {
+          reportStatus("No geometry to export");
         }
       } else {
         reportStatus("No scene loaded to export");
@@ -1114,23 +1282,47 @@ int main() {
     DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
     DrawAxes(2.0f);
 
+    // Draw all models - outline pass
     rlDisableBackfaceCulling();
-    for (int i = 0; i < model.meshCount; ++i) {
-      DrawMesh(model.meshes[i], outlineMat, model.transform);
+    for (const auto &modelWithColor : models) {
+      for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+        DrawMesh(modelWithColor.model.meshes[i], outlineMat, modelWithColor.model.transform);
+      }
     }
     rlEnableBackfaceCulling();
 
-    for (int i = 0; i < model.meshCount; ++i) {
-      DrawMesh(model.meshes[i], toonMat, model.transform);
+    // Draw all models - toon shading pass (set color per model)
+    static bool loggedOnce = false;
+    for (const auto &modelWithColor : models) {
+      const float baseCol[4] = {
+        modelWithColor.color.r / 255.0f,
+        modelWithColor.color.g / 255.0f,
+        modelWithColor.color.b / 255.0f,
+        1.0f
+      };
+
+      if (!loggedOnce) {
+        TraceLog(LOG_INFO, "Drawing with color: R=%.2f G=%.2f B=%.2f", baseCol[0], baseCol[1], baseCol[2]);
+        std::cout << "Drawing with color: R=" << baseCol[0] << " G=" << baseCol[1] << " B=" << baseCol[2] << std::endl;
+      }
+
+      SetShaderValue(toonShader, locBaseColor, baseCol, SHADER_UNIFORM_VEC4);
+
+      for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+        DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
+      }
     }
+    loggedOnce = true;
     EndMode3D();
     EndTextureMode();
 
     BeginTextureMode(rtNormalDepth);
     ClearBackground({127, 127, 255, 0});
     BeginMode3D(camera);
-    for (int i = 0; i < model.meshCount; ++i) {
-      DrawMesh(model.meshes[i], normalDepthMat, model.transform);
+    for (const auto &modelWithColor : models) {
+      for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+        DrawMesh(modelWithColor.model.meshes[i], normalDepthMat, modelWithColor.model.transform);
+      }
     }
     EndMode3D();
     EndTextureMode();
@@ -1163,6 +1355,15 @@ int main() {
     }
 
     EndDrawing();
+
+    // If in render mode, take screenshot after rendering a few frames (to ensure everything is loaded)
+    if (renderMode && !screenshotTaken && frameCount >= 3) {
+      TakeScreenshot(renderOutputPath.c_str());
+      TraceLog(LOG_INFO, "Rendered to: %s", renderOutputPath.c_str());
+      std::cout << "Rendered to: " << renderOutputPath << std::endl;
+      screenshotTaken = true;
+      break;  // Exit the loop
+    }
   }
 
   UnloadRenderTexture(rtColor);
@@ -1171,7 +1372,7 @@ int main() {
   UnloadMaterial(normalDepthMat);
   UnloadMaterial(outlineMat);   // also releases the shader
   UnloadShader(edgeShader);
-  DestroyModel(model);
+  DestroyModels(models);
   if (brandingFontCustom) {
     UnloadFont(brandingFont);
   }

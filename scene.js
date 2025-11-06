@@ -25,8 +25,8 @@ const centerOnFloor = (manifold) => {
 };
 
 const rawModule = buildDTSPCB();
-const esp32MeshPath = '~/Downloads/models/seedespc3.stl';
-const rawEsp32Mesh = loadMesh(esp32MeshPath, true);
+// const esp32MeshPath = '~/Downloads/models/seedespc3.stl';
+// const rawEsp32Mesh = loadMesh(esp32MeshPath, true);
 
 // Connector dimensions match the DTS PCB layout so we can clear the shell wall.
 const pcbWidth = 21;
@@ -74,14 +74,14 @@ const harnessModules = angles.map((angle) => {
 });
 
 
-const size = 28.3;
+const size = 35.0;  // Changed from 28.3 to test live reload!
 const pillarSize = [size, size, size-.1];
 const outerCornerRadius = 3;
 const centeredPillar = roundedBox(pillarSize[0], pillarSize[1], pillarSize[2], outerCornerRadius);
 const pillarBounds = boundingBox(centeredPillar);
 const pillarFloorAligned = translate(centeredPillar, [0, 0, -pillarBounds.min[2]]);
 
-const wallThickness = 5.;
+const wallThickness = 2.5;  // Thinner walls - was 5.0
 const innerSize = size - wallThickness * 2;
 const innerPillar = cube({ size: [21, 21, 22], center: true });
 const innerBounds = boundingBox(innerPillar);
@@ -91,14 +91,14 @@ const hollowPillar = difference(pillarFloorAligned, innerFloorAligned);
 
 const sixthModuleOffset = [0, 0, 22];
 const sixthModule = translate(centerOnFloor(rawModule), sixthModuleOffset);
-const esp32Mesh = translate(
-  rotate(centerOnFloor(rawEsp32Mesh), [0, 90, 0]),
-  [
-    sixthModuleOffset[0] + 10,
-    sixthModuleOffset[1],
-    sixthModuleOffset[2] - 10,
-  ],
-);
+// const esp32Mesh = translate(
+//   rotate(centerOnFloor(rawEsp32Mesh), [0, 90, 0]),
+//   [
+//     sixthModuleOffset[0] + 10,
+//     sixthModuleOffset[1],
+//     sixthModuleOffset[2] - 10,
+//   ],
+// );
 const scaledModules = union(...harnessModules, sixthModule);
 const harnessShell = scale(difference(hollowPillar, scaledModules), 1.035);
 
@@ -133,5 +133,7 @@ const fronthole = translate(
 
 const harnessWithConnector = difference(harnessShell, connectorHole,  fronthole);
 
-// export const scene = harnessWithConnector;
-export const scene = harnessWithConnector;
+// Import coop design with colors
+import { scene as coopScene } from './coop.js';
+
+export const scene = coopScene;

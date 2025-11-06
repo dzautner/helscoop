@@ -1314,11 +1314,35 @@ JSValue JsMinGap(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return JS_NewFloat64(ctx, a->handle->MinGap(*b->handle, searchLength));
 }
 
+JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "withColor expects (manifold, [r,g,b])");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+
+  std::array<double, 3> color{};
+  if (!GetVec3(ctx, argv[1], color)) return JS_EXCEPTION;
+
+  // Create a wrapper object with geometry and color properties
+  JSValue obj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, obj, "geometry", JS_DupValue(ctx, argv[0]));
+
+  JSValue colorArray = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, colorArray, 0, JS_NewFloat64(ctx, color[0]));
+  JS_SetPropertyUint32(ctx, colorArray, 1, JS_NewFloat64(ctx, color[1]));
+  JS_SetPropertyUint32(ctx, colorArray, 2, JS_NewFloat64(ctx, color[2]));
+  JS_SetPropertyStr(ctx, obj, "color", colorArray);
+
+  return obj;
+}
+
 void RegisterBindingsInternal(JSContext *ctx) {
   JSValue global = JS_GetGlobalObject(ctx);
   JS_SetPropertyStr(ctx, global, "cube", JS_NewCFunction(ctx, JsCube, "cube", 1));
   JS_SetPropertyStr(ctx, global, "sphere", JS_NewCFunction(ctx, JsSphere, "sphere", 1));
   JS_SetPropertyStr(ctx, global, "cylinder", JS_NewCFunction(ctx, JsCylinder, "cylinder", 1));
+  JS_SetPropertyStr(ctx, global, "withColor", JS_NewCFunction(ctx, JsWithColor, "withColor", 2));
   JS_SetPropertyStr(ctx, global, "union", JS_NewCFunction(ctx, JsUnion, "union", 1));
   JS_SetPropertyStr(ctx, global, "difference", JS_NewCFunction(ctx, JsDifference, "difference", 1));
   JS_SetPropertyStr(ctx, global, "intersection", JS_NewCFunction(ctx, JsIntersection, "intersection", 1));
