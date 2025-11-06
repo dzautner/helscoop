@@ -14,6 +14,7 @@ set_target_properties(dingcad_quickjs PROPERTIES LINKER_LANGUAGE C)
 add_executable(dingcad_viewer
   main.cpp
   js_bindings.cpp
+  primitives/wall.cpp
 )
 
 target_include_directories(dingcad_viewer

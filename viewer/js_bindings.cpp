@@ -14,6 +14,8 @@
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "manifold/meshIO.h"
+#include "primitives/wall.h"
+
 namespace {
 
 void PrintLoadMeshError(const std::string &message) {
@@ -496,6 +498,69 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double radiusHigh = (radiusTop < 0.0) ? radius : radiusTop;
   auto manifold = std::make_shared<manifold::Manifold>(
       manifold::Manifold::Cylinder(height, radius, radiusHigh, 0, center));
+  return WrapManifold(ctx, std::move(manifold));
+}
+
+JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  dingcad::primitives::WallParams params;
+
+  if (argc >= 1 && JS_IsObject(argv[0])) {
+    // Get start position [x, y]
+    JSValue startVal = JS_GetPropertyStr(ctx, argv[0], "start");
+    if (!JS_IsUndefined(startVal)) {
+      std::array<double, 3> start3{};
+      if (GetVec3(ctx, startVal, start3)) {
+        params.start = {start3[0], start3[1]};
+      } else {
+        // Try as vec2
+        JSValue x = JS_GetPropertyUint32(ctx, startVal, 0);
+        JSValue y = JS_GetPropertyUint32(ctx, startVal, 1);
+        if (!JS_IsUndefined(x) && !JS_IsUndefined(y)) {
+          JS_ToFloat64(ctx, &params.start[0], x);
+          JS_ToFloat64(ctx, &params.start[1], y);
+        }
+        JS_FreeValue(ctx, x);
+        JS_FreeValue(ctx, y);
+      }
+    }
+    JS_FreeValue(ctx, startVal);
+
+    // Get end position [x, y]
+    JSValue endVal = JS_GetPropertyStr(ctx, argv[0], "end");
+    if (!JS_IsUndefined(endVal)) {
+      std::array<double, 3> end3{};
+      if (GetVec3(ctx, endVal, end3)) {
+        params.end = {end3[0], end3[1]};
+      } else {
+        // Try as vec2
+        JSValue x = JS_GetPropertyUint32(ctx, endVal, 0);
+        JSValue y = JS_GetPropertyUint32(ctx, endVal, 1);
+        if (!JS_IsUndefined(x) && !JS_IsUndefined(y)) {
+          JS_ToFloat64(ctx, &params.end[0], x);
+          JS_ToFloat64(ctx, &params.end[1], y);
+        }
+        JS_FreeValue(ctx, x);
+        JS_FreeValue(ctx, y);
+      }
+    }
+    JS_FreeValue(ctx, endVal);
+
+    // Get height
+    JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
+    if (!JS_IsUndefined(heightVal)) {
+      JS_ToFloat64(ctx, &params.height, heightVal);
+    }
+    JS_FreeValue(ctx, heightVal);
+
+    // Get thickness (optional)
+    JSValue thicknessVal = JS_GetPropertyStr(ctx, argv[0], "thickness");
+    if (!JS_IsUndefined(thicknessVal)) {
+      JS_ToFloat64(ctx, &params.thickness, thicknessVal);
+    }
+    JS_FreeValue(ctx, thicknessVal);
+  }
+
+  auto manifold = std::make_shared<manifold::Manifold>(dingcad::primitives::CreateWall(params));
   return WrapManifold(ctx, std::move(manifold));
 }
 
@@ -1342,6 +1407,7 @@ void RegisterBindingsInternal(JSContext *ctx) {
   JS_SetPropertyStr(ctx, global, "cube", JS_NewCFunction(ctx, JsCube, "cube", 1));
   JS_SetPropertyStr(ctx, global, "sphere", JS_NewCFunction(ctx, JsSphere, "sphere", 1));
   JS_SetPropertyStr(ctx, global, "cylinder", JS_NewCFunction(ctx, JsCylinder, "cylinder", 1));
+  JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));
   JS_SetPropertyStr(ctx, global, "withColor", JS_NewCFunction(ctx, JsWithColor, "withColor", 2));
   JS_SetPropertyStr(ctx, global, "union", JS_NewCFunction(ctx, JsUnion, "union", 1));
   JS_SetPropertyStr(ctx, global, "difference", JS_NewCFunction(ctx, JsDifference, "difference", 1));
