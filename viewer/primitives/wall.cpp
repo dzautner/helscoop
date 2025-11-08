@@ -43,19 +43,21 @@ manifold::Manifold CreateStickFrameWall(const WallParams& params) {
   const double studWidth = params.studSize[0];
   const double studDepth = params.studSize[1];
 
-  // Bottom plate (runs full length)
+  // Bottom plate (runs full length, same depth as studs)
+  // With center:false, cube origin is at corner, so we place it at (0,0,0)
   manifold::Manifold bottomPlate = manifold::Manifold::Cube(
-    {length, studWidth, params.bottomPlateHeight}, false
+    {length, studDepth, params.bottomPlateHeight}, false
   );
-  bottomPlate = bottomPlate.Translate({length/2.0, studWidth/2.0, params.bottomPlateHeight/2.0});
+  bottomPlate = bottomPlate.Translate({0, 0, 0});
   components.push_back(bottomPlate);
 
-  // Top plate (runs full length)
+  // Top plate (runs full length, same depth as studs)
+  // Bottom edge at height - topPlateHeight
   const double topPlateZ = params.height - params.topPlateHeight;
   manifold::Manifold topPlate = manifold::Manifold::Cube(
-    {length, studWidth, params.topPlateHeight}, false
+    {length, studDepth, params.topPlateHeight}, false
   );
-  topPlate = topPlate.Translate({length/2.0, studWidth/2.0, topPlateZ + params.topPlateHeight/2.0});
+  topPlate = topPlate.Translate({0, 0, topPlateZ});
   components.push_back(topPlate);
 
   // Calculate stud positions
@@ -64,16 +66,17 @@ manifold::Manifold CreateStickFrameWall(const WallParams& params) {
 
   for (int i = 0; i < numStuds; i++) {
     double studX = i * params.studSpacing;
-    if (studX > length) studX = length - studWidth/2.0;
+    if (studX > length - studWidth) studX = length - studWidth;
 
     // Create vertical stud
+    // With center:false, bottom corner is at origin, so Z=bottomPlateHeight puts bottom on top of plate
     manifold::Manifold stud = manifold::Manifold::Cube(
       {studWidth, studDepth, studHeight}, false
     );
     stud = stud.Translate({
-      studX + studWidth/2.0,
-      studDepth/2.0,
-      params.bottomPlateHeight + studHeight/2.0
+      studX,
+      0,
+      params.bottomPlateHeight
     });
     components.push_back(stud);
   }
@@ -83,11 +86,11 @@ manifold::Manifold CreateStickFrameWall(const WallParams& params) {
     manifold::Manifold sheathing = manifold::Manifold::Cube(
       {length, params.sheathingThickness, params.height}, false
     );
-    // Position sheathing on back side of studs
+    // Position sheathing on back side of studs (behind the frame)
     sheathing = sheathing.Translate({
-      length/2.0,
-      studDepth + params.sheathingThickness/2.0,
-      params.height/2.0
+      0,
+      studDepth,
+      0
     });
     components.push_back(sheathing);
   }
