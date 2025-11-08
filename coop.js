@@ -320,15 +320,19 @@ const pop_door_cutout = translate(
 
 // Nesting box access cutout in front wall (external access to collect eggs)
 // The cutout should align with the nesting boxes, leaving a lip at the bottom
-const nest_total_w = nest_boxes * nest_box_w + (nest_boxes + 1) * 18;
+const nest_spacing = 18;
+const nest_total_w = nest_boxes * nest_box_w + (nest_boxes + 1) * nest_spacing;
 const nest_box_x = coop_len / 2 - door_w / 2 - nest_total_w - 100;
+// Cutout should match actual box positions (excluding outer spacing)
+const nest_cutout_w = nest_boxes * nest_box_w + (nest_boxes - 1) * nest_spacing;
+const nest_cutout_x = nest_box_x + nest_spacing;  // Start where first box starts
 // The wall's coordinate system starts at floor level (floor_stack in absolute coords)
 // So cutout Z is just: nest_height_off_floor + nest_access_lip_h (relative to wall origin)
 const nest_cutout_bottom_z = nest_height_off_floor + nest_access_lip_h;
 const nest_cutout_height = nest_box_h - nest_access_lip_h;
 const nest_access_cutout = translate(
-  cube({ size: [nest_total_w, stud_sec[1] + 2, nest_cutout_height], center: false }),
-  [nest_box_x, -1, nest_cutout_bottom_z]
+  cube({ size: [nest_cutout_w, stud_sec[1] + 2, nest_cutout_height], center: false }),
+  [nest_cutout_x, -1, nest_cutout_bottom_z]
 );
 
 // Build the walls using Wall() primitive with stick-frame construction
