@@ -185,38 +185,6 @@ function floor_frame(len, width, joist, spacing, paver_h, skid_h, floor_th) {
   return union(front_rim, back_rim, left_rim, right_rim, ...interior_joists, floor_sheet);
 }
 
-// Single stud wall with optional cutouts
-function stud_wall(len, height, stud, spacing, plate_w, cutouts = []) {
-  // Bottom plate
-  const bottom_plate = cube({ size: [len, plate_w, stud[0]], center: false });
-
-  // Top plate
-  const top_plate = translate(
-    cube({ size: [len, plate_w, stud[0]], center: false }),
-    [0, 0, height - stud[0]]
-  );
-
-  // Studs
-  const studs = [];
-  for (let x = 0; x <= len; x += spacing) {
-    studs.push(
-      translate(
-        cube({ size: [stud[0], stud[1], height - 2 * stud[0]], center: false }),
-        [x - stud[0] / 2, 0, stud[0]]
-      )
-    );
-  }
-
-  let wall = union(bottom_plate, top_plate, ...studs);
-
-  // Apply cutouts
-  if (cutouts.length > 0) {
-    wall = difference(wall, ...cutouts);
-  }
-
-  return wall;
-}
-
 // Nesting box array with round entrance holes and hinged doors
 function nesting_boxes(count, box_w, box_d, box_h, wall_t = 12, spacing = 18, door_angle = 45) {
   const boxes = [];
@@ -363,21 +331,40 @@ const nest_access_cutout = translate(
   [nest_box_x, -1, nest_cutout_bottom_z]
 );
 
-// Build the walls with cutouts
-const front_wall = translate(
-  stud_wall(coop_len, wall_h, stud_sec, stud_sp, stud_sec[1], [door_cutout, nest_access_cutout]),
-  [0, 0, floor_stack]
+// Build the walls using Wall() primitive with stick-frame construction
+
+// Front wall - along X axis from [0,0] to [coop_len, 0]
+const front_wall_frame = Wall({
+  start: [0, 0],
+  end: [coop_len, 0],
+  height: wall_h,
+  construction: "stickFrame",
+  studSize: stud_sec,
+  studSpacing: stud_sp,
+  includeSheathing: false
+});
+const front_wall = difference(
+  translate(front_wall_frame, [0, 0, floor_stack]),
+  translate(door_cutout, [0, 0, floor_stack]),
+  translate(nest_access_cutout, [0, 0, floor_stack])
 );
 
-const back_wall = translate(
-  rotate(
-    stud_wall(coop_len, wall_h, stud_sec, stud_sp, stud_sec[1], [back_vent_cutout]),
-    [0, 0, 180]
-  ),
-  [coop_len, coop_w, floor_stack]
+// Back wall - along X axis from [0, coop_w] to [coop_len, coop_w]
+const back_wall_frame = Wall({
+  start: [0, coop_w],
+  end: [coop_len, coop_w],
+  height: wall_h,
+  construction: "stickFrame",
+  studSize: stud_sec,
+  studSpacing: stud_sp,
+  includeSheathing: false
+});
+const back_wall = difference(
+  translate(back_wall_frame, [0, 0, floor_stack]),
+  translate(back_vent_cutout, [0, 0, floor_stack])
 );
 
-// Left wall - using new Wall() primitive with stick-frame construction
+// Left wall - along Y axis from [0, coop_w] to [0, 0]
 const left_wall_frame = Wall({
   start: [0, coop_w],
   end: [0, 0],
@@ -387,15 +374,21 @@ const left_wall_frame = Wall({
   studSpacing: stud_sp,
   includeSheathing: false
 });
-
 const left_wall = translate(left_wall_frame, [0, 0, floor_stack]);
 
-const right_wall = translate(
-  rotate(
-    stud_wall(coop_w, wall_h, stud_sec, stud_sp, stud_sec[1], [pop_door_cutout]),
-    [0, 0, 90]
-  ),
-  [coop_len, 0, floor_stack]
+// Right wall - along Y axis from [coop_len, 0] to [coop_len, coop_w]
+const right_wall_frame = Wall({
+  start: [coop_len, 0],
+  end: [coop_len, coop_w],
+  height: wall_h,
+  construction: "stickFrame",
+  studSize: stud_sec,
+  studSpacing: stud_sp,
+  includeSheathing: false
+});
+const right_wall = difference(
+  translate(right_wall_frame, [0, 0, floor_stack]),
+  translate(pop_door_cutout, [0, 0, floor_stack])
 );
 
 // Nesting box support structure
