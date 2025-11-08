@@ -377,18 +377,13 @@ const back_wall = translate(
   [coop_len, coop_w, floor_stack]
 );
 
-// Left wall - using new Wall() primitive with stick-frame construction visible
-const left_wall_frame = Wall({
-  start: [0, 0],
-  end: [0, coop_w],
-  height: wall_h,
-  construction: "stickFrame",
-  studSize: stud_sec,
-  studSpacing: stud_sp,
-  includeSheathing: false  // No sheathing so you can see the studs
-});
-
-const left_wall = translate(left_wall_frame, [0, 0, floor_stack]);
+const left_wall = translate(
+  rotate(
+    stud_wall(coop_w, wall_h, stud_sec, stud_sp, stud_sec[1]),
+    [0, 0, -90]
+  ),
+  [0, coop_w, floor_stack]
+);
 
 const right_wall = translate(
   rotate(
