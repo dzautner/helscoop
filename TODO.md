@@ -5,158 +5,144 @@
 
 ---
 
-## PHASE 0: Testing Infrastructure (Week 1-2)
+## PHASE 0: Testing Infrastructure (Week 1-2) ✅ COMPLETE
 
 ### 0.1 Offscreen Rendering for Automated Tests
 **Why:** Need to verify geometry renders correctly without manual inspection
 **Goal:** `./dingcad_viewer --render scene.js output.png`
 
 - [x] Research raylib `RenderTexture` API for offscreen rendering
-- [ ] Add command-line argument parsing to main.cpp
-  - [ ] Use `argc`/`argv` to detect `--render` flag
-  - [ ] Parse input scene file path
-  - [ ] Parse output image file path
-- [ ] Implement offscreen rendering mode in main.cpp
-  - [ ] Create `RenderTexture2D` instead of window when in render mode
-  - [ ] Render all passes (toon, normal/depth, composite) to texture
-  - [ ] Export texture to PNG using `ExportImage()`
-  - [ ] Exit after rendering (no interactive loop)
-- [ ] Test with existing coop.js scene
-  - [ ] Render from front view: `--render scene.js front.png --view front`
-  - [ ] Render from top view: `--render scene.js top.png --view top`
-  - [ ] Verify images are created correctly
-- [ ] Create test helper script: `./scripts/test-render.sh`
-  - [ ] Renders a scene from multiple angles
-  - [ ] Compares output to reference images (if they exist)
-  - [ ] Reports pass/fail
+- [x] Add command-line argument parsing to main.cpp
+  - [x] Use `argc`/`argv` to detect `--render` flag
+  - [x] Parse input scene file path
+  - [x] Parse output image file path
+- [x] Implement offscreen rendering mode in main.cpp
+  - [x] Create `RenderTexture2D` instead of window when in render mode
+  - [x] Render all passes (toon, normal/depth, composite) to texture
+  - [x] Export texture to PNG using `ExportImage()`
+  - [x] Exit after rendering (no interactive loop)
+- [x] Test with existing coop.js scene
+  - [x] Render from front view: `--render scene.js front.png --view front`
+  - [x] Render from top view: `--render scene.js top.png --view top`
+  - [x] Verify images are created correctly
+- [x] Create test helper script: `./scripts/test-render.sh`
+  - [x] Renders a scene from multiple angles
+  - [x] Compares output to reference images (if they exist)
+  - [x] Reports pass/fail
 
 **Files to create/modify:**
-- `viewer/main.cpp`: Add CLI parsing, offscreen mode
-- `scripts/test-render.sh`: Test automation script
+- `viewer/main.cpp`: Add CLI parsing, offscreen mode ✅
+- `scripts/test-render.sh`: Test automation script ✅
 - `tests/fixtures/`: Reference images for comparison
 
 ---
 
 ## PHASE 1: Building Primitives (Week 3-8)
 
-### 1.1 Wall Primitive - Basic Implementation
+### 1.1 Wall Primitive - Basic Implementation ✅ COMPLETE
 **Goal:** `Wall({start: [0,0], end: [3000,0], height: 2000})`
 
-#### 1.1.1 Core Wall Function (Week 3)
-- [ ] Create `viewer/primitives/` directory
-- [ ] Create `viewer/primitives/wall.h`
-  - [ ] Define `WallParams` struct with fields:
+#### 1.1.1 Core Wall Function (Week 3) ✅
+- [x] Create `viewer/primitives/` directory
+- [x] Create `viewer/primitives/wall.h`
+  - [x] Define `WallParams` struct with fields:
     - `vec2 start`, `vec2 end` (2D coordinates)
     - `double height`
     - `double thickness` (default 98mm)
     - `double bottomPlateHeight` (default 48mm)
     - `double topPlateHeight` (default 48mm)
-  - [ ] Declare `Manifold CreateWall(WallParams params)`
-- [ ] Create `viewer/primitives/wall.cpp`
-  - [ ] Implement `CreateWall()` function
-    - [ ] Calculate wall length: `sqrt((end.x-start.x)^2 + (end.y-start.y)^2)`
-    - [ ] Calculate wall angle: `atan2(end.y-start.y, end.x-start.x)`
-    - [ ] Create main wall cuboid: `cube({length, thickness, height})`
-    - [ ] Rotate wall to correct angle around Z axis
-    - [ ] Translate wall to start position
-    - [ ] Return manifold
-- [ ] Update `viewer/CMakeLists.txt`
-  - [ ] Add `primitives/wall.cpp` to source list
-- [ ] Compile and fix any errors
-  - [ ] `cmake --build build`
-  - [ ] Verify wall.cpp compiles
+  - [x] Declare `Manifold CreateWall(WallParams params)`
+- [x] Create `viewer/primitives/wall.cpp`
+  - [x] Implement `CreateWall()` function
+    - [x] Calculate wall length: `sqrt((end.x-start.x)^2 + (end.y-start.y)^2)`
+    - [x] Calculate wall angle: `atan2(end.y-start.y, end.x-start.x)`
+    - [x] Create main wall cuboid: `cube({length, thickness, height})`
+    - [x] Rotate wall to correct angle around Z axis
+    - [x] Translate wall to start position
+    - [x] Return manifold
+- [x] Update `viewer/CMakeLists.txt`
+  - [x] Add `primitives/wall.cpp` to source list
+- [x] Compile and fix any errors
+  - [x] `cmake --build build`
+  - [x] Verify wall.cpp compiles
 
-#### 1.1.2 JavaScript Binding (Week 3)
-- [ ] Open `viewer/js_bindings.cpp`
-- [ ] Add `JsWall()` function after other primitives (around line 800)
-  - [ ] Function signature: `JSValue JsWall(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)`
-  - [ ] Parameter validation: expect 1 argument (object)
-  - [ ] Extract parameters from JS object:
-    - [ ] `start` array: `JS_GetPropertyStr(ctx, argv[0], "start")`
-    - [ ] `end` array: `JS_GetPropertyStr(ctx, argv[0], "end")`
-    - [ ] `height`: `JS_GetPropertyStr(ctx, argv[0], "height")`
-    - [ ] `thickness`: `JS_GetPropertyStr(ctx, argv[0], "thickness")` (optional, default 98)
-  - [ ] Validate required parameters exist
-  - [ ] Convert JS arrays to C++ vectors
-  - [ ] Create `WallParams` struct
-  - [ ] Call `CreateWall(params)`
-  - [ ] Wrap result in `JsManifold` and return
-- [ ] Register function in global context (around line 1345)
-  - [ ] `JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));`
-- [ ] Compile and test
-  - [ ] `cmake --build build`
-  - [ ] Fix any compilation errors
+#### 1.1.2 JavaScript Binding (Week 3) ✅
+- [x] Open `viewer/js_bindings.cpp`
+- [x] Add `JsWall()` function after other primitives (around line 800)
+  - [x] Function signature: `JSValue JsWall(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)`
+  - [x] Parameter validation: expect 1 argument (object)
+  - [x] Extract parameters from JS object:
+    - [x] `start` array: `JS_GetPropertyStr(ctx, argv[0], "start")`
+    - [x] `end` array: `JS_GetPropertyStr(ctx, argv[0], "end")`
+    - [x] `height`: `JS_GetPropertyStr(ctx, argv[0], "height")`
+    - [x] `thickness`: `JS_GetPropertyStr(ctx, argv[0], "thickness")` (optional, default 98)
+  - [x] Validate required parameters exist
+  - [x] Convert JS arrays to C++ vectors
+  - [x] Create `WallParams` struct
+  - [x] Call `CreateWall(params)`
+  - [x] Wrap result in `JsManifold` and return
+- [x] Register function in global context (around line 1345)
+  - [x] `JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));`
+- [x] Compile and test
+  - [x] `cmake --build build`
+  - [x] Fix any compilation errors
 
-#### 1.1.3 Basic Test Scene (Week 3)
-- [ ] Create `tests/test_wall.js`
-  - [ ] Import wall: `const w = Wall({start: [0,0], end: [3000,0], height: 2000});`
-  - [ ] Color it: `const coloredWall = withColor(w, [0.7, 0.6, 0.4]);`
-  - [ ] Export scene: `export const scene = [coloredWall];`
-- [ ] Render test scene
-  - [ ] `./build/viewer/dingcad_viewer --render tests/test_wall.js tests/test_wall.png`
-  - [ ] Open `tests/test_wall.png` and verify:
-    - [ ] Wall is visible
-    - [ ] Wall is 3000mm long (30 units at 0.01 scale)
-    - [ ] Wall is tan/wood colored
-    - [ ] Wall appears solid (no holes or artifacts)
-- [ ] If rendering works, save as reference image
-  - [ ] `cp tests/test_wall.png tests/reference/test_wall_ref.png`
+#### 1.1.3 Basic Test Scene (Week 3) ✅
+- [x] Create `demo_simple_room.js` (instead of test_wall.js)
+  - [x] Import wall: `const w = Wall({start: [0,0], end: [3000,0], height: 2000});`
+  - [x] Color it: `const coloredWall = withColor(w, [0.7, 0.6, 0.4]);`
+  - [x] Export scene: `export const scene = [coloredWall];`
+- [x] Render test scene
+  - [x] `./build/viewer/dingcad_viewer --render demo_simple_room.js demo_room.png`
+  - [x] Open `demo_room.png` and verify:
+    - [x] Wall is visible
+    - [x] Wall is 4000mm long
+    - [x] Wall is tan/wood colored
+    - [x] Wall appears solid (no holes or artifacts)
+- [x] Rendering works, saved multiple reference images
 
-#### 1.1.4 Stick-Frame Construction (Week 4)
-**Goal:** `Wall({construction: StickFrame({studSize: [48,98], spacing: 400})})`
+#### 1.1.4 Stick-Frame Construction (Week 4) ✅ COMPLETE
+**Goal:** `Wall({construction: "stickFrame", studSize: [48,98], studSpacing: 400})`
 
-- [ ] Update `WallParams` struct in `wall.h`
-  - [ ] Add `enum ConstructionType { SOLID, STICK_FRAME }`
-  - [ ] Add `ConstructionType constructionType` (default SOLID)
-  - [ ] Add `vec2 studSize` (default [48, 98])
-  - [ ] Add `double studSpacing` (default 400mm)
-  - [ ] Add `bool includeSheathing` (default false)
-  - [ ] Add `double sheathingThickness` (default 12mm)
-- [ ] Implement stick-frame logic in `wall.cpp`
-  - [ ] Function: `Manifold CreateStickFrameWall(WallParams params)`
-  - [ ] Create bottom plate: `cube({length, studSize.x, 48})`
-  - [ ] Create top plate: same, translated to height
-  - [ ] Calculate number of studs: `num_studs = ceil(length / spacing) + 1`
-  - [ ] Create studs in loop:
-    - [ ] Stud geometry: `cube({studSize.x, studSize.y, height - 96})`
-    - [ ] Position at intervals: `x = i * spacing`
-    - [ ] Translate to correct position: `[x, 0, 48]`
-  - [ ] Add end studs at 0 and length positions
-  - [ ] Union all components: `union(bottomPlate, topPlate, ...studs)`
-  - [ ] If `includeSheathing`:
-    - [ ] Create sheathing panel: `cube({length, sheathingThickness, height})`
-    - [ ] Position on back side: `translate([0, studSize.y, 0])`
-    - [ ] Union with frame
-  - [ ] Return manifold
-- [ ] Update `CreateWall()` to dispatch based on construction type
-  - [ ] `if (params.constructionType == STICK_FRAME) return CreateStickFrameWall(params);`
-  - [ ] `else return CreateSolidWall(params);`
-- [ ] Update JS binding to parse construction parameters
-  - [ ] Check for `construction` property in JS object
-  - [ ] If it exists and is an object:
-    - [ ] Extract `type` field ("solid" or "stickFrame")
-    - [ ] Extract `studSize`, `spacing`, `sheathing` fields
-    - [ ] Set in `WallParams`
-- [ ] Create test scene: `tests/test_wall_stickframe.js`
-  ```javascript
-  const wall = Wall({
-    start: [0, 0],
-    end: [3000, 0],
-    height: 2000,
-    construction: {
-      type: 'stickFrame',
-      studSize: [48, 98],
-      spacing: 400,
-      sheathing: true
-    }
-  });
-  export const scene = [withColor(wall, [0.7, 0.6, 0.4])];
-  ```
-- [ ] Render and verify:
-  - [ ] Individual studs visible
-  - [ ] Spacing appears even
-  - [ ] Plates at top and bottom
-  - [ ] Sheathing visible if enabled
+- [x] Update `WallParams` struct in `wall.h`
+  - [x] Add `enum ConstructionType { SOLID, STICK_FRAME }`
+  - [x] Add `ConstructionType constructionType` (default SOLID)
+  - [x] Add `array<double,2> studSize` (default [48, 98])
+  - [x] Add `double studSpacing` (default 400mm)
+  - [x] Add `bool includeSheathing` (default false)
+  - [x] Add `double sheathingThickness` (default 12mm)
+- [x] Implement stick-frame logic in `wall.cpp`
+  - [x] Function: `Manifold CreateStickFrameWall(WallParams params)`
+  - [x] Create bottom plate with correct depth (studDepth)
+  - [x] Create top plate: same, translated to height
+  - [x] Calculate number of studs: `num_studs = ceil(length / spacing) + 1`
+  - [x] Create studs in loop:
+    - [x] Stud geometry: `cube({studWidth, studDepth, studHeight}, false)`
+    - [x] Position at intervals: `x = i * spacing`
+    - [x] Translate to correct position with center:false semantics
+  - [x] Union all components: `union(bottomPlate, topPlate, ...studs)`
+  - [x] If `includeSheathing`:
+    - [x] Create sheathing panel: `cube({length, sheathingThickness, height}, false)`
+    - [x] Position on back side: `translate([0, studDepth, 0])`
+    - [x] Union with frame
+  - [x] Return manifold
+- [x] Update `CreateWall()` to dispatch based on construction type
+  - [x] `if (params.constructionType == STICK_FRAME) return CreateStickFrameWall(params);`
+  - [x] `else return CreateSolidWall(params);`
+- [x] Update JS binding to parse construction parameters
+  - [x] Check for `construction` property in JS object
+  - [x] Parse string "stickFrame" or "solid"
+  - [x] Extract `studSize`, `studSpacing`, `includeSheathing` fields
+  - [x] Set in `WallParams`
+- [x] Created multiple test scenes:
+  - [x] `demo_simple_room.js` - 4m x 3m room with stick-frame walls
+  - [x] `coop.js` - All four walls converted to Wall() primitive
+- [x] Render and verify:
+  - [x] Individual studs visible ✅
+  - [x] Spacing appears even ✅
+  - [x] Plates at top and bottom ✅
+  - [x] Sheathing visible if enabled ✅
+  - [x] Fixed hovering geometry bug - studs now sit properly on plates ✅
 
 #### 1.1.5 Wall Relationships & Smart Positioning (Week 5)
 **Goal:** Wall knows its start/end, can be queried for attachment points
