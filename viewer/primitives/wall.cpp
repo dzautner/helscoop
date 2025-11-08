@@ -98,13 +98,12 @@ manifold::Manifold CreateStickFrameWall(const WallParams& params) {
     frame = frame + components[i];
   }
 
-  // Rotate to align with start->end direction
+  // Now rotate around origin to align with start->end direction
   frame = frame.Rotate(0.0, 0.0, angleDeg);
 
   // Translate to start position
-  const double centerX = params.start[0] + dx / 2.0;
-  const double centerY = params.start[1] + dy / 2.0;
-  frame = frame.Translate({centerX - length/2.0, centerY - studDepth/2.0, 0.0});
+  // The wall was built starting at origin along X-axis, so just translate to start
+  frame = frame.Translate({params.start[0], params.start[1], 0.0});
 
   return frame;
 }
