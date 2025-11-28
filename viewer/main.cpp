@@ -40,9 +40,17 @@ extern "C" {
 
 namespace {
 const Color kBaseColor = {210, 210, 220, 255};
-const char *kBrandText = "dingcad";
-constexpr float kBrandFontSize = 28.0f;
+const char *kBrandText = "HELSCOOP";
+constexpr float kBrandFontSize = 34.0f;
+constexpr int kUIFontSize = 48;  // Load at larger size for quality
 constexpr float kSceneScale = 0.1f;  // convert mm scene units to renderer units
+
+// Helper to convert string to uppercase
+std::string toUpper(const std::string &s) {
+  std::string result = s;
+  for (char &c : result) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  return result;
+}
 
 // GLSL 330 core (desktop). Uses raylib's default attribute/uniform names.
 const char* kOutlineVS = R"glsl(
@@ -878,6 +886,7 @@ struct LoadResult {
   SceneData sceneData;
   std::string message;
   std::vector<std::filesystem::path> dependencies;
+  std::vector<MaterialItem> materials;  // Evaluated materials from JS
 };
 
 // LoadSceneFromFile with optional external ModuleLoaderData (for thread safety)
@@ -974,10 +983,14 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     JS_FreeContext(ctx);
     return result;
   }
+
+  // Also get materials export (optional - may not exist)
+  JSValue materialsVal = JS_GetPropertyStr(ctx, moduleNamespace, "materials");
   JS_FreeValue(ctx, moduleNamespace);
 
   if (JS_IsUndefined(sceneVal)) {
     JS_FreeValue(ctx, sceneVal);
+    JS_FreeValue(ctx, materialsVal);
     JS_FreeContext(ctx);
     result.message = "Scene module must export 'scene'";
     assignDependencies();
@@ -1047,6 +1060,7 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     if (JS_ToUint32(ctx, &length, lengthVal) < 0) {
       JS_FreeValue(ctx, lengthVal);
       JS_FreeValue(ctx, sceneVal);
+      JS_FreeValue(ctx, materialsVal);
       JS_FreeContext(ctx);
       result.message = "Failed to get scene array length";
       assignDependencies();
@@ -1063,6 +1077,7 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
         result.sceneData.objects.push_back(*obj);
       } else {
         JS_FreeValue(ctx, sceneVal);
+        JS_FreeValue(ctx, materialsVal);
         JS_FreeContext(ctx);
         result.message = "Scene array element " + std::to_string(i) + " is not a manifold or colored object";
         assignDependencies();
@@ -1076,6 +1091,7 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
       result.sceneData.objects.push_back(*obj);
     } else {
       JS_FreeValue(ctx, sceneVal);
+      JS_FreeValue(ctx, materialsVal);
       JS_FreeContext(ctx);
       result.message = "Exported 'scene' is not a manifold or colored object";
       assignDependencies();
@@ -1085,10 +1101,83 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
 
   if (result.sceneData.objects.empty()) {
     JS_FreeValue(ctx, sceneVal);
+    JS_FreeValue(ctx, materialsVal);
     JS_FreeContext(ctx);
     result.message = "Scene is empty";
     assignDependencies();
     return result;
+  }
+
+  // Parse materials array from JS (optional export)
+  if (!JS_IsUndefined(materialsVal) && !JS_IsException(materialsVal) && JS_IsArray(materialsVal)) {
+    JSValue matLengthVal = JS_GetPropertyStr(ctx, materialsVal, "length");
+    uint32_t matLength = 0;
+    if (JS_ToUint32(ctx, &matLength, matLengthVal) >= 0) {
+      for (uint32_t i = 0; i < matLength; ++i) {
+        JSValue itemVal = JS_GetPropertyUint32(ctx, materialsVal, i);
+        MaterialItem item;
+
+        // Extract name
+        JSValue nameVal = JS_GetPropertyStr(ctx, itemVal, "name");
+        if (!JS_IsUndefined(nameVal)) {
+          const char *str = JS_ToCString(ctx, nameVal);
+          if (str) { item.name = str; JS_FreeCString(ctx, str); }
+        }
+        JS_FreeValue(ctx, nameVal);
+
+        // Extract category
+        JSValue catVal = JS_GetPropertyStr(ctx, itemVal, "category");
+        if (!JS_IsUndefined(catVal)) {
+          const char *str = JS_ToCString(ctx, catVal);
+          if (str) { item.category = str; JS_FreeCString(ctx, str); }
+        }
+        JS_FreeValue(ctx, catVal);
+
+        // Extract link
+        JSValue linkVal = JS_GetPropertyStr(ctx, itemVal, "link");
+        if (!JS_IsUndefined(linkVal)) {
+          const char *str = JS_ToCString(ctx, linkVal);
+          if (str) { item.link = str; JS_FreeCString(ctx, str); }
+        }
+        JS_FreeValue(ctx, linkVal);
+
+        // Extract unit
+        JSValue unitVal = JS_GetPropertyStr(ctx, itemVal, "unit");
+        if (!JS_IsUndefined(unitVal)) {
+          const char *str = JS_ToCString(ctx, unitVal);
+          if (str) { item.unit = str; JS_FreeCString(ctx, str); }
+        }
+        JS_FreeValue(ctx, unitVal);
+
+        // Extract unitPrice
+        JSValue priceVal = JS_GetPropertyStr(ctx, itemVal, "unitPrice");
+        if (!JS_IsUndefined(priceVal)) {
+          double val = 0;
+          if (JS_ToFloat64(ctx, &val, priceVal) >= 0) {
+            item.unitPrice = static_cast<float>(val);
+          }
+        }
+        JS_FreeValue(ctx, priceVal);
+
+        // Extract quantity (now properly evaluated from JS!)
+        JSValue qtyVal = JS_GetPropertyStr(ctx, itemVal, "quantity");
+        if (!JS_IsUndefined(qtyVal)) {
+          int32_t val = 0;
+          if (JS_ToInt32(ctx, &val, qtyVal) >= 0) {
+            item.quantity = val;
+          }
+        }
+        JS_FreeValue(ctx, qtyVal);
+
+        JS_FreeValue(ctx, itemVal);
+
+        if (!item.name.empty()) {
+          result.materials.push_back(item);
+        }
+      }
+    }
+    JS_FreeValue(ctx, matLengthVal);
+    TraceLog(LOG_INFO, "Parsed %zu materials from JS", result.materials.size());
   }
 
   result.success = true;
@@ -1096,6 +1185,7 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
                    std::to_string(result.sceneData.objects.size()) + " object(s))";
   assignDependencies();
   JS_FreeValue(ctx, sceneVal);
+  JS_FreeValue(ctx, materialsVal);
   JS_FreeContext(ctx);
 
   auto loadEnd = std::chrono::high_resolution_clock::now();
@@ -1181,6 +1271,7 @@ struct BackgroundLoadResult {
   SceneData sceneData;
   std::vector<PrecomputedMesh> meshes;
   std::vector<std::filesystem::path> dependencies;
+  std::vector<MaterialItem> materials;  // Evaluated materials from JS
 };
 
 // Does all heavy work (JS eval + CSG + tessellation) - can run on background thread
@@ -1210,6 +1301,7 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path &path) {
   result.message = loadResult.message;
   result.sceneData = std::move(loadResult.sceneData);
   result.dependencies = std::move(loadResult.dependencies);
+  result.materials = std::move(loadResult.materials);
 
   if (!result.success) {
     JS_FreeRuntime(runtime);
@@ -1298,11 +1390,24 @@ int main(int argc, char *argv[]) {
   SetTargetFPS(60);
 
   Font brandingFont = GetFontDefault();
+  Font uiFont = GetFontDefault();
   bool brandingFontCustom = false;
+  bool uiFontCustom = false;
+  // Try Berkeley Mono first (in project root), then fall back to Consolas
+  const std::filesystem::path berkeleyPath("BerkeleyMonoTrial-Regular.otf");
   const std::filesystem::path consolasPath("/System/Library/Fonts/Supplemental/Consolas.ttf");
-  if (std::filesystem::exists(consolasPath)) {
-    brandingFont = LoadFontEx(consolasPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
+  if (std::filesystem::exists(berkeleyPath)) {
+    brandingFont = LoadFontEx(berkeleyPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
+    uiFont = LoadFontEx(berkeleyPath.string().c_str(), kUIFontSize, nullptr, 0);
     brandingFontCustom = true;
+    uiFontCustom = true;
+    TraceLog(LOG_INFO, "Loaded Berkeley Mono font");
+  } else if (std::filesystem::exists(consolasPath)) {
+    brandingFont = LoadFontEx(consolasPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
+    uiFont = LoadFontEx(consolasPath.string().c_str(), kUIFontSize, nullptr, 0);
+    brandingFontCustom = true;
+    uiFontCustom = true;
+    TraceLog(LOG_INFO, "Loaded Consolas font (Berkeley Mono not found)");
   }
 
   Camera3D camera = {0};
@@ -1354,11 +1459,13 @@ int main(int argc, char *argv[]) {
     }
     watchedFiles = std::move(updated);
   };
+  std::vector<MaterialItem> initialMaterials;  // Materials from initial load
   if (defaultScript) {
     scriptPath = std::filesystem::absolute(*defaultScript);
     auto load = LoadSceneFromFile(runtime, scriptPath);
     if (load.success) {
       sceneData = load.sceneData;
+      initialMaterials = std::move(load.materials);
       reportStatus(load.message);
     } else {
       reportStatus(load.message);
@@ -1391,20 +1498,20 @@ int main(int argc, char *argv[]) {
   float materialsPanelScroll = 0.0f;
   int parameterPanelScroll = 0;
 
-  // Parse parameters and materials from scene file
+  // Parse parameters from scene file, materials come from evaluated JS
   std::vector<SceneParameter> sceneParameters;
-  std::vector<MaterialItem> sceneMaterials;
+  std::vector<MaterialItem> sceneMaterials = std::move(initialMaterials);
 
-  auto refreshParametersAndMaterials = [&]() {
+  auto refreshParameters = [&]() {
     if (!scriptPath.empty()) {
       sceneParameters = ParseSceneParameters(scriptPath);
-      sceneMaterials = ParseMaterials(scriptPath);
-      TraceLog(LOG_INFO, "Parsed %zu parameters and %zu materials",
-               sceneParameters.size(), sceneMaterials.size());
+      TraceLog(LOG_INFO, "Parsed %zu parameters", sceneParameters.size());
     }
   };
 
-  refreshParametersAndMaterials();
+  refreshParameters();
+  TraceLog(LOG_INFO, "Initial load: %zu parameters, %zu materials",
+           sceneParameters.size(), sceneMaterials.size());
 
   // Track which parameter is being edited (for deferred update)
   int editingParamIndex = -1;
@@ -1420,6 +1527,9 @@ int main(int argc, char *argv[]) {
     DestroyModels(models);
     if (brandingFontCustom) {
       UnloadFont(brandingFont);
+    }
+    if (uiFontCustom) {
+      UnloadFont(uiFont);
     }
     JS_FreeRuntime(runtime);
     CloseWindow();
@@ -1570,6 +1680,11 @@ int main(int argc, char *argv[]) {
       // GPU upload happens here on main thread - this is the only blocking part (~5ms)
       models = CreateModelsFromPrecomputed(result.meshes);
       reportStatus(result.message);
+      // Update parameters (still parsed from text) and materials (now from evaluated JS!)
+      sceneParameters = ParseSceneParameters(scriptPath);
+      sceneMaterials = std::move(result.materials);
+      TraceLog(LOG_INFO, "Updated %zu parameters and %zu materials from reload",
+               sceneParameters.size(), sceneMaterials.size());
       TraceLog(LOG_INFO, "PROFILE: Background load completed, total wall time: %lld ms", totalMs);
     } else {
       reportStatus(result.message);
@@ -1876,18 +1991,11 @@ int main(int argc, char *argv[]) {
     DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
     EndShaderMode();
 
-    const float margin = 20.0f;
-    const Vector2 textSize = MeasureTextEx(brandingFont, kBrandText, kBrandFontSize, 0.0f);
-    const Vector2 brandPos = {
-        static_cast<float>(GetScreenWidth()) - textSize.x - margin,
-        margin};
+    const float margin = 15.0f;
+    const Vector2 brandPos = {margin, margin};  // Top left above materials panel
     DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, DARKGRAY);
 
-    if (!statusMessage.empty()) {
-      constexpr float statusFontSize = 18.0f;
-      const Vector2 statusPos = {margin, margin};
-      DrawTextEx(brandingFont, statusMessage.c_str(), statusPos, statusFontSize, 0.0f, DARKGRAY);
-    }
+    // Status message removed - script name not shown at top
 
     // ========================================================================
     // MATERIALS PANEL (Left side)
@@ -1909,7 +2017,7 @@ int main(int argc, char *argv[]) {
                          static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
 
       // Title
-      DrawText("Materials & Pricing", static_cast<int>(panelX + 10), static_cast<int>(panelY + 8), 16, DARKGRAY);
+      DrawTextEx(uiFont, "MATERIALS & PRICING", {panelX + 10, panelY + 8}, 19.0f, 0.0f, DARKGRAY);
       DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
                static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
 
@@ -1936,9 +2044,9 @@ int main(int argc, char *argv[]) {
                         Fade(LIGHTGRAY, 0.3f));
 
           char catHeader[128];
-          snprintf(catHeader, sizeof(catHeader), "%s ($%.0f)",
-                   currentCategory.c_str(), categoryTotals[currentCategory]);
-          DrawText(catHeader, static_cast<int>(panelX + 10), static_cast<int>(yPos + 5), 12, DARKGRAY);
+          snprintf(catHeader, sizeof(catHeader), "%s (%.0f EUR)",
+                   toUpper(currentCategory).c_str(), categoryTotals[currentCategory]);
+          DrawTextEx(uiFont, catHeader, {panelX + 10, yPos + 5}, 14.0f, 0.0f, DARKGRAY);
           yPos += sectionHeight;
         }
 
@@ -1948,20 +2056,19 @@ int main(int argc, char *argv[]) {
         snprintf(rowText, sizeof(rowText), "  %s", mat.name.c_str());
 
         // Truncate if too long
-        std::string displayName = rowText;
+        std::string displayName = toUpper(rowText);
         if (displayName.length() > 28) {
           displayName = displayName.substr(0, 25) + "...";
         }
 
-        DrawText(displayName.c_str(), static_cast<int>(panelX + 8), static_cast<int>(yPos + 2), 10, GRAY);
+        DrawTextEx(uiFont, displayName.c_str(), {panelX + 8, yPos + 2}, 12.0f, 0.0f, GRAY);
 
         // Quantity and price on right
         char priceText[64];
-        snprintf(priceText, sizeof(priceText), "%d x $%.2f = $%.0f",
+        snprintf(priceText, sizeof(priceText), "%d X %.2f = %.0f EUR",
                  mat.quantity, mat.unitPrice, lineTotal);
-        int priceWidth = MeasureText(priceText, 10);
-        DrawText(priceText, static_cast<int>(panelX + panelWidth - priceWidth - 15),
-                 static_cast<int>(yPos + 2), 10, GRAY);
+        float priceWidth = MeasureTextEx(uiFont, priceText, 12.0f, 0.0f).x;
+        DrawTextEx(uiFont, priceText, {panelX + panelWidth - priceWidth - 15, yPos + 2}, 12.0f, 0.0f, GRAY);
 
         yPos += rowHeight;
       }
@@ -1970,12 +2077,11 @@ int main(int argc, char *argv[]) {
       DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + panelHeight - 35),
                static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + panelHeight - 35), DARKGRAY);
       char totalText[64];
-      snprintf(totalText, sizeof(totalText), "TOTAL: $%.2f", totalCost);
-      DrawText(totalText, static_cast<int>(panelX + 10), static_cast<int>(panelY + panelHeight - 25), 14, DARKGRAY);
+      snprintf(totalText, sizeof(totalText), "TOTAL: %.2f EUR", totalCost);
+      DrawTextEx(uiFont, totalText, {panelX + 10, panelY + panelHeight - 25}, 17.0f, 0.0f, DARKGRAY);
 
       // Hotkey hint
-      DrawText("[M] toggle", static_cast<int>(panelX + panelWidth - 70),
-               static_cast<int>(panelY + panelHeight - 18), 10, LIGHTGRAY);
+      DrawTextEx(uiFont, "[M] TOGGLE", {panelX + panelWidth - 85, panelY + panelHeight - 18}, 12.0f, 0.0f, LIGHTGRAY);
     }
 
     // ========================================================================
@@ -1999,7 +2105,7 @@ int main(int argc, char *argv[]) {
                          static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
 
       // Title
-      DrawText("Parameters", static_cast<int>(panelX + 10), static_cast<int>(panelY + 8), 16, DARKGRAY);
+      DrawTextEx(uiFont, "PARAMETERS", {panelX + 10, panelY + 8}, 19.0f, 0.0f, DARKGRAY);
       DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
                static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
 
@@ -2012,8 +2118,9 @@ int main(int argc, char *argv[]) {
         // Checkbox was clicked
       }
 
-      bool parameterChanged = false;
-      int changedParamIndex = -1;
+      // Track if any slider is being dragged (defer file write until mouse release)
+      static int draggingParamIndex = -1;
+      static float draggingStartValue = 0.0f;
 
       for (size_t i = 0; i < sceneParameters.size(); ++i) {
         if (yPos > panelY + panelHeight - 30.0f) break;  // Don't overflow
@@ -2027,25 +2134,24 @@ int main(int argc, char *argv[]) {
           DrawRectangle(static_cast<int>(panelX + 5), static_cast<int>(yPos),
                         static_cast<int>(panelWidth - 10), static_cast<int>(sectionHeight - 2),
                         Fade(LIGHTGRAY, 0.3f));
-          DrawText(currentSection.c_str(), static_cast<int>(panelX + 10), static_cast<int>(yPos + 5), 11, DARKGRAY);
+          DrawTextEx(uiFont, toUpper(currentSection).c_str(), {panelX + 10, yPos + 5}, 13.0f, 0.0f, DARKGRAY);
           yPos += sectionHeight;
         }
 
         // Parameter label
-        DrawText(param.displayName.c_str(), static_cast<int>(panelX + 10), static_cast<int>(yPos), 10, GRAY);
+        DrawTextEx(uiFont, toUpper(param.displayName).c_str(), {panelX + 10, yPos}, 12.0f, 0.0f, GRAY);
 
         // Value display
         char valueText[32];
         if (param.name == "nest_boxes") {
           snprintf(valueText, sizeof(valueText), "%d", static_cast<int>(param.value));
         } else if (param.name == "roof_pitch_deg") {
-          snprintf(valueText, sizeof(valueText), "%.0f deg", param.value);
+          snprintf(valueText, sizeof(valueText), "%.0f DEG", param.value);
         } else {
-          snprintf(valueText, sizeof(valueText), "%.0f mm", param.value);
+          snprintf(valueText, sizeof(valueText), "%.0f MM", param.value);
         }
-        int valueWidth = MeasureText(valueText, 10);
-        DrawText(valueText, static_cast<int>(panelX + panelWidth - valueWidth - 15),
-                 static_cast<int>(yPos), 10, DARKGRAY);
+        float valueWidth = MeasureTextEx(uiFont, valueText, 12.0f, 0.0f).x;
+        DrawTextEx(uiFont, valueText, {panelX + panelWidth - valueWidth - 15, yPos}, 12.0f, 0.0f, DARKGRAY);
 
         yPos += 12.0f;
 
@@ -2055,34 +2161,32 @@ int main(int argc, char *argv[]) {
         float newValue = GuiSlider(sliderRect, "", "", &param.value, param.minValue, param.maxValue);
         (void)newValue;  // GuiSlider modifies param.value directly
 
-        // Check if value changed
-        if (param.value != oldValue) {
-          parameterChanged = true;
-          changedParamIndex = static_cast<int>(i);
+        // Round to integer for most params
+        param.value = std::round(param.value);
 
-          // Round to integer for most params
-          param.value = std::round(param.value);
+        // Track dragging state - start drag when value changes
+        if (param.value != oldValue && draggingParamIndex == -1) {
+          draggingParamIndex = static_cast<int>(i);
+          draggingStartValue = oldValue;
         }
 
         yPos += rowHeight;
       }
 
-      // Handle parameter changes
-      if (parameterChanged && changedParamIndex >= 0 && !loadingInBackground) {
-        auto &param = sceneParameters[changedParamIndex];
-
-        // Write to file
-        if (WriteParameterToFile(scriptPath, param)) {
-          if (liveUpdatesEnabled) {
-            // Trigger reload (file watcher will pick it up, or we can force it)
-            // The file watcher should detect the change automatically
+      // Only write to file when mouse is released (end of drag)
+      if (draggingParamIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        auto &param = sceneParameters[draggingParamIndex];
+        // Only write if value actually changed from start
+        if (param.value != draggingStartValue && !loadingInBackground) {
+          if (WriteParameterToFile(scriptPath, param)) {
+            // File watcher will detect the change and trigger reload
           }
         }
+        draggingParamIndex = -1;
       }
 
       // Hotkey hint at bottom
-      DrawText("[T] toggle", static_cast<int>(panelX + panelWidth - 70),
-               static_cast<int>(panelY + panelHeight - 18), 10, LIGHTGRAY);
+      DrawTextEx(uiFont, "[T] TOGGLE", {panelX + panelWidth - 85, panelY + panelHeight - 18}, 12.0f, 0.0f, LIGHTGRAY);
     }
 
     EndDrawing();
@@ -2106,6 +2210,9 @@ int main(int argc, char *argv[]) {
   DestroyModels(models);
   if (brandingFontCustom) {
     UnloadFont(brandingFont);
+  }
+  if (uiFontCustom) {
+    UnloadFont(uiFont);
   }
   JS_FreeRuntime(runtime);
   CloseWindow();

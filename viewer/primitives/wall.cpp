@@ -95,11 +95,9 @@ manifold::Manifold CreateStickFrameWall(const WallParams& params) {
     components.push_back(sheathing);
   }
 
-  // Union all components
-  manifold::Manifold frame = components[0];
-  for (size_t i = 1; i < components.size(); i++) {
-    frame = frame + components[i];
-  }
+  // Compose all components (MUCH faster than Union for non-overlapping parts!)
+  // Components don't overlap - they just touch at edges - so Compose is safe
+  manifold::Manifold frame = manifold::Manifold::Compose(components);
 
   // Now rotate around origin to align with start->end direction
   frame = frame.Rotate(0.0, 0.0, angleDeg);

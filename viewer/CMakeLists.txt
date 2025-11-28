@@ -21,6 +21,7 @@ target_include_directories(dingcad_viewer
   PRIVATE
     ${PROJECT_SOURCE_DIR}/vendor/manifold/include
     ${PROJECT_SOURCE_DIR}/vendor/quickjs
+    ${PROJECT_SOURCE_DIR}/vendor
 )
 
 target_link_libraries(dingcad_viewer

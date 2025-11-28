@@ -58,7 +58,90 @@ const nest_access_lip_h = 90;
 const floor_stack = paver_size[2] + skid_sec[1] + joist_sec[1] + floor_th;
 
 // Scale factor for viewing (1/100 = cm instead of mm for easier viewing)
-const DISPLAY_SCALE = 0.01;
+const DISPLAY_SCALE = 0.003;  // Smaller to see whole scene
+
+// Visibility toggles - controllable from the viewer control panel
+const show_cladding = true;    // Show/hide exterior cladding
+const show_roof = true;        // Show/hide roof
+const show_walls = true;       // Show/hide wall framing
+
+// ============================================================================
+// MATERIALS & PRICING - Bill of Materials for cost estimation
+// Finnish lumber dimensions and prices (from Sarokas, K-Rauta)
+// Quantities are calculated dynamically based on coop parameters
+// ============================================================================
+
+// Calculate material quantities based on coop dimensions
+const wall_perimeter = 2 * (coop_len + coop_w);  // mm
+const wall_studs = Math.ceil(wall_perimeter / stud_sp) + 4;  // 4 corners
+const floor_joists = Math.ceil(coop_len / joist_sp) + 1;
+const floor_area_sqm = (coop_len * coop_w) / 1000000;
+const wall_area_sqm = (wall_perimeter * wall_h) / 1000000;
+const roof_pitch_rad = roof_pitch_deg * Math.PI / 180;
+const roof_run = coop_w / 2;
+const roof_slope_len = roof_run / Math.cos(roof_pitch_rad);
+const roof_area_sqm = (coop_len + 2 * overhang) * (roof_slope_len + overhang) * 2 / 1000000;
+const rafter_count = Math.ceil(coop_len / joist_sp) + 1;
+
+// Finnish lumber lengths: calculate total running meters (jm) needed
+const stud_length_m = wall_h / 1000;  // Studs are wall height
+const plate_length_jm = (wall_perimeter * 2) / 1000;  // Top + bottom plates
+const joist_length_m = coop_w / 1000;  // Joists span the width
+const rafter_length_m = (roof_slope_len + overhang) / 1000;  // Rafter length
+
+// Total running meters for each lumber type
+const studs_jm = wall_studs * stud_length_m;
+const joists_jm = floor_joists * joist_length_m;
+const rafters_jm = rafter_count * 2 * rafter_length_m;
+
+// Sheet counts (Finnish standard: 2440x1200mm = ~2.93 sqm each)
+const floor_sheets = Math.ceil(floor_area_sqm / 2.93);
+const wall_sheets = Math.ceil(wall_area_sqm / 2.93);
+const roof_sheets = Math.ceil(roof_area_sqm / 2.93);
+
+// Roofing felt rolls (~15 sqm per roll)
+const felt_rolls = Math.ceil(roof_area_sqm / 15);
+
+// Paint coverage (~10 sqm/liter, 2 coats)
+const total_paint_area = wall_area_sqm + roof_area_sqm * 0.3;
+const paint_liters = Math.ceil(total_paint_area / 5);
+
+export const materials = [
+  // Sahatavara - Runko (Finnish C24 lumber, prices in €/jm from Sarokas)
+  { name: "48x98 Runkopuu C24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(studs_jm + plate_length_jm) },
+  { name: "48x148 Lattiavasat C24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x148-c24", unit: "jm", unitPrice: 3.70, quantity: Math.ceil(joists_jm) },
+  { name: "48x98 Kattoristikot C24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(rafters_jm) },
+  { name: "Kestopuu 48x148 (jalat)", category: "Sahatavara", link: "https://www.sarokas.fi/kestopuu-48-148-vihrea", unit: "jm", unitPrice: 3.80, quantity: 12 },
+
+  // Levytavara (Finnish panels)
+  { name: "Havuvaneri 18mm lattiaan", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-18mm-iii-iii-2440x1200", unit: "levy", unitPrice: 62.78, quantity: floor_sheets },
+  { name: "Havuvaneri 12mm kattoon", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-12mm", unit: "levy", unitPrice: 45.00, quantity: roof_sheets },
+  { name: "Ulkovuoripaneeli 21mm", category: "Levytavara", link: "https://www.k-rauta.fi/kategoria/puutavara", unit: "levy", unitPrice: 55.00, quantity: wall_sheets },
+
+  // Katto (Roofing)
+  { name: "Katehuopa 15 sqm", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "rulla", unitPrice: 35.00, quantity: felt_rolls },
+  { name: "Räystäslista 2m", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 8.50, quantity: Math.ceil((coop_len * 2 + coop_w * 4) / 2000) },
+  { name: "Harjalista 2m", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 12.00, quantity: Math.ceil(coop_len / 2000) },
+
+  // Kiinnitystarvikkeet (Hardware)
+  { name: "Ruuvit 4.5x75 (500kpl)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pak", unitPrice: 24.90, quantity: Math.ceil(wall_studs / 100) },
+  { name: "Kattonaulat (1kg)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pak", unitPrice: 12.90, quantity: Math.ceil(roof_area_sqm / 10) },
+  { name: "Palkkikengät", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 2.50, quantity: floor_joists },
+  { name: "Kulmarauta", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 1.80, quantity: rafter_count * 2 },
+  { name: "Saranat (pari)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pari", unitPrice: 6.90, quantity: 4 },
+  { name: "Oven salpa", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 12.90, quantity: 2 },
+
+  // Kanalalle (Chicken-specific)
+  { name: "Hitsattu verkko 12mm", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 89.00, quantity: 2 },
+  { name: "Kanaverkko 50mm", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 45.00, quantity: 1 },
+  { name: "Automaattinen luukku", category: "Kanala", link: "https://www.amazon.de", unit: "kpl", unitPrice: 85.00, quantity: 1 },
+  { name: "Pesälaatikon pohja", category: "Kanala", link: "https://www.puuilo.fi", unit: "kpl", unitPrice: 8.90, quantity: nest_boxes },
+  { name: "Orsi 50mm pyöreä (2m)", category: "Kanala", link: "https://www.k-rauta.fi", unit: "kpl", unitPrice: 6.90, quantity: Math.ceil(coop_len / 800) },
+
+  // Maalaus & Pintakäsittely
+  { name: "Ulkomaali (Tikkurila)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 14.90, quantity: paint_liters },
+  { name: "Pohjuste (puulle)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 12.90, quantity: Math.ceil(paint_liters * 0.5) },
+];
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -74,6 +157,149 @@ function calc_paver_offsets(len, max_spacing = 1200) {
     offsets.push(i * spacing);
   }
   return offsets;
+}
+
+// ============================================================================
+// CLADDING SYSTEM - Horizontal lap siding with trim
+// ============================================================================
+
+// Cladding colors
+const CLADDING_MAIN = [0.93, 0.78, 0.18];  // Golden yellow siding
+const CLADDING_TRIM = [1, 1, 1];            // White trim
+
+// Horizontal cladding for walls running along X axis (front/back walls)
+// Creates solid panel with cutouts, plus corner trim boards
+function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45) {
+  const panel_x = base_pos[0] - margin;
+  const panel_y = base_pos[1];
+  const panel_z = base_pos[2];
+  const panel_len = len + 2 * margin;
+
+  // Main cladding panel
+  let panel = translate(
+    cube({ size: [panel_len, thickness, height], center: false }),
+    [panel_x, panel_y, panel_z]
+  );
+
+  // Apply cutouts
+  for (const cutout of cutouts) {
+    const cutout_pos = cutout[0];
+    const cutout_size = cutout[1];
+    const cutout_box = translate(
+      cube({ size: cutout_size, center: false }),
+      cutout_pos
+    );
+    panel = difference(panel, cutout_box);
+  }
+
+  // Corner trim boards (vertical)
+  const left_trim = translate(
+    cube({ size: [trim_w, thickness, height], center: false }),
+    [base_pos[0] - margin - trim_w, panel_y, panel_z]
+  );
+  const right_trim = translate(
+    cube({ size: [trim_w, thickness, height], center: false }),
+    [base_pos[0] + len + margin, panel_y, panel_z]
+  );
+
+  // Top and bottom trim (horizontal)
+  const trim_total_len = len + 2 * margin + 2 * trim_w;
+  const top_trim = translate(
+    cube({ size: [trim_total_len, thickness, 18], center: false }),
+    [base_pos[0] - margin - trim_w, panel_y, panel_z + height]
+  );
+  const bottom_trim = translate(
+    cube({ size: [trim_total_len, thickness, 18], center: false }),
+    [base_pos[0] - margin - trim_w, panel_y, panel_z - 18]
+  );
+
+  return {
+    panel: panel,
+    trim: union(left_trim, right_trim, top_trim, bottom_trim)
+  };
+}
+
+// Horizontal cladding for walls running along Y axis (left/right walls)
+function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45) {
+  const panel_x = base_pos[0];
+  const panel_y = base_pos[1] - margin;
+  const panel_z = base_pos[2];
+  const panel_width = width + 2 * margin;
+
+  // Main cladding panel
+  let panel = translate(
+    cube({ size: [thickness, panel_width, height], center: false }),
+    [panel_x, panel_y, panel_z]
+  );
+
+  // Apply cutouts
+  for (const cutout of cutouts) {
+    const cutout_pos = cutout[0];
+    const cutout_size = cutout[1];
+    const cutout_box = translate(
+      cube({ size: cutout_size, center: false }),
+      cutout_pos
+    );
+    panel = difference(panel, cutout_box);
+  }
+
+  // Corner trim boards (vertical)
+  const front_trim = translate(
+    cube({ size: [thickness, trim_w, height], center: false }),
+    [panel_x, base_pos[1] - margin - trim_w, panel_z]
+  );
+  const back_trim = translate(
+    cube({ size: [thickness, trim_w, height], center: false }),
+    [panel_x, base_pos[1] + width + margin, panel_z]
+  );
+
+  // Top and bottom trim (horizontal)
+  const trim_total_width = width + 2 * margin + 2 * trim_w;
+  const top_trim = translate(
+    cube({ size: [thickness, trim_total_width, 18], center: false }),
+    [panel_x, base_pos[1] - margin - trim_w, panel_z + height]
+  );
+  const bottom_trim = translate(
+    cube({ size: [thickness, trim_total_width, 18], center: false }),
+    [panel_x, base_pos[1] - margin - trim_w, panel_z - 18]
+  );
+
+  return {
+    panel: panel,
+    trim: union(front_trim, back_trim, top_trim, bottom_trim)
+  };
+}
+
+// Door panel - hinged door that swings outward
+function door_panel(width, height, thickness = 18) {
+  return cube({ size: [width, thickness, height], center: false });
+}
+
+// Pop door panel - bottom-hinged ramp with grip cleats
+function pop_door_panel(width, length, thickness = 18, num_cleats = 8) {
+  // Main ramp surface
+  const ramp = cube({ size: [width, thickness, length], center: false });
+
+  // Add grip cleats
+  const cleats = [];
+  const cleat_spacing = length / (num_cleats + 1);
+  for (let i = 1; i <= num_cleats; i++) {
+    const cleat = translate(
+      cube({ size: [width, 10, 10], center: false }),
+      [0, thickness, i * cleat_spacing - 5]
+    );
+    cleats.push(cleat);
+  }
+
+  return union(ramp, ...cleats);
+}
+
+// Roosting perch - cylindrical roost
+function roosting_perch(length, diameter = 50) {
+  return rotate(
+    cylinder({ height: length, radius: diameter / 2, center: false }),
+    [0, 90, 0]
+  );
 }
 
 // ============================================================================
@@ -251,7 +477,7 @@ function nesting_boxes(count, box_w, box_d, box_h, wall_t = 12, spacing = 18, do
   return { boxes: union(...boxes), doors: union(...doors) };
 }
 
-// Gable roof
+// Gable roof with complete enclosure
 function gable_roof(len, width, wall_h, floor_stack, pitch_deg, overhang, roof_t) {
   const roof_pitch_rad = pitch_deg * Math.PI / 180;
   const half_width = width / 2;
@@ -263,7 +489,10 @@ function gable_roof(len, width, wall_h, floor_stack, pitch_deg, overhang, roof_t
   const base_z = floor_stack + wall_h;
   const peak_z = base_z + roof_rise;
 
-  // Create a simple pitched roof using two rotated panels
+  // Gable end panel thickness - matches wall framing for solid integration
+  const gable_thickness = 98;  // Match stud width for proper wall integration
+
+  // Create pitched roof panels
   // Left panel (slopes down from peak toward Y=0)
   const left_panel = translate(
     rotate(
@@ -285,7 +514,109 @@ function gable_roof(len, width, wall_h, floor_stack, pitch_deg, overhang, roof_t
     [-overhang, width / 2, peak_z]
   );
 
-  return union(left_panel, right_panel);
+  // Gable end infill - solid triangular walls using hull()
+  // Use thin vertical plates at triangle vertices for clean hull geometry
+  const vertex_size = 10;  // Size of hull vertex elements
+
+  // Extra height to ensure overlap with roof underside (avoid gaps)
+  const overlap = 20;
+
+  // Front gable - triangular infill above front wall
+  // Triangle vertices: bottom-left (Y=0), bottom-right (Y=width), peak (Y=width/2)
+  const front_gable = translate(
+    hull(
+      // Bottom-left vertex
+      cube({ size: [gable_thickness, vertex_size, vertex_size], center: false }),
+      // Bottom-right vertex
+      translate(
+        cube({ size: [gable_thickness, vertex_size, vertex_size], center: false }),
+        [0, width - vertex_size, 0]
+      ),
+      // Peak vertex (with overlap to ensure contact with roof)
+      translate(
+        cube({ size: [gable_thickness, vertex_size, vertex_size], center: false }),
+        [0, half_width - vertex_size / 2, roof_rise + overlap]
+      )
+    ),
+    [0, 0, base_z]
+  );
+
+  // Back gable - same triangle at the back of the coop
+  const back_gable = translate(
+    hull(
+      cube({ size: [gable_thickness, vertex_size, vertex_size], center: false }),
+      translate(
+        cube({ size: [gable_thickness, vertex_size, vertex_size], center: false }),
+        [0, width - vertex_size, 0]
+      ),
+      translate(
+        cube({ size: [gable_thickness, vertex_size, vertex_size], center: false }),
+        [0, half_width - vertex_size / 2, roof_rise + overlap]
+      )
+    ),
+    [len - gable_thickness, 0, base_z]
+  );
+
+  // Ridge board - structural member at the peak
+  const ridge_height = 50;
+  const ridge_thickness = 25;
+  const ridge_board = translate(
+    cube({ size: [len, ridge_thickness, ridge_height], center: false }),
+    [0, width / 2 - ridge_thickness / 2, peak_z - ridge_height]
+  );
+
+  // Barge boards (verge boards) - trim along the gable rake edges
+  // These follow the roof pitch at each gable end
+  const barge_width = 150;
+  const barge_thickness = 25;
+
+  // Front gable barge boards (left and right of peak)
+  const front_barge_left = translate(
+    rotate(
+      translate(
+        cube({ size: [barge_thickness, roof_length + overhang, barge_width], center: false }),
+        [0, -(roof_length + overhang), 0]
+      ),
+      [pitch_deg, 0, 0]
+    ),
+    [-overhang, width / 2, peak_z]
+  );
+
+  const front_barge_right = translate(
+    rotate(
+      cube({ size: [barge_thickness, roof_length + overhang, barge_width], center: false }),
+      [-pitch_deg, 0, 0]
+    ),
+    [-overhang, width / 2, peak_z]
+  );
+
+  // Back gable barge boards
+  const back_barge_left = translate(
+    rotate(
+      translate(
+        cube({ size: [barge_thickness, roof_length + overhang, barge_width], center: false }),
+        [0, -(roof_length + overhang), 0]
+      ),
+      [pitch_deg, 0, 0]
+    ),
+    [len + overhang - barge_thickness, width / 2, peak_z]
+  );
+
+  const back_barge_right = translate(
+    rotate(
+      cube({ size: [barge_thickness, roof_length + overhang, barge_width], center: false }),
+      [-pitch_deg, 0, 0]
+    ),
+    [len + overhang - barge_thickness, width / 2, peak_z]
+  );
+
+  return union(
+    left_panel, right_panel,
+    front_gable, back_gable,
+    ridge_board,
+    front_barge_left, front_barge_right,
+    back_barge_left, back_barge_right
+  );
 }
 
 // ============================================================================
@@ -311,11 +642,6 @@ const back_vent_bottom_z = wall_h - vent_top_clearance - vent_h - stud_sec[0];
 const back_vent_cutout = translate(
   cube({ size: [vent_w, stud_sec[1] + 2, vent_h], center: false }),
   [coop_len / 2 - vent_w / 2, -1, back_vent_bottom_z]
-);
-
-const pop_door_cutout = translate(
-  cube({ size: [stud_sec[1] + 2, pop_w, pop_opening_h], center: false }),
-  [-1, stud_sec[1] + 50, stud_sec[0] + 50]
 );
 
 // Nesting box access cutout in front wall (external access to collect eggs)
@@ -390,10 +716,7 @@ const right_wall_frame = Wall({
   studSpacing: stud_sp,
   includeSheathing: false
 });
-const right_wall = difference(
-  translate(right_wall_frame, [0, 0, floor_stack]),
-  translate(pop_door_cutout, [0, 0, floor_stack])
-);
+const right_wall = translate(right_wall_frame, [0, 0, floor_stack]);
 
 // Nesting box support structure
 // Build a proper platform with posts directly under joists
@@ -402,16 +725,16 @@ const support_platform_top_z = floor_stack + nest_height_off_floor;
 const support_platform_bottom_z = support_platform_top_z - nest_ledger_h;
 const post_height = support_platform_bottom_z - floor_stack;
 
-// Horizontal ledger attached to wall (back edge)
+// Horizontal ledger attached to wall (back edge) - now at Y=0 to match boxes
 const nest_ledger = translate(
   cube({ size: [nest_total_w, 48, nest_ledger_h], center: false }),
-  [nest_box_x, stud_sec[1], support_platform_bottom_z]
+  [nest_box_x, 0, support_platform_bottom_z]
 );
 
 // Front cross-member (front edge)
 const front_member = translate(
   cube({ size: [nest_total_w, 48, nest_ledger_h], center: false }),
-  [nest_box_x, stud_sec[1] + nest_box_d - 48, support_platform_bottom_z]
+  [nest_box_x, nest_box_d - 48, support_platform_bottom_z]
 );
 
 // Cross joists running front-to-back, connecting ledger to front member
@@ -422,14 +745,14 @@ for (let i = 0; i < num_joists; i++) {
   const joist_x = nest_box_x + (i * nest_total_w) / (num_joists - 1);
   const joist = translate(
     cube({ size: [48, nest_box_d, nest_ledger_h], center: false }),
-    [joist_x - 24, stud_sec[1], support_platform_bottom_z]
+    [joist_x - 24, 0, support_platform_bottom_z]
   );
   cross_joists.push(joist);
 
   // Post directly under this joist
   const post = translate(
     cube({ size: [48, 48, post_height], center: false }),
-    [joist_x - 24, stud_sec[1] + nest_box_d / 2 - 24, floor_stack]
+    [joist_x - 24, nest_box_d / 2 - 24, floor_stack]
   );
   cross_joists.push(post);
 }
@@ -438,18 +761,833 @@ const nest_support_structure = union(nest_ledger, front_member, ...cross_joists)
 
 // Nesting boxes sitting ON TOP of the ledger
 // Bottom of boxes should be at nest_height_off_floor
+// Position at Y=0 (flush with front wall) so access doors face exterior
+// and wall cutout aligns with boxes
 const nest_result = nesting_boxes(nest_boxes, nest_box_w, nest_box_d, nest_box_h);
 const nesting_box_array = translate(
   nest_result.boxes,
-  [nest_box_x, stud_sec[1], floor_stack + nest_height_off_floor]
+  [nest_box_x, 0, floor_stack + nest_height_off_floor]
 );
 const nesting_box_doors = translate(
   nest_result.doors,
-  [nest_box_x, stud_sec[1], floor_stack + nest_height_off_floor]
+  [nest_box_x, 0, floor_stack + nest_height_off_floor]
 );
 
 // Build the roof
 const roof = gable_roof(coop_len, coop_w, wall_h, floor_stack, roof_pitch_deg, overhang, 8);
+
+// ============================================================================
+// CLADDING - Apply to all four walls
+// ============================================================================
+
+const cladding_th = 18;
+const cladding_margin = 25;
+
+// Front wall cladding (at Y = -cladding_th, facing outward)
+const front_cladding_cutouts = [
+  // Human door cutout
+  [[coop_len / 2 - door_w / 2, -cladding_th - 1, floor_stack + stud_sec[0]],
+   [door_w, cladding_th + 2, door_h]],
+  // Nesting box access cutout
+  [[nest_cutout_x, -cladding_th - 1, floor_stack + nest_cutout_bottom_z],
+   [nest_cutout_w, cladding_th + 2, nest_cutout_height]]
+];
+const front_cladding = horizontal_cladding_x(
+  coop_len, wall_h,
+  [0, -cladding_th, floor_stack],
+  front_cladding_cutouts
+);
+
+// Back wall cladding (at Y = coop_w + stud depth, facing outward)
+// The Wall() studs extend 98mm (studSize[1]) outward from Y=coop_w, so cladding must be outside them
+const back_cladding_y = coop_w + stud_sec[1];  // Outside the wall studs (stud depth is 98mm)
+const back_cladding_cutouts = [
+  // Vent cutout
+  [[coop_len / 2 - vent_w / 2, back_cladding_y - 1, floor_stack + back_vent_bottom_z],
+   [vent_w, cladding_th + 2, vent_h]]
+];
+const back_cladding = horizontal_cladding_x(
+  coop_len, wall_h,
+  [0, back_cladding_y, floor_stack],
+  back_cladding_cutouts
+);
+
+// Left wall cladding (at X = -cladding_th)
+const left_cladding = horizontal_cladding_y(
+  coop_w, wall_h,
+  [-cladding_th, 0, floor_stack],
+  []  // No cutouts on left wall
+);
+
+// Right wall cladding (at X = coop_len + stud depth) - solid wall (tunnel connects to run, no pop door)
+const pop_door_y = stud_sec[1] + 50;  // Used for tunnel positioning
+const right_cladding = horizontal_cladding_y(
+  coop_w, wall_h,
+  [coop_len + stud_sec[1], 0, floor_stack],  // Outside the wall studs (stud depth is 98mm)
+  []  // No cutouts - pop door removed, tunnel exits to run
+);
+
+// ============================================================================
+// DOOR PANELS
+// ============================================================================
+
+// Human door - positioned at front wall, left edge of door opening
+const human_door = translate(
+  door_panel(door_w, door_h, 18),
+  [coop_len / 2 - door_w / 2, -cladding_th - 18, floor_stack + stud_sec[0]]
+);
+
+
+// ============================================================================
+// ROOSTING PERCHES
+// ============================================================================
+
+const roost_dia = 50;
+const roost_color = [0.55, 0.35, 0.20];  // Dark brown
+
+// Lower roost - runs front to back (Y direction), above nesting boxes
+const lower_roost_h = floor_stack + nest_box_h + 200;
+const lower_roost_length = coop_w - 2 * (stud_sec[1] + 100);
+const lower_roost = translate(
+  rotate(
+    cylinder({ height: lower_roost_length, radius: roost_dia / 2, center: false }),
+    [90, 0, 0]
+  ),
+  [coop_len / 2 - door_w / 2 - nest_total_w / 2, stud_sec[1] + 100 + lower_roost_length, lower_roost_h]
+);
+
+// Mid roost - runs left to right (X direction), higher up
+const mid_roost_h = lower_roost_h + 400;
+const mid_roost_length = coop_len - 2 * (stud_sec[1] + 100);
+const mid_roost = translate(
+  rotate(
+    cylinder({ height: mid_roost_length, radius: roost_dia / 2, center: false }),
+    [0, 90, 0]
+  ),
+  [stud_sec[1] + 100, coop_w * 0.75, mid_roost_h]
+);
+
+// Upper roost - runs left to right (X direction), at back
+const upper_roost_h = mid_roost_h + 400;
+const upper_roost_length = coop_len - 2 * (stud_sec[1] + 100);
+const upper_roost = translate(
+  rotate(
+    cylinder({ height: upper_roost_length, radius: roost_dia / 2, center: false }),
+    [0, 90, 0]
+  ),
+  [stud_sec[1] + 100, coop_w - stud_sec[1] - 100, upper_roost_h]
+);
+
+
+// ============================================================================
+// VIEWING TUNNEL - Enclosed structure from coop to run
+// ============================================================================
+
+const tunnel_width = 600;
+const tunnel_length = 1200;
+const tunnel_height = 600;
+const tunnel_wall_t = 18;
+const tunnel_roof_pitch = 45;
+const tunnel_roof_t = 8;
+const tunnel_window_inset = 50;
+const tunnel_window_height = tunnel_height - 200;
+
+// Tunnel position - attached to right wall, centered on pop door
+const tunnel_base_x = coop_len;
+const tunnel_base_y = pop_door_y + pop_w / 2 - tunnel_width / 2;
+const tunnel_base_z = floor_stack;
+
+// Create tunnel floor
+const tunnel_floor = translate(
+  cube({ size: [tunnel_length, tunnel_width, tunnel_wall_t], center: false }),
+  [tunnel_base_x, tunnel_base_y, tunnel_base_z]
+);
+
+// Front wall (end facing run) - with chicken door opening at floor level
+const tunnel_front_wall_base = translate(
+  cube({ size: [tunnel_wall_t, tunnel_width, tunnel_height], center: false }),
+  [tunnel_base_x + tunnel_length - tunnel_wall_t, tunnel_base_y, tunnel_base_z]
+);
+// Chicken door opening - centered, at floor level, sized for chickens to walk through
+const chicken_door_width = 350;  // Wide enough for chickens
+const chicken_door_height = 400; // Tall enough for chickens
+const tunnel_chicken_door = translate(
+  cube({ size: [tunnel_wall_t + 2, chicken_door_width, chicken_door_height], center: false }),
+  [tunnel_base_x + tunnel_length - tunnel_wall_t - 1, tunnel_base_y + tunnel_width / 2 - chicken_door_width / 2, tunnel_base_z + tunnel_wall_t]
+);
+const tunnel_front_wall = difference(tunnel_front_wall_base, tunnel_chicken_door);
+
+// Left wall - with large hinged access door for humans (feeding access)
+const tunnel_left_wall_base = translate(
+  cube({ size: [tunnel_length, tunnel_wall_t, tunnel_height], center: false }),
+  [tunnel_base_x, tunnel_base_y, tunnel_base_z]
+);
+// Large door opening - almost full wall for easy access
+const tunnel_access_door_width = tunnel_length - 100;  // Leave 50mm frame on each side
+const tunnel_access_door_height = tunnel_height - 80;  // Leave frame at top and bottom
+const tunnel_access_door_cutout = translate(
+  cube({ size: [tunnel_access_door_width, tunnel_wall_t + 2, tunnel_access_door_height], center: false }),
+  [tunnel_base_x + 50, tunnel_base_y - 1, tunnel_base_z + 40]
+);
+const tunnel_left_wall = difference(tunnel_left_wall_base, tunnel_access_door_cutout);
+
+// Hinged access door panel (shown partially open at 30 degrees)
+const tunnel_access_door_angle = 30;
+const tunnel_access_door_panel = translate(
+  rotate(
+    cube({ size: [tunnel_access_door_width, tunnel_wall_t, tunnel_access_door_height], center: false }),
+    [0, 0, -tunnel_access_door_angle]  // Swing outward
+  ),
+  [tunnel_base_x + 50, tunnel_base_y, tunnel_base_z + 40]
+);
+
+// Right wall - with window cutout
+const tunnel_right_wall_base = translate(
+  cube({ size: [tunnel_length, tunnel_wall_t, tunnel_height], center: false }),
+  [tunnel_base_x, tunnel_base_y + tunnel_width - tunnel_wall_t, tunnel_base_z]
+);
+const tunnel_right_window = translate(
+  cube({ size: [tunnel_length - 2 * tunnel_window_inset, tunnel_wall_t + 2, tunnel_window_height], center: false }),
+  [tunnel_base_x + tunnel_window_inset, tunnel_base_y + tunnel_width - tunnel_wall_t - 1, tunnel_base_z + 100]
+);
+const tunnel_right_wall = difference(tunnel_right_wall_base, tunnel_right_window);
+
+// Tunnel roof - two pitched panels meeting at ridge
+const tunnel_rise = (tunnel_width / 2) * Math.tan(tunnel_roof_pitch * Math.PI / 180);
+const tunnel_roof_panel_width = Math.sqrt(Math.pow(tunnel_width / 2, 2) + Math.pow(tunnel_rise, 2));
+const tunnel_peak_z = tunnel_base_z + tunnel_height + tunnel_rise;
+
+// Left roof panel - slopes down from peak toward front (Y=tunnel_base_y)
+const tunnel_roof_left = translate(
+  rotate(
+    translate(
+      cube({ size: [tunnel_length, tunnel_roof_panel_width, tunnel_roof_t], center: false }),
+      [0, -tunnel_roof_panel_width, 0]  // Move so rotation pivot is at far edge
+    ),
+    [tunnel_roof_pitch, 0, 0]
+  ),
+  [tunnel_base_x, tunnel_base_y + tunnel_width / 2, tunnel_peak_z]
+);
+
+// Right roof panel - slopes down from peak toward back (Y=tunnel_base_y + tunnel_width)
+const tunnel_roof_right = translate(
+  rotate(
+    cube({ size: [tunnel_length, tunnel_roof_panel_width, tunnel_roof_t], center: false }),
+    [-tunnel_roof_pitch, 0, 0]
+  ),
+  [tunnel_base_x, tunnel_base_y + tunnel_width / 2, tunnel_peak_z]
+);
+
+// Combine tunnel walls and roof
+const tunnel_walls = union(tunnel_floor, tunnel_front_wall, tunnel_left_wall, tunnel_right_wall);
+const tunnel_roof = union(tunnel_roof_left, tunnel_roof_right);
+
+// Extended skid for tunnel support
+const tunnel_skid = translate(
+  cube({ size: [tunnel_length, skid_sec[0], skid_sec[1]], center: false }),
+  [coop_len, tunnel_base_y + tunnel_width / 2 - skid_sec[0] / 2, paver_size[2]]
+);
+
+// ============================================================================
+// ATTACHED RUN STRUCTURE
+// ============================================================================
+
+const run_length = 4000;  // Run extends along X axis from tunnel
+const run_width = 3000;   // Run width along Y axis
+const run_height = 2000;  // Run height (to eaves)
+const post_sec = [98, 98]; // Run posts cross-section
+
+// Run position - starts at end of viewing tunnel
+const run_base_x = tunnel_base_x + tunnel_length;
+const run_base_y = tunnel_base_y + tunnel_width / 2 - run_width / 2;
+const run_base_z = paver_size[2];
+
+// Corner posts
+const run_posts = [];
+const run_post_positions = [
+  [run_base_x, run_base_y, run_base_z],
+  [run_base_x, run_base_y + run_width - post_sec[1], run_base_z],
+  [run_base_x + run_length - post_sec[0], run_base_y, run_base_z],
+  [run_base_x + run_length - post_sec[0], run_base_y + run_width - post_sec[1], run_base_z]
+];
+for (const pos of run_post_positions) {
+  run_posts.push(translate(
+    cube({ size: [post_sec[0], post_sec[1], run_height], center: false }),
+    pos
+  ));
+}
+
+// Top rails connecting posts
+const run_top_rails = [];
+// Front and back rails (along X)
+run_top_rails.push(translate(
+  cube({ size: [run_length, post_sec[1], post_sec[0]], center: false }),
+  [run_base_x, run_base_y, run_base_z + run_height - post_sec[0]]
+));
+run_top_rails.push(translate(
+  cube({ size: [run_length, post_sec[1], post_sec[0]], center: false }),
+  [run_base_x, run_base_y + run_width - post_sec[1], run_base_z + run_height - post_sec[0]]
+));
+// Left and right rails (along Y)
+run_top_rails.push(translate(
+  cube({ size: [post_sec[0], run_width, post_sec[1]], center: false }),
+  [run_base_x, run_base_y, run_base_z + run_height - post_sec[0]]
+));
+run_top_rails.push(translate(
+  cube({ size: [post_sec[0], run_width, post_sec[1]], center: false }),
+  [run_base_x + run_length - post_sec[0], run_base_y, run_base_z + run_height - post_sec[0]]
+));
+
+// Lower rails (for mesh attachment)
+const run_lower_rails = [];
+const lower_rail_z = run_base_z + 100;
+// Front and back
+run_lower_rails.push(translate(
+  cube({ size: [run_length, post_sec[1] / 2, post_sec[0] / 2], center: false }),
+  [run_base_x, run_base_y, lower_rail_z]
+));
+run_lower_rails.push(translate(
+  cube({ size: [run_length, post_sec[1] / 2, post_sec[0] / 2], center: false }),
+  [run_base_x, run_base_y + run_width - post_sec[1] / 2, lower_rail_z]
+));
+
+// Gate opening - in front left corner
+const gate_width = 900;
+const gate_post = translate(
+  cube({ size: [post_sec[0], post_sec[1], run_height], center: false }),
+  [run_base_x + gate_width, run_base_y, run_base_z]
+);
+
+// Gate top beam
+const gate_beam = translate(
+  cube({ size: [gate_width, post_sec[1], post_sec[0]], center: false }),
+  [run_base_x, run_base_y, run_base_z + run_height - post_sec[0]]
+);
+
+// Run roof - A-frame structure (matching OpenSCAD approach)
+const run_roof_pitch = 30;
+const half_width = run_width / 2;
+const rise = half_width * Math.tan(run_roof_pitch * Math.PI / 180);
+const beam_size = 48; // Match OpenSCAD beam cross-section
+const beam_length = Math.sqrt(half_width * half_width + rise * rise);
+const beam_angle = Math.atan2(rise, half_width) * 180 / Math.PI;
+const post_top_z = run_base_z + run_height;
+const beam_base_z = post_top_z - beam_size;
+const ridge_z = post_top_z + rise;
+const beam_spacing = 1000;
+
+// Ridge beam running along length at peak
+const ridge_beam = translate(
+  cube({ size: [run_length + 50, beam_size, beam_size], center: false }),
+  [run_base_x, run_base_y + half_width - beam_size / 2, ridge_z - beam_size]
+);
+
+// A-frame diagonal beams - proper triangular A-frames meeting at ridge
+// Mirror around the run's centerline (Y = run_base_y + half_width)
+const run_center_y = run_base_y + half_width;
+const run_rafters = [];
+for (let x_offset = 0; x_offset <= run_length; x_offset += beam_spacing) {
+  const x = run_base_x + x_offset;
+  const x_clamped = Math.min(x, run_base_x + run_length - beam_size);
+
+  // LEFT rafter - starts at front rail, goes UP to ridge
+  let left_beam = cube({ size: [beam_size, beam_length, beam_size], center: false });
+  left_beam = translate(left_beam, [0, -beam_size / 2, 0]);
+  left_beam = rotate(left_beam, [beam_angle, 0, 0]);
+  left_beam = translate(left_beam, [0, beam_size / 2, 0]);
+  left_beam = translate(left_beam, [x_clamped, run_base_y, beam_base_z]);
+
+  // RIGHT rafter - mirror left beam around the run's centerline
+  let right_beam = cube({ size: [beam_size, beam_length, beam_size], center: false });
+  right_beam = translate(right_beam, [0, -beam_size / 2, 0]);
+  right_beam = rotate(right_beam, [beam_angle, 0, 0]);
+  right_beam = translate(right_beam, [0, beam_size / 2, 0]);
+  right_beam = translate(right_beam, [x_clamped, run_base_y, beam_base_z]);
+  // Move to center the run at Y=0, mirror, then move back
+  right_beam = translate(right_beam, [0, -run_center_y, 0]);
+  right_beam = scale(right_beam, [1, -1, 1]);
+  right_beam = translate(right_beam, [0, run_center_y, 0]);
+
+  run_rafters.push(left_beam, right_beam);
+}
+
+// Combine run structure
+const run_frame = union(
+  ...run_posts, ...run_top_rails, ...run_lower_rails,
+  gate_post, gate_beam, ridge_beam, ...run_rafters
+);
+
+// ============================================================================
+// CHICKEN GYM - Multi-level enrichment structure inside run
+// ============================================================================
+
+const gym_width = 1500;
+const gym_depth = 1000;
+const gym_height = 1800;
+const gym_stud = 98;
+const gym_platform_t = 18;
+
+// Gym position - in the back portion of the run
+const gym_base_x = run_base_x + run_length - gym_width - 200;
+const gym_base_y = run_base_y + run_width / 2 - gym_depth / 2;
+const gym_base_z = run_base_z;
+
+// Main vertical posts
+const gym_post_1 = translate(
+  cube({ size: [gym_stud, gym_stud, gym_height * 0.85], center: false }),
+  [gym_base_x + gym_width * 0.3, gym_base_y + gym_depth * 0.4, gym_base_z]
+);
+const gym_post_2 = translate(
+  cube({ size: [gym_stud, gym_stud, gym_height * 0.7], center: false }),
+  [gym_base_x + gym_width * 0.65, gym_base_y + gym_depth * 0.55, gym_base_z]
+);
+const gym_post_3 = translate(
+  cube({ size: [gym_stud, gym_stud, gym_height * 0.95], center: false }),
+  [gym_base_x + gym_width * 0.45, gym_base_y + gym_depth * 0.25, gym_base_z]
+);
+
+// Platforms at various heights
+const gym_platform_1 = translate(
+  cube({ size: [400, 350, gym_platform_t], center: false }),
+  [gym_base_x + gym_width * 0.3 - 100, gym_base_y + gym_depth * 0.4 - 80, gym_base_z + 400]
+);
+const gym_platform_2 = translate(
+  cube({ size: [380, 380, gym_platform_t], center: false }),
+  [gym_base_x + gym_width * 0.65 - 80, gym_base_y + gym_depth * 0.55 - 100, gym_base_z + 480]
+);
+const gym_platform_3 = translate(
+  cube({ size: [420, 320, gym_platform_t], center: false }),
+  [gym_base_x + gym_width * 0.45 - 120, gym_base_y + gym_depth * 0.25 - 60, gym_base_z + 720]
+);
+const gym_platform_4 = translate(
+  cube({ size: [360, 340, gym_platform_t], center: false }),
+  [gym_base_x + gym_width * 0.3 - 90, gym_base_y + gym_depth * 0.4 - 100, gym_base_z + 1050]
+);
+
+// Perches between posts (horizontal bars)
+const gym_perch_1 = translate(
+  rotate(
+    cylinder({ height: gym_width * 0.4, radius: 25, center: false }),
+    [0, 90, 0]
+  ),
+  [gym_base_x + gym_width * 0.3, gym_base_y + gym_depth * 0.4, gym_base_z + 550]
+);
+const gym_perch_2 = translate(
+  rotate(
+    cylinder({ height: gym_width * 0.3, radius: 25, center: false }),
+    [0, 90, 0]
+  ),
+  [gym_base_x + gym_width * 0.45, gym_base_y + gym_depth * 0.25, gym_base_z + 850]
+);
+const gym_perch_3 = translate(
+  rotate(
+    cylinder({ height: gym_depth * 0.5, radius: 25, center: false }),
+    [90, 0, 0]
+  ),
+  [gym_base_x + gym_width * 0.5, gym_base_y + gym_depth * 0.55 + gym_depth * 0.5, gym_base_z + 1200]
+);
+
+// Combine gym structure
+const chicken_gym = union(
+  gym_post_1, gym_post_2, gym_post_3,
+  gym_platform_1, gym_platform_2, gym_platform_3, gym_platform_4,
+  gym_perch_1, gym_perch_2, gym_perch_3
+);
+
+// ============================================================================
+// DECORATIVE BUSHES - around the run
+// ============================================================================
+
+// Simple bush approximation using spheres
+function bush(size, position) {
+  // Create a bush using a large sphere for the main body
+  const main = translate(
+    sphere({ radius: size * 0.5 }),
+    [position[0], position[1], position[2] + size * 0.3]
+  );
+  return main;
+}
+
+// Place bushes around the run
+const bush_positions = [
+  [run_base_x + 500, run_base_y - 300, run_base_z],
+  [run_base_x + run_length - 500, run_base_y - 300, run_base_z],
+  [run_base_x + run_length + 200, run_base_y + run_width / 2, run_base_z],
+  [run_base_x + run_length - 500, run_base_y + run_width + 300, run_base_z]
+];
+
+const bushes = bush_positions.map(pos => bush(400, pos));
+const all_bushes = union(...bushes);
+
+// ============================================================================
+// TUNNEL SKIRTING - Covers tunnel foundation
+// ============================================================================
+
+const tunnel_skirting_front = translate(
+  cube({ size: [skirting_t, tunnel_width, floor_stack], center: false }),
+  [tunnel_base_x - skirting_t, tunnel_base_y, 0]
+);
+const tunnel_skirting_back = translate(
+  cube({ size: [skirting_t, tunnel_width, floor_stack], center: false }),
+  [tunnel_base_x + tunnel_length, tunnel_base_y, 0]
+);
+const tunnel_skirting_left = translate(
+  cube({ size: [tunnel_length, skirting_t, floor_stack], center: false }),
+  [tunnel_base_x, tunnel_base_y - skirting_t, 0]
+);
+const tunnel_skirting_right = translate(
+  cube({ size: [tunnel_length, skirting_t, floor_stack], center: false }),
+  [tunnel_base_x, tunnel_base_y + tunnel_width, 0]
+);
+const tunnel_skirting = union(tunnel_skirting_front, tunnel_skirting_back, tunnel_skirting_left, tunnel_skirting_right);
+
+// ============================================================================
+// FEEDER AND WATERER - Inside viewing tunnel
+// ============================================================================
+
+// Feeder - red cylinder with tray
+function chicken_feeder(diameter = 250, height = 300) {
+  const container = translate(
+    cylinder({ height: height * 0.7, radius: diameter * 0.4, center: false }),
+    [0, 0, height * 0.3]
+  );
+  const tray = cylinder({ height: height * 0.2, radius: diameter * 0.5, center: false });
+  return union(container, tray);
+}
+
+// Waterer - blue cylinder with trough
+function chicken_waterer(diameter = 250, height = 280) {
+  const reservoir = translate(
+    cylinder({ height: height * 0.6, radius: diameter * 0.35, center: false }),
+    [0, 0, height * 0.25]
+  );
+  const trough = cylinder({ height: height * 0.15, radius: diameter * 0.45, center: false });
+  return union(reservoir, trough);
+}
+
+// Position feeder and waterer in tunnel
+const feeder = translate(
+  chicken_feeder(250, 300),
+  [tunnel_base_x + tunnel_length - 400, tunnel_base_y + tunnel_width / 2 - 100, tunnel_base_z + 18]
+);
+const waterer = translate(
+  chicken_waterer(250, 280),
+  [tunnel_base_x + tunnel_length - 600, tunnel_base_y + tunnel_width / 2 + 100, tunnel_base_z + 18]
+);
+
+// ============================================================================
+// RUN GATE - Hinged gate panel
+// ============================================================================
+
+const gate_height = 1800;
+const gate_frame_w = 48;
+
+// Gate frame
+const gate_left_stile = translate(
+  cube({ size: [gate_frame_w, gate_frame_w, gate_height], center: false }),
+  [run_base_x, run_base_y - gate_frame_w, run_base_z]
+);
+const gate_right_stile = translate(
+  cube({ size: [gate_frame_w, gate_frame_w, gate_height], center: false }),
+  [run_base_x + gate_width - gate_frame_w, run_base_y - gate_frame_w, run_base_z]
+);
+const gate_top_rail = translate(
+  cube({ size: [gate_width, gate_frame_w, gate_frame_w], center: false }),
+  [run_base_x, run_base_y - gate_frame_w, run_base_z + gate_height - gate_frame_w]
+);
+const gate_bottom_rail = translate(
+  cube({ size: [gate_width, gate_frame_w, gate_frame_w], center: false }),
+  [run_base_x, run_base_y - gate_frame_w, run_base_z]
+);
+const gate_mid_rail = translate(
+  cube({ size: [gate_width, gate_frame_w, gate_frame_w], center: false }),
+  [run_base_x, run_base_y - gate_frame_w, run_base_z + gate_height / 2]
+);
+
+const run_gate = union(gate_left_stile, gate_right_stile, gate_top_rail, gate_bottom_rail, gate_mid_rail);
+
+// ============================================================================
+// RUN ROOF - Ridge beam only (rafters disabled - too complex for now)
+// ============================================================================
+
+// The ridge beam is already in run_frame, no additional rafters needed
+// Just create a dummy object for the rafters variable
+const run_roof_rafters = cube({ size: [1, 1, 1], center: false });
+
+// ============================================================================
+// CHICKENS - Parametric chicken models
+// ============================================================================
+
+// Simple chicken model using basic primitives
+function chicken(scale_factor = 1.0, pose = 0) {
+  const s = scale_factor * 100;
+
+  // Body (ellipsoid approximated by scaled sphere)
+  const body = translate(
+    sphere({ radius: s * 0.4 }),
+    [0, 0, s * 0.5]
+  );
+
+  // Head
+  const head = translate(
+    sphere({ radius: s * 0.15 }),
+    [s * 0.35, 0, s * 0.75]
+  );
+
+  // Beak (small cone approximated by cylinder)
+  const beak = translate(
+    rotate(
+      cylinder({ height: s * 0.12, radius: s * 0.04, center: false }),
+      [0, 90, 0]
+    ),
+    [s * 0.45, 0, s * 0.72]
+  );
+
+  // Comb (on top of head)
+  const comb = translate(
+    cube({ size: [s * 0.08, s * 0.03, s * 0.12], center: true }),
+    [s * 0.32, 0, s * 0.88]
+  );
+
+  // Tail
+  const tail = translate(
+    rotate(
+      cube({ size: [s * 0.15, s * 0.08, s * 0.35], center: true }),
+      [30, 0, 0]
+    ),
+    [-s * 0.35, 0, s * 0.65]
+  );
+
+  // Legs (two cylinders)
+  const leg1 = translate(
+    cylinder({ height: s * 0.25, radius: s * 0.03, center: false }),
+    [s * 0.05, s * 0.08, 0]
+  );
+  const leg2 = translate(
+    cylinder({ height: s * 0.25, radius: s * 0.03, center: false }),
+    [s * 0.05, -s * 0.08, 0]
+  );
+
+  return union(body, head, beak, comb, tail, leg1, leg2);
+}
+
+// Place chickens around the scene
+const chicken_scale = 2.5;
+
+// Chicken in run near entrance
+const chicken1 = translate(
+  rotate(chicken(chicken_scale, 0), [0, 0, 45]),
+  [run_base_x + 600, run_base_y + 800, run_base_z]
+);
+
+// Chicken mid-run
+const chicken2 = translate(
+  rotate(chicken(chicken_scale, 0.1), [0, 0, -120]),
+  [run_base_x + run_length * 0.4, run_base_y + run_width * 0.3, run_base_z]
+);
+
+// Chicken near gym
+const chicken3 = translate(
+  rotate(chicken(chicken_scale, 0.4), [0, 0, 200]),
+  [run_base_x + run_length * 0.7, run_base_y + run_width * 0.6, run_base_z]
+);
+
+// Chicken in viewing tunnel
+const chicken4 = translate(
+  rotate(chicken(chicken_scale * 0.9, 0.9), [0, 0, -45]),
+  [tunnel_base_x + tunnel_length - 350, tunnel_base_y + tunnel_width / 2 - 50, tunnel_base_z + 18]
+);
+
+// Chicken at waterer
+const chicken5 = translate(
+  rotate(chicken(chicken_scale * 0.9, 0.7), [0, 0, 120]),
+  [tunnel_base_x + tunnel_length - 550, tunnel_base_y + tunnel_width / 2 + 80, tunnel_base_z + 18]
+);
+
+// Chicken on gym platform
+const chicken6 = translate(
+  rotate(chicken(chicken_scale * 0.9, 0), [0, 0, 90]),
+  [gym_base_x + gym_width * 0.4, gym_base_y + gym_depth * 0.4, gym_base_z + 420]
+);
+
+// Chicken in nesting box
+const chicken7 = translate(
+  rotate(chicken(chicken_scale * 0.8, 0), [0, 0, 90]),
+  [nest_box_x + nest_spacing + nest_box_w / 2, nest_box_d / 2, floor_stack + 68]
+);
+
+// Another in run
+const chicken8 = translate(
+  rotate(chicken(chicken_scale, 0.6), [0, 0, -30]),
+  [run_base_x + run_length * 0.5, run_base_y + run_width * 0.6, run_base_z]
+);
+
+const all_chickens = union(chicken1, chicken2, chicken3, chicken4, chicken5, chicken6, chicken7, chicken8);
+
+// ============================================================================
+// MESH APRON - Predator-proof skirt around run base
+// ============================================================================
+
+const apron_width = 400;
+const apron_thickness = 5;
+
+// Front apron (extends outward from front of run)
+const apron_front = translate(
+  cube({ size: [run_length, apron_width, apron_thickness], center: false }),
+  [run_base_x, run_base_y - apron_width, run_base_z]
+);
+
+// Back apron
+const apron_back = translate(
+  cube({ size: [run_length, apron_width, apron_thickness], center: false }),
+  [run_base_x, run_base_y + run_width, run_base_z]
+);
+
+// Left apron (at tunnel end)
+const apron_left = translate(
+  cube({ size: [apron_width, run_width + 2 * apron_width, apron_thickness], center: false }),
+  [run_base_x - apron_width, run_base_y - apron_width, run_base_z]
+);
+
+// Right apron (far end)
+const apron_right = translate(
+  cube({ size: [apron_width, run_width + 2 * apron_width, apron_thickness], center: false }),
+  [run_base_x + run_length, run_base_y - apron_width, run_base_z]
+);
+
+const mesh_apron = union(apron_front, apron_back, apron_left, apron_right);
+
+// ============================================================================
+// L-EXTENSION - Optional L-shaped extension to run
+// ============================================================================
+
+const l_extension_enabled = true;
+const l_extension_length = 2000;  // Along X from corner
+const l_extension_width = 4000;   // Along -Y (extending forward)
+
+// L-extension position - extends from back-right corner of run
+const l_junction_x = run_base_x + run_length - l_extension_length;
+const l_junction_y = run_base_y;
+const l_junction_z = run_base_z;
+
+// L-extension corner posts
+const l_posts = [];
+if (l_extension_enabled) {
+  // Front-left corner (at junction)
+  l_posts.push(translate(
+    cube({ size: [post_sec[0], post_sec[1], run_height], center: false }),
+    [l_junction_x, l_junction_y - l_extension_width, l_junction_z]
+  ));
+
+  // Front-right corner
+  l_posts.push(translate(
+    cube({ size: [post_sec[0], post_sec[1], run_height], center: false }),
+    [l_junction_x + l_extension_length - post_sec[0], l_junction_y - l_extension_width, l_junction_z]
+  ));
+
+  // Back-right corner (connects to main run)
+  l_posts.push(translate(
+    cube({ size: [post_sec[0], post_sec[1], run_height], center: false }),
+    [l_junction_x + l_extension_length - post_sec[0], l_junction_y - post_sec[1], l_junction_z]
+  ));
+}
+
+// L-extension top rails
+const l_top_rails = [];
+if (l_extension_enabled) {
+  // Front rail (along X)
+  l_top_rails.push(translate(
+    cube({ size: [l_extension_length, post_sec[1], post_sec[0]], center: false }),
+    [l_junction_x, l_junction_y - l_extension_width, l_junction_z + run_height - post_sec[0]]
+  ));
+
+  // Left rail (along Y)
+  l_top_rails.push(translate(
+    cube({ size: [post_sec[0], l_extension_width, post_sec[1]], center: false }),
+    [l_junction_x, l_junction_y - l_extension_width, l_junction_z + run_height - post_sec[0]]
+  ));
+
+  // Right rail (along Y, connecting to main run)
+  l_top_rails.push(translate(
+    cube({ size: [post_sec[0], l_extension_width - post_sec[1], post_sec[1]], center: false }),
+    [l_junction_x + l_extension_length - post_sec[0], l_junction_y - l_extension_width + post_sec[1], l_junction_z + run_height - post_sec[0]]
+  ));
+}
+
+// L-extension ridge beam - DISABLED for now (was flying off)
+// The L-extension has different dimensions (4000mm wide) so its ridge would be much higher
+// For now, just use posts and rails without a ridge
+const l_ridge_rise = (l_extension_width / 2) * Math.tan(run_roof_pitch * Math.PI / 180);
+// const l_ridge_beam = ...disabled...
+
+const l_extension_frame = l_extension_enabled ? union(...l_posts, ...l_top_rails) : cube({ size: [1, 1, 1], center: false });
+
+// ============================================================================
+// LOUNGE AREA - Table and chairs in L-extension corner
+// ============================================================================
+
+const table_diameter = 700;
+const table_height = 550;
+const chair_spacing = 800;
+
+// Table position - in center of L-extension
+const table_x = l_junction_x + l_extension_length / 2;
+const table_y = l_junction_y - l_extension_width / 2;
+const table_z = l_junction_z;
+
+// Table top (circular - approximated with cylinder)
+const table_top = translate(
+  cylinder({ height: 40, radius: table_diameter / 2, center: false }),
+  [table_x, table_y, table_z + table_height]
+);
+
+// Table pedestal
+const table_pedestal = translate(
+  cylinder({ height: table_height, radius: 80, center: false }),
+  [table_x, table_y, table_z]
+);
+
+// Simple chair (seat + back)
+function make_chair(x, y, z, angle) {
+  const seat_w = 450;
+  const seat_h = 450;
+  const seat = translate(
+    rotate(
+      cube({ size: [seat_w, seat_w, 40], center: true }),
+      [0, 0, angle]
+    ),
+    [x, y, z + seat_h]
+  );
+  const back = translate(
+    rotate(
+      cube({ size: [seat_w, 40, 400], center: true }),
+      [0, 0, angle]
+    ),
+    [x - seat_w / 3 * Math.cos(angle * Math.PI / 180),
+     y - seat_w / 3 * Math.sin(angle * Math.PI / 180),
+     z + seat_h + 200]
+  );
+  const legs = [];
+  for (let i = 0; i < 4; i++) {
+    const leg_angle = i * 90 + 45;
+    const leg_x = x + 150 * Math.cos((angle + leg_angle) * Math.PI / 180);
+    const leg_y = y + 150 * Math.sin((angle + leg_angle) * Math.PI / 180);
+    legs.push(translate(
+      cylinder({ height: seat_h, radius: 20, center: false }),
+      [leg_x, leg_y, z]
+    ));
+  }
+  return union(seat, back, ...legs);
+}
+
+// Four chairs around the table
+const chair1 = l_extension_enabled ? make_chair(table_x + chair_spacing, table_y, table_z, 180) : cube({ size: [1, 1, 1], center: false });
+const chair2 = l_extension_enabled ? make_chair(table_x - chair_spacing, table_y, table_z, 0) : cube({ size: [1, 1, 1], center: false });
+const chair3 = l_extension_enabled ? make_chair(table_x, table_y + chair_spacing, table_z, 270) : cube({ size: [1, 1, 1], center: false });
+const chair4 = l_extension_enabled ? make_chair(table_x, table_y - chair_spacing, table_z, 90) : cube({ size: [1, 1, 1], center: false });
+
+const lounge_table = l_extension_enabled ? union(table_top, table_pedestal) : cube({ size: [1, 1, 1], center: false });
+const lounge_chairs = l_extension_enabled ? union(chair1, chair2, chair3, chair4) : cube({ size: [1, 1, 1], center: false });
 
 // Define realistic colors for architectural elements
 const CONCRETE_GRAY = [0.65, 0.65, 0.68];     // Pavers
@@ -460,6 +1598,8 @@ const ROOF_CHARCOAL = [0.30, 0.30, 0.32];     // Roof shingles
 const SKIRTING_DARK = [0.45, 0.36, 0.28];     // Skirting panels
 const NEST_BOX_WOOD = [0.68, 0.53, 0.35];     // Nesting boxes (slightly darker wood)
 const DOOR_WOOD = [0.60, 0.45, 0.30];         // Doors (darker stained wood)
+const ROOST_BROWN = [0.55, 0.35, 0.20];       // Roosting perches
+const RAMP_WOOD = [0.65, 0.50, 0.32];         // Ramps
 
 // Scale down for display and apply colors
 const scaledFoundation = withColor(scale(foundation, DISPLAY_SCALE), CONCRETE_GRAY);
@@ -474,17 +1614,125 @@ const scaledNestSupport = withColor(scale(nest_support_structure, DISPLAY_SCALE)
 const scaledNestingBoxes = withColor(scale(nesting_box_array, DISPLAY_SCALE), NEST_BOX_WOOD);
 const scaledNestDoors = withColor(scale(nesting_box_doors, DISPLAY_SCALE), DOOR_WOOD);
 
-// Export as array of colored objects
+// Cladding
+const scaledFrontCladding = withColor(scale(front_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
+const scaledFrontTrim = withColor(scale(front_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
+const scaledBackCladding = withColor(scale(back_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
+const scaledBackTrim = withColor(scale(back_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
+const scaledLeftCladding = withColor(scale(left_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
+const scaledLeftTrim = withColor(scale(left_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
+const scaledRightCladding = withColor(scale(right_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
+const scaledRightTrim = withColor(scale(right_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
+
+// Doors
+const scaledHumanDoor = withColor(scale(human_door, DISPLAY_SCALE), DOOR_WOOD);
+
+// Roosting perches
+const scaledLowerRoost = withColor(scale(lower_roost, DISPLAY_SCALE), ROOST_BROWN);
+const scaledMidRoost = withColor(scale(mid_roost, DISPLAY_SCALE), ROOST_BROWN);
+const scaledUpperRoost = withColor(scale(upper_roost, DISPLAY_SCALE), ROOST_BROWN);
+
+// Viewing tunnel
+const TUNNEL_WALL_COLOR = [0.87, 0.72, 0.53];  // BurlyWood
+const scaledTunnelWalls = withColor(scale(tunnel_walls, DISPLAY_SCALE), TUNNEL_WALL_COLOR);
+const scaledTunnelRoof = withColor(scale(tunnel_roof, DISPLAY_SCALE), ROOF_CHARCOAL);
+const scaledTunnelSkid = withColor(scale(tunnel_skid, DISPLAY_SCALE), WOOD_TAN);
+const scaledTunnelAccessDoor = withColor(scale(tunnel_access_door_panel, DISPLAY_SCALE), DOOR_WOOD);
+
+// Run structure
+const RUN_FRAME_COLOR = [0.55, 0.45, 0.35];  // Cedar-ish brown
+const scaledRunFrame = withColor(scale(run_frame, DISPLAY_SCALE), RUN_FRAME_COLOR);
+
+// Chicken gym
+const GYM_WOOD = [0.87, 0.72, 0.53];  // BurlyWood
+const scaledChickenGym = withColor(scale(chicken_gym, DISPLAY_SCALE), GYM_WOOD);
+
+// Bushes
+const BUSH_GREEN = [0.33, 0.42, 0.18];  // DarkOliveGreen
+const scaledBushes = withColor(scale(all_bushes, DISPLAY_SCALE), BUSH_GREEN);
+
+// Tunnel skirting
+const scaledTunnelSkirting = withColor(scale(tunnel_skirting, DISPLAY_SCALE), SKIRTING_DARK);
+
+// Feeder and waterer
+const FEEDER_RED = [0.8, 0.2, 0.15];
+const WATERER_BLUE = [0.2, 0.4, 0.8];
+const scaledFeeder = withColor(scale(feeder, DISPLAY_SCALE), FEEDER_RED);
+const scaledWaterer = withColor(scale(waterer, DISPLAY_SCALE), WATERER_BLUE);
+
+// Run gate
+const GATE_WOOD = [0.5, 0.35, 0.2];
+const scaledRunGate = withColor(scale(run_gate, DISPLAY_SCALE), GATE_WOOD);
+
+// Run roof rafters
+const scaledRunRafters = withColor(scale(run_roof_rafters, DISPLAY_SCALE), RUN_FRAME_COLOR);
+
+// Chickens
+const CHICKEN_WHITE = [0.95, 0.95, 0.9];
+const scaledChickens = withColor(scale(all_chickens, DISPLAY_SCALE), CHICKEN_WHITE);
+
+// Mesh apron
+const MESH_GRAY = [0.6, 0.6, 0.6];
+const scaledMeshApron = withColor(scale(mesh_apron, DISPLAY_SCALE), MESH_GRAY);
+
+// L-extension
+const scaledLExtension = withColor(scale(l_extension_frame, DISPLAY_SCALE), RUN_FRAME_COLOR);
+
+// Lounge area
+const TABLE_WOOD = [0.87, 0.72, 0.53];
+const scaledLoungeTable = withColor(scale(lounge_table, DISPLAY_SCALE), TABLE_WOOD);
+const scaledLoungeChairs = withColor(scale(lounge_chairs, DISPLAY_SCALE), TABLE_WOOD);
+
+// Export as array of colored objects (with visibility toggles)
 export const scene = [
+  // Foundation & base (always shown)
   scaledFoundation,
   scaledSkirting,
   scaledFloor,
-  scaledFrontWall,
-  scaledBackWall,
-  scaledLeftWall,
-  scaledRightWall,
-  scaledRoof,
+  // Wall framing (conditional)
+  ...(show_walls ? [scaledFrontWall, scaledBackWall, scaledLeftWall, scaledRightWall] : []),
+  // Cladding (conditional)
+  ...(show_cladding ? [
+    scaledFrontCladding, scaledFrontTrim,
+    scaledBackCladding, scaledBackTrim,
+    scaledLeftCladding, scaledLeftTrim,
+    scaledRightCladding, scaledRightTrim
+  ] : []),
+  // Roof (conditional)
+  ...(show_roof ? [scaledRoof] : []),
+  // Nesting area (always shown - interior)
   scaledNestSupport,
   scaledNestingBoxes,
-  scaledNestDoors
+  scaledNestDoors,
+  // Doors (conditional with cladding)
+  ...(show_cladding ? [scaledHumanDoor] : []),
+  // Roosting perches (always shown - interior)
+  scaledLowerRoost,
+  scaledMidRoost,
+  scaledUpperRoost,
+  // Viewing tunnel
+  scaledTunnelWalls,
+  ...(show_roof ? [scaledTunnelRoof] : []),
+  scaledTunnelSkid,
+  scaledTunnelAccessDoor,
+  // Attached run
+  scaledRunFrame,
+  scaledRunGate,
+  scaledRunRafters,
+  scaledMeshApron,
+  // Chicken gym
+  scaledChickenGym,
+  // Landscaping
+  scaledBushes,
+  // Tunnel extras
+  scaledTunnelSkirting,
+  scaledFeeder,
+  scaledWaterer,
+  // Chickens
+  scaledChickens,
+  // L-extension
+  scaledLExtension,
+  // Lounge area
+  scaledLoungeTable,
+  scaledLoungeChairs
 ];
