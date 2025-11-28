@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -37,20 +38,25 @@ void JsManifoldFinalizer(JSRuntime *rt, JSValue val) {
   delete wrapper;
 }
 
+// Mutex for thread-safe class ID initialization
+static std::mutex g_classIdMutex;
+
 void EnsureManifoldClassInternal(JSRuntime *runtime) {
-  static bool idInitialised = false;
-  static bool classRegistered = false;
-  if (!idInitialised) {
-    JS_NewClassID(runtime, &g_manifoldClassId);
-    idInitialised = true;
+  // Thread-safe class ID initialization (only needs to happen once globally)
+  {
+    std::lock_guard<std::mutex> lock(g_classIdMutex);
+    static bool idInitialised = false;
+    if (!idInitialised) {
+      JS_NewClassID(runtime, &g_manifoldClassId);
+      idInitialised = true;
+    }
   }
-  if (!classRegistered) {
-    JSClassDef def{};
-    def.class_name = "Manifold";
-    def.finalizer = JsManifoldFinalizer;
-    JS_NewClass(runtime, g_manifoldClassId, &def);
-    classRegistered = true;
-  }
+  // IMPORTANT: JS_NewClass must be called for EACH runtime, not just once!
+  // QuickJS requires class registration per-runtime, even with same class ID.
+  JSClassDef def{};
+  def.class_name = "Manifold";
+  def.finalizer = JsManifoldFinalizer;
+  JS_NewClass(runtime, g_manifoldClassId, &def);
 }
 
 JSValue WrapManifold(JSContext *ctx, std::shared_ptr<manifold::Manifold> manifold) {
@@ -620,25 +626,20 @@ JSValue JsBoolean(JSContext *ctx, int argc, JSValueConst *argv,
   if (argc < 2) {
     return JS_ThrowTypeError(ctx, "boolean operation requires at least two manifolds");
   }
-  JsManifold *base = GetJsManifold(ctx, argv[0]);
-  if (!base) return JS_EXCEPTION;
-  std::shared_ptr<manifold::Manifold> result =
-      std::make_shared<manifold::Manifold>(*base->handle);
-  for (int i = 1; i < argc; ++i) {
-    JsManifold *next = GetJsManifold(ctx, argv[i]);
-    if (!next) return JS_EXCEPTION;
-    switch (op) {
-      case manifold::OpType::Add:
-        result = std::make_shared<manifold::Manifold>(*result + *next->handle);
-        break;
-      case manifold::OpType::Subtract:
-        result = std::make_shared<manifold::Manifold>(*result - *next->handle);
-        break;
-      case manifold::OpType::Intersect:
-        result = std::make_shared<manifold::Manifold>(*result ^ *next->handle);
-        break;
-    }
+
+  // Collect all manifolds for batch operation (MUCH faster than sequential!)
+  std::vector<manifold::Manifold> parts;
+  parts.reserve(argc);
+  for (int i = 0; i < argc; ++i) {
+    JsManifold *m = GetJsManifold(ctx, argv[i]);
+    if (!m) return JS_EXCEPTION;
+    parts.push_back(*m->handle);
   }
+
+  // Use BatchBoolean for efficient multi-operand boolean operations
+  auto result = std::make_shared<manifold::Manifold>(
+    manifold::Manifold::BatchBoolean(parts, op)
+  );
   return WrapManifold(ctx, std::move(result));
 }
 

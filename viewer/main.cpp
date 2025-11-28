@@ -2,10 +2,18 @@
 #include "raymath.h"
 #include "rlgl.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cmath>
+#include <future>
+#include <mutex>
+#include <thread>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
@@ -242,6 +250,257 @@ struct ModuleLoaderData {
 };
 
 ModuleLoaderData g_module_loader_data;
+
+// Forward declaration for ReadTextFile (defined later)
+std::optional<std::string> ReadTextFile(const std::filesystem::path &path);
+
+// ============================================================================
+// PARAMETER PANEL STRUCTURES
+// ============================================================================
+
+struct SceneParameter {
+  std::string name;           // Variable name in JS
+  std::string displayName;    // Human-readable name
+  std::string section;        // Section grouping (e.g., "Coop Dimensions")
+  float value;                // Current value
+  float minValue;             // Slider minimum
+  float maxValue;             // Slider maximum
+  int lineNumber;             // Line number in file (for editing)
+};
+
+struct MaterialItem {
+  std::string name;
+  std::string category;
+  std::string link;
+  std::string unit;
+  float unitPrice;
+  int quantity;
+};
+
+// Parse parameters from a JS file
+std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path &path) {
+  std::vector<SceneParameter> params;
+
+  auto source = ReadTextFile(path);
+  if (!source) return params;
+
+  // Parameter definitions: name, displayName, section, min, max
+  struct ParamDef {
+    const char* name;
+    const char* displayName;
+    const char* section;
+    float minVal;
+    float maxVal;
+  };
+
+  const std::vector<ParamDef> knownParams = {
+    // Coop Dimensions
+    {"coop_len", "Coop Length", "Coop Dimensions", 1500, 6000},
+    {"coop_w", "Coop Width", "Coop Dimensions", 1500, 6000},
+    {"wall_h", "Wall Height", "Coop Dimensions", 1500, 3000},
+    // Roof
+    {"roof_pitch_deg", "Roof Pitch", "Roof", 15, 45},
+    {"overhang", "Overhang", "Roof", 50, 400},
+    // Doors
+    {"door_w", "Door Width", "Doors", 500, 1000},
+    {"door_h", "Door Height", "Doors", 1200, 2200},
+    {"pop_w", "Pop Door Width", "Doors", 150, 400},
+    {"pop_opening_h", "Pop Opening Height", "Doors", 200, 500},
+    // Nesting Boxes
+    {"nest_boxes", "Number of Boxes", "Nesting Boxes", 1, 6},
+    {"nest_box_w", "Box Width", "Nesting Boxes", 200, 500},
+    {"nest_box_d", "Box Depth", "Nesting Boxes", 300, 600},
+    {"nest_box_h", "Box Height", "Nesting Boxes", 250, 500},
+    {"nest_height_off_floor", "Height Off Floor", "Nesting Boxes", 100, 600},
+  };
+
+  // Parse the source line by line
+  std::istringstream stream(*source);
+  std::string line;
+  int lineNum = 0;
+
+  while (std::getline(stream, line)) {
+    lineNum++;
+
+    // Look for "const name = value;" patterns
+    for (const auto& def : knownParams) {
+      std::string pattern = std::string("const ") + def.name + " = ";
+      size_t pos = line.find(pattern);
+      if (pos != std::string::npos) {
+        // Extract the value
+        size_t valueStart = pos + pattern.length();
+        size_t valueEnd = line.find(';', valueStart);
+        if (valueEnd != std::string::npos) {
+          std::string valueStr = line.substr(valueStart, valueEnd - valueStart);
+          // Trim whitespace
+          valueStr.erase(0, valueStr.find_first_not_of(" \t"));
+          valueStr.erase(valueStr.find_last_not_of(" \t") + 1);
+
+          try {
+            float value = std::stof(valueStr);
+            params.push_back({
+              def.name,
+              def.displayName,
+              def.section,
+              value,
+              def.minVal,
+              def.maxVal,
+              lineNum
+            });
+          } catch (...) {
+            // Skip non-numeric values
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  return params;
+}
+
+// Parse materials from a JS file (reads the export const materials = [...] block)
+std::vector<MaterialItem> ParseMaterials(const std::filesystem::path &path) {
+  std::vector<MaterialItem> materials;
+
+  auto source = ReadTextFile(path);
+  if (!source) return materials;
+
+  // Find "export const materials = ["
+  size_t startPos = source->find("export const materials = [");
+  if (startPos == std::string::npos) return materials;
+
+  // Find the closing bracket
+  size_t endPos = source->find("];", startPos);
+  if (endPos == std::string::npos) return materials;
+
+  std::string block = source->substr(startPos, endPos - startPos + 2);
+
+  // Parse each { ... } block
+  size_t pos = 0;
+  while ((pos = block.find('{', pos)) != std::string::npos) {
+    size_t objEnd = block.find('}', pos);
+    if (objEnd == std::string::npos) break;
+
+    std::string objStr = block.substr(pos, objEnd - pos + 1);
+    MaterialItem item;
+
+    // Extract name
+    size_t namePos = objStr.find("name:");
+    if (namePos != std::string::npos) {
+      size_t qStart = objStr.find('"', namePos);
+      size_t qEnd = objStr.find('"', qStart + 1);
+      if (qStart != std::string::npos && qEnd != std::string::npos) {
+        item.name = objStr.substr(qStart + 1, qEnd - qStart - 1);
+      }
+    }
+
+    // Extract category
+    size_t catPos = objStr.find("category:");
+    if (catPos != std::string::npos) {
+      size_t qStart = objStr.find('"', catPos);
+      size_t qEnd = objStr.find('"', qStart + 1);
+      if (qStart != std::string::npos && qEnd != std::string::npos) {
+        item.category = objStr.substr(qStart + 1, qEnd - qStart - 1);
+      }
+    }
+
+    // Extract link
+    size_t linkPos = objStr.find("link:");
+    if (linkPos != std::string::npos) {
+      size_t qStart = objStr.find('"', linkPos);
+      size_t qEnd = objStr.find('"', qStart + 1);
+      if (qStart != std::string::npos && qEnd != std::string::npos) {
+        item.link = objStr.substr(qStart + 1, qEnd - qStart - 1);
+      }
+    }
+
+    // Extract unit
+    size_t unitPos = objStr.find("unit:");
+    if (unitPos != std::string::npos) {
+      size_t qStart = objStr.find('"', unitPos);
+      size_t qEnd = objStr.find('"', qStart + 1);
+      if (qStart != std::string::npos && qEnd != std::string::npos) {
+        item.unit = objStr.substr(qStart + 1, qEnd - qStart - 1);
+      }
+    }
+
+    // Extract unitPrice
+    size_t pricePos = objStr.find("unitPrice:");
+    if (pricePos != std::string::npos) {
+      size_t numStart = pricePos + 10;
+      while (numStart < objStr.size() && (objStr[numStart] == ' ' || objStr[numStart] == ':')) numStart++;
+      size_t numEnd = objStr.find_first_of(",}", numStart);
+      if (numEnd != std::string::npos) {
+        std::string numStr = objStr.substr(numStart, numEnd - numStart);
+        try { item.unitPrice = std::stof(numStr); } catch (...) { item.unitPrice = 0; }
+      }
+    }
+
+    // Extract quantity (may be a variable name or number)
+    size_t qtyPos = objStr.find("quantity:");
+    if (qtyPos != std::string::npos) {
+      size_t numStart = qtyPos + 9;
+      while (numStart < objStr.size() && (objStr[numStart] == ' ' || objStr[numStart] == ':')) numStart++;
+      size_t numEnd = objStr.find_first_of(",}", numStart);
+      if (numEnd != std::string::npos) {
+        std::string numStr = objStr.substr(numStart, numEnd - numStart);
+        numStr.erase(0, numStr.find_first_not_of(" \t"));
+        numStr.erase(numStr.find_last_not_of(" \t") + 1);
+        try { item.quantity = std::stoi(numStr); } catch (...) { item.quantity = 0; }
+      }
+    }
+
+    if (!item.name.empty()) {
+      materials.push_back(item);
+    }
+
+    pos = objEnd + 1;
+  }
+
+  return materials;
+}
+
+// Write a parameter value back to the JS file
+bool WriteParameterToFile(const std::filesystem::path &path, const SceneParameter &param) {
+  auto source = ReadTextFile(path);
+  if (!source) return false;
+
+  std::ostringstream result;
+  std::istringstream stream(*source);
+  std::string line;
+  int lineNum = 0;
+
+  while (std::getline(stream, line)) {
+    lineNum++;
+    if (lineNum == param.lineNumber) {
+      // Replace this line
+      std::string pattern = std::string("const ") + param.name + " = ";
+      size_t pos = line.find(pattern);
+      if (pos != std::string::npos) {
+        size_t valueStart = pos + pattern.length();
+        size_t valueEnd = line.find(';', valueStart);
+        if (valueEnd != std::string::npos) {
+          // Reconstruct line with new value
+          std::ostringstream newValue;
+          if (param.name == "nest_boxes") {
+            newValue << static_cast<int>(param.value);  // Integer for count
+          } else {
+            newValue << static_cast<int>(param.value);  // Integer for mm values
+          }
+          result << line.substr(0, valueStart) << newValue.str() << line.substr(valueEnd) << "\n";
+          continue;
+        }
+      }
+    }
+    result << line << "\n";
+  }
+
+  std::ofstream out(path);
+  if (!out) return false;
+  out << result.str();
+  return true;
+}
 
 struct WatchedFile {
   std::optional<std::filesystem::file_time_type> timestamp;
@@ -621,25 +880,36 @@ struct LoadResult {
   std::vector<std::filesystem::path> dependencies;
 };
 
-LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &path) {
+// LoadSceneFromFile with optional external ModuleLoaderData (for thread safety)
+LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &path, ModuleLoaderData *loaderData = nullptr) {
+  auto loadStart = std::chrono::high_resolution_clock::now();
+
+  // Use provided loaderData or fallback to global (for backward compat)
+  ModuleLoaderData *data = loaderData ? loaderData : &g_module_loader_data;
+
   LoadResult result;
   const auto absolutePath = std::filesystem::absolute(path);
   if (!std::filesystem::exists(absolutePath)) {
     result.message = "Scene file not found: " + absolutePath.string();
     return result;
   }
-  g_module_loader_data.baseDir = absolutePath.parent_path();
-  g_module_loader_data.dependencies.clear();
-  g_module_loader_data.dependencies.insert(absolutePath);
+  data->baseDir = absolutePath.parent_path();
+  data->dependencies.clear();
+  data->dependencies.insert(absolutePath);
   auto sourceOpt = ReadTextFile(absolutePath);
   if (!sourceOpt) {
     result.message = "Unable to read scene file: " + absolutePath.string();
-    result.dependencies.assign(g_module_loader_data.dependencies.begin(),
-                               g_module_loader_data.dependencies.end());
+    result.dependencies.assign(data->dependencies.begin(),
+                               data->dependencies.end());
     return result;
   }
+
+  auto afterRead = std::chrono::high_resolution_clock::now();
+
   JSContext *ctx = JS_NewContext(runtime);
   RegisterBindings(ctx);
+
+  auto afterBindings = std::chrono::high_resolution_clock::now();
 
   auto captureException = [&]() {
     JSValue exc = JS_GetException(ctx);
@@ -651,8 +921,8 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     JS_FreeValue(ctx, exc);
   };
   auto assignDependencies = [&]() {
-    result.dependencies.assign(g_module_loader_data.dependencies.begin(),
-                               g_module_loader_data.dependencies.end());
+    result.dependencies.assign(data->dependencies.begin(),
+                               data->dependencies.end());
   };
 
   JSValue moduleFunc = JS_Eval(ctx, sourceOpt->c_str(), sourceOpt->size(), absolutePath.string().c_str(),
@@ -664,6 +934,8 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     return result;
   }
 
+  auto afterCompile = std::chrono::high_resolution_clock::now();
+
   if (JS_ResolveModule(ctx, moduleFunc) < 0) {
     captureException();
     JS_FreeValue(ctx, moduleFunc);
@@ -671,6 +943,8 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     JS_FreeContext(ctx);
     return result;
   }
+
+  auto afterResolve = std::chrono::high_resolution_clock::now();
 
   auto *module = static_cast<JSModuleDef *>(JS_VALUE_GET_PTR(moduleFunc));
   JSValue evalResult = JS_EvalFunction(ctx, moduleFunc);
@@ -681,6 +955,8 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
     return result;
   }
   JS_FreeValue(ctx, evalResult);
+
+  auto afterEval = std::chrono::high_resolution_clock::now();
 
   JSValue moduleNamespace = JS_GetModuleNamespace(ctx, module);
   if (JS_IsException(moduleNamespace)) {
@@ -821,19 +1097,67 @@ LoadResult LoadSceneFromFile(JSRuntime *runtime, const std::filesystem::path &pa
   assignDependencies();
   JS_FreeValue(ctx, sceneVal);
   JS_FreeContext(ctx);
+
+  auto loadEnd = std::chrono::high_resolution_clock::now();
+  auto readMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterRead - loadStart).count();
+  auto bindingsMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterBindings - afterRead).count();
+  auto compileMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterCompile - afterBindings).count();
+  auto resolveMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterResolve - afterCompile).count();
+  auto evalMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterEval - afterResolve).count();
+  auto parseMs = std::chrono::duration_cast<std::chrono::milliseconds>(loadEnd - afterEval).count();
+  auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(loadEnd - loadStart).count();
+
+  TraceLog(LOG_INFO, "PROFILE: LoadSceneFromFile: read=%lld ms, bindings=%lld ms, compile=%lld ms, "
+           "resolve=%lld ms, eval/CSG=%lld ms, parse=%lld ms, TOTAL=%lld ms",
+           readMs, bindingsMs, compileMs, resolveMs, evalMs, parseMs, totalMs);
+
   return result;
 }
 
 std::vector<ModelWithColor> CreateModelsFromScene(const SceneData &sceneData) {
-  std::vector<ModelWithColor> result;
-  result.reserve(sceneData.objects.size());
+  auto start = std::chrono::high_resolution_clock::now();
+
+  // Phase 1: Parallel mesh tessellation (GetMeshGL is thread-safe and CPU-bound)
+  struct MeshTask {
+    std::future<manifold::MeshGL> future;
+    Color color;
+  };
+  std::vector<MeshTask> tasks;
+  tasks.reserve(sceneData.objects.size());
 
   for (const auto &obj : sceneData.objects) {
     if (obj.geometry) {
-      Model model = CreateRaylibModelFrom(obj.geometry->GetMeshGL(), obj.color);
-      result.push_back({model, obj.color});
+      tasks.push_back({
+        std::async(std::launch::async, [geom = obj.geometry]() {
+          return geom->GetMeshGL();
+        }),
+        obj.color
+      });
     }
   }
+
+  // Collect tessellated meshes
+  std::vector<std::pair<manifold::MeshGL, Color>> meshes;
+  meshes.reserve(tasks.size());
+  for (auto &task : tasks) {
+    meshes.emplace_back(task.future.get(), task.color);
+  }
+
+  auto meshEnd = std::chrono::high_resolution_clock::now();
+  auto meshMs = std::chrono::duration_cast<std::chrono::milliseconds>(meshEnd - start).count();
+
+  // Phase 2: GPU upload (must be sequential, on main thread)
+  std::vector<ModelWithColor> result;
+  result.reserve(meshes.size());
+  for (auto &[meshGL, color] : meshes) {
+    Model model = CreateRaylibModelFrom(meshGL, color);
+    result.push_back({model, color});
+  }
+
+  auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::high_resolution_clock::now() - start).count();
+  TraceLog(LOG_INFO, "PROFILE: CreateModelsFromScene: tessellation=%lld ms, total=%lld ms (%zu objects)",
+           meshMs, totalMs, result.size());
 
   return result;
 }
@@ -843,6 +1167,112 @@ void DestroyModels(std::vector<ModelWithColor> &models) {
     DestroyModel(modelWithColor.model);
   }
   models.clear();
+}
+
+// Pre-computed mesh data that can be created off the main thread
+struct PrecomputedMesh {
+  manifold::MeshGL meshGL;
+  Color color;
+};
+
+struct BackgroundLoadResult {
+  bool success = false;
+  std::string message;
+  SceneData sceneData;
+  std::vector<PrecomputedMesh> meshes;
+  std::vector<std::filesystem::path> dependencies;
+};
+
+// Does all heavy work (JS eval + CSG + tessellation) - can run on background thread
+// Creates its own JSRuntime since JSRuntime is not thread-safe
+BackgroundLoadResult LoadAndTessellate(const std::filesystem::path &path) {
+  auto start = std::chrono::high_resolution_clock::now();
+  BackgroundLoadResult result;
+
+  // Create a new runtime for this thread (JSRuntime is not thread-safe)
+  JSRuntime *runtime = JS_NewRuntime();
+  if (!runtime) {
+    result.message = "Failed to create JS runtime for background load";
+    return result;
+  }
+
+  // CRITICAL: Register the Manifold class on THIS runtime
+  // Each JSRuntime needs its own class registration!
+  EnsureManifoldClass(runtime);
+
+  // Use a LOCAL ModuleLoaderData to avoid race conditions with main thread
+  ModuleLoaderData localLoaderData;
+  JS_SetModuleLoaderFunc(runtime, nullptr, FilesystemModuleLoader, &localLoaderData);
+
+  // Step 1: Load scene from file (JS eval + CSG) - pass local loader data
+  LoadResult loadResult = LoadSceneFromFile(runtime, path, &localLoaderData);
+  result.success = loadResult.success;
+  result.message = loadResult.message;
+  result.sceneData = std::move(loadResult.sceneData);
+  result.dependencies = std::move(loadResult.dependencies);
+
+  if (!result.success) {
+    JS_FreeRuntime(runtime);
+    return result;
+  }
+
+  auto afterLoad = std::chrono::high_resolution_clock::now();
+
+  // Step 2: Parallel tessellation (GetMeshGL)
+  struct TessTask {
+    std::future<manifold::MeshGL> future;
+    Color color;
+  };
+  std::vector<TessTask> tasks;
+  tasks.reserve(result.sceneData.objects.size());
+
+  for (const auto &obj : result.sceneData.objects) {
+    if (obj.geometry) {
+      tasks.push_back({
+        std::async(std::launch::async, [geom = obj.geometry]() {
+          return geom->GetMeshGL();
+        }),
+        obj.color
+      });
+    }
+  }
+
+  // Collect tessellated meshes
+  result.meshes.reserve(tasks.size());
+  for (auto &task : tasks) {
+    result.meshes.push_back({task.future.get(), task.color});
+  }
+
+  auto end = std::chrono::high_resolution_clock::now();
+  auto loadMs = std::chrono::duration_cast<std::chrono::milliseconds>(afterLoad - start).count();
+  auto tessMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - afterLoad).count();
+  auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+  TraceLog(LOG_INFO, "PROFILE: LoadAndTessellate (background): load=%lld ms, tess=%lld ms, total=%lld ms",
+           loadMs, tessMs, totalMs);
+
+  JS_FreeRuntime(runtime);
+  return result;
+}
+
+// Convert pre-computed meshes to raylib Models (must run on main thread for GPU upload)
+std::vector<ModelWithColor> CreateModelsFromPrecomputed(std::vector<PrecomputedMesh> &meshes) {
+  auto start = std::chrono::high_resolution_clock::now();
+
+  std::vector<ModelWithColor> result;
+  result.reserve(meshes.size());
+
+  for (auto &mesh : meshes) {
+    Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
+    result.push_back({model, mesh.color});
+  }
+
+  auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::high_resolution_clock::now() - start).count();
+  TraceLog(LOG_INFO, "PROFILE: CreateModelsFromPrecomputed (GPU upload): %lld ms (%zu objects)",
+           totalMs, result.size());
+
+  return result;
 }
 
 }  // namespace
@@ -951,6 +1381,34 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<ModelWithColor> models = CreateModelsFromScene(sceneData);
+
+  // ============================================================================
+  // UI STATE - Parameter and Materials Panels
+  // ============================================================================
+  bool showParametersPanel = true;
+  bool showMaterialsPanel = true;
+  bool liveUpdatesEnabled = true;
+  float materialsPanelScroll = 0.0f;
+  int parameterPanelScroll = 0;
+
+  // Parse parameters and materials from scene file
+  std::vector<SceneParameter> sceneParameters;
+  std::vector<MaterialItem> sceneMaterials;
+
+  auto refreshParametersAndMaterials = [&]() {
+    if (!scriptPath.empty()) {
+      sceneParameters = ParseSceneParameters(scriptPath);
+      sceneMaterials = ParseMaterials(scriptPath);
+      TraceLog(LOG_INFO, "Parsed %zu parameters and %zu materials",
+               sceneParameters.size(), sceneMaterials.size());
+    }
+  };
+
+  refreshParametersAndMaterials();
+
+  // Track which parameter is being edited (for deferred update)
+  int editingParamIndex = -1;
+  float editingParamOriginalValue = 0.0f;
 
   Shader outlineShader = LoadShaderFromMemory(kOutlineVS, kOutlineFS);
   Shader toonShader = LoadShaderFromMemory(kToonVS, kToonFS);
@@ -1068,26 +1526,69 @@ int main(int argc, char *argv[]) {
   int frameCount = 0;
   bool screenshotTaken = false;
 
+  // Background loading state
+  std::future<BackgroundLoadResult> backgroundLoadFuture;
+  bool loadingInBackground = false;
+  auto backgroundLoadStartTime = std::chrono::high_resolution_clock::now();
+
+  // Lambda to start background load
+  auto startBackgroundLoad = [&]() {
+    if (loadingInBackground) {
+      TraceLog(LOG_INFO, "Background load already in progress, skipping");
+      return;
+    }
+    loadingInBackground = true;
+    backgroundLoadStartTime = std::chrono::high_resolution_clock::now();
+    reportStatus("Loading...");
+
+    // Launch background thread (creates its own JSRuntime since it's not thread-safe)
+    backgroundLoadFuture = std::async(std::launch::async, [scriptPath]() {
+      return LoadAndTessellate(scriptPath);
+    });
+    TraceLog(LOG_INFO, "Started background load");
+  };
+
+  // Lambda to check and apply background load result
+  auto checkBackgroundLoad = [&]() {
+    if (!loadingInBackground) return;
+
+    // Check if future is ready (non-blocking)
+    if (backgroundLoadFuture.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+      return;  // Still loading, keep rendering old scene
+    }
+
+    // Get the result
+    BackgroundLoadResult result = backgroundLoadFuture.get();
+    loadingInBackground = false;
+
+    auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - backgroundLoadStartTime).count();
+
+    if (result.success) {
+      sceneData = std::move(result.sceneData);
+      DestroyModels(models);
+      // GPU upload happens here on main thread - this is the only blocking part (~5ms)
+      models = CreateModelsFromPrecomputed(result.meshes);
+      reportStatus(result.message);
+      TraceLog(LOG_INFO, "PROFILE: Background load completed, total wall time: %lld ms", totalMs);
+    } else {
+      reportStatus(result.message);
+      TraceLog(LOG_WARNING, "Background load failed: %s", result.message.c_str());
+    }
+
+    if (!result.dependencies.empty()) {
+      setWatchedFiles(result.dependencies);
+    }
+  };
+
   while (!WindowShouldClose()) {
     frameCount++;
     const Vector2 mouseDelta = GetMouseDelta();
 
-    auto reloadScene = [&]() {
-      auto load = LoadSceneFromFile(runtime, scriptPath);
-      if (load.success) {
-        sceneData = load.sceneData;
-        DestroyModels(models);
-        models = CreateModelsFromScene(sceneData);
-        reportStatus(load.message);
-      } else {
-        reportStatus(load.message);
-      }
-      if (!load.dependencies.empty()) {
-        setWatchedFiles(load.dependencies);
-      }
-    };
+    // Check if background load is ready (non-blocking)
+    checkBackgroundLoad();
 
-    if (!scriptPath.empty()) {
+    if (!scriptPath.empty() && !loadingInBackground) {
       bool changed = false;
       for (const auto &entry : watchedFiles) {
         std::error_code ec;
@@ -1104,12 +1605,20 @@ int main(int argc, char *argv[]) {
         }
       }
       if (changed) {
-        reloadScene();
+        startBackgroundLoad();
       }
     }
 
     if (IsKeyPressed(KEY_R) && !scriptPath.empty()) {
-      reloadScene();
+      startBackgroundLoad();
+    }
+
+    // Panel toggle hotkeys
+    if (IsKeyPressed(KEY_T)) {
+      showParametersPanel = !showParametersPanel;
+    }
+    if (IsKeyPressed(KEY_M)) {
+      showMaterialsPanel = !showMaterialsPanel;
     }
 
     static bool prevPDown = false;
@@ -1189,7 +1698,33 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    // Check if mouse is over any UI panel - if so, skip camera controls
+    bool mouseOverPanel = false;
+    {
+      Vector2 mousePos = GetMousePosition();
+      int screenWidth = GetScreenWidth();
+      int screenHeight = GetScreenHeight();
+
+      // Materials panel bounds (left side)
+      if (showMaterialsPanel && !sceneMaterials.empty()) {
+        Rectangle matPanel = {10.0f, 10.0f, 320.0f, static_cast<float>(screenHeight) - 20.0f};
+        if (CheckCollisionPointRec(mousePos, matPanel)) {
+          mouseOverPanel = true;
+        }
+      }
+
+      // Parameters panel bounds (right side)
+      if (showParametersPanel && !sceneParameters.empty()) {
+        float paramPanelWidth = 280.0f;
+        float paramPanelX = static_cast<float>(screenWidth) - paramPanelWidth - 10.0f;
+        Rectangle paramPanel = {paramPanelX, 10.0f, paramPanelWidth, static_cast<float>(screenHeight) - 20.0f};
+        if (CheckCollisionPointRec(mousePos, paramPanel)) {
+          mouseOverPanel = true;
+        }
+      }
+    }
+
+    if (!mouseOverPanel && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       orbitYaw -= mouseDelta.x * 0.01f;
       orbitPitch += mouseDelta.y * 0.01f;
       const float limit = DEG2RAD * 89.0f;
@@ -1197,7 +1732,7 @@ int main(int argc, char *argv[]) {
     }
 
     const float wheel = GetMouseWheelMove();
-    if (wheel != 0.0f) {
+    if (!mouseOverPanel && wheel != 0.0f) {
       orbitDistance *= (1.0f - wheel * 0.1f);
       orbitDistance = Clamp(orbitDistance, 1.0f, 50.0f);
     }
@@ -1207,7 +1742,7 @@ int main(int argc, char *argv[]) {
     const Vector3 right = Vector3Normalize(Vector3CrossProduct(worldUp, forward));
     const Vector3 camUp = Vector3CrossProduct(forward, right);
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+    if (!mouseOverPanel && IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
       camera.target = Vector3Add(camera.target,
                                  Vector3Scale(right, mouseDelta.x * 0.01f * orbitDistance));
       camera.target = Vector3Add(camera.target,
@@ -1352,6 +1887,202 @@ int main(int argc, char *argv[]) {
       constexpr float statusFontSize = 18.0f;
       const Vector2 statusPos = {margin, margin};
       DrawTextEx(brandingFont, statusMessage.c_str(), statusPos, statusFontSize, 0.0f, DARKGRAY);
+    }
+
+    // ========================================================================
+    // MATERIALS PANEL (Left side)
+    // ========================================================================
+    if (showMaterialsPanel && !sceneMaterials.empty()) {
+      const float panelWidth = 320.0f;
+      const float panelX = 10.0f;
+      const float panelY = 50.0f;
+      const float panelHeight = static_cast<float>(screenHeight) - 100.0f;
+      const float rowHeight = 22.0f;
+      const float headerHeight = 30.0f;
+      const float sectionHeight = 26.0f;
+
+      // Panel background
+      DrawRectangle(static_cast<int>(panelX), static_cast<int>(panelY),
+                    static_cast<int>(panelWidth), static_cast<int>(panelHeight),
+                    Fade(RAYWHITE, 0.95f));
+      DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
+                         static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
+
+      // Title
+      DrawText("Materials & Pricing", static_cast<int>(panelX + 10), static_cast<int>(panelY + 8), 16, DARKGRAY);
+      DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
+               static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
+
+      float yPos = panelY + headerHeight + 5.0f;
+      std::string currentCategory;
+      float totalCost = 0.0f;
+
+      // Calculate totals by category
+      std::unordered_map<std::string, float> categoryTotals;
+      for (const auto &mat : sceneMaterials) {
+        categoryTotals[mat.category] += mat.unitPrice * mat.quantity;
+        totalCost += mat.unitPrice * mat.quantity;
+      }
+
+      for (const auto &mat : sceneMaterials) {
+        if (yPos > panelY + panelHeight - 50.0f) break;  // Don't overflow
+
+        // Category header
+        if (mat.category != currentCategory) {
+          currentCategory = mat.category;
+          yPos += 5.0f;
+          DrawRectangle(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+                        static_cast<int>(panelWidth - 10), static_cast<int>(sectionHeight - 2),
+                        Fade(LIGHTGRAY, 0.3f));
+
+          char catHeader[128];
+          snprintf(catHeader, sizeof(catHeader), "%s ($%.0f)",
+                   currentCategory.c_str(), categoryTotals[currentCategory]);
+          DrawText(catHeader, static_cast<int>(panelX + 10), static_cast<int>(yPos + 5), 12, DARKGRAY);
+          yPos += sectionHeight;
+        }
+
+        // Material row
+        char rowText[256];
+        float lineTotal = mat.unitPrice * mat.quantity;
+        snprintf(rowText, sizeof(rowText), "  %s", mat.name.c_str());
+
+        // Truncate if too long
+        std::string displayName = rowText;
+        if (displayName.length() > 28) {
+          displayName = displayName.substr(0, 25) + "...";
+        }
+
+        DrawText(displayName.c_str(), static_cast<int>(panelX + 8), static_cast<int>(yPos + 2), 10, GRAY);
+
+        // Quantity and price on right
+        char priceText[64];
+        snprintf(priceText, sizeof(priceText), "%d x $%.2f = $%.0f",
+                 mat.quantity, mat.unitPrice, lineTotal);
+        int priceWidth = MeasureText(priceText, 10);
+        DrawText(priceText, static_cast<int>(panelX + panelWidth - priceWidth - 15),
+                 static_cast<int>(yPos + 2), 10, GRAY);
+
+        yPos += rowHeight;
+      }
+
+      // Total at bottom
+      DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + panelHeight - 35),
+               static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + panelHeight - 35), DARKGRAY);
+      char totalText[64];
+      snprintf(totalText, sizeof(totalText), "TOTAL: $%.2f", totalCost);
+      DrawText(totalText, static_cast<int>(panelX + 10), static_cast<int>(panelY + panelHeight - 25), 14, DARKGRAY);
+
+      // Hotkey hint
+      DrawText("[M] toggle", static_cast<int>(panelX + panelWidth - 70),
+               static_cast<int>(panelY + panelHeight - 18), 10, LIGHTGRAY);
+    }
+
+    // ========================================================================
+    // PARAMETERS PANEL (Right side)
+    // ========================================================================
+    if (showParametersPanel && !sceneParameters.empty()) {
+      const float panelWidth = 280.0f;
+      const float panelX = static_cast<float>(screenWidth) - panelWidth - 10.0f;
+      const float panelY = 50.0f;
+      const float panelHeight = static_cast<float>(screenHeight) - 100.0f;
+      const float rowHeight = 28.0f;
+      const float headerHeight = 30.0f;
+      const float sectionHeight = 24.0f;
+      const float sliderHeight = 16.0f;
+
+      // Panel background
+      DrawRectangle(static_cast<int>(panelX), static_cast<int>(panelY),
+                    static_cast<int>(panelWidth), static_cast<int>(panelHeight),
+                    Fade(RAYWHITE, 0.95f));
+      DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
+                         static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
+
+      // Title
+      DrawText("Parameters", static_cast<int>(panelX + 10), static_cast<int>(panelY + 8), 16, DARKGRAY);
+      DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
+               static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
+
+      float yPos = panelY + headerHeight + 5.0f;
+      std::string currentSection;
+
+      // Live updates checkbox
+      Rectangle checkboxRect = {panelX + panelWidth - 100, panelY + 8, 14, 14};
+      if (GuiCheckBox(checkboxRect, "Live", &liveUpdatesEnabled)) {
+        // Checkbox was clicked
+      }
+
+      bool parameterChanged = false;
+      int changedParamIndex = -1;
+
+      for (size_t i = 0; i < sceneParameters.size(); ++i) {
+        if (yPos > panelY + panelHeight - 30.0f) break;  // Don't overflow
+
+        auto &param = sceneParameters[i];
+
+        // Section header
+        if (param.section != currentSection) {
+          currentSection = param.section;
+          yPos += 5.0f;
+          DrawRectangle(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+                        static_cast<int>(panelWidth - 10), static_cast<int>(sectionHeight - 2),
+                        Fade(LIGHTGRAY, 0.3f));
+          DrawText(currentSection.c_str(), static_cast<int>(panelX + 10), static_cast<int>(yPos + 5), 11, DARKGRAY);
+          yPos += sectionHeight;
+        }
+
+        // Parameter label
+        DrawText(param.displayName.c_str(), static_cast<int>(panelX + 10), static_cast<int>(yPos), 10, GRAY);
+
+        // Value display
+        char valueText[32];
+        if (param.name == "nest_boxes") {
+          snprintf(valueText, sizeof(valueText), "%d", static_cast<int>(param.value));
+        } else if (param.name == "roof_pitch_deg") {
+          snprintf(valueText, sizeof(valueText), "%.0f deg", param.value);
+        } else {
+          snprintf(valueText, sizeof(valueText), "%.0f mm", param.value);
+        }
+        int valueWidth = MeasureText(valueText, 10);
+        DrawText(valueText, static_cast<int>(panelX + panelWidth - valueWidth - 15),
+                 static_cast<int>(yPos), 10, DARKGRAY);
+
+        yPos += 12.0f;
+
+        // Slider
+        Rectangle sliderRect = {panelX + 10, yPos, panelWidth - 25, sliderHeight};
+        float oldValue = param.value;
+        float newValue = GuiSlider(sliderRect, "", "", &param.value, param.minValue, param.maxValue);
+        (void)newValue;  // GuiSlider modifies param.value directly
+
+        // Check if value changed
+        if (param.value != oldValue) {
+          parameterChanged = true;
+          changedParamIndex = static_cast<int>(i);
+
+          // Round to integer for most params
+          param.value = std::round(param.value);
+        }
+
+        yPos += rowHeight;
+      }
+
+      // Handle parameter changes
+      if (parameterChanged && changedParamIndex >= 0 && !loadingInBackground) {
+        auto &param = sceneParameters[changedParamIndex];
+
+        // Write to file
+        if (WriteParameterToFile(scriptPath, param)) {
+          if (liveUpdatesEnabled) {
+            // Trigger reload (file watcher will pick it up, or we can force it)
+            // The file watcher should detect the change automatically
+          }
+        }
+      }
+
+      // Hotkey hint at bottom
+      DrawText("[T] toggle", static_cast<int>(panelX + panelWidth - 70),
+               static_cast<int>(panelY + panelHeight - 18), 10, LIGHTGRAY);
     }
 
     EndDrawing();
