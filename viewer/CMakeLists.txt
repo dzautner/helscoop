@@ -17,6 +17,7 @@ add_executable(dingcad_viewer
   file_utils.cpp
   mesh_utils.cpp
   scene_loader.cpp
+  material_loader.cpp
   ui_panels.cpp
   primitives/wall.cpp
 )

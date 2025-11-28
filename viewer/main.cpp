@@ -23,6 +23,7 @@ extern "C" {
 #include "file_utils.h"
 #include "mesh_utils.h"
 #include "scene_loader.h"
+#include "material_loader.h"
 #include "ui_panels.h"
 
 using namespace dingcad;
@@ -87,6 +88,9 @@ int main(int argc, char *argv[]) {
   JSRuntime *runtime = JS_NewRuntime();
   EnsureManifoldClass(runtime);
   JS_SetModuleLoaderFunc(runtime, nullptr, FilesystemModuleLoader, &g_moduleLoaderData);
+
+  // Load material library
+  InitMaterialLibrary(std::filesystem::current_path());
 
   SceneData sceneData;
   std::string statusMessage;

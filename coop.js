@@ -1589,7 +1589,16 @@ const chair4 = l_extension_enabled ? make_chair(table_x, table_y - chair_spacing
 const lounge_table = l_extension_enabled ? union(table_top, table_pedestal) : cube({ size: [1, 1, 1], center: false });
 const lounge_chairs = l_extension_enabled ? union(chair1, chair2, chair3, chair4) : cube({ size: [1, 1, 1], center: false });
 
-// Define realistic colors for architectural elements
+// ============================================================================
+// MATERIAL HELPER - Use material references from materials.json database
+// ============================================================================
+
+// Helper to create object with material reference (colors auto-loaded from materials.json)
+function withMaterial(geometry, materialId) {
+  return { geometry: geometry, material: materialId };
+}
+
+// Define realistic colors for architectural elements (fallback for non-material items)
 const CONCRETE_GRAY = [0.65, 0.65, 0.68];     // Pavers
 const WOOD_TAN = [0.76, 0.60, 0.42];          // Skids (pressure-treated wood)
 const PLYWOOD_LIGHT = [0.85, 0.75, 0.60];     // Floor
@@ -1601,28 +1610,29 @@ const DOOR_WOOD = [0.60, 0.45, 0.30];         // Doors (darker stained wood)
 const ROOST_BROWN = [0.55, 0.35, 0.20];       // Roosting perches
 const RAMP_WOOD = [0.65, 0.50, 0.32];         // Ramps
 
-// Scale down for display and apply colors
-const scaledFoundation = withColor(scale(foundation, DISPLAY_SCALE), CONCRETE_GRAY);
+// Scale down for display and apply colors/materials
+// Using material references from materials.json where applicable
+const scaledFoundation = withMaterial(scale(foundation, DISPLAY_SCALE), 'concrete_block');
 const scaledSkirting = withColor(scale(skirting, DISPLAY_SCALE), SKIRTING_DARK);
-const scaledFloor = withColor(scale(floor, DISPLAY_SCALE), PLYWOOD_LIGHT);
-const scaledFrontWall = withColor(scale(front_wall, DISPLAY_SCALE), WOOD_NATURAL);
-const scaledBackWall = withColor(scale(back_wall, DISPLAY_SCALE), WOOD_NATURAL);
-const scaledLeftWall = withColor(scale(left_wall, DISPLAY_SCALE), WOOD_NATURAL);
-const scaledRightWall = withColor(scale(right_wall, DISPLAY_SCALE), WOOD_NATURAL);
-const scaledRoof = withColor(scale(roof, DISPLAY_SCALE), ROOF_CHARCOAL);
-const scaledNestSupport = withColor(scale(nest_support_structure, DISPLAY_SCALE), WOOD_NATURAL);
-const scaledNestingBoxes = withColor(scale(nesting_box_array, DISPLAY_SCALE), NEST_BOX_WOOD);
+const scaledFloor = withMaterial(scale(floor, DISPLAY_SCALE), 'osb_18mm');
+const scaledFrontWall = withMaterial(scale(front_wall, DISPLAY_SCALE), 'pine_48x98_c24');
+const scaledBackWall = withMaterial(scale(back_wall, DISPLAY_SCALE), 'pine_48x98_c24');
+const scaledLeftWall = withMaterial(scale(left_wall, DISPLAY_SCALE), 'pine_48x98_c24');
+const scaledRightWall = withMaterial(scale(right_wall, DISPLAY_SCALE), 'pine_48x98_c24');
+const scaledRoof = withMaterial(scale(roof, DISPLAY_SCALE), 'galvanized_roofing');
+const scaledNestSupport = withMaterial(scale(nest_support_structure, DISPLAY_SCALE), 'pine_48x98_c24');
+const scaledNestingBoxes = withMaterial(scale(nesting_box_array, DISPLAY_SCALE), 'nest_box_plywood');
 const scaledNestDoors = withColor(scale(nesting_box_doors, DISPLAY_SCALE), DOOR_WOOD);
 
-// Cladding
-const scaledFrontCladding = withColor(scale(front_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
-const scaledFrontTrim = withColor(scale(front_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
-const scaledBackCladding = withColor(scale(back_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
-const scaledBackTrim = withColor(scale(back_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
-const scaledLeftCladding = withColor(scale(left_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
-const scaledLeftTrim = withColor(scale(left_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
-const scaledRightCladding = withColor(scale(right_cladding.panel, DISPLAY_SCALE), CLADDING_MAIN);
-const scaledRightTrim = withColor(scale(right_cladding.trim, DISPLAY_SCALE), CLADDING_TRIM);
+// Cladding - using plywood for exterior panels, trim for trim boards
+const scaledFrontCladding = withMaterial(scale(front_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledFrontTrim = withMaterial(scale(front_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
+const scaledBackCladding = withMaterial(scale(back_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledBackTrim = withMaterial(scale(back_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
+const scaledLeftCladding = withMaterial(scale(left_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledLeftTrim = withMaterial(scale(left_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
+const scaledRightCladding = withMaterial(scale(right_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledRightTrim = withMaterial(scale(right_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
 
 // Doors
 const scaledHumanDoor = withColor(scale(human_door, DISPLAY_SCALE), DOOR_WOOD);
@@ -1671,9 +1681,8 @@ const scaledRunRafters = withColor(scale(run_roof_rafters, DISPLAY_SCALE), RUN_F
 const CHICKEN_WHITE = [0.95, 0.95, 0.9];
 const scaledChickens = withColor(scale(all_chickens, DISPLAY_SCALE), CHICKEN_WHITE);
 
-// Mesh apron
-const MESH_GRAY = [0.6, 0.6, 0.6];
-const scaledMeshApron = withColor(scale(mesh_apron, DISPLAY_SCALE), MESH_GRAY);
+// Mesh apron - hardware cloth for predator protection
+const scaledMeshApron = withMaterial(scale(mesh_apron, DISPLAY_SCALE), 'hardware_cloth');
 
 // L-extension
 const scaledLExtension = withColor(scale(l_extension_frame, DISPLAY_SCALE), RUN_FRAME_COLOR);

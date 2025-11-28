@@ -3,12 +3,14 @@
 #include "raylib.h"
 #include "manifold/manifold.h"
 
+#include <array>
 #include <cctype>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace dingcad {
@@ -34,10 +36,60 @@ struct Vec3f {
   float x, y, z;
 };
 
-// Scene object with optional color
+// PBR Visual properties for materials
+struct PBRVisual {
+  std::array<float, 3> albedo = {0.8f, 0.8f, 0.8f};  // RGB [0-1]
+  float roughness = 0.5f;                             // [0-1]
+  float metallic = 0.0f;                              // [0-1]
+  std::string albedoTexture;                          // Path to texture (future)
+  std::string normalTexture;                          // Path to normal map (future)
+
+  // Convert to raylib Color
+  Color toColor() const {
+    return Color{
+      static_cast<unsigned char>(albedo[0] * 255.0f),
+      static_cast<unsigned char>(albedo[1] * 255.0f),
+      static_cast<unsigned char>(albedo[2] * 255.0f),
+      255
+    };
+  }
+};
+
+// Pricing info for BOM generation
+struct PBRPricing {
+  std::string unit;
+  float unitPrice = 0.0f;
+  std::string supplier;
+  std::string link;
+};
+
+// Full PBR material definition
+struct PBRMaterial {
+  std::string id;
+  std::string name;
+  std::string category;
+  std::vector<std::string> tags;
+  PBRVisual visual;
+  PBRPricing pricing;
+};
+
+// Material library loaded from JSON
+struct MaterialLibrary {
+  std::unordered_map<std::string, PBRMaterial> materials;
+  std::filesystem::path basePath;
+
+  const PBRMaterial* get(const std::string& id) const {
+    auto it = materials.find(id);
+    return it != materials.end() ? &it->second : nullptr;
+  }
+};
+
+// Scene object with optional color and material reference
 struct ColoredObject {
   std::shared_ptr<manifold::Manifold> geometry;
   Color color;
+  std::string materialId;  // Optional reference to material library
+  int quantity = 1;        // For BOM calculation
 };
 
 // Collection of scene objects

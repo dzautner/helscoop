@@ -1,6 +1,7 @@
 #include "scene_loader.h"
 #include "file_utils.h"
 #include "js_bindings.h"
+#include "material_loader.h"
 
 #include "raymath.h"
 
@@ -153,48 +154,82 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
   }
 
   auto parseColoredObject = [&](JSValue objVal) -> std::optional<ColoredObject> {
+    // Case 1: Raw manifold geometry
     auto manifoldHandle = GetManifoldHandle(ctx, objVal);
     if (manifoldHandle) {
-      return ColoredObject{manifoldHandle, kBaseColor};
+      return ColoredObject{manifoldHandle, kBaseColor, "", 1};
     }
 
+    // Case 2: Object with geometry property
     JSValue geomVal = JS_GetPropertyStr(ctx, objVal, "geometry");
-    JSValue colorVal = JS_GetPropertyStr(ctx, objVal, "color");
+    if (JS_IsUndefined(geomVal)) {
+      JS_FreeValue(ctx, geomVal);
+      return std::nullopt;
+    }
 
-    if (!JS_IsUndefined(geomVal) && !JS_IsUndefined(colorVal)) {
-      auto geom = GetManifoldHandle(ctx, geomVal);
+    auto geom = GetManifoldHandle(ctx, geomVal);
+    JS_FreeValue(ctx, geomVal);
+    if (!geom) {
+      return std::nullopt;
+    }
 
-      if (geom && JS_IsArray(colorVal)) {
-        std::array<double, 3> colorArray{};
-        bool colorOk = true;
+    Color color = kBaseColor;
+    std::string materialId;
+    int quantity = 1;
 
-        for (uint32_t i = 0; i < 3; ++i) {
-          JSValue element = JS_GetPropertyUint32(ctx, colorVal, i);
-          if (JS_ToFloat64(ctx, &colorArray[i], element) < 0) {
-            colorOk = false;
-            JS_FreeValue(ctx, element);
-            break;
-          }
-          JS_FreeValue(ctx, element);
+    // Check for material reference (string)
+    JSValue materialVal = JS_GetPropertyStr(ctx, objVal, "material");
+    if (!JS_IsUndefined(materialVal) && JS_IsString(materialVal)) {
+      const char* matIdStr = JS_ToCString(ctx, materialVal);
+      if (matIdStr) {
+        materialId = matIdStr;
+        // Look up in material library for color
+        const PBRMaterial* mat = g_materialLibrary.get(materialId);
+        if (mat) {
+          color = mat->visual.toColor();
         }
-
-        if (colorOk) {
-          Color color = {
-            static_cast<unsigned char>(Clamp(colorArray[0] * 255.0, 0.0, 255.0)),
-            static_cast<unsigned char>(Clamp(colorArray[1] * 255.0, 0.0, 255.0)),
-            static_cast<unsigned char>(Clamp(colorArray[2] * 255.0, 0.0, 255.0)),
-            255
-          };
-          JS_FreeValue(ctx, geomVal);
-          JS_FreeValue(ctx, colorVal);
-          return ColoredObject{geom, color};
-        }
+        JS_FreeCString(ctx, matIdStr);
       }
     }
+    JS_FreeValue(ctx, materialVal);
 
-    JS_FreeValue(ctx, geomVal);
+    // Check for explicit color (overrides material color)
+    JSValue colorVal = JS_GetPropertyStr(ctx, objVal, "color");
+    if (!JS_IsUndefined(colorVal) && JS_IsArray(colorVal)) {
+      std::array<double, 3> colorArray{};
+      bool colorOk = true;
+
+      for (uint32_t i = 0; i < 3; ++i) {
+        JSValue element = JS_GetPropertyUint32(ctx, colorVal, i);
+        if (JS_ToFloat64(ctx, &colorArray[i], element) < 0) {
+          colorOk = false;
+          JS_FreeValue(ctx, element);
+          break;
+        }
+        JS_FreeValue(ctx, element);
+      }
+
+      if (colorOk) {
+        color = {
+          static_cast<unsigned char>(Clamp(colorArray[0] * 255.0, 0.0, 255.0)),
+          static_cast<unsigned char>(Clamp(colorArray[1] * 255.0, 0.0, 255.0)),
+          static_cast<unsigned char>(Clamp(colorArray[2] * 255.0, 0.0, 255.0)),
+          255
+        };
+      }
+    }
     JS_FreeValue(ctx, colorVal);
-    return std::nullopt;
+
+    // Check for quantity
+    JSValue quantityVal = JS_GetPropertyStr(ctx, objVal, "quantity");
+    if (!JS_IsUndefined(quantityVal)) {
+      int32_t q = 1;
+      JS_ToInt32(ctx, &q, quantityVal);
+      quantity = q;
+    }
+    JS_FreeValue(ctx, quantityVal);
+
+    return ColoredObject{geom, color, materialId, quantity};
   };
 
   if (JS_IsArray(sceneVal)) {
