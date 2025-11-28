@@ -32,22 +32,25 @@ void main()
 }
 )glsl";
 
-// Toon (cel) shading - lit 3D pass
+// Toon (cel) shading - lit 3D pass with optional texture support
 inline const char* kToonVS = R"glsl(
 #version 330
 in vec3 vertexPosition;
 in vec3 vertexNormal;
+in vec2 vertexTexCoord;
 uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matView;
 out vec3 vNvs;
 out vec3 vVdir;
+out vec2 vTexCoord;
 void main() {
     vec4 wpos = matModel * vec4(vertexPosition, 1.0);
     vec3 nvs  = mat3(matView) * mat3(matModel) * vertexNormal;
     vNvs      = normalize(nvs);
     vec3 vpos = (matView * wpos).xyz;
     vVdir     = normalize(-vpos);
+    vTexCoord = vertexTexCoord;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )glsl";
@@ -56,6 +59,7 @@ inline const char* kToonFS = R"glsl(
 #version 330
 in vec3 vNvs;
 in vec3 vVdir;
+in vec2 vTexCoord;
 out vec4 finalColor;
 
 uniform vec3 lightDirVS;
@@ -66,6 +70,8 @@ uniform float diffuseWeight;
 uniform float rimWeight;
 uniform float specWeight;
 uniform float specShininess;
+uniform sampler2D albedoTex;
+uniform int useTexture;  // 0 = solid color, 1 = sample texture
 
 float quantize(float x, int steps){
     float s = max(1, steps-1);
@@ -77,6 +83,12 @@ void main() {
     vec3 l   = normalize(lightDirVS);
     vec3 v   = normalize(vVdir);
 
+    // Get albedo color - either from texture or solid baseColor
+    vec3 albedo = baseColor.rgb;
+    if (useTexture > 0) {
+        albedo = texture(albedoTex, vTexCoord).rgb * baseColor.rgb;
+    }
+
     float ndl = max(0.0, dot(n,l));
     float cel = quantize(ndl, toonSteps);
 
@@ -86,7 +98,7 @@ void main() {
     spec = step(0.5, spec) * specWeight;
 
     float shade = clamp(ambient + diffuseWeight*cel + rimWeight*rim + spec, 0.0, 1.0);
-    finalColor  = vec4(baseColor.rgb * shade, 1.0);
+    finalColor  = vec4(albedo * shade, 1.0);
 }
 )glsl";
 

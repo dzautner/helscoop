@@ -76,11 +76,23 @@ struct PBRMaterial {
 // Material library loaded from JSON
 struct MaterialLibrary {
   std::unordered_map<std::string, PBRMaterial> materials;
+  std::unordered_map<std::string, Texture2D> loadedTextures;  // Keyed by material ID
   std::filesystem::path basePath;
 
   const PBRMaterial* get(const std::string& id) const {
     auto it = materials.find(id);
     return it != materials.end() ? &it->second : nullptr;
+  }
+
+  // Get loaded texture for a material (returns nullptr if not loaded)
+  Texture2D* getTexture(const std::string& materialId) {
+    auto it = loadedTextures.find(materialId);
+    return it != loadedTextures.end() ? &it->second : nullptr;
+  }
+
+  const Texture2D* getTexture(const std::string& materialId) const {
+    auto it = loadedTextures.find(materialId);
+    return it != loadedTextures.end() ? &it->second : nullptr;
   }
 };
 
@@ -97,10 +109,11 @@ struct SceneData {
   std::vector<ColoredObject> objects;
 };
 
-// Raylib model with associated color
+// Raylib model with associated color and material reference
 struct ModelWithColor {
   Model model;
   Color color;
+  std::string materialId;  // For texture lookup
 };
 
 // Module loader state for QuickJS
@@ -148,6 +161,7 @@ struct LoadResult {
 struct PrecomputedMesh {
   manifold::MeshGL meshGL;
   Color color;
+  std::string materialId;
 };
 
 // Result of background loading (JS eval + CSG + tessellation)

@@ -406,6 +406,7 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
   struct TessTask {
     std::future<manifold::MeshGL> future;
     Color color;
+    std::string materialId;
   };
   std::vector<TessTask> tasks;
   tasks.reserve(result.sceneData.objects.size());
@@ -416,14 +417,15 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
         std::async(std::launch::async, [geom = obj.geometry]() {
           return geom->GetMeshGL();
         }),
-        obj.color
+        obj.color,
+        obj.materialId
       });
     }
   }
 
   result.meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    result.meshes.push_back({task.future.get(), task.color});
+    result.meshes.push_back({task.future.get(), task.color, task.materialId});
   }
 
   auto end = std::chrono::high_resolution_clock::now();

@@ -208,4 +208,44 @@ bool InitMaterialLibrary(const std::filesystem::path& basePath) {
   return true;
 }
 
+void LoadMaterialTextures() {
+  int loadedCount = 0;
+  for (auto& [id, mat] : g_materialLibrary.materials) {
+    if (!mat.visual.albedoTexture.empty()) {
+      std::filesystem::path texPath = mat.visual.albedoTexture;
+
+      // If relative path, resolve against material library base path
+      if (texPath.is_relative()) {
+        texPath = g_materialLibrary.basePath / texPath;
+      }
+
+      if (std::filesystem::exists(texPath)) {
+        Texture2D tex = LoadTexture(texPath.string().c_str());
+        if (tex.id != 0) {
+          // Set texture wrapping mode to repeat for tiling
+          SetTextureWrap(tex, TEXTURE_WRAP_REPEAT);
+          g_materialLibrary.loadedTextures[id] = tex;
+          loadedCount++;
+          TraceLog(LOG_INFO, "Loaded texture for material '%s': %s", id.c_str(), texPath.string().c_str());
+        } else {
+          TraceLog(LOG_WARNING, "Failed to load texture for material '%s': %s", id.c_str(), texPath.string().c_str());
+        }
+      } else {
+        TraceLog(LOG_WARNING, "Texture file not found for material '%s': %s", id.c_str(), texPath.string().c_str());
+      }
+    }
+  }
+
+  if (loadedCount > 0) {
+    std::cout << "Loaded " << loadedCount << " material textures" << std::endl;
+  }
+}
+
+void UnloadMaterialTextures() {
+  for (auto& [id, tex] : g_materialLibrary.loadedTextures) {
+    UnloadTexture(tex);
+  }
+  g_materialLibrary.loadedTextures.clear();
+}
+
 }  // namespace dingcad

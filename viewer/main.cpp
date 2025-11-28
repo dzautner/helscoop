@@ -208,6 +208,8 @@ int main(int argc, char *argv[]) {
   const int locRimWeight = GetShaderLocation(toonShader, "rimWeight");
   const int locSpecWeight = GetShaderLocation(toonShader, "specWeight");
   const int locSpecShininess = GetShaderLocation(toonShader, "specShininess");
+  const int locAlbedoTex = GetShaderLocation(toonShader, "albedoTex");
+  const int locUseTexture = GetShaderLocation(toonShader, "useTexture");
   Material toonMat = LoadMaterialDefault();
   toonMat.shader = toonShader;
 
@@ -242,6 +244,11 @@ int main(int argc, char *argv[]) {
   SetShaderValue(toonShader, locSpecWeight, &specWeight, SHADER_UNIFORM_FLOAT);
   float specShininess = 32.0f;
   SetShaderValue(toonShader, locSpecShininess, &specShininess, SHADER_UNIFORM_FLOAT);
+  int useTexture = 0;  // Default: no texture
+  SetShaderValue(toonShader, locUseTexture, &useTexture, SHADER_UNIFORM_INT);
+
+  // Load material textures (must be after OpenGL init)
+  LoadMaterialTextures();
 
   float normalThreshold = 0.25f;
   float depthThreshold = 0.002f;
@@ -538,6 +545,21 @@ int main(int argc, char *argv[]) {
       };
       SetShaderValue(toonShader, locBaseColor, modelColor, SHADER_UNIFORM_VEC4);
 
+      // Check for material texture
+      Texture2D* tex = nullptr;
+      if (!modelWithColor.materialId.empty()) {
+        tex = g_materialLibrary.getTexture(modelWithColor.materialId);
+      }
+
+      if (tex && tex->id != 0) {
+        int useTex = 1;
+        SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
+        SetShaderValueTexture(toonShader, locAlbedoTex, *tex);
+      } else {
+        int useTex = 0;
+        SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
+      }
+
       for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
         DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
       }
@@ -602,6 +624,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Cleanup
+  UnloadMaterialTextures();
   UnloadRenderTexture(rtColor);
   UnloadRenderTexture(rtNormalDepth);
   UnloadMaterial(toonMat);

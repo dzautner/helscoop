@@ -60,7 +60,9 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
 
   std::vector<Vector3> normals(vertexCount);
   std::vector<Color> colors(vertexCount);
+  std::vector<Vector2> texcoords(vertexCount);
   const Vector3 lightDir = Vector3Normalize({0.45f, 0.85f, 0.35f});
+  const float textureScale = 1.0f;  // 1 meter per texture repeat
 
   for (int v = 0; v < vertexCount; ++v) {
     const Vector3 n = accum[v];
@@ -71,6 +73,25 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
       normal = {n.x / length, n.y / length, n.z / length};
     }
     normals[v] = normal;
+
+    // Triplanar UV mapping based on dominant normal axis
+    const Vector3& pos = positions[v];
+    const float absX = std::fabs(normal.x);
+    const float absY = std::fabs(normal.y);
+    const float absZ = std::fabs(normal.z);
+
+    Vector2 uv;
+    if (absX >= absY && absX >= absZ) {
+      // X-facing: project onto YZ plane
+      uv = {pos.z * textureScale, pos.y * textureScale};
+    } else if (absY >= absX && absY >= absZ) {
+      // Y-facing: project onto XZ plane
+      uv = {pos.x * textureScale, pos.z * textureScale};
+    } else {
+      // Z-facing: project onto XY plane
+      uv = {pos.x * textureScale, pos.y * textureScale};
+    }
+    texcoords[v] = uv;
 
     float intensity = Vector3DotProduct(normal, lightDir);
     intensity = Clamp(intensity, 0.0f, 1.0f);
@@ -107,11 +128,13 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
     std::vector<Vector3> chunkPositions;
     std::vector<Vector3> chunkNormals;
     std::vector<Color> chunkColors;
+    std::vector<Vector2> chunkTexcoords;
     std::vector<unsigned short> chunkIndices;
 
     chunkPositions.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
     chunkNormals.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
     chunkColors.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
+    chunkTexcoords.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
     chunkIndices.reserve(std::min(kMaxVerticesPerMesh, vertexCount) * 3);
 
     while (triIndex < triangleCount) {
@@ -140,6 +163,7 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
           chunkPositions.push_back(positions[original]);
           chunkNormals.push_back(normals[original]);
           chunkColors.push_back(colors[original]);
+          chunkTexcoords.push_back(texcoords[original]);
         }
         chunkIndices.push_back(static_cast<unsigned short>(remap[original]));
       }
@@ -152,8 +176,8 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
     chunkMesh.vertices = static_cast<float*>(MemAlloc(chunkVertexCount * 3 * sizeof(float)));
     chunkMesh.normals = static_cast<float*>(MemAlloc(chunkVertexCount * 3 * sizeof(float)));
     chunkMesh.colors = static_cast<unsigned char*>(MemAlloc(chunkVertexCount * 4 * sizeof(unsigned char)));
+    chunkMesh.texcoords = static_cast<float*>(MemAlloc(chunkVertexCount * 2 * sizeof(float)));
     chunkMesh.indices = static_cast<unsigned short*>(MemAlloc(chunkIndices.size() * sizeof(unsigned short)));
-    chunkMesh.texcoords = nullptr;
     chunkMesh.texcoords2 = nullptr;
     chunkMesh.tangents = nullptr;
 
@@ -173,6 +197,10 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
       chunkMesh.colors[v * 4 + 1] = color.g;
       chunkMesh.colors[v * 4 + 2] = color.b;
       chunkMesh.colors[v * 4 + 3] = color.a;
+
+      const Vector2& uv = chunkTexcoords[v];
+      chunkMesh.texcoords[v * 2 + 0] = uv.x;
+      chunkMesh.texcoords[v * 2 + 1] = uv.y;
     }
 
     std::memcpy(chunkMesh.indices, chunkIndices.data(), chunkIndices.size() * sizeof(unsigned short));
@@ -233,9 +261,15 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
 
   std::vector<ModelWithColor> result;
   result.reserve(meshes.size());
+  size_t idx = 0;
   for (auto& [meshGL, color] : meshes) {
     Model model = CreateRaylibModelFrom(meshGL, color);
-    result.push_back({model, color});
+    std::string materialId;
+    if (idx < sceneData.objects.size()) {
+      materialId = sceneData.objects[idx].materialId;
+    }
+    result.push_back({model, color, materialId});
+    idx++;
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -254,7 +288,7 @@ std::vector<ModelWithColor> CreateModelsFromPrecomputed(std::vector<PrecomputedM
 
   for (auto& mesh : meshes) {
     Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
-    result.push_back({model, mesh.color});
+    result.push_back({model, mesh.color, mesh.materialId});
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(

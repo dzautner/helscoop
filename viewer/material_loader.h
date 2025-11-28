@@ -19,4 +19,11 @@ extern MaterialLibrary g_materialLibrary;
 // Initialize global material library
 bool InitMaterialLibrary(const std::filesystem::path& basePath);
 
+// Load textures for all materials that have texture paths
+// Must be called from main thread after OpenGL is initialized
+void LoadMaterialTextures();
+
+// Unload all loaded textures
+void UnloadMaterialTextures();
+
 }  // namespace dingcad
