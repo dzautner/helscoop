@@ -14,11 +14,16 @@ set_target_properties(dingcad_quickjs PROPERTIES LINKER_LANGUAGE C)
 add_executable(dingcad_viewer
   main.cpp
   js_bindings.cpp
+  file_utils.cpp
+  mesh_utils.cpp
+  scene_loader.cpp
+  ui_panels.cpp
   primitives/wall.cpp
 )
 
 target_include_directories(dingcad_viewer
   PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/vendor/manifold/include
     ${PROJECT_SOURCE_DIR}/vendor/quickjs
     ${PROJECT_SOURCE_DIR}/vendor
