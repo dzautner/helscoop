@@ -21,12 +21,14 @@ ThermalAnalysisResult CalculateThermalLoss(
   result.minHeatFlux = std::numeric_limits<float>::max();
   result.maxHeatFlux = 0.0f;
 
-  // Build a map of materialId -> total surface area from all MaterialItems
-  // Each MaterialItem has its own surfaceArea, so we sum them by materialId
+  // Build a map of materialId -> total surface area
+  // NOTE: scene_loader.cpp already calculates the total area per materialId from geometry
+  // and assigns the SAME total to EACH MaterialItem with that ID. So we must NOT sum
+  // duplicates here - just take the first occurrence of each materialId.
   std::unordered_map<std::string, float> areaByMaterial;
   for (const auto& mat : materials) {
-    if (!mat.materialId.empty()) {
-      areaByMaterial[mat.materialId] += mat.surfaceArea;
+    if (!mat.materialId.empty() && areaByMaterial.count(mat.materialId) == 0) {
+      areaByMaterial[mat.materialId] = mat.surfaceArea;
     }
   }
 
@@ -51,11 +53,21 @@ ThermalAnalysisResult CalculateThermalLoss(
     // Only count ENVELOPE materials for thermal calculations
     // Skip structural elements (lumber), finishes (paint), hardware, fasteners, etc.
     // These are either inside the wall cavity or don't form the thermal barrier
+    //
+    // NOTE: When explicit insulation geometry exists:
+    // - "sheathing" (e.g. plywood): structural/weatherproofing, not thermal barrier
+    // - "roofing" (e.g. metal): weather protection, not thermal barrier
+    // These are NOT counted because insulation is the actual thermal barrier.
+    // Counting both would double-count the same wall/roof area.
+    //
+    // Only count:
+    // - "insulation": the actual thermal barrier (R=2.86 for 100mm mineral wool)
+    //
+    // NOTE: "masonry" (foundations) is NOT counted because it contacts the ground
+    // (~10°C year-round), not the outside air temperature. Ground-contact heat
+    // transfer requires different calculations with a different ΔT.
     const std::string& category = mat->category;
-    bool isEnvelopeMaterial = (category == "sheathing" ||
-                               category == "roofing" ||
-                               category == "insulation" ||
-                               category == "masonry");
+    bool isEnvelopeMaterial = (category == "insulation");
     if (!isEnvelopeMaterial) continue;
 
     // Get the TOTAL area for this material (summed from all objects using it)
@@ -72,17 +84,11 @@ ThermalAnalysisResult CalculateThermalLoss(
     // R_total = R_si + R_material + R_cavity + R_se
     float R_material = mat->thermal.getRValue();
 
-    // For sheathing materials (walls), add cavity R-value
-    // Wall() primitive creates framed walls with cavities - assume basic insulation
-    // Air gap (uninsulated): ~0.18 m²·K/W
-    // 100mm mineral wool: ~2.86 m²·K/W (0.1m / 0.035 W/mK)
-    // We'll assume a conservatively insulated cavity (~2.0 m²·K/W)
-    float R_cavity = 0.0f;
-    if (category == "sheathing") {
-      R_cavity = 2.0f;  // Assume wall cavity has ~100mm basic insulation
-    }
+    // Note: Wall/roof insulation is now modeled explicitly with insulation_100mm material
+    // The 'insulation' category will be picked up and its R-value calculated from
+    // the material's thermal properties (conductivity 0.035 W/mK, thickness 100mm = R=2.86)
 
-    float R_total = settings.surfaceRInside + R_material + R_cavity + settings.surfaceROutside;
+    float R_total = settings.surfaceRInside + R_material + settings.surfaceROutside;
 
     // U-value (thermal transmittance)
     float U = 1.0f / R_total;
