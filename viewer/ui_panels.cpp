@@ -4,11 +4,34 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <unordered_map>
 
 namespace dingcad {
+
+// Helper function to check if a string contains another (case-insensitive)
+static bool containsIgnoreCase(const std::string& haystack, const std::string& needle) {
+  if (needle.empty()) return true;
+  std::string lowerHaystack = haystack;
+  std::string lowerNeedle = needle;
+  std::transform(lowerHaystack.begin(), lowerHaystack.end(), lowerHaystack.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(lowerNeedle.begin(), lowerNeedle.end(), lowerNeedle.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return lowerHaystack.find(lowerNeedle) != std::string::npos;
+}
+
+// Check if material matches the search filter
+static bool materialMatchesFilter(const MaterialItem& mat, const char* filterText) {
+  if (filterText[0] == '\0') return true;
+  std::string filter(filterText);
+  return containsIgnoreCase(mat.name, filter) ||
+         containsIgnoreCase(mat.category, filter) ||
+         containsIgnoreCase(mat.materialId, filter);
+}
 
 void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
                         UIState& uiState,
@@ -22,6 +45,7 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   const float panelHeight = static_cast<float>(screenHeight) - 100.0f;
   const float rowHeight = 24.0f;
   const float headerHeight = 30.0f;
+  const float searchBoxHeight = 26.0f;
   const float sectionHeight = 26.0f;
   const float colorSwatchSize = 14.0f;
   const float footerHeight = 50.0f;
@@ -32,24 +56,33 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
 
   Vector2 mousePos = GetMousePosition();
 
-  // Calculate totals and content height
+  // Calculate totals and content height (only for filtered materials)
   std::unordered_map<std::string, float> categoryTotals;
   float totalCost = 0.0f;
+  float filteredTotalCost = 0.0f;
   float contentHeight = 5.0f;  // Initial padding
   std::string prevCategory;
+  int filteredCount = 0;
   for (const auto& mat : materials) {
+    // Always calculate full totals for footer display
     categoryTotals[mat.category] += mat.unitPrice * mat.quantity;
     totalCost += mat.unitPrice * mat.quantity;
-    if (mat.category != prevCategory) {
-      prevCategory = mat.category;
-      contentHeight += 5.0f + sectionHeight;  // Category header
+
+    // Calculate content height only for filtered items
+    if (materialMatchesFilter(mat, uiState.materialFilterText)) {
+      filteredCount++;
+      filteredTotalCost += mat.unitPrice * mat.quantity;
+      if (mat.category != prevCategory) {
+        prevCategory = mat.category;
+        contentHeight += 5.0f + sectionHeight;  // Category header
+      }
+      contentHeight += rowHeight;
     }
-    contentHeight += rowHeight;
   }
 
-  // Scrollable area dimensions
-  const float scrollAreaY = panelY + headerHeight;
-  const float scrollAreaHeight = panelHeight - headerHeight - footerHeight;
+  // Scrollable area dimensions (account for search box)
+  const float scrollAreaY = panelY + headerHeight + searchBoxHeight;
+  const float scrollAreaHeight = panelHeight - headerHeight - searchBoxHeight - footerHeight;
   const float maxScroll = std::max(0.0f, contentHeight - scrollAreaHeight);
 
   // Panel background
@@ -63,6 +96,70 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   DrawTextEx(uiFont, "MATERIALS & PRICING", {panelX + 10, panelY + 8}, 19.0f, 0.0f, DARKGRAY);
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
+
+  // Search box
+  float searchY = panelY + headerHeight + 3.0f;
+  Rectangle searchRect = {panelX + 10, searchY, panelWidth - 20, searchBoxHeight - 6.0f};
+
+  // Draw search box background
+  DrawRectangleRec(searchRect, Fade(LIGHTGRAY, 0.2f));
+  DrawRectangleLinesEx(searchRect, 1.0f, uiState.materialFilterActive ? BLUE : GRAY);
+
+  // Handle search box focus
+  if (CheckCollisionPointRec(mousePos, searchRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    uiState.materialFilterActive = true;
+  } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(mousePos, searchRect)) {
+    uiState.materialFilterActive = false;
+  }
+
+  // Handle text input when search box is active
+  if (uiState.materialFilterActive) {
+    int key = GetCharPressed();
+    size_t len = strlen(uiState.materialFilterText);
+    while (key > 0) {
+      if ((key >= 32) && (key <= 125) && (len < sizeof(uiState.materialFilterText) - 1)) {
+        uiState.materialFilterText[len] = static_cast<char>(key);
+        uiState.materialFilterText[len + 1] = '\0';
+        len++;
+        uiState.materialScrollOffset = 0.0f;  // Reset scroll when filter changes
+      }
+      key = GetCharPressed();
+    }
+    if (IsKeyPressed(KEY_BACKSPACE) && len > 0) {
+      uiState.materialFilterText[len - 1] = '\0';
+      uiState.materialScrollOffset = 0.0f;
+    }
+    if (IsKeyPressed(KEY_ESCAPE)) {
+      uiState.materialFilterActive = false;
+    }
+  }
+
+  // Draw search text or placeholder
+  const char* searchDisplayText = (uiState.materialFilterText[0] != '\0')
+                                      ? uiState.materialFilterText
+                                      : "Search materials...";
+  Color searchTextColor = (uiState.materialFilterText[0] != '\0') ? DARKGRAY : GRAY;
+  DrawTextEx(uiFont, searchDisplayText, {searchRect.x + 5, searchRect.y + 3}, 12.0f, 0.0f, searchTextColor);
+
+  // Draw cursor when active
+  if (uiState.materialFilterActive && ((static_cast<int>(GetTime() * 2.0f) % 2) == 0)) {
+    float cursorX = searchRect.x + 5 + MeasureTextEx(uiFont, uiState.materialFilterText, 12.0f, 0.0f).x + 1;
+    DrawLine(static_cast<int>(cursorX), static_cast<int>(searchRect.y + 3),
+             static_cast<int>(cursorX), static_cast<int>(searchRect.y + 15), DARKGRAY);
+  }
+
+  // Draw filter indicator and clear button if filtering
+  if (uiState.materialFilterText[0] != '\0') {
+    // Clear button (X)
+    Rectangle clearRect = {searchRect.x + searchRect.width - 18, searchRect.y + 2, 16, 16};
+    bool clearHovered = CheckCollisionPointRec(mousePos, clearRect);
+    DrawTextEx(uiFont, "X", {clearRect.x + 4, clearRect.y + 1}, 12.0f, 0.0f,
+               clearHovered ? RED : GRAY);
+    if (clearHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+      uiState.materialFilterText[0] = '\0';
+      uiState.materialScrollOffset = 0.0f;
+    }
+  }
 
   // Handle mouse wheel scrolling when over panel
   Rectangle panelRect = {panelX, panelY, panelWidth, panelHeight};
@@ -82,6 +179,11 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   std::string currentCategory;
 
   for (const auto& mat : materials) {
+    // Skip materials that don't match the filter
+    if (!materialMatchesFilter(mat, uiState.materialFilterText)) {
+      continue;
+    }
+
     // Category header
     if (mat.category != currentCategory) {
       currentCategory = mat.category;
@@ -192,9 +294,15 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(footerY + 5),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(footerY + 5), DARKGRAY);
 
-  char totalText[64];
-  snprintf(totalText, sizeof(totalText), "TOTAL: %.2f EUR", totalCost);
-  DrawTextEx(uiFont, totalText, {panelX + 10, footerY + 15}, 17.0f, 0.0f, DARKGRAY);
+  // Show filtered or total cost
+  char totalText[80];
+  if (uiState.materialFilterText[0] != '\0') {
+    snprintf(totalText, sizeof(totalText), "SHOWING %d/%zu (%.0f EUR)",
+             filteredCount, materials.size(), filteredTotalCost);
+  } else {
+    snprintf(totalText, sizeof(totalText), "TOTAL: %.2f EUR", totalCost);
+  }
+  DrawTextEx(uiFont, totalText, {panelX + 10, footerY + 15}, 16.0f, 0.0f, DARKGRAY);
 
   // Hotkey hint and instructions
   DrawTextEx(uiFont, "[M] TOGGLE  SHIFT+CLICK 3D=SELECT",

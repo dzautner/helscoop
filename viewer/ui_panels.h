@@ -24,6 +24,10 @@ struct UIState {
   // Scroll offsets for panels
   float materialScrollOffset = 0.0f;
   float parameterScrollOffset = 0.0f;
+
+  // Material search/filter
+  char materialFilterText[64] = "";
+  bool materialFilterActive = false;
 };
 
 // Draw materials panel on left side (updates uiState.hoveredMaterialId)
