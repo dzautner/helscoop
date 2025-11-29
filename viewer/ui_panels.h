@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "thermal.h"
 #include "raylib.h"
 
 #include <filesystem>
@@ -13,6 +14,8 @@ namespace dingcad {
 struct UIState {
   bool showParametersPanel = true;
   bool showMaterialsPanel = true;
+  bool showThermalPanel = false;
+  bool thermalViewEnabled = false;
   bool liveUpdatesEnabled = true;
   int draggingParamIndex = -1;
   float draggingStartValue = 0.0f;
@@ -28,6 +31,9 @@ struct UIState {
   // Material search/filter
   char materialFilterText[64] = "";
   bool materialFilterActive = false;
+
+  // Thermal settings (user-adjustable)
+  ThermalSettings thermalSettings;
 };
 
 // Draw materials panel on left side (updates uiState.hoveredMaterialId)
@@ -49,6 +55,18 @@ bool IsMouseOverPanels(const std::vector<MaterialItem>& materials,
                        const std::vector<SceneParameter>& parameters,
                        bool showMaterialsPanel,
                        bool showParametersPanel,
+                       int screenWidth, int screenHeight);
+
+// Draw thermal analysis panel (bottom left when enabled)
+// Returns true if thermal settings were modified (need recalculation)
+bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
+                      UIState& uiState,
+                      const Font& uiFont,
+                      int screenWidth, int screenHeight);
+
+// Draw a color scale legend for thermal view
+void DrawThermalLegend(float minFlux, float maxFlux,
+                       const Font& uiFont,
                        int screenWidth, int screenHeight);
 
 }  // namespace dingcad

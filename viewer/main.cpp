@@ -25,6 +25,7 @@ extern "C" {
 #include "scene_loader.h"
 #include "material_loader.h"
 #include "ui_panels.h"
+#include "thermal.h"
 
 using namespace dingcad;
 
@@ -159,6 +160,8 @@ int main(int argc, char *argv[]) {
   UIState uiState;
   std::vector<SceneParameter> sceneParameters;
   std::vector<MaterialItem> sceneMaterials = std::move(initialMaterials);
+  ThermalAnalysisResult thermalResult;
+  bool thermalResultDirty = true;  // Flag to recalculate when scene changes
 
   auto refreshParameters = [&]() {
     if (!scriptPath.empty()) {
@@ -338,6 +341,7 @@ int main(int argc, char *argv[]) {
       reportStatus(result.message);
       sceneParameters = ParseSceneParameters(scriptPath);
       sceneMaterials = std::move(result.materials);
+      thermalResultDirty = true;  // Recalculate thermal after scene reload
       TraceLog(LOG_INFO, "Updated %zu parameters and %zu materials from reload",
                sceneParameters.size(), sceneMaterials.size());
       TraceLog(LOG_INFO, "PROFILE: Background load completed, total wall time: %lld ms", totalMs);
@@ -379,32 +383,44 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if (IsKeyPressed(KEY_R) && !scriptPath.empty()) {
-      startBackgroundLoad();
+    // Skip global hotkeys when search filter is active (typing in search box)
+    if (!uiState.materialFilterActive) {
+      if (IsKeyPressed(KEY_R) && !scriptPath.empty()) {
+        startBackgroundLoad();
+      }
+
+      // Panel toggle hotkeys
+      if (IsKeyPressed(KEY_T)) {
+        uiState.showParametersPanel = !uiState.showParametersPanel;
+      }
+      if (IsKeyPressed(KEY_M)) {
+        uiState.showMaterialsPanel = !uiState.showMaterialsPanel;
+      }
+      if (IsKeyPressed(KEY_H)) {
+        uiState.thermalViewEnabled = !uiState.thermalViewEnabled;
+        uiState.showThermalPanel = uiState.thermalViewEnabled;
+        if (uiState.thermalViewEnabled) {
+          thermalResultDirty = true;  // Recalculate on toggle
+        }
+      }
     }
 
-    // Panel toggle hotkeys
-    if (IsKeyPressed(KEY_T)) {
-      uiState.showParametersPanel = !uiState.showParametersPanel;
-    }
-    if (IsKeyPressed(KEY_M)) {
-      uiState.showMaterialsPanel = !uiState.showMaterialsPanel;
-    }
-
-    // Export handling
+    // Export handling - also skip when filter is active
     static bool prevPDown = false;
     bool exportRequested = false;
 
-    for (int key = GetKeyPressed(); key != 0; key = GetKeyPressed()) {
-      if (key == KEY_P) exportRequested = true;
+    if (!uiState.materialFilterActive) {
+      for (int key = GetKeyPressed(); key != 0; key = GetKeyPressed()) {
+        if (key == KEY_P) exportRequested = true;
+      }
+      for (int ch = GetCharPressed(); ch != 0; ch = GetCharPressed()) {
+        if (ch == 'p' || ch == 'P') exportRequested = true;
+      }
+      const bool pDown = IsKeyDown(KEY_P);
+      if (pDown && !prevPDown) exportRequested = true;
+      prevPDown = pDown;
+      if (!exportRequested && IsKeyPressed(KEY_P)) exportRequested = true;
     }
-    for (int ch = GetCharPressed(); ch != 0; ch = GetCharPressed()) {
-      if (ch == 'p' || ch == 'P') exportRequested = true;
-    }
-    const bool pDown = IsKeyDown(KEY_P);
-    if (pDown && !prevPDown) exportRequested = true;
-    prevPDown = pDown;
-    if (!exportRequested && IsKeyPressed(KEY_P)) exportRequested = true;
 
     if (exportRequested && !sceneData.objects.empty()) {
       std::vector<manifold::Manifold> allGeometry;
@@ -514,20 +530,23 @@ int main(int argc, char *argv[]) {
       camera.target = Vector3Add(camera.target, Vector3Scale(camUp, -mouseDelta.y * 0.01f * orbitDistance));
     }
 
-    if (IsKeyPressed(KEY_SPACE)) {
-      camera.target = initialTarget;
-      orbitDistance = initialDistance;
-      orbitYaw = initialYaw;
-      orbitPitch = initialPitch;
-    }
+    // Skip camera movement keys when search filter is active
+    if (!uiState.materialFilterActive) {
+      if (IsKeyPressed(KEY_SPACE)) {
+        camera.target = initialTarget;
+        orbitDistance = initialDistance;
+        orbitYaw = initialYaw;
+        orbitPitch = initialPitch;
+      }
 
-    const float moveSpeed = 0.05f * orbitDistance;
-    if (IsKeyDown(KEY_W)) camera.target = Vector3Add(camera.target, Vector3Scale(forward, moveSpeed));
-    if (IsKeyDown(KEY_S)) camera.target = Vector3Add(camera.target, Vector3Scale(forward, -moveSpeed));
-    if (IsKeyDown(KEY_A)) camera.target = Vector3Add(camera.target, Vector3Scale(right, -moveSpeed));
-    if (IsKeyDown(KEY_D)) camera.target = Vector3Add(camera.target, Vector3Scale(right, moveSpeed));
-    if (IsKeyDown(KEY_Q)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, -moveSpeed));
-    if (IsKeyDown(KEY_E)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, moveSpeed));
+      const float moveSpeed = 0.05f * orbitDistance;
+      if (IsKeyDown(KEY_W)) camera.target = Vector3Add(camera.target, Vector3Scale(forward, moveSpeed));
+      if (IsKeyDown(KEY_S)) camera.target = Vector3Add(camera.target, Vector3Scale(forward, -moveSpeed));
+      if (IsKeyDown(KEY_A)) camera.target = Vector3Add(camera.target, Vector3Scale(right, -moveSpeed));
+      if (IsKeyDown(KEY_D)) camera.target = Vector3Add(camera.target, Vector3Scale(right, moveSpeed));
+      if (IsKeyDown(KEY_Q)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, -moveSpeed));
+      if (IsKeyDown(KEY_E)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, moveSpeed));
+    }
 
     const Vector3 offsets = {
         orbitDistance * cosf(orbitPitch) * sinf(orbitYaw),
@@ -576,6 +595,23 @@ int main(int argc, char *argv[]) {
     SetShaderValue(normalDepthShader, locNear, &zNear, SHADER_UNIFORM_FLOAT);
     SetShaderValue(normalDepthShader, locFar, &zFar, SHADER_UNIFORM_FLOAT);
 
+    // Recalculate thermal analysis if needed
+    if (uiState.thermalViewEnabled && thermalResultDirty) {
+      thermalResult = CalculateThermalLoss(models, sceneMaterials, g_materialLibrary, uiState.thermalSettings);
+      thermalResultDirty = false;
+      TraceLog(LOG_INFO, "Thermal analysis: %.1f W total heat loss, %zu surfaces",
+               thermalResult.totalHeatLoss_W, thermalResult.surfaces.size());
+    }
+
+    // Build thermal color lookup map for rendering
+    std::unordered_map<std::string, Color> thermalColorByMaterial;
+    if (uiState.thermalViewEnabled) {
+      for (const auto& surface : thermalResult.surfaces) {
+        thermalColorByMaterial[surface.materialId] = HeatFluxToColor(
+            surface.heatFluxDensity, thermalResult.minHeatFlux, thermalResult.maxHeatFlux);
+      }
+    }
+
     // Render to color texture
     BeginTextureMode(rtColor);
     ClearBackground(RAYWHITE);
@@ -614,10 +650,19 @@ int main(int argc, char *argv[]) {
 
     // Toon shading pass
     for (const auto &modelWithColor : models) {
+      // Use thermal color if thermal view is enabled and material has thermal data
+      Color renderColor = modelWithColor.color;
+      if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
+        auto it = thermalColorByMaterial.find(modelWithColor.materialId);
+        if (it != thermalColorByMaterial.end()) {
+          renderColor = it->second;
+        }
+      }
+
       const float modelColor[4] = {
-        modelWithColor.color.r / 255.0f,
-        modelWithColor.color.g / 255.0f,
-        modelWithColor.color.b / 255.0f,
+        renderColor.r / 255.0f,
+        renderColor.g / 255.0f,
+        renderColor.b / 255.0f,
         1.0f
       };
       SetShaderValue(toonShader, locBaseColor, modelColor, SHADER_UNIFORM_VEC4);
@@ -698,6 +743,18 @@ int main(int argc, char *argv[]) {
                                               screenWidth, screenHeight,
                                               loadingInBackground, scriptPath);
       (void)paramWritten;  // File watcher handles reload
+    }
+
+    // Thermal view UI
+    if (uiState.thermalViewEnabled) {
+      if (uiState.showThermalPanel) {
+        if (DrawThermalPanel(thermalResult, uiState, uiFont, screenWidth, screenHeight)) {
+          // Thermal settings changed - trigger recalculation
+          thermalResultDirty = true;
+        }
+      }
+      DrawThermalLegend(thermalResult.minHeatFlux, thermalResult.maxHeatFlux,
+                        uiFont, screenWidth, screenHeight);
     }
 
     EndDrawing();

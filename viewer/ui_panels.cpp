@@ -33,6 +33,15 @@ static bool materialMatchesFilter(const MaterialItem& mat, const char* filterTex
          containsIgnoreCase(mat.materialId, filter);
 }
 
+// Get thermal panel bounds for click blocking
+static Rectangle GetThermalPanelBounds(int screenHeight) {
+  const float panelWidth = 340.0f;
+  const float panelHeight = 420.0f;  // Matches DrawThermalPanel
+  const float panelX = 10.0f;
+  const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
+  return {panelX, panelY, panelWidth, panelHeight};
+}
+
 void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
                         UIState& uiState,
                         const Font& uiFont,
@@ -205,10 +214,18 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
 
     // Only process row if visible
     if (yPos + rowHeight > scrollAreaY && yPos < scrollAreaY + scrollAreaHeight) {
-      // Check if mouse is over this row (only within scroll area)
+      // Check if mouse is over thermal panel (to prevent hover/click through)
+      bool mouseOverThermalPanel = false;
+      if (uiState.thermalViewEnabled) {
+        Rectangle thermalBounds = GetThermalPanelBounds(screenHeight);
+        mouseOverThermalPanel = CheckCollisionPointRec(mousePos, thermalBounds);
+      }
+
+      // Check if mouse is over this row (only within scroll area, not over thermal panel)
       Rectangle rowRect = {panelX + 5, yPos, panelWidth - 10 - scrollbarWidth, rowHeight};
       bool isHovered = CheckCollisionPointRec(mousePos, rowRect) &&
-                       mousePos.y >= scrollAreaY && mousePos.y < scrollAreaY + scrollAreaHeight;
+                       mousePos.y >= scrollAreaY && mousePos.y < scrollAreaY + scrollAreaHeight &&
+                       !mouseOverThermalPanel;
       bool isSelected = !uiState.selectedMaterialId.empty() &&
                         uiState.selectedMaterialId == mat.materialId;
 
@@ -221,7 +238,7 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
         }
       }
 
-      // Handle click to select/open link
+      // Handle click to select/open link (isHovered already excludes thermal panel)
       if (isHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (uiState.selectedMaterialId == mat.materialId) {
           // Already selected - open link if available
@@ -450,6 +467,318 @@ bool IsMouseOverPanels(const std::vector<MaterialItem>& materials,
   }
 
   return false;
+}
+
+bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
+                      UIState& uiState,
+                      const Font& uiFont,
+                      int screenWidth, int screenHeight) {
+  bool settingsChanged = false;
+
+  const float panelWidth = 340.0f;
+  const float panelHeight = 420.0f;  // Compact visual display
+  const float panelX = 10.0f;
+  const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
+  const float sliderWidth = panelWidth - 80.0f;
+
+  // Panel background
+  DrawRectangle(static_cast<int>(panelX), static_cast<int>(panelY),
+                static_cast<int>(panelWidth), static_cast<int>(panelHeight),
+                Fade(Color{30, 30, 40, 255}, 0.95f));
+  DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
+                     static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
+
+  float yPos = panelY + 10.0f;
+  ThermalSettings& settings = uiState.thermalSettings;
+
+  // Title
+  DrawTextEx(uiFont, "THERMAL SIMULATION", {panelX + 10, yPos}, 18.0f, 0.0f, WHITE);
+  yPos += 28.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 8.0f;
+
+  // === VISUAL TEMPERATURE DISPLAY ===
+  // Two boxes: OUTSIDE (input) and INSIDE (calculated equilibrium temp)
+  float boxWidth = 90.0f;
+  float boxHeight = 60.0f;
+  float boxGap = 70.0f;  // Space for arrows
+  float boxStartX = panelX + (panelWidth - 2 * boxWidth - boxGap) / 2.0f;
+
+  // Outside temp box (left) - USER INPUT
+  float outsideBoxX = boxStartX;
+  Color outsideColor = settings.outsideTemp < 0 ? SKYBLUE : (settings.outsideTemp < 10 ? Color{100, 180, 255, 255} : GREEN);
+  DrawRectangle(static_cast<int>(outsideBoxX), static_cast<int>(yPos),
+                static_cast<int>(boxWidth), static_cast<int>(boxHeight), Fade(outsideColor, 0.3f));
+  DrawRectangleLines(static_cast<int>(outsideBoxX), static_cast<int>(yPos),
+                     static_cast<int>(boxWidth), static_cast<int>(boxHeight), outsideColor);
+  DrawTextEx(uiFont, "OUTSIDE", {outsideBoxX + 15, yPos + 5}, 11.0f, 0.0f, LIGHTGRAY);
+  char tempLabel[32];
+  snprintf(tempLabel, sizeof(tempLabel), "%.0f", settings.outsideTemp);
+  Vector2 tempSize = MeasureTextEx(uiFont, tempLabel, 28.0f, 0.0f);
+  DrawTextEx(uiFont, tempLabel, {outsideBoxX + (boxWidth - tempSize.x) / 2.0f, yPos + 22}, 28.0f, 0.0f, outsideColor);
+  DrawTextEx(uiFont, "\xc2\xb0""C", {outsideBoxX + (boxWidth + tempSize.x) / 2.0f + 2, yPos + 26}, 14.0f, 0.0f, outsideColor);
+
+  // Inside temp box (right) - CALCULATED OUTPUT (equilibrium temperature)
+  float insideBoxX = outsideBoxX + boxWidth + boxGap;
+  float insideTemp = thermalResult.equilibriumTemp;  // This is the OUTPUT!
+  Color insideColor = insideTemp < 0 ? RED : (insideTemp < 10 ? ORANGE : GREEN);
+  DrawRectangle(static_cast<int>(insideBoxX), static_cast<int>(yPos),
+                static_cast<int>(boxWidth), static_cast<int>(boxHeight), Fade(insideColor, 0.3f));
+  DrawRectangleLines(static_cast<int>(insideBoxX), static_cast<int>(yPos),
+                     static_cast<int>(boxWidth), static_cast<int>(boxHeight), insideColor);
+  DrawTextEx(uiFont, "INSIDE", {insideBoxX + 20, yPos + 5}, 11.0f, 0.0f, LIGHTGRAY);
+  snprintf(tempLabel, sizeof(tempLabel), "%.1f", insideTemp);
+  tempSize = MeasureTextEx(uiFont, tempLabel, 24.0f, 0.0f);
+  DrawTextEx(uiFont, tempLabel, {insideBoxX + (boxWidth - tempSize.x) / 2.0f, yPos + 24}, 24.0f, 0.0f, insideColor);
+  DrawTextEx(uiFont, "\xc2\xb0""C", {insideBoxX + (boxWidth + tempSize.x) / 2.0f + 2, yPos + 28}, 12.0f, 0.0f, insideColor);
+  // Label indicating this is calculated
+  DrawTextEx(uiFont, "(calculated)", {insideBoxX + 12, yPos + 48}, 9.0f, 0.0f, DARKGRAY);
+
+  // Heat flow arrows (animated pulse based on heat loss)
+  float arrowCenterX = outsideBoxX + boxWidth + boxGap / 2.0f;
+  float arrowY = yPos + boxHeight / 2.0f;
+  float arrowLen = 25.0f;
+
+  // Animate arrows with pulsing based on time
+  float pulse = 0.5f + 0.5f * sinf(static_cast<float>(GetTime()) * 4.0f);
+  // Delta is now based on equilibrium temp vs outside temp
+  float eqDelta = insideTemp - settings.outsideTemp;
+  Color arrowColor = Fade(eqDelta > 0 ? RED : SKYBLUE, 0.6f + 0.4f * pulse);
+
+  if (eqDelta > 0) {
+    // Heat flowing OUT (inside warmer than outside) - arrows point left
+    for (int i = 0; i < 3; i++) {
+      float offset = static_cast<float>(i - 1) * 12.0f;
+      float ax = arrowCenterX + offset;
+      // Arrow pointing left (heat escaping)
+      DrawLine(static_cast<int>(ax + arrowLen/2), static_cast<int>(arrowY),
+               static_cast<int>(ax - arrowLen/2), static_cast<int>(arrowY), arrowColor);
+      DrawLine(static_cast<int>(ax - arrowLen/2), static_cast<int>(arrowY),
+               static_cast<int>(ax - arrowLen/2 + 8), static_cast<int>(arrowY - 6), arrowColor);
+      DrawLine(static_cast<int>(ax - arrowLen/2), static_cast<int>(arrowY),
+               static_cast<int>(ax - arrowLen/2 + 8), static_cast<int>(arrowY + 6), arrowColor);
+    }
+    // Heat loss label
+    char lossLabel[32];
+    snprintf(lossLabel, sizeof(lossLabel), "%.0fW", thermalResult.totalHeatLoss_W);
+    Vector2 lossSize = MeasureTextEx(uiFont, lossLabel, 10.0f, 0.0f);
+    DrawTextEx(uiFont, lossLabel, {arrowCenterX - lossSize.x / 2.0f, arrowY + 12}, 10.0f, 0.0f, RED);
+  } else if (eqDelta < 0) {
+    // Heat flowing IN (outside warmer) - arrows point right
+    for (int i = 0; i < 3; i++) {
+      float offset = static_cast<float>(i - 1) * 12.0f;
+      float ax = arrowCenterX + offset;
+      DrawLine(static_cast<int>(ax - arrowLen/2), static_cast<int>(arrowY),
+               static_cast<int>(ax + arrowLen/2), static_cast<int>(arrowY), arrowColor);
+      DrawLine(static_cast<int>(ax + arrowLen/2), static_cast<int>(arrowY),
+               static_cast<int>(ax + arrowLen/2 - 8), static_cast<int>(arrowY - 6), arrowColor);
+      DrawLine(static_cast<int>(ax + arrowLen/2), static_cast<int>(arrowY),
+               static_cast<int>(ax + arrowLen/2 - 8), static_cast<int>(arrowY + 6), arrowColor);
+    }
+  } else {
+    // No heat flow
+    DrawTextEx(uiFont, "=", {arrowCenterX - 5, arrowY - 8}, 16.0f, 0.0f, GRAY);
+  }
+
+  yPos += boxHeight + 10.0f;
+
+  // Delta T prominently displayed (using equilibrium-based delta)
+  char deltaText[64];
+  snprintf(deltaText, sizeof(deltaText), "\xce\x94T = %.1f\xc2\xb0""C  (inside %s outside)",
+           eqDelta, eqDelta > 0 ? "warmer than" : (eqDelta < 0 ? "colder than" : "="));
+  DrawTextEx(uiFont, deltaText, {panelX + 10, yPos}, 11.0f, 0.0f,
+             eqDelta > 0 ? ORANGE : (eqDelta < 0 ? SKYBLUE : GRAY));
+  yPos += 18.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 6.0f;
+
+  // === OUTSIDE TEMPERATURE (the only input) ===
+  DrawTextEx(uiFont, "OUTSIDE TEMPERATURE", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  // Outside temperature slider with value display
+  char outTempLabel[16];
+  snprintf(outTempLabel, sizeof(outTempLabel), "%.0f\xc2\xb0""C", settings.outsideTemp);
+  DrawTextEx(uiFont, outTempLabel, {panelX + 10, yPos + 1}, 11.0f, 0.0f, SKYBLUE);
+  Rectangle outsideSlider = {panelX + 60, yPos, sliderWidth - 20, 12};
+  float oldOutside = settings.outsideTemp;
+  GuiSlider(outsideSlider, "", "", &settings.outsideTemp, -40.0f, 30.0f);
+  settings.outsideTemp = std::round(settings.outsideTemp);
+  if (settings.outsideTemp != oldOutside) settingsChanged = true;
+  yPos += 20.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 8.0f;
+
+  // === HEAT SOURCES ===
+  DrawTextEx(uiFont, "HEAT SOURCES", {panelX + 10, yPos}, 12.0f, 0.0f, SKYBLUE);
+  yPos += 20.0f;
+
+  // Chickens checkbox and count
+  Rectangle chickenCheck = {panelX + 10, yPos, 14, 14};
+  bool oldChickensEnabled = settings.chickensEnabled;
+  GuiCheckBox(chickenCheck, "", &settings.chickensEnabled);
+  if (settings.chickensEnabled != oldChickensEnabled) settingsChanged = true;
+
+  DrawTextEx(uiFont, "CHICKENS", {panelX + 30, yPos + 1}, 11.0f, 0.0f,
+             settings.chickensEnabled ? WHITE : GRAY);
+
+  // Chicken count slider
+  float chickenCount = static_cast<float>(settings.chickenCount);
+  Rectangle chickenSlider = {panelX + 110, yPos, 120, 14};
+  float oldCount = chickenCount;
+  GuiSlider(chickenSlider, "", "", &chickenCount, 0.0f, 12.0f);
+  settings.chickenCount = static_cast<int>(std::round(chickenCount));
+  if (chickenCount != oldCount) settingsChanged = true;
+
+  char chickenLabel[32];
+  float chickenHeat = settings.chickensEnabled ? settings.chickenCount * settings.heatPerChicken_W : 0.0f;
+  snprintf(chickenLabel, sizeof(chickenLabel), "%d (%.0fW)", settings.chickenCount, chickenHeat);
+  float chickenLabelW = MeasureTextEx(uiFont, chickenLabel, 11.0f, 0.0f).x;
+  DrawTextEx(uiFont, chickenLabel, {panelX + panelWidth - chickenLabelW - 10, yPos + 1}, 11.0f, 0.0f,
+             settings.chickensEnabled ? ORANGE : GRAY);
+  yPos += 22.0f;
+
+  // Heater checkbox and power
+  Rectangle heaterCheck = {panelX + 10, yPos, 14, 14};
+  bool oldHeaterEnabled = settings.heaterEnabled;
+  GuiCheckBox(heaterCheck, "", &settings.heaterEnabled);
+  if (settings.heaterEnabled != oldHeaterEnabled) settingsChanged = true;
+
+  DrawTextEx(uiFont, "HEATER", {panelX + 30, yPos + 1}, 11.0f, 0.0f,
+             settings.heaterEnabled ? WHITE : GRAY);
+
+  // Heater power slider
+  Rectangle heaterSlider = {panelX + 110, yPos, 120, 14};
+  float oldPower = settings.heaterPower_W;
+  GuiSlider(heaterSlider, "", "", &settings.heaterPower_W, 0.0f, 500.0f);
+  settings.heaterPower_W = std::round(settings.heaterPower_W / 10.0f) * 10.0f;  // Round to 10W
+  if (settings.heaterPower_W != oldPower) settingsChanged = true;
+
+  char heaterLabel[32];
+  snprintf(heaterLabel, sizeof(heaterLabel), "%.0fW", settings.heaterEnabled ? settings.heaterPower_W : 0.0f);
+  float heaterLabelW = MeasureTextEx(uiFont, heaterLabel, 11.0f, 0.0f).x;
+  DrawTextEx(uiFont, heaterLabel, {panelX + panelWidth - heaterLabelW - 10, yPos + 1}, 11.0f, 0.0f,
+             settings.heaterEnabled ? RED : GRAY);
+  yPos += 22.0f;
+
+  // Total heat input
+  char inputText[48];
+  snprintf(inputText, sizeof(inputText), "TOTAL HEAT INPUT: %.0fW", thermalResult.totalHeatInput_W);
+  DrawTextEx(uiFont, inputText, {panelX + 10, yPos}, 11.0f, 0.0f, LIGHTGRAY);
+  yPos += 22.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 8.0f;
+
+  // === ANALYSIS RESULTS ===
+  DrawTextEx(uiFont, "THERMAL ANALYSIS", {panelX + 10, yPos}, 12.0f, 0.0f, SKYBLUE);
+  yPos += 20.0f;
+
+  // Total heat loss
+  char heatText[64];
+  snprintf(heatText, sizeof(heatText), "HEAT LOSS: %.0fW (%.2f kW)",
+           thermalResult.totalHeatLoss_W, thermalResult.heatingPower_kW);
+  DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 12.0f, 0.0f, ORANGE);
+  yPos += 20.0f;
+
+  // Heat balance (is heat input sufficient?)
+  Color balanceColor = thermalResult.heatBalance_W >= 0 ? GREEN : RED;
+  const char* balanceSign = thermalResult.heatBalance_W >= 0 ? "+" : "";
+  snprintf(heatText, sizeof(heatText), "HEAT BALANCE: %s%.0fW",
+           balanceSign, thermalResult.heatBalance_W);
+  DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 12.0f, 0.0f, balanceColor);
+  yPos += 20.0f;
+
+  // Heat flux range
+  snprintf(heatText, sizeof(heatText), "FLUX RANGE: %.0f - %.0f W/m2",
+           thermalResult.minHeatFlux, thermalResult.maxHeatFlux);
+  DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 10.0f, 0.0f, LIGHTGRAY);
+  yPos += 18.0f;
+
+  // UA coefficient
+  snprintf(heatText, sizeof(heatText), "UA COEFFICIENT: %.1f W/K", thermalResult.totalUA);
+  DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 10.0f, 0.0f, LIGHTGRAY);
+  yPos += 20.0f;
+
+  // Status message
+  const char* statusMsg;
+  Color statusColor;
+  if (thermalResult.heatBalance_W >= 0) {
+    statusMsg = "WARMING - Heat input exceeds loss";
+    statusColor = GREEN;
+  } else if (thermalResult.equilibriumTemp >= 0) {
+    statusMsg = "COOLING - Will stabilize above freezing";
+    statusColor = YELLOW;
+  } else if (thermalResult.equilibriumTemp >= -10) {
+    statusMsg = "COLD - Consider adding heat source";
+    statusColor = ORANGE;
+  } else {
+    statusMsg = "CRITICAL - Requires heating!";
+    statusColor = RED;
+  }
+  DrawTextEx(uiFont, statusMsg, {panelX + 10, yPos}, 10.0f, 0.0f, statusColor);
+
+  // Hotkey hint
+  DrawTextEx(uiFont, "[H] TOGGLE VIEW", {panelX + 10, panelY + panelHeight - 18}, 10.0f, 0.0f, GRAY);
+
+  return settingsChanged;
+}
+
+void DrawThermalLegend(float minFlux, float maxFlux,
+                       const Font& uiFont,
+                       int screenWidth, int screenHeight) {
+  // Draw a horizontal color gradient legend at the bottom center
+  const float legendWidth = 300.0f;
+  const float legendHeight = 20.0f;
+  const float legendX = (static_cast<float>(screenWidth) - legendWidth) / 2.0f;
+  const float legendY = static_cast<float>(screenHeight) - 50.0f;
+
+  // Background
+  DrawRectangle(static_cast<int>(legendX - 10), static_cast<int>(legendY - 25),
+                static_cast<int>(legendWidth + 20), static_cast<int>(legendHeight + 45),
+                Fade(Color{20, 20, 30, 255}, 0.85f));
+
+  // Title
+  Vector2 titleSize = MeasureTextEx(uiFont, "HEAT FLUX (W/m2)", 12.0f, 0.0f);
+  DrawTextEx(uiFont, "HEAT FLUX (W/m2)",
+             {legendX + (legendWidth - titleSize.x) / 2.0f, legendY - 20.0f},
+             12.0f, 0.0f, WHITE);
+
+  // Draw gradient bar
+  for (int i = 0; i < static_cast<int>(legendWidth); ++i) {
+    float t = static_cast<float>(i) / legendWidth;
+    float flux = minFlux + t * (maxFlux - minFlux);
+    Color c = HeatFluxToColor(flux, minFlux, maxFlux);
+    DrawLine(static_cast<int>(legendX + i), static_cast<int>(legendY),
+             static_cast<int>(legendX + i), static_cast<int>(legendY + legendHeight), c);
+  }
+
+  // Border
+  DrawRectangleLines(static_cast<int>(legendX), static_cast<int>(legendY),
+                     static_cast<int>(legendWidth), static_cast<int>(legendHeight), WHITE);
+
+  // Labels
+  char minLabel[32], maxLabel[32];
+  snprintf(minLabel, sizeof(minLabel), "%.0f", minFlux);
+  snprintf(maxLabel, sizeof(maxLabel), "%.0f", maxFlux);
+
+  float labelY = legendY + legendHeight + 5.0f;
+  DrawTextEx(uiFont, minLabel, {legendX, labelY}, 11.0f, 0.0f, SKYBLUE);
+
+  Vector2 maxSize = MeasureTextEx(uiFont, maxLabel, 11.0f, 0.0f);
+  DrawTextEx(uiFont, maxLabel, {legendX + legendWidth - maxSize.x, labelY}, 11.0f, 0.0f, RED);
+
+  DrawTextEx(uiFont, "LOW", {legendX + 25.0f, labelY}, 10.0f, 0.0f, GRAY);
+
+  Vector2 highSize = MeasureTextEx(uiFont, "HIGH", 10.0f, 0.0f);
+  DrawTextEx(uiFont, "HIGH", {legendX + legendWidth - highSize.x - 5.0f, labelY}, 10.0f, 0.0f, GRAY);
 }
 
 }  // namespace dingcad
