@@ -142,6 +142,7 @@ struct MaterialItem {
   std::string unit;
   float unitPrice = 0.0f;
   int quantity = 0;
+  float surfaceArea = 0.0f;  // Total surface area in square meters
   Color color = {200, 200, 200, 255};  // Preview color from material library
 };
 

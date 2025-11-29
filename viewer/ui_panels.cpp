@@ -254,10 +254,21 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
       Color textColor = isHovered ? DARKBLUE : GRAY;
       DrawTextEx(uiFont, displayName.c_str(), {swatchX + colorSwatchSize + 6, yPos + 4}, 12.0f, 0.0f, textColor);
 
-      // Quantity and price on right
+      // Surface area and price on right
       float lineTotal = mat.unitPrice * mat.quantity;
-      char priceText[64];
-      snprintf(priceText, sizeof(priceText), "%dX%.0f", mat.quantity, lineTotal);
+      char priceText[80];
+      if (mat.surfaceArea > 0.0f) {
+        // Show surface area in m² (or cm² if very small)
+        if (mat.surfaceArea >= 0.01f) {
+          snprintf(priceText, sizeof(priceText), "%.2f m\xc2\xb2  %dX%.0f", mat.surfaceArea, mat.quantity, lineTotal);
+        } else {
+          // Convert to cm² for very small areas
+          float areaCm2 = mat.surfaceArea * 10000.0f;
+          snprintf(priceText, sizeof(priceText), "%.0f cm\xc2\xb2  %dX%.0f", areaCm2, mat.quantity, lineTotal);
+        }
+      } else {
+        snprintf(priceText, sizeof(priceText), "%dX%.0f", mat.quantity, lineTotal);
+      }
       float priceWidth = MeasureTextEx(uiFont, priceText, 11.0f, 0.0f).x;
       DrawTextEx(uiFont, priceText, {panelX + panelWidth - priceWidth - 15 - scrollbarWidth, yPos + 5}, 11.0f, 0.0f, GRAY);
     }

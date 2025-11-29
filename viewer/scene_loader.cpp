@@ -367,6 +367,25 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     JS_FreeValue(ctx, matLengthVal);
   }
 
+  // Calculate surface area per materialId from scene geometry
+  // First, build a map of materialId -> total surface area
+  std::unordered_map<std::string, double> surfaceAreaByMaterial;
+  for (const auto& obj : result.sceneData.objects) {
+    if (obj.geometry && !obj.materialId.empty()) {
+      double area = obj.geometry->SurfaceArea();
+      // Convert from mm² to m² (divide by 1,000,000)
+      surfaceAreaByMaterial[obj.materialId] += area / 1000000.0;
+    }
+  }
+
+  // Update each material item with its total surface area
+  for (auto& mat : result.materials) {
+    auto it = surfaceAreaByMaterial.find(mat.materialId);
+    if (it != surfaceAreaByMaterial.end()) {
+      mat.surfaceArea = static_cast<float>(it->second);
+    }
+  }
+
   result.success = true;
   result.message = "Loaded " + absolutePath.string() + " (" +
                    std::to_string(result.sceneData.objects.size()) + " object(s))";
