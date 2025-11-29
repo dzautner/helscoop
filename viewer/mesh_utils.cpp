@@ -341,4 +341,28 @@ void DrawXZGrid(int halfLines, float spacing, Color color) {
   }
 }
 
+PickResult PickModelAtRay(const Ray& ray, const std::vector<ModelWithColor>& models) {
+  PickResult result;
+  float closestDistance = std::numeric_limits<float>::max();
+
+  for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
+    const auto& modelWithColor = models[modelIdx];
+    const Model& model = modelWithColor.model;
+
+    // Test each mesh in the model
+    for (int meshIdx = 0; meshIdx < model.meshCount; ++meshIdx) {
+      RayCollision collision = GetRayCollisionMesh(ray, model.meshes[meshIdx], model.transform);
+      if (collision.hit && collision.distance < closestDistance) {
+        closestDistance = collision.distance;
+        result.hit = true;
+        result.distance = collision.distance;
+        result.modelIndex = static_cast<int>(modelIdx);
+        result.materialId = modelWithColor.materialId;
+      }
+    }
+  }
+
+  return result;
+}
+
 }  // namespace dingcad

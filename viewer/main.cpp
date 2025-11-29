@@ -446,8 +446,52 @@ int main(int argc, char *argv[]) {
                                             uiState.showMaterialsPanel, uiState.showParametersPanel,
                                             screenWidth, screenHeight);
 
-    // Camera controls
-    if (!mouseOverPanel && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    // Object picking with middle-click or Shift+Left-click
+    // This allows reverse selection: click on 3D object to highlight its material
+    if (!mouseOverPanel &&
+        (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE) ||
+         (IsKeyDown(KEY_LEFT_SHIFT) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)))) {
+      Vector2 mousePos = GetMousePosition();
+      Ray pickRay = GetMouseRay(mousePos, camera);
+      PickResult pickResult = PickModelAtRay(pickRay, models);
+
+      if (pickResult.hit && !pickResult.materialId.empty()) {
+        uiState.selectedMaterialId = pickResult.materialId;
+
+        // Calculate scroll offset to show the selected material in the panel
+        // Find the material index and scroll to it
+        float scrollTarget = 0.0f;
+        float yPos = 5.0f;  // Initial padding
+        const float rowHeight = 24.0f;
+        const float sectionHeight = 26.0f;
+        std::string prevCategory;
+        for (size_t i = 0; i < sceneMaterials.size(); ++i) {
+          const auto& mat = sceneMaterials[i];
+          if (mat.category != prevCategory) {
+            prevCategory = mat.category;
+            yPos += 5.0f + sectionHeight;
+          }
+          if (mat.materialId == pickResult.materialId) {
+            // Scroll to center this item (adjust by half the visible height)
+            scrollTarget = std::max(0.0f, yPos - 100.0f);
+            break;
+          }
+          yPos += rowHeight;
+        }
+        uiState.materialScrollOffset = scrollTarget;
+
+        // Ensure materials panel is visible
+        uiState.showMaterialsPanel = true;
+
+        TraceLog(LOG_INFO, "Picked object with material: %s", pickResult.materialId.c_str());
+      } else if (pickResult.hit) {
+        // Clicked on object without materialId - clear selection
+        uiState.selectedMaterialId.clear();
+      }
+    }
+
+    // Camera controls (skip if shift is held - that's for object picking)
+    if (!mouseOverPanel && !IsKeyDown(KEY_LEFT_SHIFT) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       orbitYaw -= mouseDelta.x * 0.01f;
       orbitPitch += mouseDelta.y * 0.01f;
       const float limit = DEG2RAD * 89.0f;

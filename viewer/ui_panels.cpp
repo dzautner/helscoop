@@ -197,7 +197,7 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   DrawTextEx(uiFont, totalText, {panelX + 10, footerY + 15}, 17.0f, 0.0f, DARKGRAY);
 
   // Hotkey hint and instructions
-  DrawTextEx(uiFont, "[M] TOGGLE  CLICK=SELECT  2X=LINK",
+  DrawTextEx(uiFont, "[M] TOGGLE  SHIFT+CLICK 3D=SELECT",
              {panelX + 10, footerY + 35}, 10.0f, 0.0f, LIGHTGRAY);
 }
 
