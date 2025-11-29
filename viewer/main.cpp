@@ -539,14 +539,34 @@ int main(int argc, char *argv[]) {
     DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
     DrawAxes(2.0f);
 
-    // Outline pass
+    // Determine which material ID to highlight (hover takes precedence)
+    const std::string& highlightMatId = !uiState.hoveredMaterialId.empty()
+        ? uiState.hoveredMaterialId
+        : uiState.selectedMaterialId;
+
+    // Outline pass - use bright highlight for hovered/selected material
     rlDisableBackfaceCulling();
     for (const auto &modelWithColor : models) {
+      // Check if this object should be highlighted
+      bool shouldHighlight = !highlightMatId.empty() &&
+                             modelWithColor.materialId == highlightMatId;
+
+      if (shouldHighlight) {
+        // Bright cyan outline for highlighted objects
+        setOutlineUniforms(outlineThickness * 2.5f, ORANGE);
+      } else {
+        // Normal black outline
+        setOutlineUniforms(outlineThickness, outlineColor);
+      }
+
       for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
         DrawMesh(modelWithColor.model.meshes[i], outlineMat, modelWithColor.model.transform);
       }
     }
     rlEnableBackfaceCulling();
+
+    // Reset outline uniforms for consistency
+    setOutlineUniforms(outlineThickness, outlineColor);
 
     // Toon shading pass
     for (const auto &modelWithColor : models) {
@@ -626,7 +646,7 @@ int main(int argc, char *argv[]) {
 
     // Draw UI panels
     if (uiState.showMaterialsPanel) {
-      DrawMaterialsPanel(sceneMaterials, uiFont, screenWidth, screenHeight);
+      DrawMaterialsPanel(sceneMaterials, uiState, uiFont, screenWidth, screenHeight);
     }
 
     if (uiState.showParametersPanel) {

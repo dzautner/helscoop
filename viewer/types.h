@@ -136,11 +136,13 @@ struct SceneParameter {
 // Material item for cost estimation
 struct MaterialItem {
   std::string name;
+  std::string materialId;  // Key to match with model objects
   std::string category;
   std::string link;
   std::string unit;
   float unitPrice = 0.0f;
   int quantity = 0;
+  Color color = {200, 200, 200, 255};  // Preview color from material library
 };
 
 // File watch state

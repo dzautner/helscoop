@@ -4,6 +4,7 @@
 #include "raylib.h"
 
 #include <filesystem>
+#include <string>
 #include <vector>
 
 namespace dingcad {
@@ -15,10 +16,19 @@ struct UIState {
   bool liveUpdatesEnabled = true;
   int draggingParamIndex = -1;
   float draggingStartValue = 0.0f;
+
+  // Material hover/selection state
+  std::string hoveredMaterialId;   // Material being hovered in panel
+  std::string selectedMaterialId;  // Material clicked/selected (persistent)
+
+  // Scroll offsets for panels
+  float materialScrollOffset = 0.0f;
+  float parameterScrollOffset = 0.0f;
 };
 
-// Draw materials panel on left side
+// Draw materials panel on left side (updates uiState.hoveredMaterialId)
 void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
+                        UIState& uiState,
                         const Font& uiFont,
                         int screenWidth, int screenHeight);
 

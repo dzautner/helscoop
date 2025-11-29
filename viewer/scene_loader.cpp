@@ -341,6 +341,22 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
         }
         JS_FreeValue(ctx, qtyVal);
 
+        // Parse materialId for matching with scene objects
+        JSValue matIdVal = JS_GetPropertyStr(ctx, itemVal, "materialId");
+        if (!JS_IsUndefined(matIdVal)) {
+          const char* str = JS_ToCString(ctx, matIdVal);
+          if (str) {
+            item.materialId = str;
+            // Look up color from material library
+            const PBRMaterial* mat = g_materialLibrary.get(item.materialId);
+            if (mat) {
+              item.color = mat->visual.toColor();
+            }
+            JS_FreeCString(ctx, str);
+          }
+        }
+        JS_FreeValue(ctx, matIdVal);
+
         JS_FreeValue(ctx, itemVal);
 
         if (!item.name.empty()) {

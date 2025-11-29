@@ -108,20 +108,20 @@ const paint_liters = Math.ceil(total_paint_area / 5);
 
 export const materials = [
   // Sahatavara - Runko (Finnish C24 lumber, prices in €/jm from Sarokas)
-  { name: "48x98 Runkopuu C24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(studs_jm + plate_length_jm) },
-  { name: "48x148 Lattiavasat C24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x148-c24", unit: "jm", unitPrice: 3.70, quantity: Math.ceil(joists_jm) },
-  { name: "48x98 Kattoristikot C24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(rafters_jm) },
-  { name: "Kestopuu 48x148 (jalat)", category: "Sahatavara", link: "https://www.sarokas.fi/kestopuu-48-148-vihrea", unit: "jm", unitPrice: 3.80, quantity: 12 },
+  { name: "48x98 Runkopuu C24", materialId: "pine_48x98_c24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(studs_jm + plate_length_jm) },
+  { name: "48x148 Lattiavasat C24", materialId: "pine_48x148_c24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x148-c24", unit: "jm", unitPrice: 3.70, quantity: Math.ceil(joists_jm) },
+  { name: "48x98 Kattoristikot C24", materialId: "pine_48x98_c24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(rafters_jm) },
+  { name: "Kestopuu 48x148 (jalat)", materialId: "pressure_treated_48x148", category: "Sahatavara", link: "https://www.sarokas.fi/kestopuu-48-148-vihrea", unit: "jm", unitPrice: 3.80, quantity: 12 },
 
   // Levytavara (Finnish panels)
-  { name: "Havuvaneri 18mm lattiaan", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-18mm-iii-iii-2440x1200", unit: "levy", unitPrice: 62.78, quantity: floor_sheets },
-  { name: "Havuvaneri 12mm kattoon", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-12mm", unit: "levy", unitPrice: 45.00, quantity: roof_sheets },
-  { name: "Ulkovuoripaneeli 21mm", category: "Levytavara", link: "https://www.k-rauta.fi/kategoria/puutavara", unit: "levy", unitPrice: 55.00, quantity: wall_sheets },
+  { name: "Havuvaneri 18mm lattiaan", materialId: "osb_18mm", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-18mm-iii-iii-2440x1200", unit: "levy", unitPrice: 62.78, quantity: floor_sheets },
+  { name: "Havuvaneri 12mm kattoon", materialId: "galvanized_roofing", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-12mm", unit: "levy", unitPrice: 45.00, quantity: roof_sheets },
+  { name: "Ulkovuoripaneeli 21mm", materialId: "plywood_9mm_exterior", category: "Levytavara", link: "https://www.k-rauta.fi/kategoria/puutavara", unit: "levy", unitPrice: 55.00, quantity: wall_sheets },
 
   // Katto (Roofing)
-  { name: "Katehuopa 15 sqm", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "rulla", unitPrice: 35.00, quantity: felt_rolls },
-  { name: "Räystäslista 2m", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 8.50, quantity: Math.ceil((coop_len * 2 + coop_w * 4) / 2000) },
-  { name: "Harjalista 2m", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 12.00, quantity: Math.ceil(coop_len / 2000) },
+  { name: "Katehuopa 15 sqm", materialId: "galvanized_roofing", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "rulla", unitPrice: 35.00, quantity: felt_rolls },
+  { name: "Räystäslista 2m", materialId: "exterior_paint_white", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 8.50, quantity: Math.ceil((coop_len * 2 + coop_w * 4) / 2000) },
+  { name: "Harjalista 2m", materialId: "galvanized_roofing", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 12.00, quantity: Math.ceil(coop_len / 2000) },
 
   // Kiinnitystarvikkeet (Hardware)
   { name: "Ruuvit 4.5x75 (500kpl)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pak", unitPrice: 24.90, quantity: Math.ceil(wall_studs / 100) },
@@ -132,11 +132,11 @@ export const materials = [
   { name: "Oven salpa", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 12.90, quantity: 2 },
 
   // Kanalalle (Chicken-specific)
-  { name: "Hitsattu verkko 12mm", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 89.00, quantity: 2 },
-  { name: "Kanaverkko 50mm", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 45.00, quantity: 1 },
+  { name: "Hitsattu verkko 12mm", materialId: "hardware_cloth", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 89.00, quantity: 2 },
+  { name: "Kanaverkko 50mm", materialId: "hardware_cloth", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 45.00, quantity: 1 },
   { name: "Automaattinen luukku", category: "Kanala", link: "https://www.amazon.de", unit: "kpl", unitPrice: 85.00, quantity: 1 },
-  { name: "Pesälaatikon pohja", category: "Kanala", link: "https://www.puuilo.fi", unit: "kpl", unitPrice: 8.90, quantity: nest_boxes },
-  { name: "Orsi 50mm pyöreä (2m)", category: "Kanala", link: "https://www.k-rauta.fi", unit: "kpl", unitPrice: 6.90, quantity: Math.ceil(coop_len / 800) },
+  { name: "Pesälaatikon pohja", materialId: "nest_box_plywood", category: "Kanala", link: "https://www.puuilo.fi", unit: "kpl", unitPrice: 8.90, quantity: nest_boxes },
+  { name: "Orsi 50mm pyöreä (2m)", materialId: "pine_48x98_c24", category: "Kanala", link: "https://www.k-rauta.fi", unit: "kpl", unitPrice: 6.90, quantity: Math.ceil(coop_len / 800) },
 
   // Maalaus & Pintakäsittely
   { name: "Ulkomaali (Tikkurila)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 14.90, quantity: paint_liters },
