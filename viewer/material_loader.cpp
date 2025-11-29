@@ -210,6 +210,15 @@ bool InitMaterialLibrary(const std::filesystem::path& basePath) {
 
 void LoadMaterialTextures() {
   int loadedCount = 0;
+  int materialsWithTex = 0;
+  TraceLog(LOG_INFO, "LoadMaterialTextures: checking %zu materials in library", g_materialLibrary.materials.size());
+  for (auto& [id, mat] : g_materialLibrary.materials) {
+    if (!mat.visual.albedoTexture.empty()) {
+      materialsWithTex++;
+      TraceLog(LOG_INFO, "Material '%s' has albedoTexture: '%s'", id.c_str(), mat.visual.albedoTexture.c_str());
+    }
+  }
+  TraceLog(LOG_INFO, "Found %d materials with texture paths", materialsWithTex);
   for (auto& [id, mat] : g_materialLibrary.materials) {
     if (!mat.visual.albedoTexture.empty()) {
       std::filesystem::path texPath = mat.visual.albedoTexture;

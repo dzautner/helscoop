@@ -183,6 +183,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
       const char* matIdStr = JS_ToCString(ctx, materialVal);
       if (matIdStr) {
         materialId = matIdStr;
+        TraceLog(LOG_INFO, "SCENE-LOAD: Parsed object with material='%s'", matIdStr);
         // Look up in material library for color
         const PBRMaterial* mat = g_materialLibrary.get(materialId);
         if (mat) {

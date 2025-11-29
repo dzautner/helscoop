@@ -235,6 +235,7 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
   struct MeshTask {
     std::future<manifold::MeshGL> future;
     Color color;
+    std::string materialId;
   };
   std::vector<MeshTask> tasks;
   tasks.reserve(sceneData.objects.size());
@@ -245,15 +246,21 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
         std::async(std::launch::async, [geom = obj.geometry]() {
           return geom->GetMeshGL();
         }),
-        obj.color
+        obj.color,
+        obj.materialId
       });
     }
   }
 
-  std::vector<std::pair<manifold::MeshGL, Color>> meshes;
+  struct MeshResult {
+    manifold::MeshGL meshGL;
+    Color color;
+    std::string materialId;
+  };
+  std::vector<MeshResult> meshes;
   meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    meshes.emplace_back(task.future.get(), task.color);
+    meshes.push_back({task.future.get(), task.color, std::move(task.materialId)});
   }
 
   auto meshEnd = std::chrono::high_resolution_clock::now();
@@ -261,15 +268,9 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
 
   std::vector<ModelWithColor> result;
   result.reserve(meshes.size());
-  size_t idx = 0;
-  for (auto& [meshGL, color] : meshes) {
-    Model model = CreateRaylibModelFrom(meshGL, color);
-    std::string materialId;
-    if (idx < sceneData.objects.size()) {
-      materialId = sceneData.objects[idx].materialId;
-    }
-    result.push_back({model, color, materialId});
-    idx++;
+  for (auto& mesh : meshes) {
+    Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
+    result.push_back({model, mesh.color, std::move(mesh.materialId)});
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(

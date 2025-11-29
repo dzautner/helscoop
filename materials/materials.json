@@ -25,7 +25,8 @@
       "visual": {
         "albedo": [0.85, 0.72, 0.52],
         "roughness": 0.75,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/wood/pine_albedo.png"
       },
       "pricing": {
         "unit": "jm",
@@ -41,7 +42,8 @@
       "visual": {
         "albedo": [0.45, 0.55, 0.38],
         "roughness": 0.70,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/wood/treated_albedo.png"
       },
       "pricing": {
         "unit": "jm",
@@ -57,7 +59,8 @@
       "visual": {
         "albedo": [0.78, 0.68, 0.48],
         "roughness": 0.85,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/osb/osb_albedo.png"
       },
       "pricing": {
         "unit": "sheet",
@@ -73,7 +76,8 @@
       "visual": {
         "albedo": [0.75, 0.65, 0.45],
         "roughness": 0.85,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/osb/osb_albedo.png"
       },
       "pricing": {
         "unit": "sheet",
@@ -89,7 +93,8 @@
       "visual": {
         "albedo": [0.72, 0.62, 0.48],
         "roughness": 0.65,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/plywood/plywood_albedo.png"
       },
       "pricing": {
         "unit": "sheet",
@@ -105,7 +110,8 @@
       "visual": {
         "albedo": [0.72, 0.72, 0.75],
         "roughness": 0.25,
-        "metallic": 1.0
+        "metallic": 1.0,
+        "albedoTexture": "textures/metal/galvanized_albedo.png"
       },
       "pricing": {
         "unit": "sqm",
@@ -121,7 +127,8 @@
       "visual": {
         "albedo": [0.70, 0.70, 0.73],
         "roughness": 0.30,
-        "metallic": 1.0
+        "metallic": 1.0,
+        "albedoTexture": "textures/metal/galvanized_albedo.png"
       },
       "pricing": {
         "unit": "jm",
@@ -201,7 +208,8 @@
       "visual": {
         "albedo": [0.95, 0.95, 0.92],
         "roughness": 0.55,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/plywood/white_paint_albedo.png"
       },
       "pricing": {
         "unit": "liter",
@@ -249,7 +257,8 @@
       "visual": {
         "albedo": [0.55, 0.55, 0.52],
         "roughness": 0.90,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/concrete/concrete_albedo.png"
       },
       "pricing": {
         "unit": "kpl",
@@ -265,7 +274,8 @@
       "visual": {
         "albedo": [0.80, 0.70, 0.55],
         "roughness": 0.60,
-        "metallic": 0.0
+        "metallic": 0.0,
+        "albedoTexture": "textures/plywood/plywood_albedo.png"
       },
       "pricing": {
         "unit": "sheet",

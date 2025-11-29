@@ -212,6 +212,9 @@ int main(int argc, char *argv[]) {
   const int locUseTexture = GetShaderLocation(toonShader, "useTexture");
   Material toonMat = LoadMaterialDefault();
   toonMat.shader = toonShader;
+  // Tell raylib that our albedoTex sampler is at SHADER_LOC_MAP_DIFFUSE location
+  // This makes raylib bind material.maps[MATERIAL_MAP_DIFFUSE].texture to our sampler
+  toonShader.locs[SHADER_LOC_MAP_DIFFUSE] = locAlbedoTex;
 
   // Normal/depth shader setup
   const int locNear = GetShaderLocation(normalDepthShader, "zNear");
@@ -249,6 +252,16 @@ int main(int argc, char *argv[]) {
 
   // Load material textures (must be after OpenGL init)
   LoadMaterialTextures();
+
+  // Create a 1x1 white fallback texture for when no material texture is available
+  // This ensures the albedoTex sampler is always bound to something valid
+  Image whiteImg = GenImageColor(1, 1, WHITE);
+  Texture2D fallbackTexture = LoadTextureFromImage(whiteImg);
+  UnloadImage(whiteImg);
+
+  // Set fallback texture on toon material - raylib will handle texture unit binding
+  // Use MATERIAL_MAP_DIFFUSE (index 0) which raylib binds to texture unit 0
+  toonMat.maps[MATERIAL_MAP_DIFFUSE].texture = fallbackTexture;
 
   float normalThreshold = 0.25f;
   float depthThreshold = 0.002f;
@@ -545,20 +558,29 @@ int main(int argc, char *argv[]) {
       };
       SetShaderValue(toonShader, locBaseColor, modelColor, SHADER_UNIFORM_VEC4);
 
-      // Check for material texture
-      Texture2D* tex = nullptr;
+      // Get material texture or use fallback
+      Texture2D* materialTex = nullptr;
       if (!modelWithColor.materialId.empty()) {
-        tex = g_materialLibrary.getTexture(modelWithColor.materialId);
+        materialTex = g_materialLibrary.getTexture(modelWithColor.materialId);
       }
 
-      if (tex && tex->id != 0) {
-        int useTex = 1;
-        SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
-        SetShaderValueTexture(toonShader, locAlbedoTex, *tex);
-      } else {
-        int useTex = 0;
-        SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
+      // Set texture on material and update useTexture uniform
+      int useTex = (materialTex && materialTex->id != 0) ? 1 : 0;
+
+      // Debug log on first frame only - log ALL materials
+      static bool loggedOnce = false;
+      if (frameCount == 0 && !loggedOnce) {
+        TraceLog(LOG_INFO, "RENDER-CHECK: matId='%s' useTex=%d (first obj)",
+                 modelWithColor.materialId.empty() ? "(empty)" : modelWithColor.materialId.c_str(),
+                 useTex);
+        loggedOnce = true;
       }
+
+      SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
+
+      // Update material's diffuse map with either material texture or fallback
+      toonMat.maps[MATERIAL_MAP_DIFFUSE].texture =
+        (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
 
       for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
         DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
@@ -578,6 +600,9 @@ int main(int argc, char *argv[]) {
     }
     EndMode3D();
     EndTextureMode();
+
+    // Rebind normal/depth texture in case texture slots were modified by per-object bindings
+    SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
 
     // Final composite
     BeginDrawing();
