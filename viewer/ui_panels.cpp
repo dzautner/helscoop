@@ -1001,6 +1001,92 @@ void DrawThermalLegend(float minFlux, float maxFlux,
   DrawTextEx(uiFont, "HIGH", {legendX + legendWidth - highSize.x - 5.0f, labelY}, 10.0f, 0.0f, GRAY);
 }
 
+void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
+                         UIState& uiState,
+                         const Font& uiFont,
+                         int screenWidth, int screenHeight) {
+  const float panelWidth = 320.0f;
+  const float panelHeight = 280.0f;
+  // Position to the left of the thermal panel
+  const float panelX = 10.0f;
+  const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f - 730.0f;  // Above thermal
+
+  // Panel background with green/red tint based on status
+  Color bgColor = structResult.allPassed ? Color{30, 40, 35, 255} : Color{40, 35, 30, 255};
+  DrawRectangle(static_cast<int>(panelX), static_cast<int>(panelY),
+                static_cast<int>(panelWidth), static_cast<int>(panelHeight),
+                Fade(bgColor, 0.95f));
+  DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
+                     static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
+
+  float yPos = panelY + 10.0f;
+
+  // Title with status color
+  Color titleColor = structResult.allPassed ? GREEN : (structResult.errorCount > 0 ? RED : ORANGE);
+  DrawTextEx(uiFont, "STRUCTURAL CHECK", {panelX + 10.0f, yPos}, 16.0f, 0.0f, titleColor);
+  yPos += 24.0f;
+
+  // Summary line
+  char summaryText[64];
+  if (structResult.allPassed) {
+    snprintf(summaryText, sizeof(summaryText), "All %zu lumber members OK",
+             structResult.checks.size() == 0 ? 0 : structResult.checks.size());
+    DrawTextEx(uiFont, summaryText, {panelX + 10.0f, yPos}, 12.0f, 0.0f, GREEN);
+  } else {
+    snprintf(summaryText, sizeof(summaryText), "%d span warnings found",
+             structResult.warningCount);
+    DrawTextEx(uiFont, summaryText, {panelX + 10.0f, yPos}, 12.0f, 0.0f, ORANGE);
+  }
+  yPos += 20.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 8.0f;
+
+  // List each warning
+  int displayCount = 0;
+  for (const auto& check : structResult.checks) {
+    if (yPos > panelY + panelHeight - 40.0f) {
+      // Show "more..." indicator
+      char moreText[32];
+      snprintf(moreText, sizeof(moreText), "... and %zu more",
+               structResult.checks.size() - displayCount);
+      DrawTextEx(uiFont, moreText, {panelX + 10.0f, yPos}, 10.0f, 0.0f, GRAY);
+      break;
+    }
+
+    // Member name
+    DrawTextEx(uiFont, check.memberName.c_str(), {panelX + 10.0f, yPos}, 11.0f, 0.0f, WHITE);
+    yPos += 14.0f;
+
+    // Span info
+    char spanText[80];
+    snprintf(spanText, sizeof(spanText), "  Span: %.0fmm (max %.0fmm)",
+             check.actualSpan_mm, check.maxAllowedSpan_mm);
+    DrawTextEx(uiFont, spanText, {panelX + 10.0f, yPos}, 10.0f, 0.0f, RED);
+    yPos += 12.0f;
+
+    // Suggestion
+    char suggestText[80];
+    snprintf(suggestText, sizeof(suggestText), "  -> %s", check.suggestedMaterial.c_str());
+    DrawTextEx(uiFont, suggestText, {panelX + 10.0f, yPos}, 10.0f, 0.0f, YELLOW);
+    yPos += 16.0f;
+
+    displayCount++;
+  }
+
+  // If no issues, show helpful text
+  if (structResult.checks.empty()) {
+    yPos += 10.0f;
+    DrawTextEx(uiFont, "No lumber spans exceed limits.", {panelX + 10.0f, yPos}, 10.0f, 0.0f, GRAY);
+    yPos += 14.0f;
+    DrawTextEx(uiFont, "Span data from materials.json", {panelX + 10.0f, yPos}, 9.0f, 0.0f, DARKGRAY);
+  }
+
+  // Hotkey hint
+  DrawTextEx(uiFont, "[S] TOGGLE", {panelX + 10.0f, panelY + panelHeight - 18.0f}, 10.0f, 0.0f, GRAY);
+}
+
 bool DrawToolbar(UIState& uiState,
                  const Font& uiFont,
                  int screenWidth,
@@ -1068,6 +1154,11 @@ bool DrawToolbar(UIState& uiState,
   bool thermalToggled = drawToggleButton("H", "[H]", uiState.thermalViewEnabled, RED);
   if (thermalToggled) {
     uiState.showThermalPanel = uiState.thermalViewEnabled;
+    anyToggled = true;
+  }
+
+  // Structural panel toggle [S]
+  if (drawToggleButton("S", "[S]", uiState.showStructuralPanel, ORANGE)) {
     anyToggled = true;
   }
 

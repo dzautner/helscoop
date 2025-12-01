@@ -120,6 +120,18 @@ PBRMaterial ParseMaterial(JSContext* ctx, const std::string& id, JSValue matObj)
   }
   JS_FreeValue(ctx, pricingVal);
 
+  // Parse structural properties
+  JSValue structVal = JS_GetPropertyStr(ctx, matObj, "structural");
+  if (!JS_IsUndefined(structVal)) {
+    mat.structural.gradeClass = GetStringProp(ctx, structVal, "gradeClass");
+    mat.structural.maxSpan_floor_mm = GetFloatProp(ctx, structVal, "maxSpan_floor_mm", 0.0f);
+    mat.structural.maxSpan_wall_mm = GetFloatProp(ctx, structVal, "maxSpan_wall_mm", 0.0f);
+    mat.structural.maxSpan_rafter_mm = GetFloatProp(ctx, structVal, "maxSpan_rafter_mm", 0.0f);
+    mat.structural.bendingStrength_MPa = GetFloatProp(ctx, structVal, "bendingStrength_MPa", 0.0f);
+    mat.structural.modulus_GPa = GetFloatProp(ctx, structVal, "modulus_GPa", 0.0f);
+  }
+  JS_FreeValue(ctx, structVal);
+
   return mat;
 }
 

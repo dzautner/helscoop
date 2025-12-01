@@ -26,6 +26,7 @@ extern "C" {
 #include "material_loader.h"
 #include "ui_panels.h"
 #include "thermal.h"
+#include "structural.h"
 
 using namespace dingcad;
 
@@ -162,6 +163,8 @@ int main(int argc, char *argv[]) {
   std::vector<MaterialItem> sceneMaterials = std::move(initialMaterials);
   ThermalAnalysisResult thermalResult;
   bool thermalResultDirty = true;  // Flag to recalculate when scene changes
+  StructuralAnalysisResult structuralResult;
+  bool structuralResultDirty = true;  // Flag to recalculate when scene changes
 
   auto refreshParameters = [&]() {
     if (!scriptPath.empty()) {
@@ -342,6 +345,7 @@ int main(int argc, char *argv[]) {
       sceneParameters = ParseSceneParameters(scriptPath);
       sceneMaterials = std::move(result.materials);
       thermalResultDirty = true;  // Recalculate thermal after scene reload
+      structuralResultDirty = true;  // Recalculate structural after scene reload
       TraceLog(LOG_INFO, "Updated %zu parameters and %zu materials from reload",
                sceneParameters.size(), sceneMaterials.size());
       TraceLog(LOG_INFO, "PROFILE: Background load completed, total wall time: %lld ms", totalMs);
@@ -401,6 +405,12 @@ int main(int argc, char *argv[]) {
         uiState.showThermalPanel = uiState.thermalViewEnabled;
         if (uiState.thermalViewEnabled) {
           thermalResultDirty = true;  // Recalculate on toggle
+        }
+      }
+      if (IsKeyPressed(KEY_S)) {
+        uiState.showStructuralPanel = !uiState.showStructuralPanel;
+        if (uiState.showStructuralPanel) {
+          structuralResultDirty = true;  // Recalculate on toggle
         }
       }
     }
@@ -604,6 +614,15 @@ int main(int argc, char *argv[]) {
                thermalResult.totalHeatLoss_W, thermalResult.annualHeatLoss_kWh, thermalResult.surfaces.size());
     }
 
+    // Recalculate structural analysis if needed
+    if (uiState.showStructuralPanel && structuralResultDirty) {
+      structuralResult = AnalyzeStructure(models, g_materialLibrary, kSceneScale);
+      structuralResultDirty = false;
+      TraceLog(LOG_INFO, "Structural analysis: %d warnings, %s",
+               structuralResult.warningCount,
+               structuralResult.allPassed ? "all OK" : "issues found");
+    }
+
     // Build thermal color lookup map for rendering
     std::unordered_map<std::string, Color> thermalColorByMaterial;
     if (uiState.thermalViewEnabled) {
@@ -782,6 +801,11 @@ int main(int argc, char *argv[]) {
       }
       DrawThermalLegend(thermalResult.minHeatFlux, thermalResult.maxHeatFlux,
                         uiFont, screenWidth, screenHeight);
+    }
+
+    // Draw structural panel
+    if (uiState.showStructuralPanel) {
+      DrawStructuralPanel(structuralResult, uiState, uiFont, screenWidth, screenHeight);
     }
 
     EndDrawing();

@@ -21,6 +21,7 @@ add_executable(dingcad_viewer
   ui_panels.cpp
   thermal.cpp
   climate_data.cpp
+  structural.cpp
   primitives/wall.cpp
 )
 

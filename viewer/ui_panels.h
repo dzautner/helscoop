@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "thermal.h"
+#include "structural.h"
 #include "raylib.h"
 
 #include <filesystem>
@@ -15,6 +16,7 @@ struct UIState {
   bool showParametersPanel = true;
   bool showMaterialsPanel = true;
   bool showThermalPanel = false;
+  bool showStructuralPanel = false;
   bool thermalViewEnabled = false;
   bool liveUpdatesEnabled = true;
   int draggingParamIndex = -1;
@@ -71,6 +73,12 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
 void DrawThermalLegend(float minFlux, float maxFlux,
                        const Font& uiFont,
                        int screenWidth, int screenHeight);
+
+// Draw structural analysis panel
+void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
+                         UIState& uiState,
+                         const Font& uiFont,
+                         int screenWidth, int screenHeight);
 
 // Draw toolbar at top of screen with panel toggles
 // Returns true if any toggle was clicked (for status updates)

@@ -15,6 +15,14 @@
         "conductivity": 0.12,
         "thickness": 98
       },
+      "structural": {
+        "gradeClass": "C24",
+        "maxSpan_floor_mm": 2500,
+        "maxSpan_wall_mm": 2700,
+        "maxSpan_rafter_mm": 2200,
+        "bendingStrength_MPa": 24,
+        "modulus_GPa": 11
+      },
       "pricing": {
         "unit": "jm",
         "unitPrice": 2.60,
@@ -36,6 +44,14 @@
         "conductivity": 0.12,
         "thickness": 148
       },
+      "structural": {
+        "gradeClass": "C24",
+        "maxSpan_floor_mm": 4000,
+        "maxSpan_wall_mm": 3500,
+        "maxSpan_rafter_mm": 3500,
+        "bendingStrength_MPa": 24,
+        "modulus_GPa": 11
+      },
       "pricing": {
         "unit": "jm",
         "unitPrice": 3.70,
@@ -56,6 +72,14 @@
       "thermal": {
         "conductivity": 0.12,
         "thickness": 148
+      },
+      "structural": {
+        "gradeClass": "C24",
+        "maxSpan_floor_mm": 4000,
+        "maxSpan_wall_mm": 3500,
+        "maxSpan_rafter_mm": 3500,
+        "bendingStrength_MPa": 24,
+        "modulus_GPa": 11
       },
       "pricing": {
         "unit": "jm",

@@ -81,6 +81,16 @@ struct PBRPricing {
   std::string link;
 };
 
+// Structural properties for lumber and framing
+struct PBRStructural {
+  std::string gradeClass;        // e.g., "C24"
+  float maxSpan_floor_mm = 0;    // Max span as floor joist
+  float maxSpan_wall_mm = 0;     // Max span as wall stud
+  float maxSpan_rafter_mm = 0;   // Max span as rafter
+  float bendingStrength_MPa = 0; // Characteristic bending strength
+  float modulus_GPa = 0;         // Modulus of elasticity
+};
+
 // Full PBR material definition
 struct PBRMaterial {
   std::string id;
@@ -90,6 +100,7 @@ struct PBRMaterial {
   PBRVisual visual;
   PBRThermal thermal;
   PBRPricing pricing;
+  PBRStructural structural;
 };
 
 // Material library loaded from JSON
