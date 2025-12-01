@@ -50,8 +50,8 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
 
   const float panelWidth = 320.0f;
   const float panelX = 10.0f;
-  const float panelY = 50.0f;
-  const float panelHeight = static_cast<float>(screenHeight) - 100.0f;
+  const float panelY = kToolbarHeight + 8.0f;  // Below toolbar
+  const float panelHeight = static_cast<float>(screenHeight) - kToolbarHeight - 60.0f;
   const float rowHeight = 24.0f;
   const float headerHeight = 30.0f;
   const float searchBoxHeight = 26.0f;
@@ -347,8 +347,8 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
 
   const float panelWidth = 280.0f;
   const float panelX = static_cast<float>(screenWidth) - panelWidth - 10.0f;
-  const float panelY = 50.0f;
-  const float panelHeight = static_cast<float>(screenHeight) - 100.0f;
+  const float panelY = kToolbarHeight + 8.0f;  // Below toolbar
+  const float panelHeight = static_cast<float>(screenHeight) - kToolbarHeight - 60.0f;
   const float rowHeight = 28.0f;
   const float headerHeight = 30.0f;
   const float sectionHeight = 24.0f;
@@ -496,9 +496,16 @@ bool IsMouseOverPanels(const std::vector<MaterialItem>& materials,
                        int screenWidth, int screenHeight) {
   Vector2 mousePos = GetMousePosition();
 
+  // Toolbar at top
+  if (mousePos.y < kToolbarHeight) {
+    return true;
+  }
+
   // Materials panel bounds
   if (showMaterialsPanel && !materials.empty()) {
-    Rectangle matPanel = {10.0f, 10.0f, 320.0f, static_cast<float>(screenHeight) - 20.0f};
+    float panelY = kToolbarHeight + 8.0f;
+    float panelHeight = static_cast<float>(screenHeight) - kToolbarHeight - 60.0f;
+    Rectangle matPanel = {10.0f, panelY, 320.0f, panelHeight};
     if (CheckCollisionPointRec(mousePos, matPanel)) {
       return true;
     }
@@ -508,7 +515,9 @@ bool IsMouseOverPanels(const std::vector<MaterialItem>& materials,
   if (showParametersPanel && !parameters.empty()) {
     float paramPanelWidth = 280.0f;
     float paramPanelX = static_cast<float>(screenWidth) - paramPanelWidth - 10.0f;
-    Rectangle paramPanel = {paramPanelX, 10.0f, paramPanelWidth, static_cast<float>(screenHeight) - 20.0f};
+    float panelY = kToolbarHeight + 8.0f;
+    float panelHeight = static_cast<float>(screenHeight) - kToolbarHeight - 60.0f;
+    Rectangle paramPanel = {paramPanelX, panelY, paramPanelWidth, panelHeight};
     if (CheckCollisionPointRec(mousePos, paramPanel)) {
       return true;
     }
@@ -869,6 +878,130 @@ void DrawThermalLegend(float minFlux, float maxFlux,
 
   Vector2 highSize = MeasureTextEx(uiFont, "HIGH", 10.0f, 0.0f);
   DrawTextEx(uiFont, "HIGH", {legendX + legendWidth - highSize.x - 5.0f, labelY}, 10.0f, 0.0f, GRAY);
+}
+
+bool DrawToolbar(UIState& uiState,
+                 const Font& uiFont,
+                 int screenWidth,
+                 const std::string& statusMessage) {
+  bool anyToggled = false;
+
+  const float toolbarHeight = kToolbarHeight;
+  const float buttonSize = 30.0f;
+  const float buttonGap = 6.0f;
+  const float startX = 140.0f;  // After branding text
+
+  Vector2 mousePos = GetMousePosition();
+
+  // Semi-transparent dark background
+  DrawRectangle(0, 0, screenWidth, static_cast<int>(toolbarHeight),
+                Fade(Color{35, 35, 45, 255}, 0.95f));
+  DrawLine(0, static_cast<int>(toolbarHeight), screenWidth, static_cast<int>(toolbarHeight), DARKGRAY);
+
+  float x = startX;
+  float y = (toolbarHeight - buttonSize) / 2.0f;
+
+  // Helper lambda to draw a toggle button
+  auto drawToggleButton = [&](const char* label, const char* hotkey, bool& state, Color activeColor) -> bool {
+    Rectangle btn = {x, y, buttonSize, buttonSize};
+    bool hovered = CheckCollisionPointRec(mousePos, btn);
+    bool clicked = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
+    // Button background
+    Color bgColor = state ? activeColor : (hovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
+    DrawRectangleRec(btn, bgColor);
+    DrawRectangleLinesEx(btn, 1.0f, state ? activeColor : DARKGRAY);
+
+    // Label centered
+    Vector2 labelSize = MeasureTextEx(uiFont, label, 14.0f, 0.0f);
+    DrawTextEx(uiFont, label,
+               {x + (buttonSize - labelSize.x) / 2.0f, y + (buttonSize - labelSize.y) / 2.0f - 2.0f},
+               14.0f, 0.0f, state ? WHITE : (hovered ? LIGHTGRAY : GRAY));
+
+    // Hotkey below button
+    Vector2 hotkeySize = MeasureTextEx(uiFont, hotkey, 8.0f, 0.0f);
+    DrawTextEx(uiFont, hotkey,
+               {x + (buttonSize - hotkeySize.x) / 2.0f, y + buttonSize - 2.0f},
+               8.0f, 0.0f, Color{100, 100, 110, 255});
+
+    x += buttonSize + buttonGap;
+
+    if (clicked) {
+      state = !state;
+      return true;
+    }
+    return false;
+  };
+
+  // Materials panel toggle [M]
+  if (drawToggleButton("M", "[M]", uiState.showMaterialsPanel, ORANGE)) {
+    anyToggled = true;
+  }
+
+  // Parameters panel toggle [T]
+  if (drawToggleButton("P", "[T]", uiState.showParametersPanel, BLUE)) {
+    anyToggled = true;
+  }
+
+  // Thermal view toggle [H]
+  bool thermalToggled = drawToggleButton("H", "[H]", uiState.thermalViewEnabled, RED);
+  if (thermalToggled) {
+    uiState.showThermalPanel = uiState.thermalViewEnabled;
+    anyToggled = true;
+  }
+
+  // Separator
+  x += 4.0f;
+  DrawLine(static_cast<int>(x), 8, static_cast<int>(x), static_cast<int>(toolbarHeight - 8), Color{80, 80, 90, 255});
+  x += 10.0f;
+
+  // Export section label
+  DrawTextEx(uiFont, "EXPORT:", {x, y + 8}, 10.0f, 0.0f, Color{100, 100, 110, 255});
+  x += 55.0f;
+
+  // STL export button [P]
+  Rectangle stlBtn = {x, y, 40.0f, buttonSize};
+  bool stlHovered = CheckCollisionPointRec(mousePos, stlBtn);
+  DrawRectangleRec(stlBtn, stlHovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
+  DrawRectangleLinesEx(stlBtn, 1.0f, DARKGRAY);
+  DrawTextEx(uiFont, "STL", {x + 8, y + 8}, 12.0f, 0.0f, stlHovered ? WHITE : GRAY);
+  DrawTextEx(uiFont, "[P]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{100, 100, 110, 255});
+  x += 46.0f;
+
+  // IFC export button [I] (placeholder - will implement later)
+  Rectangle ifcBtn = {x, y, 40.0f, buttonSize};
+  bool ifcHovered = CheckCollisionPointRec(mousePos, ifcBtn);
+  DrawRectangleRec(ifcBtn, ifcHovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
+  DrawRectangleLinesEx(ifcBtn, 1.0f, DARKGRAY);
+  DrawTextEx(uiFont, "IFC", {x + 8, y + 8}, 12.0f, 0.0f, ifcHovered ? Color{150, 150, 160, 255} : Color{80, 80, 90, 255});
+  DrawTextEx(uiFont, "[I]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{80, 80, 90, 255});
+  x += 46.0f;
+
+  // Status message on right side
+  if (!statusMessage.empty()) {
+    Vector2 statusSize = MeasureTextEx(uiFont, statusMessage.c_str(), 11.0f, 0.0f);
+    float statusX = static_cast<float>(screenWidth) - statusSize.x - 15.0f;
+
+    // Truncate if too long
+    std::string displayStatus = statusMessage;
+    float maxStatusWidth = static_cast<float>(screenWidth) - x - 30.0f;
+    if (statusSize.x > maxStatusWidth && maxStatusWidth > 50.0f) {
+      // Find how many chars fit
+      size_t chars = static_cast<size_t>(maxStatusWidth / 7.0f);
+      if (chars < statusMessage.size()) {
+        displayStatus = "..." + statusMessage.substr(statusMessage.size() - chars + 3);
+      }
+      statusX = x + 20.0f;
+    }
+
+    // Status with subtle background
+    DrawRectangle(static_cast<int>(statusX - 5), static_cast<int>(y + 2),
+                  static_cast<int>(statusSize.x + 10), static_cast<int>(buttonSize - 4),
+                  Fade(Color{40, 40, 50, 255}, 0.8f));
+    DrawTextEx(uiFont, displayStatus.c_str(), {statusX, y + 8}, 11.0f, 0.0f, LIGHTGRAY);
+  }
+
+  return anyToggled;
 }
 
 }  // namespace dingcad

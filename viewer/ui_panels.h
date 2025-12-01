@@ -20,6 +20,9 @@ struct UIState {
   int draggingParamIndex = -1;
   float draggingStartValue = 0.0f;
 
+  // Toolbar (always visible)
+  bool showToolbar = true;
+
   // Material hover/selection state
   std::string hoveredMaterialId;   // Material being hovered in panel
   std::string selectedMaterialId;  // Material clicked/selected (persistent)
@@ -68,5 +71,15 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
 void DrawThermalLegend(float minFlux, float maxFlux,
                        const Font& uiFont,
                        int screenWidth, int screenHeight);
+
+// Draw toolbar at top of screen with panel toggles
+// Returns true if any toggle was clicked (for status updates)
+bool DrawToolbar(UIState& uiState,
+                 const Font& uiFont,
+                 int screenWidth,
+                 const std::string& statusMessage);
+
+// Toolbar height constant for panel positioning
+inline constexpr float kToolbarHeight = 42.0f;
 
 }  // namespace dingcad

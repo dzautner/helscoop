@@ -751,12 +751,15 @@ int main(int argc, char *argv[]) {
     DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
     EndShaderMode();
 
-    // Draw branding
-    const float margin = 15.0f;
-    const Vector2 brandPos = {margin, margin};
-    DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, DARKGRAY);
+    // Draw toolbar at top (includes panel toggles and status)
+    DrawToolbar(uiState, uiFont, screenWidth, statusMessage);
 
-    // Draw UI panels
+    // Draw branding in toolbar area
+    const float margin = 15.0f;
+    const Vector2 brandPos = {margin, 4.0f};  // Adjusted for toolbar
+    DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, WHITE);
+
+    // Draw UI panels (positioned below toolbar)
     if (uiState.showMaterialsPanel) {
       DrawMaterialsPanel(sceneMaterials, uiState, uiFont, screenWidth, screenHeight);
     }
