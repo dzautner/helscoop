@@ -1,1 +1,22 @@
+# Build output
 build/
+
+# Renders (generated images)
+renders/
+*.png
+!materials/textures/**/*.png
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.xcodeproj/
+*.xcworkspace/
+
+# Temporary files
+*.tmp
+*.log
