@@ -1,4 +1,5 @@
 #include "ui_panels.h"
+#include "climate_data.h"
 #include "file_utils.h"
 
 #define RAYGUI_IMPLEMENTATION
@@ -36,7 +37,7 @@ static bool materialMatchesFilter(const MaterialItem& mat, const char* filterTex
 // Get thermal panel bounds for click blocking
 static Rectangle GetThermalPanelBounds(int screenHeight) {
   const float panelWidth = 340.0f;
-  const float panelHeight = 520.0f;  // Matches DrawThermalPanel
+  const float panelHeight = 720.0f;  // Matches DrawThermalPanel (extended for climate)
   const float panelX = 10.0f;
   const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
   return {panelX, panelY, panelWidth, panelHeight};
@@ -533,7 +534,7 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
   bool settingsChanged = false;
 
   const float panelWidth = 340.0f;
-  const float panelHeight = 520.0f;  // Extended for monthly cost display
+  const float panelHeight = 720.0f;  // Extended for climate data and annual costs
   const float panelX = 10.0f;
   const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
   const float sliderWidth = panelWidth - 80.0f;
@@ -551,6 +552,53 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
   // Title
   DrawTextEx(uiFont, "THERMAL SIMULATION", {panelX + 10, yPos}, 18.0f, 0.0f, WHITE);
   yPos += 28.0f;
+
+  // === CLIMATE LOCATION SELECTOR ===
+  DrawTextEx(uiFont, "CLIMATE LOCATION", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  // Draw location buttons in two rows
+  const auto& locations = GetClimateLocations();
+  float btnWidth = 38.0f;
+  float btnHeight = 18.0f;
+  float btnSpacing = 3.0f;
+  int buttonsPerRow = 4;
+
+  for (size_t i = 0; i < locations.size(); ++i) {
+    int row = static_cast<int>(i) / buttonsPerRow;
+    int col = static_cast<int>(i) % buttonsPerRow;
+    float btnX = panelX + 10.0f + col * (btnWidth + btnSpacing);
+    float btnY = yPos + row * (btnHeight + 2.0f);
+
+    bool isSelected = (static_cast<int>(i) == settings.selectedLocationIndex);
+    Color btnColor = isSelected ? Color{60, 120, 180, 255} : Color{50, 50, 60, 255};
+    Color textColor = isSelected ? WHITE : LIGHTGRAY;
+
+    Rectangle btnRect = {btnX, btnY, btnWidth, btnHeight};
+    DrawRectangleRec(btnRect, btnColor);
+    if (isSelected) {
+      DrawRectangleLinesEx(btnRect, 1.0f, SKYBLUE);
+    }
+
+    // Draw location code centered
+    Vector2 codeSize = MeasureTextEx(uiFont, locations[i].code.c_str(), 10.0f, 0.0f);
+    DrawTextEx(uiFont, locations[i].code.c_str(),
+               {btnX + (btnWidth - codeSize.x) / 2.0f, btnY + 4.0f},
+               10.0f, 0.0f, textColor);
+
+    // Check for click
+    if (CheckCollisionPointRec(GetMousePosition(), btnRect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      settings.selectedLocationIndex = static_cast<int>(i);
+      settingsChanged = true;
+    }
+  }
+
+  yPos += ((static_cast<int>(locations.size()) + buttonsPerRow - 1) / buttonsPerRow) * (btnHeight + 2.0f) + 6.0f;
+
+  // Show selected location name
+  const ClimateLocation& selectedClimate = GetClimateLocation(settings.selectedLocationIndex);
+  DrawTextEx(uiFont, selectedClimate.name.c_str(), {panelX + 10, yPos}, 10.0f, 0.0f, SKYBLUE);
+  yPos += 14.0f;
 
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
@@ -805,6 +853,79 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
     DrawTextEx(uiFont, "MONTHLY COST: 0 EUR (heater off)", {panelX + 10, yPos}, 11.0f, 0.0f, GRAY);
   }
   yPos += 20.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 8.0f;
+
+  // === ANNUAL CLIMATE ANALYSIS ===
+  if (thermalResult.hasAnnualData) {
+    DrawTextEx(uiFont, "ANNUAL HEATING NEEDS", {panelX + 10, yPos}, 12.0f, 0.0f, SKYBLUE);
+    yPos += 18.0f;
+
+    // Monthly temperature bar chart
+    float chartX = panelX + 10.0f;
+    float chartWidth = panelWidth - 20.0f;
+    float chartHeight = 50.0f;
+    float barWidth = chartWidth / 12.0f - 2.0f;
+
+    // Draw chart background
+    DrawRectangle(static_cast<int>(chartX), static_cast<int>(yPos),
+                  static_cast<int>(chartWidth), static_cast<int>(chartHeight),
+                  Color{40, 40, 50, 255});
+
+    // Draw zero line (freezing point)
+    const ClimateLocation& climate = GetClimateLocation(settings.selectedLocationIndex);
+    float minTemp = -20.0f, maxTemp = 20.0f;
+    float zeroY = yPos + chartHeight * (maxTemp / (maxTemp - minTemp));
+    DrawLine(static_cast<int>(chartX), static_cast<int>(zeroY),
+             static_cast<int>(chartX + chartWidth), static_cast<int>(zeroY),
+             Fade(WHITE, 0.3f));
+
+    // Draw monthly bars
+    for (int m = 0; m < 12; ++m) {
+      float temp = climate.monthlyAvgTemp[m];
+      float barH = (temp / (maxTemp - minTemp)) * chartHeight;
+      float barX = chartX + m * (barWidth + 2.0f) + 1.0f;
+      float barY = zeroY - barH;
+      if (barH < 0) {
+        barY = zeroY;
+        barH = -barH;
+      }
+
+      Color barColor = temp < 0 ? SKYBLUE : (temp < 10 ? Color{100, 180, 255, 255} : GREEN);
+      DrawRectangle(static_cast<int>(barX), static_cast<int>(barY),
+                    static_cast<int>(barWidth), static_cast<int>(barH), barColor);
+
+      // Month label (first letter only)
+      const char* monthShort = GetMonthShortName(m);
+      char monthLetter[2] = {monthShort[0], '\0'};
+      DrawTextEx(uiFont, monthLetter, {barX + barWidth/2 - 3, yPos + chartHeight + 2}, 8.0f, 0.0f, GRAY);
+    }
+
+    yPos += chartHeight + 14.0f;
+
+    // Annual totals
+    char annualText[64];
+    snprintf(annualText, sizeof(annualText), "HEATING NEEDED: %.0f kWh/year",
+             thermalResult.annualHeatLoss_kWh);
+    DrawTextEx(uiFont, annualText, {panelX + 10, yPos}, 11.0f, 0.0f, ORANGE);
+    yPos += 16.0f;
+
+    // Annual cost (highlighted)
+    Color costColor = thermalResult.annualHeatingCost_EUR > 200 ? RED :
+                      (thermalResult.annualHeatingCost_EUR > 100 ? ORANGE : GREEN);
+    snprintf(annualText, sizeof(annualText), "ANNUAL COST: %.0f EUR",
+             thermalResult.annualHeatingCost_EUR);
+    DrawTextEx(uiFont, annualText, {panelX + 10, yPos}, 14.0f, 0.0f, costColor);
+    yPos += 22.0f;
+
+    // Design temperature note
+    snprintf(annualText, sizeof(annualText), "Design temp: %.0f°C (coldest expected)",
+             climate.designTemp);
+    DrawTextEx(uiFont, annualText, {panelX + 10, yPos}, 9.0f, 0.0f, DARKGRAY);
+    yPos += 16.0f;
+  }
 
   // Status message
   const char* statusMsg;

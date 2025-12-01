@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "types.h"
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,11 @@ struct ThermalSettings {
 
   // Electricity cost (Finland 2024)
   float electricityPrice_cPerKwh = 12.0f;  // Electricity price in cents/kWh (Finnish avg ~8-15c)
+
+  // Climate location (for annual calculations)
+  int selectedLocationIndex = 0;  // Index into climate locations (0 = Helsinki)
+  bool useClimateData = true;     // Use monthly data vs. static outsideTemp
+  float targetInsideTemp = 5.0f;  // Target minimum inside temperature for heating calc
 
   // Get total heat input from all sources
   float GetTotalHeatInput_W() const {
@@ -59,6 +65,13 @@ struct ThermalAnalysisResult {
   float totalHeatInput_W;     // Heat from chickens + heater (W)
   float equilibriumTemp;      // Equilibrium inside temp with heat sources (°C)
   float heatBalance_W;        // Net heat (input - loss), positive = warming
+
+  // Annual calculations (based on climate data)
+  std::array<float, 12> monthlyHeatLoss_kWh;    // Heat loss per month (kWh)
+  std::array<float, 12> monthlyHeatingCost_EUR; // Heating cost per month (EUR)
+  float annualHeatLoss_kWh = 0.0f;              // Total annual heat loss (kWh)
+  float annualHeatingCost_EUR = 0.0f;           // Total annual heating cost (EUR)
+  bool hasAnnualData = false;                   // True if annual calculations done
 };
 
 // Calculate thermal properties for all objects in scene
@@ -66,6 +79,12 @@ ThermalAnalysisResult CalculateThermalLoss(
     const std::vector<ModelWithColor>& models,
     const std::vector<MaterialItem>& materials,
     const MaterialLibrary& library,
+    const ThermalSettings& settings);
+
+// Calculate annual heating needs based on climate data
+// Updates the monthly and annual fields in result
+void CalculateAnnualThermal(
+    ThermalAnalysisResult& result,
     const ThermalSettings& settings);
 
 // Map heat flux to color (blue = low loss/good, red = high loss/bad)

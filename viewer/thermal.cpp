@@ -1,4 +1,5 @@
 #include "thermal.h"
+#include "climate_data.h"
 #include "material_loader.h"
 
 #include <algorithm>
@@ -7,6 +8,10 @@
 #include <unordered_set>
 
 namespace dingcad {
+
+// Days per month (non-leap year)
+static const int kDaysPerMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+static const float kHoursPerDay = 24.0f;
 
 ThermalAnalysisResult CalculateThermalLoss(
     const std::vector<ModelWithColor>& models,
@@ -204,6 +209,63 @@ const char* GetHeatLossDescription(float heatFlux_W_per_m2) {
   } else {
     return "Severe heat loss";
   }
+}
+
+void CalculateAnnualThermal(
+    ThermalAnalysisResult& result,
+    const ThermalSettings& settings) {
+
+  // Reset annual data
+  result.annualHeatLoss_kWh = 0.0f;
+  result.annualHeatingCost_EUR = 0.0f;
+  result.hasAnnualData = false;
+
+  // Need UA coefficient from prior calculation
+  if (result.totalUA <= 0.0f) {
+    return;
+  }
+
+  const ClimateLocation& climate = GetClimateLocation(settings.selectedLocationIndex);
+
+  // Calculate chicken heat contribution (constant throughout year)
+  float chickenHeat_W = 0.0f;
+  if (settings.chickensEnabled) {
+    chickenHeat_W = settings.chickenCount * settings.heatPerChicken_W;
+  }
+
+  // Calculate for each month
+  for (int month = 0; month < 12; ++month) {
+    float outsideTemp = climate.monthlyAvgTemp[month];
+    float targetTemp = settings.targetInsideTemp;
+
+    // Only need heating when outside is colder than target
+    float deltaT = std::max(0.0f, targetTemp - outsideTemp);
+
+    // Heat loss this month (W) based on average delta T
+    float heatLoss_W = result.totalUA * deltaT;
+
+    // Hours in this month
+    float hoursInMonth = kDaysPerMonth[month] * kHoursPerDay;
+
+    // Heat loss in kWh
+    float heatLoss_kWh = (heatLoss_W * hoursInMonth) / 1000.0f;
+
+    // Chicken heat contribution (free heating)
+    float chickenHeat_kWh = (chickenHeat_W * hoursInMonth) / 1000.0f;
+
+    // Net heating needed (must be at least 0)
+    float heatingNeeded_kWh = std::max(0.0f, heatLoss_kWh - chickenHeat_kWh);
+
+    // Store monthly values
+    result.monthlyHeatLoss_kWh[month] = heatingNeeded_kWh;
+    result.monthlyHeatingCost_EUR[month] = heatingNeeded_kWh * settings.electricityPrice_cPerKwh / 100.0f;
+
+    // Accumulate annual totals
+    result.annualHeatLoss_kWh += heatingNeeded_kWh;
+    result.annualHeatingCost_EUR += result.monthlyHeatingCost_EUR[month];
+  }
+
+  result.hasAnnualData = true;
 }
 
 }  // namespace dingcad

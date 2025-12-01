@@ -20,6 +20,7 @@ add_executable(dingcad_viewer
   material_loader.cpp
   ui_panels.cpp
   thermal.cpp
+  climate_data.cpp
   primitives/wall.cpp
 )
 

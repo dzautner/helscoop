@@ -598,9 +598,10 @@ int main(int argc, char *argv[]) {
     // Recalculate thermal analysis if needed
     if (uiState.thermalViewEnabled && thermalResultDirty) {
       thermalResult = CalculateThermalLoss(models, sceneMaterials, g_materialLibrary, uiState.thermalSettings);
+      CalculateAnnualThermal(thermalResult, uiState.thermalSettings);  // Add annual heating calc
       thermalResultDirty = false;
-      TraceLog(LOG_INFO, "Thermal analysis: %.1f W total heat loss, %zu surfaces",
-               thermalResult.totalHeatLoss_W, thermalResult.surfaces.size());
+      TraceLog(LOG_INFO, "Thermal analysis: %.1f W total heat loss, %.0f kWh/year, %zu surfaces",
+               thermalResult.totalHeatLoss_W, thermalResult.annualHeatLoss_kWh, thermalResult.surfaces.size());
     }
 
     // Build thermal color lookup map for rendering
