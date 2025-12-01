@@ -29,7 +29,7 @@ const skid_sec = [148, 148];       // Skid cross-section [thickness, height]
 const skirting_t = 12;             // Skirting panel thickness
 
 // Doors
-const door_w = 700;              // Human door width
+const door_w = 649;              // Human door width
 const door_h = 1700;             // Human door height
 const pop_w = 250;               // Pop door width
 const pop_opening_h = 300;       // Pop door opening height
