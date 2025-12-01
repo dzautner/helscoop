@@ -34,13 +34,44 @@ static bool materialMatchesFilter(const MaterialItem& mat, const char* filterTex
          containsIgnoreCase(mat.materialId, filter);
 }
 
-// Get thermal panel bounds for click blocking
-static Rectangle GetThermalPanelBounds(int screenHeight) {
-  const float panelWidth = 340.0f;
-  const float panelHeight = 720.0f;  // Matches DrawThermalPanel (extended for climate)
-  const float panelX = 10.0f;
-  const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
-  return {panelX, panelY, panelWidth, panelHeight};
+// Handle draggable panel header - returns true if being dragged
+static bool HandlePanelDrag(UIState& uiState, int panelId, PanelPos& pos,
+                            float panelX, float panelY, float panelWidth, float headerHeight) {
+  Vector2 mousePos = GetMousePosition();
+  Rectangle headerRect = {panelX, panelY, panelWidth, headerHeight};
+
+  // Start drag on mouse down in header (but not if already dragging a param slider)
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+      CheckCollisionPointRec(mousePos, headerRect) &&
+      uiState.draggingParamIndex == -1) {
+    uiState.draggingPanel = panelId;
+    uiState.dragOffset = {mousePos.x - panelX, mousePos.y - panelY};
+  }
+
+  // Continue drag
+  if (uiState.draggingPanel == panelId && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    pos.x = mousePos.x - uiState.dragOffset.x;
+    pos.y = mousePos.y - uiState.dragOffset.y;
+    return true;
+  }
+
+  // End drag
+  if (uiState.draggingPanel == panelId && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    uiState.draggingPanel = -1;
+  }
+
+  return false;
+}
+
+// Draw drag handle indicator
+static void DrawDragHandle(const Font& uiFont, float panelX, float panelY, float panelWidth) {
+  // Small dots in the header to indicate draggable
+  float cx = panelX + panelWidth - 15.0f;
+  float cy = panelY + 12.0f;
+  for (int i = 0; i < 3; i++) {
+    DrawCircle(static_cast<int>(cx + i * 4), static_cast<int>(cy), 1.5f, Color{80, 80, 90, 255});
+    DrawCircle(static_cast<int>(cx + i * 4), static_cast<int>(cy + 4), 1.5f, Color{80, 80, 90, 255});
+  }
 }
 
 void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
@@ -49,10 +80,23 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
                         int screenWidth, int screenHeight) {
   if (materials.empty()) return;
 
-  const float panelWidth = 320.0f;
-  const float panelX = 10.0f;
-  const float panelY = kToolbarHeight + 8.0f;  // Below toolbar
-  const float panelHeight = static_cast<float>(screenHeight) - kToolbarHeight - 60.0f;
+  const float panelWidth = 300.0f;
+  const float panelHeight = 550.0f;
+
+  // Initialize default position if not set
+  if (!uiState.materialsPos.initialized) {
+    uiState.materialsPos.x = 10.0f;
+    uiState.materialsPos.y = kToolbarHeight + 10.0f;
+    uiState.materialsPos.initialized = true;
+  }
+
+  float panelX = uiState.materialsPos.x;
+  float panelY = uiState.materialsPos.y;
+
+  // Handle dragging
+  HandlePanelDrag(uiState, 0, uiState.materialsPos, panelX, panelY, panelWidth, 28.0f);
+  panelX = uiState.materialsPos.x;
+  panelY = uiState.materialsPos.y;
   const float rowHeight = 24.0f;
   const float headerHeight = 30.0f;
   const float searchBoxHeight = 26.0f;
@@ -102,8 +146,9 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
                      static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
 
-  // Title
-  DrawTextEx(uiFont, "MATERIALS & PRICING", {panelX + 10, panelY + 8}, 19.0f, 0.0f, DARKGRAY);
+  // Title with drag handle
+  DrawTextEx(uiFont, "MATERIALS & PRICING", {panelX + 10, panelY + 8}, 16.0f, 0.0f, DARKGRAY);
+  DrawDragHandle(uiFont, panelX, panelY, panelWidth);
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
 
@@ -217,8 +262,8 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
     if (yPos + rowHeight > scrollAreaY && yPos < scrollAreaY + scrollAreaHeight) {
       // Check if mouse is over thermal panel (to prevent hover/click through)
       bool mouseOverThermalPanel = false;
-      if (uiState.thermalViewEnabled) {
-        Rectangle thermalBounds = GetThermalPanelBounds(screenHeight);
+      if (uiState.thermalViewEnabled && uiState.thermalPos.initialized) {
+        Rectangle thermalBounds = {uiState.thermalPos.x, uiState.thermalPos.y, 320.0f, 500.0f};
         mouseOverThermalPanel = CheckCollisionPointRec(mousePos, thermalBounds);
       }
 
@@ -346,10 +391,23 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
                          const std::filesystem::path& scriptPath) {
   if (parameters.empty()) return false;
 
-  const float panelWidth = 280.0f;
-  const float panelX = static_cast<float>(screenWidth) - panelWidth - 10.0f;
-  const float panelY = kToolbarHeight + 8.0f;  // Below toolbar
-  const float panelHeight = static_cast<float>(screenHeight) - kToolbarHeight - 60.0f;
+  const float panelWidth = 260.0f;
+  const float panelHeight = 580.0f;
+
+  // Initialize default position if not set
+  if (!state.parametersPos.initialized) {
+    state.parametersPos.x = static_cast<float>(screenWidth) - panelWidth - 10.0f;
+    state.parametersPos.y = kToolbarHeight + 10.0f;
+    state.parametersPos.initialized = true;
+  }
+
+  float panelX = state.parametersPos.x;
+  float panelY = state.parametersPos.y;
+
+  // Handle dragging
+  HandlePanelDrag(state, 1, state.parametersPos, panelX, panelY, panelWidth, 28.0f);
+  panelX = state.parametersPos.x;
+  panelY = state.parametersPos.y;
   const float rowHeight = 28.0f;
   const float headerHeight = 30.0f;
   const float sectionHeight = 24.0f;
@@ -362,13 +420,14 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
   DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
                      static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
 
-  // Title
-  DrawTextEx(uiFont, "PARAMETERS", {panelX + 10, panelY + 8}, 19.0f, 0.0f, DARKGRAY);
+  // Title with drag handle
+  DrawTextEx(uiFont, "PARAMETERS", {panelX + 10, panelY + 8}, 16.0f, 0.0f, DARKGRAY);
+  DrawDragHandle(uiFont, panelX, panelY, panelWidth);
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
 
   // Live updates checkbox
-  Rectangle checkboxRect = {panelX + panelWidth - 100, panelY + 8, 14, 14};
+  Rectangle checkboxRect = {panelX + panelWidth - 65, panelY + 8, 14, 14};
   GuiCheckBox(checkboxRect, "Live", &state.liveUpdatesEnabled);
 
   // Calculate content height for scroll limits
@@ -533,10 +592,23 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
                       int screenWidth, int screenHeight) {
   bool settingsChanged = false;
 
-  const float panelWidth = 340.0f;
-  const float panelHeight = 720.0f;  // Extended for climate data and annual costs
-  const float panelX = 10.0f;
-  const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
+  const float panelWidth = 320.0f;
+  const float panelHeight = 720.0f;
+
+  // Initialize default position if not set
+  if (!uiState.thermalPos.initialized) {
+    uiState.thermalPos.x = 10.0f;
+    uiState.thermalPos.y = kToolbarHeight + 10.0f;
+    uiState.thermalPos.initialized = true;
+  }
+
+  float panelX = uiState.thermalPos.x;
+  float panelY = uiState.thermalPos.y;
+
+  // Handle dragging
+  HandlePanelDrag(uiState, 2, uiState.thermalPos, panelX, panelY, panelWidth, 28.0f);
+  panelX = uiState.thermalPos.x;
+  panelY = uiState.thermalPos.y;
   const float sliderWidth = panelWidth - 80.0f;
 
   // Panel background
@@ -549,9 +621,10 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
   float yPos = panelY + 10.0f;
   ThermalSettings& settings = uiState.thermalSettings;
 
-  // Title
-  DrawTextEx(uiFont, "THERMAL SIMULATION", {panelX + 10, yPos}, 18.0f, 0.0f, WHITE);
-  yPos += 28.0f;
+  // Title with drag handle
+  DrawTextEx(uiFont, "THERMAL SIMULATION", {panelX + 10, yPos}, 14.0f, 0.0f, WHITE);
+  DrawDragHandle(uiFont, panelX, panelY, panelWidth);
+  yPos += 24.0f;
 
   // === CLIMATE LOCATION SELECTOR ===
   DrawTextEx(uiFont, "CLIMATE LOCATION", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
@@ -1005,11 +1078,23 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
                          UIState& uiState,
                          const Font& uiFont,
                          int screenWidth, int screenHeight) {
-  const float panelWidth = 320.0f;
-  const float panelHeight = 280.0f;
-  // Position to the left of the thermal panel
-  const float panelX = 10.0f;
-  const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f - 730.0f;  // Above thermal
+  const float panelWidth = 280.0f;
+  const float panelHeight = 250.0f;
+
+  // Initialize default position if not set
+  if (!uiState.structuralPos.initialized) {
+    uiState.structuralPos.x = static_cast<float>(screenWidth) - panelWidth - 10.0f;
+    uiState.structuralPos.y = static_cast<float>(screenHeight) - panelHeight - 50.0f;
+    uiState.structuralPos.initialized = true;
+  }
+
+  float panelX = uiState.structuralPos.x;
+  float panelY = uiState.structuralPos.y;
+
+  // Handle dragging
+  HandlePanelDrag(uiState, 3, uiState.structuralPos, panelX, panelY, panelWidth, 28.0f);
+  panelX = uiState.structuralPos.x;
+  panelY = uiState.structuralPos.y;
 
   // Panel background with green/red tint based on status
   Color bgColor = structResult.allPassed ? Color{30, 40, 35, 255} : Color{40, 35, 30, 255};
@@ -1021,10 +1106,11 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
 
   float yPos = panelY + 10.0f;
 
-  // Title with status color
+  // Title with status color and drag handle
   Color titleColor = structResult.allPassed ? GREEN : (structResult.errorCount > 0 ? RED : ORANGE);
-  DrawTextEx(uiFont, "STRUCTURAL CHECK", {panelX + 10.0f, yPos}, 16.0f, 0.0f, titleColor);
-  yPos += 24.0f;
+  DrawTextEx(uiFont, "STRUCTURAL CHECK", {panelX + 10.0f, yPos}, 14.0f, 0.0f, titleColor);
+  DrawDragHandle(uiFont, panelX, panelY, panelWidth);
+  yPos += 22.0f;
 
   // Summary line
   char summaryText[64];
@@ -1094,100 +1180,66 @@ bool DrawToolbar(UIState& uiState,
   bool anyToggled = false;
 
   const float toolbarHeight = kToolbarHeight;
-  const float buttonSize = 30.0f;
-  const float buttonGap = 6.0f;
-  const float startX = 140.0f;  // After branding text
+  const float btnH = 20.0f;
+  const float gap = 2.0f;
 
   Vector2 mousePos = GetMousePosition();
 
-  // Semi-transparent dark background
-  DrawRectangle(0, 0, screenWidth, static_cast<int>(toolbarHeight),
-                Fade(Color{35, 35, 45, 255}, 0.95f));
-  DrawLine(0, static_cast<int>(toolbarHeight), screenWidth, static_cast<int>(toolbarHeight), DARKGRAY);
+  // Dark toolbar background
+  DrawRectangle(0, 0, screenWidth, static_cast<int>(toolbarHeight), Color{20, 20, 25, 255});
 
-  float x = startX;
-  float y = (toolbarHeight - buttonSize) / 2.0f;
+  float x = 160.0f;  // After HELSCOOP branding
+  float y = (toolbarHeight - btnH) / 2.0f;
 
-  // Helper lambda to draw a toggle button
-  auto drawToggleButton = [&](const char* label, const char* hotkey, bool& state, Color activeColor) -> bool {
-    Rectangle btn = {x, y, buttonSize, buttonSize};
+  // Simple toggle button
+  auto toggleBtn = [&](const char* label, bool& state, Color activeColor) -> bool {
+    float btnW = 20.0f;
+    Rectangle btn = {x, y, btnW, btnH};
     bool hovered = CheckCollisionPointRec(mousePos, btn);
     bool clicked = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 
-    // Button background
-    Color bgColor = state ? activeColor : (hovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
-    DrawRectangleRec(btn, bgColor);
-    DrawRectangleLinesEx(btn, 1.0f, state ? activeColor : DARKGRAY);
+    Color bg = state ? activeColor : (hovered ? Color{45, 45, 50, 255} : Color{30, 30, 35, 255});
+    DrawRectangleRec(btn, bg);
 
-    // Label centered
-    Vector2 labelSize = MeasureTextEx(uiFont, label, 14.0f, 0.0f);
-    DrawTextEx(uiFont, label,
-               {x + (buttonSize - labelSize.x) / 2.0f, y + (buttonSize - labelSize.y) / 2.0f - 2.0f},
-               14.0f, 0.0f, state ? WHITE : (hovered ? LIGHTGRAY : GRAY));
+    Vector2 sz = MeasureTextEx(uiFont, label, 11.0f, 0.0f);
+    DrawTextEx(uiFont, label, {x + (btnW - sz.x) / 2.0f, y + 4.0f}, 11.0f, 0.0f,
+               state ? WHITE : (hovered ? LIGHTGRAY : Color{100, 100, 110, 255}));
 
-    // Hotkey below button
-    Vector2 hotkeySize = MeasureTextEx(uiFont, hotkey, 8.0f, 0.0f);
-    DrawTextEx(uiFont, hotkey,
-               {x + (buttonSize - hotkeySize.x) / 2.0f, y + buttonSize - 2.0f},
-               8.0f, 0.0f, Color{100, 100, 110, 255});
-
-    x += buttonSize + buttonGap;
-
-    if (clicked) {
-      state = !state;
-      return true;
-    }
+    x += btnW + gap;
+    if (clicked) { state = !state; return true; }
     return false;
   };
 
-  // Materials panel toggle [M]
-  if (drawToggleButton("M", "[M]", uiState.showMaterialsPanel, ORANGE)) {
-    anyToggled = true;
-  }
-
-  // Parameters panel toggle [T]
-  if (drawToggleButton("P", "[T]", uiState.showParametersPanel, BLUE)) {
-    anyToggled = true;
-  }
-
-  // Thermal view toggle [H]
-  bool thermalToggled = drawToggleButton("H", "[H]", uiState.thermalViewEnabled, RED);
-  if (thermalToggled) {
+  // Panel toggles
+  if (toggleBtn("M", uiState.showMaterialsPanel, Color{180, 100, 40, 255})) anyToggled = true;
+  if (toggleBtn("T", uiState.showParametersPanel, Color{60, 120, 180, 255})) anyToggled = true;
+  if (toggleBtn("H", uiState.thermalViewEnabled, Color{180, 60, 60, 255})) {
     uiState.showThermalPanel = uiState.thermalViewEnabled;
     anyToggled = true;
   }
-
-  // Structural panel toggle [S]
-  if (drawToggleButton("S", "[S]", uiState.showStructuralPanel, ORANGE)) {
-    anyToggled = true;
-  }
+  if (toggleBtn("S", uiState.showStructuralPanel, Color{180, 140, 40, 255})) anyToggled = true;
 
   // Separator
   x += 4.0f;
-  DrawLine(static_cast<int>(x), 8, static_cast<int>(x), static_cast<int>(toolbarHeight - 8), Color{80, 80, 90, 255});
-  x += 10.0f;
+  DrawLine(static_cast<int>(x), 8, static_cast<int>(x), static_cast<int>(toolbarHeight - 8), Color{40, 40, 45, 255});
+  x += 6.0f;
 
-  // Export section label
-  DrawTextEx(uiFont, "EXPORT:", {x, y + 8}, 10.0f, 0.0f, Color{100, 100, 110, 255});
-  x += 55.0f;
+  // Export buttons
+  auto exportBtn = [&](const char* label) -> bool {
+    float btnW = 28.0f;
+    Rectangle btn = {x, y, btnW, btnH};
+    bool hovered = CheckCollisionPointRec(mousePos, btn);
+    bool clicked = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    DrawRectangleRec(btn, hovered ? Color{45, 45, 50, 255} : Color{30, 30, 35, 255});
+    Vector2 sz = MeasureTextEx(uiFont, label, 10.0f, 0.0f);
+    DrawTextEx(uiFont, label, {x + (btnW - sz.x) / 2.0f, y + 5.0f}, 10.0f, 0.0f,
+               hovered ? WHITE : Color{100, 100, 110, 255});
+    x += btnW + gap;
+    return clicked;
+  };
 
-  // STL export button [P]
-  Rectangle stlBtn = {x, y, 40.0f, buttonSize};
-  bool stlHovered = CheckCollisionPointRec(mousePos, stlBtn);
-  DrawRectangleRec(stlBtn, stlHovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
-  DrawRectangleLinesEx(stlBtn, 1.0f, DARKGRAY);
-  DrawTextEx(uiFont, "STL", {x + 8, y + 8}, 12.0f, 0.0f, stlHovered ? WHITE : GRAY);
-  DrawTextEx(uiFont, "[P]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{100, 100, 110, 255});
-  x += 46.0f;
-
-  // IFC export button [I]
-  Rectangle ifcBtn = {x, y, 40.0f, buttonSize};
-  bool ifcHovered = CheckCollisionPointRec(mousePos, ifcBtn);
-  DrawRectangleRec(ifcBtn, ifcHovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
-  DrawRectangleLinesEx(ifcBtn, 1.0f, DARKGRAY);
-  DrawTextEx(uiFont, "IFC", {x + 8, y + 8}, 12.0f, 0.0f, ifcHovered ? WHITE : GRAY);
-  DrawTextEx(uiFont, "[I]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{100, 100, 110, 255});
-  x += 46.0f;
+  if (exportBtn("STL")) uiState.stlExportClicked = true;
+  if (exportBtn("IFC")) uiState.ifcExportClicked = true;
 
   // Status message on right side
   if (!statusMessage.empty()) {
@@ -1208,9 +1260,9 @@ bool DrawToolbar(UIState& uiState,
 
     // Status with subtle background
     DrawRectangle(static_cast<int>(statusX - 5), static_cast<int>(y + 2),
-                  static_cast<int>(statusSize.x + 10), static_cast<int>(buttonSize - 4),
+                  static_cast<int>(statusSize.x + 10), static_cast<int>(btnH - 4),
                   Fade(Color{40, 40, 50, 255}, 0.8f));
-    DrawTextEx(uiFont, displayStatus.c_str(), {statusX, y + 8}, 11.0f, 0.0f, LIGHTGRAY);
+    DrawTextEx(uiFont, displayStatus.c_str(), {statusX, y + 5}, 11.0f, 0.0f, LIGHTGRAY);
   }
 
   return anyToggled;

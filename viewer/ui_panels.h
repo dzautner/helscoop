@@ -11,6 +11,13 @@
 
 namespace dingcad {
 
+// Panel position for draggable panels
+struct PanelPos {
+  float x = 0.0f;
+  float y = 0.0f;
+  bool initialized = false;
+};
+
 // UI state container
 struct UIState {
   bool showParametersPanel = true;
@@ -39,6 +46,20 @@ struct UIState {
 
   // Thermal settings (user-adjustable)
   ThermalSettings thermalSettings;
+
+  // Draggable panel positions
+  PanelPos materialsPos;
+  PanelPos parametersPos;
+  PanelPos thermalPos;
+  PanelPos structuralPos;
+
+  // Panel dragging state
+  int draggingPanel = -1;  // -1=none, 0=materials, 1=params, 2=thermal, 3=structural
+  Vector2 dragOffset = {0, 0};
+
+  // Export button clicks (set by toolbar, cleared by main after handling)
+  bool stlExportClicked = false;
+  bool ifcExportClicked = false;
 };
 
 // Draw materials panel on left side (updates uiState.hoveredMaterialId)

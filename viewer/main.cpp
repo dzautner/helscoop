@@ -416,11 +416,12 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // Export handling - also skip when filter is active
+    // STL Export handling - keyboard [P] or toolbar button
     static bool prevPDown = false;
-    bool exportRequested = false;
+    bool exportRequested = uiState.stlExportClicked;
+    uiState.stlExportClicked = false;  // Clear the flag
 
-    if (!uiState.materialFilterActive) {
+    if (!uiState.materialFilterActive && !exportRequested) {
       for (int key = GetKeyPressed(); key != 0; key = GetKeyPressed()) {
         if (key == KEY_P) exportRequested = true;
       }
@@ -466,11 +467,12 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // IFC Export handling [I]
+    // IFC Export handling - keyboard [I] or toolbar button
     static bool prevIDown = false;
-    bool ifcExportRequested = false;
+    bool ifcExportRequested = uiState.ifcExportClicked;
+    uiState.ifcExportClicked = false;  // Clear the flag
 
-    if (!uiState.materialFilterActive) {
+    if (!uiState.materialFilterActive && !ifcExportRequested) {
       const bool iDown = IsKeyDown(KEY_I);
       if (iDown && !prevIDown) ifcExportRequested = true;
       prevIDown = iDown;
@@ -490,10 +492,10 @@ int main(int argc, char *argv[]) {
       if (dirErr && !std::filesystem::exists(downloads)) {
         reportStatus("IFC export failed: cannot access " + downloads.string());
       } else {
-        std::filesystem::path ifcPath = downloads / "ding.ifc";
+        std::filesystem::path ifcPath = downloads / "helscoop.ifc";
         std::string error;
         if (ExportToIFC(sceneData, sceneMaterials, g_materialLibrary, ifcPath, error)) {
-          reportStatus("Saved " + ifcPath.string());
+          reportStatus("Saved ~/Downloads/helscoop.ifc");
         } else {
           reportStatus("IFC export failed: " + error);
         }
@@ -551,8 +553,9 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // Camera controls (skip if shift is held - that's for object picking)
-    if (!mouseOverPanel && !IsKeyDown(KEY_LEFT_SHIFT) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    // Camera controls (skip if shift is held - that's for object picking, or if dragging a panel)
+    bool isDraggingPanel = uiState.draggingPanel >= 0;
+    if (!mouseOverPanel && !isDraggingPanel && !IsKeyDown(KEY_LEFT_SHIFT) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       orbitYaw -= mouseDelta.x * 0.01f;
       orbitPitch += mouseDelta.y * 0.01f;
       const float limit = DEG2RAD * 89.0f;
@@ -560,7 +563,7 @@ int main(int argc, char *argv[]) {
     }
 
     const float wheel = GetMouseWheelMove();
-    if (!mouseOverPanel && wheel != 0.0f) {
+    if (!mouseOverPanel && !isDraggingPanel && wheel != 0.0f) {
       orbitDistance *= (1.0f - wheel * 0.1f);
       orbitDistance = Clamp(orbitDistance, 1.0f, 50.0f);
     }
@@ -570,7 +573,7 @@ int main(int argc, char *argv[]) {
     const Vector3 right = Vector3Normalize(Vector3CrossProduct(worldUp, forward));
     const Vector3 camUp = Vector3CrossProduct(forward, right);
 
-    if (!mouseOverPanel && IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+    if (!mouseOverPanel && !isDraggingPanel && IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
       camera.target = Vector3Add(camera.target, Vector3Scale(right, mouseDelta.x * 0.01f * orbitDistance));
       camera.target = Vector3Add(camera.target, Vector3Scale(camUp, -mouseDelta.y * 0.01f * orbitDistance));
     }

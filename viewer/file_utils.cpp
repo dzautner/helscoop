@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <regex>
 #include <sstream>
 
 namespace dingcad {
@@ -113,6 +114,19 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
   auto source = ReadTextFile(path);
   if (!source) return params;
 
+  // Check for re-export pattern: export { ... } from './path/to/file.js'
+  // If found, parse that file instead
+  std::regex reexportRegex(R"(export\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"])");
+  std::smatch match;
+  if (std::regex_search(*source, match, reexportRegex)) {
+    std::string importPath = match[1].str();
+    std::filesystem::path resolvedPath = path.parent_path() / importPath;
+    if (std::filesystem::exists(resolvedPath)) {
+      source = ReadTextFile(resolvedPath);
+      if (!source) return params;
+    }
+  }
+
   struct ParamDef {
     const char* name;
     const char* displayName;
@@ -204,8 +218,24 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
 }
 
 bool WriteParameterToFile(const std::filesystem::path& path, const SceneParameter& param) {
+  // First check if this file re-exports from another file
   auto source = ReadTextFile(path);
   if (!source) return false;
+
+  std::filesystem::path actualPath = path;
+
+  // Check for re-export pattern
+  std::regex reexportRegex(R"(export\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"])");
+  std::smatch match;
+  if (std::regex_search(*source, match, reexportRegex)) {
+    std::string importPath = match[1].str();
+    std::filesystem::path resolvedPath = path.parent_path() / importPath;
+    if (std::filesystem::exists(resolvedPath)) {
+      actualPath = resolvedPath;
+      source = ReadTextFile(actualPath);
+      if (!source) return false;
+    }
+  }
 
   std::ostringstream result;
   std::istringstream stream(*source);
@@ -231,7 +261,7 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
     result << line << "\n";
   }
 
-  std::ofstream out(path);
+  std::ofstream out(actualPath);
   if (!out) return false;
   out << result.str();
   return true;
