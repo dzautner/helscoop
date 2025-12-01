@@ -22,6 +22,7 @@ add_executable(dingcad_viewer
   thermal.cpp
   climate_data.cpp
   structural.cpp
+  ifc_export.cpp
   primitives/wall.cpp
 )
 

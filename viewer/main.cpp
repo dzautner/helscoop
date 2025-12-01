@@ -27,6 +27,7 @@ extern "C" {
 #include "ui_panels.h"
 #include "thermal.h"
 #include "structural.h"
+#include "ifc_export.h"
 
 using namespace dingcad;
 
@@ -461,6 +462,40 @@ int main(int argc, char *argv[]) {
           } else {
             reportStatus(error);
           }
+        }
+      }
+    }
+
+    // IFC Export handling [I]
+    static bool prevIDown = false;
+    bool ifcExportRequested = false;
+
+    if (!uiState.materialFilterActive) {
+      const bool iDown = IsKeyDown(KEY_I);
+      if (iDown && !prevIDown) ifcExportRequested = true;
+      prevIDown = iDown;
+      if (!ifcExportRequested && IsKeyPressed(KEY_I)) ifcExportRequested = true;
+    }
+
+    if (ifcExportRequested && !sceneData.objects.empty()) {
+      std::filesystem::path downloads;
+      if (const char *home = std::getenv("HOME")) {
+        downloads = std::filesystem::path(home) / "Downloads";
+      } else {
+        downloads = std::filesystem::current_path();
+      }
+
+      std::error_code dirErr;
+      std::filesystem::create_directories(downloads, dirErr);
+      if (dirErr && !std::filesystem::exists(downloads)) {
+        reportStatus("IFC export failed: cannot access " + downloads.string());
+      } else {
+        std::filesystem::path ifcPath = downloads / "ding.ifc";
+        std::string error;
+        if (ExportToIFC(sceneData, sceneMaterials, g_materialLibrary, ifcPath, error)) {
+          reportStatus("Saved " + ifcPath.string());
+        } else {
+          reportStatus("IFC export failed: " + error);
         }
       }
     }

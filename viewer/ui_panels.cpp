@@ -1180,13 +1180,13 @@ bool DrawToolbar(UIState& uiState,
   DrawTextEx(uiFont, "[P]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{100, 100, 110, 255});
   x += 46.0f;
 
-  // IFC export button [I] (placeholder - will implement later)
+  // IFC export button [I]
   Rectangle ifcBtn = {x, y, 40.0f, buttonSize};
   bool ifcHovered = CheckCollisionPointRec(mousePos, ifcBtn);
   DrawRectangleRec(ifcBtn, ifcHovered ? Color{70, 70, 80, 255} : Color{50, 50, 60, 255});
   DrawRectangleLinesEx(ifcBtn, 1.0f, DARKGRAY);
-  DrawTextEx(uiFont, "IFC", {x + 8, y + 8}, 12.0f, 0.0f, ifcHovered ? Color{150, 150, 160, 255} : Color{80, 80, 90, 255});
-  DrawTextEx(uiFont, "[I]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{80, 80, 90, 255});
+  DrawTextEx(uiFont, "IFC", {x + 8, y + 8}, 12.0f, 0.0f, ifcHovered ? WHITE : GRAY);
+  DrawTextEx(uiFont, "[I]", {x + 10, y + buttonSize - 2}, 8.0f, 0.0f, Color{100, 100, 110, 255});
   x += 46.0f;
 
   // Status message on right side
