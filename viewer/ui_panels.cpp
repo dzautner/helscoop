@@ -36,7 +36,7 @@ static bool materialMatchesFilter(const MaterialItem& mat, const char* filterTex
 // Get thermal panel bounds for click blocking
 static Rectangle GetThermalPanelBounds(int screenHeight) {
   const float panelWidth = 340.0f;
-  const float panelHeight = 420.0f;  // Matches DrawThermalPanel
+  const float panelHeight = 520.0f;  // Matches DrawThermalPanel
   const float panelX = 10.0f;
   const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
   return {panelX, panelY, panelWidth, panelHeight};
@@ -366,15 +366,52 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(panelY + headerHeight),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(panelY + headerHeight), LIGHTGRAY);
 
-  float yPos = panelY + headerHeight + 5.0f;
-  std::string currentSection;
-
   // Live updates checkbox
   Rectangle checkboxRect = {panelX + panelWidth - 100, panelY + 8, 14, 14};
   GuiCheckBox(checkboxRect, "Live", &state.liveUpdatesEnabled);
 
+  // Calculate content height for scroll limits
+  float contentHeight = 0.0f;
+  std::string tempSection;
+  for (const auto& param : parameters) {
+    if (param.section != tempSection) {
+      tempSection = param.section;
+      contentHeight += 5.0f + sectionHeight;
+    }
+    contentHeight += 12.0f + rowHeight;
+  }
+
+  // Handle mouse wheel scrolling when mouse is over panel
+  Rectangle panelRect = {panelX, panelY + headerHeight, panelWidth, panelHeight - headerHeight - 25.0f};
+  if (CheckCollisionPointRec(GetMousePosition(), panelRect)) {
+    float wheel = GetMouseWheelMove();
+    state.parameterScrollOffset -= wheel * 40.0f;
+  }
+
+  // Clamp scroll offset
+  float maxScroll = std::max(0.0f, contentHeight - (panelHeight - headerHeight - 50.0f));
+  state.parameterScrollOffset = std::clamp(state.parameterScrollOffset, 0.0f, maxScroll);
+
+  // Begin scissor mode to clip content
+  BeginScissorMode(static_cast<int>(panelX), static_cast<int>(panelY + headerHeight + 2),
+                   static_cast<int>(panelWidth), static_cast<int>(panelHeight - headerHeight - 25.0f));
+
+  float yPos = panelY + headerHeight + 5.0f - state.parameterScrollOffset;
+  std::string currentSection;
+
   for (size_t i = 0; i < parameters.size(); ++i) {
-    if (yPos > panelY + panelHeight - 30.0f) break;
+    // Skip rendering items far above viewport (optimization)
+    if (yPos + rowHeight + sectionHeight < panelY + headerHeight) {
+      auto& param = parameters[i];
+      if (param.section != currentSection) {
+        currentSection = param.section;
+        yPos += 5.0f + sectionHeight;
+      }
+      yPos += 12.0f + rowHeight;
+      continue;
+    }
+    // Stop rendering items far below viewport
+    if (yPos > panelY + panelHeight) break;
 
     auto& param = parameters[i];
 
@@ -421,6 +458,17 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
     }
 
     yPos += rowHeight;
+  }
+
+  // End scissor mode
+  EndScissorMode();
+
+  // Draw scroll indicator if content is scrollable
+  if (maxScroll > 0.0f) {
+    float scrollbarHeight = (panelHeight - headerHeight - 50.0f) * (panelHeight - headerHeight - 50.0f) / contentHeight;
+    float scrollbarY = panelY + headerHeight + 5.0f + (state.parameterScrollOffset / maxScroll) * (panelHeight - headerHeight - 55.0f - scrollbarHeight);
+    DrawRectangle(static_cast<int>(panelX + panelWidth - 8), static_cast<int>(scrollbarY),
+                  4, static_cast<int>(scrollbarHeight), Fade(GRAY, 0.5f));
   }
 
   // Only write to file when mouse is released
@@ -476,7 +524,7 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
   bool settingsChanged = false;
 
   const float panelWidth = 340.0f;
-  const float panelHeight = 420.0f;  // Compact visual display
+  const float panelHeight = 520.0f;  // Extended for monthly cost display
   const float panelX = 10.0f;
   const float panelY = static_cast<float>(screenHeight) - panelHeight - 60.0f;
   const float sliderWidth = panelWidth - 80.0f;
@@ -705,6 +753,48 @@ bool DrawThermalPanel(const ThermalAnalysisResult& thermalResult,
   // UA coefficient
   snprintf(heatText, sizeof(heatText), "UA COEFFICIENT: %.1f W/K", thermalResult.totalUA);
   DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 10.0f, 0.0f, LIGHTGRAY);
+  yPos += 16.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 8.0f;
+
+  // === ELECTRICITY COST ===
+  DrawTextEx(uiFont, "ELECTRICITY COST", {panelX + 10, yPos}, 12.0f, 0.0f, SKYBLUE);
+  yPos += 18.0f;
+
+  // Electricity price slider
+  DrawTextEx(uiFont, "PRICE", {panelX + 10, yPos + 1}, 11.0f, 0.0f, WHITE);
+  Rectangle priceSlider = {panelX + 60, yPos, 120, 14};
+  float oldPrice = settings.electricityPrice_cPerKwh;
+  GuiSlider(priceSlider, "", "", &settings.electricityPrice_cPerKwh, 5.0f, 50.0f);
+  settings.electricityPrice_cPerKwh = std::round(settings.electricityPrice_cPerKwh);
+  if (settings.electricityPrice_cPerKwh != oldPrice) settingsChanged = true;
+
+  char priceLabel[32];
+  snprintf(priceLabel, sizeof(priceLabel), "%.0f c/kWh", settings.electricityPrice_cPerKwh);
+  float priceLabelW = MeasureTextEx(uiFont, priceLabel, 11.0f, 0.0f).x;
+  DrawTextEx(uiFont, priceLabel, {panelX + panelWidth - priceLabelW - 10, yPos + 1}, 11.0f, 0.0f, YELLOW);
+  yPos += 22.0f;
+
+  // Calculate monthly cost (based on heater power only, 24/7 operation)
+  float heaterPowerKw = settings.heaterEnabled ? settings.heaterPower_W / 1000.0f : 0.0f;
+  float hoursPerMonth = 24.0f * 30.0f;  // ~720 hours
+  float monthlyKwh = heaterPowerKw * hoursPerMonth;
+  float monthlyCostEur = monthlyKwh * settings.electricityPrice_cPerKwh / 100.0f;
+
+  // Monthly kWh consumption
+  snprintf(heatText, sizeof(heatText), "HEATER CONSUMPTION: %.0f kWh/month", monthlyKwh);
+  DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 10.0f, 0.0f, LIGHTGRAY);
+  yPos += 16.0f;
+
+  // Monthly cost in euros (highlighted)
+  if (settings.heaterEnabled && settings.heaterPower_W > 0) {
+    snprintf(heatText, sizeof(heatText), "MONTHLY COST: %.2f EUR", monthlyCostEur);
+    DrawTextEx(uiFont, heatText, {panelX + 10, yPos}, 14.0f, 0.0f, monthlyCostEur > 50 ? RED : (monthlyCostEur > 20 ? ORANGE : GREEN));
+  } else {
+    DrawTextEx(uiFont, "MONTHLY COST: 0 EUR (heater off)", {panelX + 10, yPos}, 11.0f, 0.0f, GRAY);
+  }
   yPos += 20.0f;
 
   // Status message

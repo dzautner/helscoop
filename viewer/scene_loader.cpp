@@ -2,6 +2,7 @@
 #include "file_utils.h"
 #include "js_bindings.h"
 #include "material_loader.h"
+#include "thermal_area.h"
 
 #include "raymath.h"
 
@@ -142,7 +143,21 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
   }
 
   JSValue materialsVal = JS_GetPropertyStr(ctx, moduleNamespace, "materials");
+  JSValue displayScaleVal = JS_GetPropertyStr(ctx, moduleNamespace, "displayScale");
   JS_FreeValue(ctx, moduleNamespace);
+
+  // Parse display scale for surface area calculation (default 1.0 if not provided)
+  double displayScale = 1.0;
+  if (!JS_IsUndefined(displayScaleVal)) {
+    double val;
+    if (JS_ToFloat64(ctx, &val, displayScaleVal) == 0 && val > 0) {
+      displayScale = val;
+      TraceLog(LOG_INFO, "SCALE: Read displayScale from scene: %f", displayScale);
+    }
+  } else {
+    TraceLog(LOG_WARNING, "SCALE: displayScale not exported, using default 1.0");
+  }
+  JS_FreeValue(ctx, displayScaleVal);
 
   if (JS_IsUndefined(sceneVal)) {
     JS_FreeValue(ctx, sceneVal);
@@ -369,12 +384,37 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
 
   // Calculate surface area per materialId from scene geometry
   // First, build a map of materialId -> total surface area
+  // Note: Geometry is scaled by displayScale for rendering, so surface area is
+  // scaled by displayScale². We need to undo this to get the original mm² area.
+  //
+  // IMPORTANT: For thermal calculations, we need the PROJECTED area perpendicular
+  // to heat flow, not the full 3D mesh surface area. For insulation slabs:
+  // - A 2.4m × 2.5m × 0.1m floor insulation has ~13m² mesh surface (all 6 faces)
+  // - But only 6m² is the actual thermal barrier (the XY face)
+  const double scaleSquared = displayScale * displayScale;
   std::unordered_map<std::string, double> surfaceAreaByMaterial;
   for (const auto& obj : result.sceneData.objects) {
     if (obj.geometry && !obj.materialId.empty()) {
-      double area = obj.geometry->SurfaceArea();
-      // Convert from mm² to m² (divide by 1,000,000)
-      surfaceAreaByMaterial[obj.materialId] += area / 1000000.0;
+      // Look up material to check if it's a thermal envelope material
+      const PBRMaterial* mat = g_materialLibrary.get(obj.materialId);
+      bool isThermalEnvelope = mat && (mat->category == "insulation" || mat->category == "masonry");
+
+      double scaledArea;
+      if (isThermalEnvelope) {
+        // Use thermal envelope area calculation (projected area perpendicular to heat flow)
+        scaledArea = CalculateThermalEnvelopeArea(*obj.geometry);
+        TraceLog(LOG_INFO, "THERMAL-AREA: Material '%s' category='%s' using thermal envelope area: %.2f mm²",
+                 obj.materialId.c_str(), mat->category.c_str(), scaledArea);
+      } else {
+        // Use full 3D surface area for non-thermal materials
+        scaledArea = obj.geometry->SurfaceArea();
+      }
+
+      // Undo display scaling (area scales with scale²), then convert mm² to m²
+      double originalArea_m2 = scaledArea / scaleSquared / 1000000.0;
+      TraceLog(LOG_INFO, "AREA-CALC: Material '%s' scaledArea=%.2f scaleSquared=%.9f originalArea=%.2f m²",
+               obj.materialId.c_str(), scaledArea, scaleSquared, originalArea_m2);
+      surfaceAreaByMaterial[obj.materialId] += originalArea_m2;
     }
   }
 

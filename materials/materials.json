@@ -11,6 +11,10 @@
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
       },
+      "thermal": {
+        "conductivity": 0.12,
+        "thickness": 98
+      },
       "pricing": {
         "unit": "jm",
         "unitPrice": 2.60,
@@ -27,6 +31,10 @@
         "roughness": 0.75,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
+      },
+      "thermal": {
+        "conductivity": 0.12,
+        "thickness": 148
       },
       "pricing": {
         "unit": "jm",
@@ -45,6 +53,10 @@
         "metallic": 0.0,
         "albedoTexture": "textures/wood/treated_albedo.png"
       },
+      "thermal": {
+        "conductivity": 0.12,
+        "thickness": 148
+      },
       "pricing": {
         "unit": "jm",
         "unitPrice": 3.80,
@@ -61,6 +73,10 @@
         "roughness": 0.85,
         "metallic": 0.0,
         "albedoTexture": "textures/osb/osb_albedo.png"
+      },
+      "thermal": {
+        "conductivity": 0.13,
+        "thickness": 9
       },
       "pricing": {
         "unit": "sheet",
@@ -79,6 +95,10 @@
         "metallic": 0.0,
         "albedoTexture": "textures/osb/osb_albedo.png"
       },
+      "thermal": {
+        "conductivity": 0.13,
+        "thickness": 18
+      },
       "pricing": {
         "unit": "sheet",
         "unitPrice": 22.00,
@@ -95,6 +115,10 @@
         "roughness": 0.65,
         "metallic": 0.0,
         "albedoTexture": "textures/plywood/plywood_albedo.png"
+      },
+      "thermal": {
+        "conductivity": 0.13,
+        "thickness": 9
       },
       "pricing": {
         "unit": "sheet",
@@ -113,6 +137,10 @@
         "metallic": 1.0,
         "albedoTexture": "textures/metal/galvanized_albedo.png"
       },
+      "thermal": {
+        "conductivity": 50.0,
+        "thickness": 0.5
+      },
       "pricing": {
         "unit": "sqm",
         "unitPrice": 8.50,
@@ -130,6 +158,10 @@
         "metallic": 1.0,
         "albedoTexture": "textures/metal/galvanized_albedo.png"
       },
+      "thermal": {
+        "conductivity": 50.0,
+        "thickness": 0.5
+      },
       "pricing": {
         "unit": "jm",
         "unitPrice": 12.00,
@@ -145,6 +177,10 @@
         "albedo": [0.65, 0.65, 0.68],
         "roughness": 0.40,
         "metallic": 0.9
+      },
+      "thermal": {
+        "conductivity": 0.0,
+        "thickness": 0.0
       },
       "pricing": {
         "unit": "sqm",
@@ -162,6 +198,10 @@
         "roughness": 0.95,
         "metallic": 0.0
       },
+      "thermal": {
+        "conductivity": 0.035,
+        "thickness": 100
+      },
       "pricing": {
         "unit": "sqm",
         "unitPrice": 6.50,
@@ -177,6 +217,10 @@
         "albedo": [0.15, 0.15, 0.18],
         "roughness": 0.20,
         "metallic": 0.0
+      },
+      "thermal": {
+        "conductivity": 0.33,
+        "thickness": 0.2
       },
       "pricing": {
         "unit": "sqm",
@@ -260,6 +304,10 @@
         "metallic": 0.0,
         "albedoTexture": "textures/concrete/concrete_albedo.png"
       },
+      "thermal": {
+        "conductivity": 1.7,
+        "thickness": 200
+      },
       "pricing": {
         "unit": "kpl",
         "unitPrice": 4.50,
@@ -277,6 +325,10 @@
         "metallic": 0.0,
         "albedoTexture": "textures/plywood/plywood_albedo.png"
       },
+      "thermal": {
+        "conductivity": 0.13,
+        "thickness": 12
+      },
       "pricing": {
         "unit": "sheet",
         "unitPrice": 32.00,
@@ -293,11 +345,57 @@
         "roughness": 0.65,
         "metallic": 0.0
       },
+      "thermal": {
+        "conductivity": 0.12,
+        "thickness": 21
+      },
       "pricing": {
         "unit": "jm",
         "unitPrice": 1.20,
         "supplier": "sarokas",
         "link": "https://www.sarokas.fi/lista-21x45"
+      }
+    },
+    "door_thermal_bridge": {
+      "name": "Ovi (lämpösilta)",
+      "category": "opening",
+      "tags": ["thermal-bridge", "door", "weak-point"],
+      "visual": {
+        "albedo": [0.6, 0.45, 0.3],
+        "roughness": 0.70,
+        "metallic": 0.0
+      },
+      "thermal": {
+        "conductivity": 0.12,
+        "thickness": 45
+      }
+    },
+    "vent_thermal_bridge": {
+      "name": "Tuuletusaukko (lämpösilta)",
+      "category": "opening",
+      "tags": ["thermal-bridge", "vent", "weak-point"],
+      "visual": {
+        "albedo": [0.3, 0.3, 0.35],
+        "roughness": 0.50,
+        "metallic": 0.5
+      },
+      "thermal": {
+        "conductivity": 25.0,
+        "thickness": 1
+      }
+    },
+    "nest_access_thermal_bridge": {
+      "name": "Pesälaatikkoaukko (lämpösilta)",
+      "category": "opening",
+      "tags": ["thermal-bridge", "nest", "weak-point"],
+      "visual": {
+        "albedo": [0.75, 0.65, 0.50],
+        "roughness": 0.65,
+        "metallic": 0.0
+      },
+      "thermal": {
+        "conductivity": 0.13,
+        "thickness": 12
       }
     }
   },

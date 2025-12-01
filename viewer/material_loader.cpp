@@ -102,6 +102,14 @@ PBRMaterial ParseMaterial(JSContext* ctx, const std::string& id, JSValue matObj)
   }
   JS_FreeValue(ctx, visualVal);
 
+  // Parse thermal properties
+  JSValue thermalVal = JS_GetPropertyStr(ctx, matObj, "thermal");
+  if (!JS_IsUndefined(thermalVal)) {
+    mat.thermal.conductivity = GetFloatProp(ctx, thermalVal, "conductivity", 0.0f);
+    mat.thermal.thickness = GetFloatProp(ctx, thermalVal, "thickness", 0.0f);
+  }
+  JS_FreeValue(ctx, thermalVal);
+
   // Parse pricing properties
   JSValue pricingVal = JS_GetPropertyStr(ctx, matObj, "pricing");
   if (!JS_IsUndefined(pricingVal)) {

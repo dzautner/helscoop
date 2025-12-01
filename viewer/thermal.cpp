@@ -60,14 +60,15 @@ ThermalAnalysisResult CalculateThermalLoss(
     // These are NOT counted because insulation is the actual thermal barrier.
     // Counting both would double-count the same wall/roof area.
     //
-    // Only count:
+    // Count these categories:
     // - "insulation": the actual thermal barrier (R=2.86 for 100mm mineral wool)
+    // - "opening": thermal weak points (doors, vents, nest access) - much lower R-values
     //
     // NOTE: "masonry" (foundations) is NOT counted because it contacts the ground
     // (~10°C year-round), not the outside air temperature. Ground-contact heat
     // transfer requires different calculations with a different ΔT.
     const std::string& category = mat->category;
-    bool isEnvelopeMaterial = (category == "insulation");
+    bool isEnvelopeMaterial = (category == "insulation" || category == "opening");
     if (!isEnvelopeMaterial) continue;
 
     // Get the TOTAL area for this material (summed from all objects using it)

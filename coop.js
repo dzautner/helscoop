@@ -59,11 +59,69 @@ const floor_stack = paver_size[2] + skid_sec[1] + joist_sec[1] + floor_th;
 
 // Scale factor for viewing (1/100 = cm instead of mm for easier viewing)
 const DISPLAY_SCALE = 0.003;  // Smaller to see whole scene
+// Export display scale for surface area calculation in C++
+export const displayScale = DISPLAY_SCALE;
 
-// Visibility toggles - controllable from the viewer control panel
-const show_cladding = true;    // Show/hide exterior cladding
-const show_roof = true;        // Show/hide roof
-const show_walls = true;       // Show/hide wall framing
+// ============================================================================
+// VISIBILITY TOGGLES - Show/hide components to see inside
+// ============================================================================
+// @param show_cladding "Visibility" Show exterior cladding (0-1)
+const show_cladding = 1;       // 1=show, 0=hide exterior cladding
+// @param show_roof "Visibility" Show roof (0-1)
+const show_roof = 1;           // 1=show, 0=hide roof
+// @param show_walls "Visibility" Show wall framing (0-1)
+const show_walls = 1;          // 1=show, 0=hide wall framing
+// @param show_floor "Visibility" Show floor and foundation (0-1)
+const show_floor = 1;          // 1=show, 0=hide floor
+// @param show_insulation "Visibility" Show insulation (0-1)
+const show_insulation = 1;     // 1=show, 0=hide insulation
+// @param show_run "Visibility" Show chicken run (0-1)
+const show_run = 1;            // 1=show, 0=hide run
+// @param show_tunnel "Visibility" Show viewing tunnel (0-1)
+const show_tunnel = 1;         // 1=show, 0=hide tunnel
+// @param show_interior "Visibility" Show interior (roosts, nests) (0-1)
+const show_interior = 1;       // 1=show, 0=hide interior
+// @param show_chickens "Visibility" Show chickens (0-1)
+const show_chickens = 1;       // 1=show, 0=hide chickens
+
+// ============================================================================
+// DOOR ANGLES - Simulate doors open/closed (degrees)
+// ============================================================================
+// @param human_door_angle "Doors" Human door swing angle (0-120)
+const human_door_angle = 0;    // 0=closed, 90=fully open
+// @param nest_lid_angle "Doors" Nest box lid angle (0-90)
+const nest_lid_angle = 45;     // 0=closed, 90=fully open
+// @param tunnel_door_angle "Doors" Tunnel access door angle (0-90)
+const tunnel_door_angle = 30;  // 0=closed, 90=fully open
+// @param run_gate_angle "Doors" Run gate swing angle (0-120)
+const run_gate_angle = 0;      // 0=closed, 90=open
+
+// ============================================================================
+// ELECTRICITY & HEATING COSTS (Finland 2024)
+// ============================================================================
+// @param electricity_price "Energy" Electricity price c/kWh (5-50)
+const electricity_price = 12;  // Finnish spot price ~8-15 c/kWh average
+// @param heater_power "Energy" Heater power in watts (100-2000)
+const heater_power = 250;      // Chicken heat plate ~250W
+// @param chicken_body_heat "Energy" Heat per chicken in watts (5-15)
+const chicken_body_heat = 10;  // ~10W per chicken body heat
+// @param num_chickens_for_heat "Energy" Number of chickens (0-20)
+const num_chickens_for_heat = 6; // 6 chickens = 60W body heat
+
+// Calculate total heat input and monthly cost
+const total_heat_input_W = heater_power + (chicken_body_heat * num_chickens_for_heat);
+const monthly_kwh = (heater_power / 1000) * 24 * 30;  // kWh per month (heater only)
+const monthly_cost_eur = (monthly_kwh * electricity_price) / 100;  // € per month
+
+// Export heating info for thermal panel
+export const heatingInfo = {
+  heaterPower: heater_power,
+  chickenHeat: chicken_body_heat * num_chickens_for_heat,
+  totalHeat: total_heat_input_W,
+  monthlyKwh: monthly_kwh,
+  monthlyCost: monthly_cost_eur,
+  electricityPrice: electricity_price
+};
 
 // ============================================================================
 // MATERIALS & PRICING - Bill of Materials for cost estimation
@@ -141,6 +199,14 @@ export const materials = [
   // Maalaus & Pintakäsittely
   { name: "Ulkomaali (Tikkurila)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 14.90, quantity: paint_liters },
   { name: "Pohjuste (puulle)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 12.90, quantity: Math.ceil(paint_liters * 0.5) },
+
+  // Eristeet (Insulation)
+  { name: "Mineraalivilla 100mm (seinät)", materialId: "insulation_100mm", category: "Eristeet", link: "https://www.paroc.fi/tuotteet/seinaeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(wall_area_sqm) },
+  { name: "Mineraalivilla 100mm (katto)", materialId: "insulation_100mm", category: "Eristeet", link: "https://www.paroc.fi/tuotteet/kattoeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(roof_area_sqm) },
+  { name: "Mineraalivilla 100mm (lattia)", materialId: "insulation_100mm", category: "Eristeet", link: "https://www.paroc.fi/tuotteet/lattiaeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(floor_area_sqm) },
+
+  // Lämpösillat (Thermal weak points - for thermal simulation, not BOM)
+  { name: "Ovi (lämpösilta)", materialId: "door_thermal_bridge", category: "Lämpösillat", unit: "kpl", unitPrice: 0, quantity: 1 },
 ];
 
 // ============================================================================
@@ -763,7 +829,7 @@ const nest_support_structure = union(nest_ledger, front_member, ...cross_joists)
 // Bottom of boxes should be at nest_height_off_floor
 // Position at Y=0 (flush with front wall) so access doors face exterior
 // and wall cutout aligns with boxes
-const nest_result = nesting_boxes(nest_boxes, nest_box_w, nest_box_d, nest_box_h);
+const nest_result = nesting_boxes(nest_boxes, nest_box_w, nest_box_d, nest_box_h, 12, 18, nest_lid_angle);
 const nesting_box_array = translate(
   nest_result.boxes,
   [nest_box_x, 0, floor_stack + nest_height_off_floor]
@@ -775,6 +841,143 @@ const nesting_box_doors = translate(
 
 // Build the roof
 const roof = gable_roof(coop_len, coop_w, wall_h, floor_stack, roof_pitch_deg, overhang, 8);
+
+// ============================================================================
+// ROOF INSULATION - 100mm mineral wool under roof panels
+// ============================================================================
+
+const insulation_thickness = 100;  // 100mm mineral wool batts
+
+// Calculate roof geometry (must match gable_roof function)
+const roof_base_z = floor_stack + wall_h;
+const roof_half_width = coop_w / 2;
+const roof_rise = roof_half_width * Math.tan(roof_pitch_deg * Math.PI / 180);
+const roof_slope_length = roof_half_width / Math.cos(roof_pitch_deg * Math.PI / 180);
+const roof_peak_z = roof_base_z + roof_rise;
+const insulation_plate_len = coop_len;  // No overhang for insulation (stays inside)
+const insulation_plate_width = roof_slope_length;  // Match roof slope length
+
+// Left roof insulation panel - positioned below metal roofing
+// The insulation sits on the underside of the roof, between rafters
+const roof_insulation_left = translate(
+  rotate(
+    translate(
+      cube({ size: [insulation_plate_len, insulation_plate_width, insulation_thickness], center: false }),
+      [0, -insulation_plate_width, -insulation_thickness]  // Below roof panel
+    ),
+    [roof_pitch_deg, 0, 0]
+  ),
+  [0, coop_w / 2, roof_peak_z]
+);
+
+// Right roof insulation panel - mirror of left
+const roof_insulation_right = translate(
+  rotate(
+    cube({ size: [insulation_plate_len, insulation_plate_width, insulation_thickness], center: false }),
+    [-roof_pitch_deg, 0, 0]
+  ),
+  [0, coop_w / 2, roof_peak_z - insulation_thickness]
+);
+
+// Combined roof insulation
+const roof_insulation = union(roof_insulation_left, roof_insulation_right);
+
+// ============================================================================
+// WALL INSULATION - 100mm mineral wool in wall cavities
+// ============================================================================
+
+// Wall insulation fills the stud cavities (between interior and exterior)
+// Stud depth is 98mm, so 100mm insulation will compress slightly (realistic)
+const wall_insulation_depth = stud_sec[1];  // Match stud depth (98mm)
+
+// Front wall insulation (along X axis at Y=0) - with door and nest access cutouts
+const front_wall_insulation_base = translate(
+  cube({ size: [coop_len, wall_insulation_depth, wall_h], center: false }),
+  [0, 0, floor_stack]
+);
+// Door cutout in front insulation
+// Make cutout extend beyond insulation boundaries to ensure clean cut
+const front_insulation_door_cutout = translate(
+  cube({ size: [door_w + 10, wall_insulation_depth + 20, door_h + 10], center: false }),
+  [coop_len / 2 - door_w / 2 - 5, -10, floor_stack + stud_sec[0] - 5]
+);
+// Nesting box access cutout in front insulation
+const front_insulation_nest_cutout = translate(
+  cube({ size: [nest_cutout_w, wall_insulation_depth + 2, nest_cutout_height], center: false }),
+  [nest_cutout_x, -1, floor_stack + nest_cutout_bottom_z]
+);
+const front_wall_insulation = difference(
+  difference(front_wall_insulation_base, front_insulation_door_cutout),
+  front_insulation_nest_cutout
+);
+
+// Back wall insulation (along X axis at Y=coop_w) - with vent cutout
+const back_wall_insulation_base = translate(
+  cube({ size: [coop_len, wall_insulation_depth, wall_h], center: false }),
+  [0, coop_w, floor_stack]
+);
+// Vent cutout in back insulation
+const back_insulation_vent_cutout = translate(
+  cube({ size: [vent_w, wall_insulation_depth + 2, vent_h], center: false }),
+  [coop_len / 2 - vent_w / 2, coop_w - 1, floor_stack + back_vent_bottom_z]
+);
+const back_wall_insulation = difference(back_wall_insulation_base, back_insulation_vent_cutout);
+
+// Left wall insulation (along Y axis at X=0) - no cutouts
+const left_wall_insulation = translate(
+  cube({ size: [wall_insulation_depth, coop_w, wall_h], center: false }),
+  [0, 0, floor_stack]
+);
+
+// Right wall insulation (along Y axis at X=coop_len) - with nesting box cutout
+const right_wall_insulation_base = translate(
+  cube({ size: [wall_insulation_depth, coop_w, wall_h], center: false }),
+  [coop_len, 0, floor_stack]
+);
+// Nesting box exterior cutout - boxes protrude through right wall
+// The boxes are positioned at nest_box_x (X position) and extend nest_box_d into the wall
+// We need to cut through at Y position where boxes sit (centered around coop_w/2)
+const nest_box_y_start = 0;  // Nesting boxes span from front wall
+const nest_box_y_end = nest_box_d + 50;  // Box depth plus some margin
+const right_insulation_nest_cutout = translate(
+  cube({ size: [wall_insulation_depth + 2, nest_box_y_end - nest_box_y_start, nest_box_h + 50], center: false }),
+  [coop_len - 1, nest_box_y_start, floor_stack + nest_height_off_floor]
+);
+const right_wall_insulation = difference(right_wall_insulation_base, right_insulation_nest_cutout);
+
+// Combined wall insulation
+const wall_insulation = union(
+  front_wall_insulation,
+  back_wall_insulation,
+  left_wall_insulation,
+  right_wall_insulation
+);
+
+// ============================================================================
+// THERMAL NOTE: Openings (doors, vents) use ACTUAL geometry with thermal materials
+// ============================================================================
+// The thermal calculation works correctly because:
+// 1. Wall insulation has cutouts where doors/vents are (CSG difference)
+// 2. The actual door/vent geometry has materials with "opening" category
+// 3. Heat loss is calculated separately for insulation (R=2.86) and openings (lower R)
+// No fake "thermal slab" geometry needed - the real geometry provides the area.
+
+// ============================================================================
+// FLOOR INSULATION - 100mm mineral wool between floor joists
+// ============================================================================
+
+// Floor insulation sits between joists, below the OSB floor sheet
+// Positioned at the bottom of the joist cavities (on top of skids)
+const floor_insulation_z = paver_size[2] + skid_sec[1];  // Top of skids
+const floor_insulation_height = joist_sec[1];  // Fill joist cavity depth (98mm)
+
+// Single slab covering the entire floor area (simplified representation)
+// In reality, it would be cut to fit between joists, but for thermal calc
+// the total area is what matters
+const floor_insulation = translate(
+  cube({ size: [coop_len, coop_w, floor_insulation_height], center: false }),
+  [0, 0, floor_insulation_z]
+);
 
 // ============================================================================
 // CLADDING - Apply to all four walls
@@ -831,10 +1034,17 @@ const right_cladding = horizontal_cladding_y(
 // DOOR PANELS
 // ============================================================================
 
-// Human door - positioned at front wall, left edge of door opening
+// Human door - positioned at front wall, hinged on left edge
+// Rotates around the left hinge point based on human_door_angle parameter
+const human_door_panel = door_panel(door_w, door_h, 18);
+const human_door_hinge_x = coop_len / 2 - door_w / 2;
+const human_door_hinge_y = -cladding_th - 18;
 const human_door = translate(
-  door_panel(door_w, door_h, 18),
-  [coop_len / 2 - door_w / 2, -cladding_th - 18, floor_stack + stud_sec[0]]
+  rotate(
+    human_door_panel,
+    [0, 0, -human_door_angle]  // Swing outward (negative Y direction)
+  ),
+  [human_door_hinge_x, human_door_hinge_y, floor_stack + stud_sec[0]]
 );
 
 
@@ -931,12 +1141,11 @@ const tunnel_access_door_cutout = translate(
 );
 const tunnel_left_wall = difference(tunnel_left_wall_base, tunnel_access_door_cutout);
 
-// Hinged access door panel (shown partially open at 30 degrees)
-const tunnel_access_door_angle = 30;
+// Hinged access door panel - uses tunnel_door_angle parameter
 const tunnel_access_door_panel = translate(
   rotate(
     cube({ size: [tunnel_access_door_width, tunnel_wall_t, tunnel_access_door_height], center: false }),
-    [0, 0, -tunnel_access_door_angle]  // Swing outward
+    [0, 0, -tunnel_door_angle]  // Swing outward based on parameter
   ),
   [tunnel_base_x + 50, tunnel_base_y, tunnel_base_z + 40]
 );
@@ -1304,7 +1513,16 @@ const gate_mid_rail = translate(
   [run_base_x, run_base_y - gate_frame_w, run_base_z + gate_height / 2]
 );
 
-const run_gate = union(gate_left_stile, gate_right_stile, gate_top_rail, gate_bottom_rail, gate_mid_rail);
+// Combine gate frame, then apply rotation based on run_gate_angle parameter
+// Gate hinges on left edge, swings outward (negative Y direction)
+const run_gate_frame = union(gate_left_stile, gate_right_stile, gate_top_rail, gate_bottom_rail, gate_mid_rail);
+const run_gate = translate(
+  rotate(
+    translate(run_gate_frame, [-run_base_x, -run_base_y + gate_frame_w, -run_base_z]),  // Move to origin for rotation
+    [0, 0, -run_gate_angle]  // Swing outward
+  ),
+  [run_base_x, run_base_y - gate_frame_w, run_base_z]  // Move back to position
+);
 
 // ============================================================================
 // RUN ROOF - Ridge beam only (rafters disabled - too complex for now)
@@ -1635,7 +1853,7 @@ const scaledRightCladding = withMaterial(scale(right_cladding.panel, DISPLAY_SCA
 const scaledRightTrim = withMaterial(scale(right_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
 
 // Doors
-const scaledHumanDoor = withColor(scale(human_door, DISPLAY_SCALE), DOOR_WOOD);
+const scaledHumanDoor = withMaterial(scale(human_door, DISPLAY_SCALE), 'door_thermal_bridge');
 
 // Roosting perches
 const scaledLowerRoost = withColor(scale(lower_roost, DISPLAY_SCALE), ROOST_BROWN);
@@ -1684,6 +1902,15 @@ const scaledChickens = withColor(scale(all_chickens, DISPLAY_SCALE), CHICKEN_WHI
 // Mesh apron - hardware cloth for predator protection
 const scaledMeshApron = withMaterial(scale(mesh_apron, DISPLAY_SCALE), 'hardware_cloth');
 
+// Insulation - 100mm mineral wool batts
+const scaledRoofInsulation = withMaterial(scale(roof_insulation, DISPLAY_SCALE), 'insulation_100mm');
+// Wall insulation as separate panels (so thermal area calculation can detect them as thin slabs)
+const scaledFrontWallInsulation = withMaterial(scale(front_wall_insulation, DISPLAY_SCALE), 'insulation_100mm');
+const scaledBackWallInsulation = withMaterial(scale(back_wall_insulation, DISPLAY_SCALE), 'insulation_100mm');
+const scaledLeftWallInsulation = withMaterial(scale(left_wall_insulation, DISPLAY_SCALE), 'insulation_100mm');
+const scaledRightWallInsulation = withMaterial(scale(right_wall_insulation, DISPLAY_SCALE), 'insulation_100mm');
+const scaledFloorInsulation = withMaterial(scale(floor_insulation, DISPLAY_SCALE), 'insulation_100mm');
+
 // L-extension
 const scaledLExtension = withColor(scale(l_extension_frame, DISPLAY_SCALE), RUN_FRAME_COLOR);
 
@@ -1694,10 +1921,8 @@ const scaledLoungeChairs = withColor(scale(lounge_chairs, DISPLAY_SCALE), TABLE_
 
 // Export as array of colored objects (with visibility toggles)
 export const scene = [
-  // Foundation & base (always shown)
-  scaledFoundation,
-  scaledSkirting,
-  scaledFloor,
+  // Foundation & base (conditional)
+  ...(show_floor ? [scaledFoundation, scaledSkirting, scaledFloor] : []),
   // Wall framing (conditional)
   ...(show_walls ? [scaledFrontWall, scaledBackWall, scaledLeftWall, scaledRightWall] : []),
   // Cladding (conditional)
@@ -1709,39 +1934,45 @@ export const scene = [
   ] : []),
   // Roof (conditional)
   ...(show_roof ? [scaledRoof] : []),
-  // Nesting area (always shown - interior)
-  scaledNestSupport,
-  scaledNestingBoxes,
-  scaledNestDoors,
-  // Doors (conditional with cladding)
-  ...(show_cladding ? [scaledHumanDoor] : []),
-  // Roosting perches (always shown - interior)
-  scaledLowerRoost,
-  scaledMidRoost,
-  scaledUpperRoost,
-  // Viewing tunnel
-  scaledTunnelWalls,
-  ...(show_roof ? [scaledTunnelRoof] : []),
-  scaledTunnelSkid,
-  scaledTunnelAccessDoor,
-  // Attached run
-  scaledRunFrame,
-  scaledRunGate,
-  scaledRunRafters,
-  scaledMeshApron,
-  // Chicken gym
-  scaledChickenGym,
-  // Landscaping
+  // Insulation (conditional)
+  ...(show_insulation && show_roof ? [scaledRoofInsulation] : []),
+  ...(show_insulation && show_walls ? [scaledFrontWallInsulation, scaledBackWallInsulation, scaledLeftWallInsulation, scaledRightWallInsulation] : []),
+  ...(show_insulation && show_floor ? [scaledFloorInsulation] : []),
+  // Interior elements (nesting, roosts) - conditional
+  ...(show_interior ? [
+    scaledNestSupport,
+    scaledNestingBoxes,
+    scaledNestDoors,
+    scaledLowerRoost,
+    scaledMidRoost,
+    scaledUpperRoost
+  ] : []),
+  // Doors (show with cladding OR insulation for thermal calculation)
+  ...((show_cladding || show_insulation) ? [scaledHumanDoor] : []),
+  // Viewing tunnel (conditional)
+  ...(show_tunnel ? [
+    scaledTunnelWalls,
+    scaledTunnelSkid,
+    scaledTunnelAccessDoor,
+    scaledTunnelSkirting,
+    scaledFeeder,
+    scaledWaterer
+  ] : []),
+  ...(show_tunnel && show_roof ? [scaledTunnelRoof] : []),
+  // Attached run (conditional)
+  ...(show_run ? [
+    scaledRunFrame,
+    scaledRunGate,
+    scaledRunRafters,
+    scaledMeshApron,
+    scaledChickenGym,
+    scaledLExtension
+  ] : []),
+  // Landscaping (always shown)
   scaledBushes,
-  // Tunnel extras
-  scaledTunnelSkirting,
-  scaledFeeder,
-  scaledWaterer,
-  // Chickens
-  scaledChickens,
-  // L-extension
-  scaledLExtension,
-  // Lounge area
+  // Chickens (conditional)
+  ...(show_chickens ? [scaledChickens] : []),
+  // Lounge area (always shown)
   scaledLoungeTable,
   scaledLoungeChairs
 ];

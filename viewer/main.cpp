@@ -650,6 +650,19 @@ int main(int argc, char *argv[]) {
 
     // Toon shading pass
     for (const auto &modelWithColor : models) {
+      // In thermal view, hide exterior layers that cover insulation
+      // This makes the thermal visualization visible
+      if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
+        const PBRMaterial* mat = g_materialLibrary.get(modelWithColor.materialId);
+        if (mat) {
+          const std::string& cat = mat->category;
+          // Hide sheathing, roofing, and finish - they cover the insulation
+          if (cat == "sheathing" || cat == "roofing" || cat == "finish") {
+            continue;  // Skip this object in thermal view
+          }
+        }
+      }
+
       // Use thermal color if thermal view is enabled and material has thermal data
       Color renderColor = modelWithColor.color;
       if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
@@ -703,6 +716,16 @@ int main(int argc, char *argv[]) {
     ClearBackground({127, 127, 255, 0});
     BeginMode3D(camera);
     for (const auto &modelWithColor : models) {
+      // Skip exterior layers in thermal view (same filter as toon shading pass)
+      if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
+        const PBRMaterial* mat = g_materialLibrary.get(modelWithColor.materialId);
+        if (mat) {
+          const std::string& cat = mat->category;
+          if (cat == "sheathing" || cat == "roofing" || cat == "finish") {
+            continue;
+          }
+        }
+      }
       for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
         DrawMesh(modelWithColor.model.meshes[i], normalDepthMat, modelWithColor.model.transform);
       }

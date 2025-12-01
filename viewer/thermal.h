@@ -22,6 +22,9 @@ struct ThermalSettings {
   bool chickensEnabled = true;    // Toggle chicken heat
   bool heaterEnabled = false;     // Toggle heater
 
+  // Electricity cost (Finland 2024)
+  float electricityPrice_cPerKwh = 12.0f;  // Electricity price in cents/kWh (Finnish avg ~8-15c)
+
   // Get total heat input from all sources
   float GetTotalHeatInput_W() const {
     float total = 0.0f;

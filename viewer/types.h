@@ -55,6 +55,24 @@ struct PBRVisual {
   }
 };
 
+// Thermal properties for heat transfer calculations
+struct PBRThermal {
+  float conductivity = 0.0f;  // Thermal conductivity in W/(m·K)
+  float thickness = 0.0f;     // Typical thickness in mm
+
+  // Calculate R-value (thermal resistance) in m²·K/W
+  float getRValue() const {
+    if (conductivity <= 0.0f || thickness <= 0.0f) return 0.5f;  // Default for unknown
+    return (thickness / 1000.0f) / conductivity;  // Convert mm to m
+  }
+
+  // Calculate U-value (thermal transmittance) in W/(m²·K)
+  float getUValue() const {
+    float r = getRValue();
+    return r > 0.0f ? 1.0f / r : 2.0f;  // Default U=2 for unknown
+  }
+};
+
 // Pricing info for BOM generation
 struct PBRPricing {
   std::string unit;
@@ -70,6 +88,7 @@ struct PBRMaterial {
   std::string category;
   std::vector<std::string> tags;
   PBRVisual visual;
+  PBRThermal thermal;
   PBRPricing pricing;
 };
 

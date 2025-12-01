@@ -122,20 +122,44 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
   };
 
   const std::vector<ParamDef> knownParams = {
+    // Coop Dimensions
     {"coop_len", "Coop Length", "Coop Dimensions", 1500, 6000},
     {"coop_w", "Coop Width", "Coop Dimensions", 1500, 6000},
     {"wall_h", "Wall Height", "Coop Dimensions", 1500, 3000},
+    // Roof
     {"roof_pitch_deg", "Roof Pitch", "Roof", 15, 45},
     {"overhang", "Overhang", "Roof", 50, 400},
+    // Doors
     {"door_w", "Door Width", "Doors", 500, 1000},
     {"door_h", "Door Height", "Doors", 1200, 2200},
     {"pop_w", "Pop Door Width", "Doors", 150, 400},
     {"pop_opening_h", "Pop Opening Height", "Doors", 200, 500},
+    // Nesting Boxes
     {"nest_boxes", "Number of Boxes", "Nesting Boxes", 1, 6},
     {"nest_box_w", "Box Width", "Nesting Boxes", 200, 500},
     {"nest_box_d", "Box Depth", "Nesting Boxes", 300, 600},
     {"nest_box_h", "Box Height", "Nesting Boxes", 250, 500},
     {"nest_height_off_floor", "Height Off Floor", "Nesting Boxes", 100, 600},
+    // Visibility Toggles
+    {"show_cladding", "Show Cladding", "Visibility", 0, 1},
+    {"show_roof", "Show Roof", "Visibility", 0, 1},
+    {"show_walls", "Show Wall Framing", "Visibility", 0, 1},
+    {"show_floor", "Show Floor", "Visibility", 0, 1},
+    {"show_insulation", "Show Insulation", "Visibility", 0, 1},
+    {"show_run", "Show Chicken Run", "Visibility", 0, 1},
+    {"show_tunnel", "Show Tunnel", "Visibility", 0, 1},
+    {"show_interior", "Show Interior", "Visibility", 0, 1},
+    {"show_chickens", "Show Chickens", "Visibility", 0, 1},
+    // Door Angles
+    {"human_door_angle", "Human Door", "Door Angles", 0, 120},
+    {"nest_lid_angle", "Nest Box Lid", "Door Angles", 0, 90},
+    {"tunnel_door_angle", "Tunnel Door", "Door Angles", 0, 90},
+    {"run_gate_angle", "Run Gate", "Door Angles", 0, 120},
+    // Energy & Heating
+    {"electricity_price", "Price c/kWh", "Energy", 5, 50},
+    {"heater_power", "Heater Watts", "Energy", 100, 2000},
+    {"chicken_body_heat", "Heat/Chicken W", "Energy", 5, 15},
+    {"num_chickens_for_heat", "Num Chickens", "Energy", 0, 20},
   };
 
   std::istringstream stream(*source);
