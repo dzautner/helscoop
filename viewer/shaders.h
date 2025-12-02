@@ -369,8 +369,14 @@ void main() {
     // Final color
     vec3 color = ambient + Lo;
 
-    // HDR tone mapping (Reinhard)
-    color = color / (color + vec3(1.0));
+    // ACES Filmic tone mapping (better contrast and color preservation than Reinhard)
+    // From: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    color = clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
 
     // Gamma correction
     color = pow(color, vec3(1.0 / 2.2));
@@ -446,21 +452,29 @@ inline const char* kShadowDepth_VS = R"glsl(
 
 in vec3 vertexPosition;
 
-uniform mat4 lightMVP;
+uniform mat4 mvp;
+
+out float fragDepth;
 
 void main() {
-    gl_Position = lightMVP * vec4(vertexPosition, 1.0);
+    vec4 clipPos = mvp * vec4(vertexPosition, 1.0);
+    gl_Position = clipPos;
+    // Pass normalized device coordinate depth (will be in -1 to 1 range)
+    fragDepth = clipPos.z / clipPos.w;
 }
 )glsl";
 
 inline const char* kShadowDepth_FS = R"glsl(
 #version 330
 
+in float fragDepth;
+
 out vec4 fragColor;
 
 void main() {
-    // Just output depth (automatically written to depth buffer)
-    fragColor = vec4(1.0);
+    // Convert from NDC (-1 to 1) to 0-1 range
+    float depth = fragDepth * 0.5 + 0.5;
+    fragColor = vec4(depth, depth, depth, 1.0);
 }
 )glsl";
 
@@ -570,17 +584,23 @@ vec3 getEnvironmentLight(vec3 N, float rough) {
     return mix(skyColor, (skyColorTop + skyColorBottom + groundColor) / 3.0, rough * 0.5);
 }
 
-float calculateShadow(vec4 fragPosLS) {
+float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     // Perspective divide
     vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
     projCoords = projCoords * 0.5 + 0.5;
 
-    // Outside shadow map
+    // Flip Y for render texture coordinate system
+    projCoords.y = 1.0 - projCoords.y;
+
+    // Outside shadow map - no shadow
     if (projCoords.z > 1.0) return 0.0;
     if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
     float currentDepth = projCoords.z;
-    float bias = 0.005;
+
+    // Slope-scaled bias to reduce shadow acne on angled surfaces
+    float cosTheta = max(dot(normal, lightDir), 0.0);
+    float bias = max(0.01 * (1.0 - cosTheta), 0.003);
 
     // PCF soft shadows (3x3 kernel)
     float shadow = 0.0;
@@ -623,8 +643,9 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // Shadow calculation
-    float shadow = calculateShadow(fragPosLightSpace);
+    // Shadow calculation (disabled for now - needs coordinate system debugging)
+    // float shadow = calculateShadow(fragPosLightSpace, N, L);
+    float shadow = 0.0;
 
     // Direct lighting with shadows
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
@@ -642,11 +663,75 @@ void main() {
 
     vec3 color = ambient + Lo;
 
-    // Tone mapping
-    color = color / (color + vec3(1.0));
+    // ACES Filmic tone mapping
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    color = clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+
+    // Gamma correction
     color = pow(color, vec3(1.0 / 2.2));
 
     finalColor = vec4(color, 1.0);
+}
+)glsl";
+
+// ============================================================================
+// Ground Plane Shader
+// Simple ground plane with gradient and soft edge fade
+// ============================================================================
+
+inline const char* kGroundPlane_VS = R"glsl(
+#version 330
+
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+
+uniform mat4 mvp;
+uniform mat4 matModel;
+
+out vec3 fragWorldPos;
+out vec2 fragTexCoord;
+
+void main() {
+    vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
+    fragWorldPos = worldPos.xyz;
+    fragTexCoord = vertexTexCoord;
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)glsl";
+
+inline const char* kGroundPlane_FS = R"glsl(
+#version 330
+
+in vec3 fragWorldPos;
+in vec2 fragTexCoord;
+
+out vec4 finalColor;
+
+uniform vec3 groundColor;
+uniform vec3 horizonColor;
+uniform float fadeRadius;
+uniform vec3 sceneCenter;
+
+void main() {
+    // Distance from scene center for fade
+    float dist = length(fragWorldPos.xz - sceneCenter.xz);
+    float fade = 1.0 - smoothstep(fadeRadius * 0.5, fadeRadius, dist);
+
+    // Grid pattern (subtle)
+    vec2 grid = abs(fract(fragWorldPos.xz * 0.5) - 0.5);
+    float gridLine = smoothstep(0.48, 0.5, max(grid.x, grid.y));
+    float gridAlpha = gridLine * 0.08;
+
+    // Base color with slight gradient toward horizon
+    vec3 color = mix(groundColor, horizonColor, smoothstep(0.0, fadeRadius, dist) * 0.3);
+    color = mix(color, color * 0.92, gridAlpha);
+
+    // Output with fade to transparent at edges
+    finalColor = vec4(color, fade * 0.85);
 }
 )glsl";
 

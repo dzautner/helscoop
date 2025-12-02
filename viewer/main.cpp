@@ -206,6 +206,24 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  // Shadow mapping shaders
+  Shader shadowDepthShader = LoadShaderFromMemory(shaders::kShadowDepth_VS, shaders::kShadowDepth_FS);
+  Shader pbrShadowShader = LoadShaderFromMemory(shaders::kPBRShadow_VS, shaders::kPBRShadow_FS);
+  bool shadowsEnabled = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
+  if (shadowsEnabled) {
+    TraceLog(LOG_INFO, "Shadow mapping enabled");
+  }
+
+  // Ground plane shader
+  Shader groundPlaneShader = LoadShaderFromMemory(shaders::kGroundPlane_VS, shaders::kGroundPlane_FS);
+  const int locGroundColor = GetShaderLocation(groundPlaneShader, "groundColor");
+  const int locHorizonColor = GetShaderLocation(groundPlaneShader, "horizonColor");
+  const int locFadeRadius = GetShaderLocation(groundPlaneShader, "fadeRadius");
+  const int locSceneCenter = GetShaderLocation(groundPlaneShader, "sceneCenter");
+
+  Material groundPlaneMat = LoadMaterialDefault();
+  groundPlaneMat.shader = groundPlaneShader;
+
   // Outline shader setup
   const int locOutline = GetShaderLocation(outlineShader, "outline");
   const int locOutlineColor = GetShaderLocation(outlineShader, "outlineColor");
@@ -286,10 +304,10 @@ int main(int argc, char *argv[]) {
   const int locSkyHorizon = GetShaderLocation(skyShader, "skyHorizon");
   const int locSkyGround = GetShaderLocation(skyShader, "groundColor");
 
-  // Sky colors - soft outdoor lighting
-  const float skyTopCol[3] = {0.35f, 0.55f, 0.85f};     // Deep blue sky
-  const float skyHorizonCol[3] = {0.75f, 0.82f, 0.92f}; // Pale blue horizon
-  const float skyGroundCol[3] = {0.25f, 0.30f, 0.22f};  // Dark grass/ground
+  // Sky colors - vibrant outdoor lighting
+  const float skyTopCol[3] = {0.4f, 0.6f, 0.95f};       // Bright blue sky
+  const float skyHorizonCol[3] = {0.85f, 0.9f, 1.0f};   // Light blue/white horizon
+  const float skyGroundCol[3] = {0.4f, 0.45f, 0.35f};   // Muted ground color
   SetShaderValue(skyShader, locSkyTop, skyTopCol, SHADER_UNIFORM_VEC3);
   SetShaderValue(skyShader, locSkyHorizon, skyHorizonCol, SHADER_UNIFORM_VEC3);
   SetShaderValue(skyShader, locSkyGround, skyGroundCol, SHADER_UNIFORM_VEC3);
@@ -303,6 +321,60 @@ int main(int argc, char *argv[]) {
   UploadMesh(&skyQuad, false);
   // Transform to put plane in XY (rotate -90 degrees around X axis)
   Matrix skyTransform = MatrixRotateX(-90.0f * DEG2RAD);
+
+  // Create ground plane mesh for PBR mode (large, high-res for smooth fade)
+  const float groundPlaneSize = 60.0f;
+  Mesh groundPlaneMesh = GenMeshPlane(groundPlaneSize, groundPlaneSize, 1, 1);
+  UploadMesh(&groundPlaneMesh, false);
+  Matrix groundPlaneTransform = MatrixTranslate(0.0f, -0.01f, 0.0f);  // Slightly below origin
+
+  // ============================================================================
+  // Shadow mapping setup - Use standard render texture and encode depth in color
+  // ============================================================================
+  const int SHADOW_MAP_SIZE = 2048;
+  RenderTexture2D shadowMap = {0};
+  if (shadowsEnabled) {
+    shadowMap = LoadRenderTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    // Set texture filtering for shadow map
+    SetTextureFilter(shadowMap.texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureWrap(shadowMap.texture, TEXTURE_WRAP_CLAMP);
+    TraceLog(LOG_INFO, "Shadow map render texture created successfully (%dx%d)", SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+  }
+
+  // Shadow depth shader uniforms
+  const int locShadowLightMVP = GetShaderLocation(shadowDepthShader, "lightMVP");
+
+  // PBR Shadow shader uniforms
+  const int locPbrShadowAlbedoColor = GetShaderLocation(pbrShadowShader, "albedoColor");
+  const int locPbrShadowMetallic = GetShaderLocation(pbrShadowShader, "metallic");
+  const int locPbrShadowRoughness = GetShaderLocation(pbrShadowShader, "roughness");
+  const int locPbrShadowAo = GetShaderLocation(pbrShadowShader, "ao");
+  const int locPbrShadowAlbedoTex = GetShaderLocation(pbrShadowShader, "albedoTex");
+  const int locPbrShadowUseAlbedoTex = GetShaderLocation(pbrShadowShader, "useAlbedoTex");
+  const int locPbrShadowShadowMap = GetShaderLocation(pbrShadowShader, "shadowMap");
+  const int locPbrShadowLightDir = GetShaderLocation(pbrShadowShader, "lightDir");
+  const int locPbrShadowLightColor = GetShaderLocation(pbrShadowShader, "lightColor");
+  const int locPbrShadowSkyTop = GetShaderLocation(pbrShadowShader, "skyColorTop");
+  const int locPbrShadowSkyBottom = GetShaderLocation(pbrShadowShader, "skyColorBottom");
+  const int locPbrShadowGround = GetShaderLocation(pbrShadowShader, "groundColor");
+  const int locPbrShadowLightSpaceMatrix = GetShaderLocation(pbrShadowShader, "lightSpaceMatrix");
+
+  // Set PBR shadow shader environment colors (same as regular PBR)
+  SetShaderValue(pbrShadowShader, locPbrShadowSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
+  SetShaderValue(pbrShadowShader, locPbrShadowSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
+  SetShaderValue(pbrShadowShader, locPbrShadowGround, pbrGround, SHADER_UNIFORM_VEC3);
+  SetShaderValue(pbrShadowShader, locPbrShadowLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
+
+  // Set shadow map sampler to use texture unit 1
+  int shadowMapTexUnit = 1;
+  SetShaderValue(pbrShadowShader, locPbrShadowShadowMap, &shadowMapTexUnit, SHADER_UNIFORM_INT);
+
+  Material pbrShadowMat = LoadMaterialDefault();
+  pbrShadowMat.shader = pbrShadowShader;
+  pbrShadowShader.locs[SHADER_LOC_MAP_DIFFUSE] = locPbrShadowAlbedoTex;
+
+  Material shadowDepthMat = LoadMaterialDefault();
+  shadowDepthMat.shader = shadowDepthShader;
 
   // Static toon lighting configuration
   const Vector3 lightDirWS = Vector3Normalize({0.45f, 0.85f, 0.35f});
@@ -861,6 +933,67 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    // ========================================================================
+    // SHADOW MAP PASS - Render depth from light's perspective
+    // ========================================================================
+    Matrix lightSpaceMatrix = MatrixIdentity();
+    if (shadowsEnabled && pbrModeEnabled) {
+      // Calculate light space matrix for shadow mapping
+      Vector3 lightDir = lightDirWS;
+      Vector3 sceneCenter = {0.0f, 1.5f, 0.0f};  // Approximate scene center
+      float sceneRadius = 12.0f;  // Approximate scene radius
+
+      // Light view matrix - looking at scene from light direction
+      Vector3 lightPos = Vector3Add(sceneCenter, Vector3Scale(lightDir, sceneRadius * 2.0f));
+      Matrix lightView = MatrixLookAt(lightPos, sceneCenter, {0.0f, 1.0f, 0.0f});
+
+      // Orthographic projection for directional light
+      float orthoSize = sceneRadius * 1.5f;
+      Matrix lightProj = MatrixOrtho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1f, sceneRadius * 4.0f);
+
+      lightSpaceMatrix = MatrixMultiply(lightView, lightProj);
+
+      // Render shadow map (depth encoded in color texture)
+      BeginTextureMode(shadowMap);
+      ClearBackground(WHITE);  // White = max depth (far away)
+
+      // Set up orthographic camera from light's perspective
+      Camera3D lightCam = {0};
+      lightCam.position = lightPos;
+      lightCam.target = sceneCenter;
+      lightCam.up = {0.0f, 1.0f, 0.0f};
+      lightCam.fovy = orthoSize * 2.0f;  // Full width for ortho
+      lightCam.projection = CAMERA_ORTHOGRAPHIC;
+
+      BeginMode3D(lightCam);
+
+      // Get the actual view-projection matrix that Raylib is using
+      Matrix lightViewMat = rlGetMatrixModelview();
+      Matrix lightProjMat = rlGetMatrixProjection();
+      lightSpaceMatrix = MatrixMultiply(lightViewMat, lightProjMat);
+
+      for (const auto &modelWithColor : models) {
+        for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+          DrawMesh(modelWithColor.model.meshes[i], shadowDepthMat, modelWithColor.model.transform);
+        }
+      }
+
+      EndMode3D();
+      EndTextureMode();
+
+      // Update PBR shadow shader with light space matrix
+      SetShaderValueMatrix(pbrShadowShader, locPbrShadowLightSpaceMatrix, lightSpaceMatrix);
+      SetShaderValue(pbrShadowShader, locPbrShadowLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+
+      // Bind shadow map to texture unit 1
+      rlActiveTextureSlot(1);
+      rlEnableTexture(shadowMap.texture.id);
+    }
+
+    // ========================================================================
+    // MAIN COLOR PASS
+    // ========================================================================
+
     // Render to color texture
     BeginTextureMode(rtColor);
     ClearBackground(RAYWHITE);
@@ -888,12 +1021,24 @@ int main(int argc, char *argv[]) {
 
     BeginMode3D(camera);
     if (pbrModeEnabled) {
-      // Subtle ground grid for PBR mode
-      DrawXZGrid(60, 0.5f, Fade(GRAY, 0.15f));
+      // Draw ground plane with shader
+      float gpGroundCol[3] = {0.35f, 0.38f, 0.32f};  // Muted grass green
+      float gpHorizonCol[3] = {0.45f, 0.48f, 0.42f};
+      float gpFadeRadius = groundPlaneSize * 0.45f;
+      float gpSceneCenter[3] = {0.0f, 0.0f, 0.0f};
+
+      SetShaderValue(groundPlaneShader, locGroundColor, gpGroundCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locHorizonColor, gpHorizonCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locFadeRadius, &gpFadeRadius, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(groundPlaneShader, locSceneCenter, gpSceneCenter, SHADER_UNIFORM_VEC3);
+
+      BeginBlendMode(BLEND_ALPHA);
+      DrawMesh(groundPlaneMesh, groundPlaneMat, groundPlaneTransform);
+      EndBlendMode();
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
+      DrawAxes(2.0f);  // Only draw axes in toon mode
     }
-    DrawAxes(2.0f);
 
     // Determine which material ID to highlight (hover takes precedence)
     const std::string& highlightMatId = !uiState.hoveredMaterialId.empty()
@@ -1027,10 +1172,6 @@ int main(int argc, char *argv[]) {
       int useTex = (materialTex && materialTex->id != 0) ? 1 : 0;
 
       if (pbrModeEnabled) {
-        // PBR rendering path
-        SetShaderValue(pbrShader, locPbrAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
-        SetShaderValue(pbrShader, locPbrUseAlbedoTex, &useTex, SHADER_UNIFORM_INT);
-
         // Get material PBR properties (roughness, metallic)
         float matRoughness = 0.5f;
         float matMetallic = 0.0f;
@@ -1044,15 +1185,34 @@ int main(int argc, char *argv[]) {
           }
         }
 
-        SetShaderValue(pbrShader, locPbrRoughness, &matRoughness, SHADER_UNIFORM_FLOAT);
-        SetShaderValue(pbrShader, locPbrMetallic, &matMetallic, SHADER_UNIFORM_FLOAT);
-        SetShaderValue(pbrShader, locPbrAo, &matAo, SHADER_UNIFORM_FLOAT);
+        if (shadowsEnabled) {
+          // PBR with shadows rendering path
+          SetShaderValue(pbrShadowShader, locPbrShadowAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
+          SetShaderValue(pbrShadowShader, locPbrShadowUseAlbedoTex, &useTex, SHADER_UNIFORM_INT);
+          SetShaderValue(pbrShadowShader, locPbrShadowRoughness, &matRoughness, SHADER_UNIFORM_FLOAT);
+          SetShaderValue(pbrShadowShader, locPbrShadowMetallic, &matMetallic, SHADER_UNIFORM_FLOAT);
+          SetShaderValue(pbrShadowShader, locPbrShadowAo, &matAo, SHADER_UNIFORM_FLOAT);
 
-        pbrMat.maps[MATERIAL_MAP_DIFFUSE].texture =
-          (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
+          pbrShadowMat.maps[MATERIAL_MAP_DIFFUSE].texture =
+            (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
 
-        for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
-          DrawMesh(modelWithColor.model.meshes[i], pbrMat, modelWithColor.model.transform);
+          for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+            DrawMesh(modelWithColor.model.meshes[i], pbrShadowMat, modelWithColor.model.transform);
+          }
+        } else {
+          // PBR without shadows (fallback)
+          SetShaderValue(pbrShader, locPbrAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
+          SetShaderValue(pbrShader, locPbrUseAlbedoTex, &useTex, SHADER_UNIFORM_INT);
+          SetShaderValue(pbrShader, locPbrRoughness, &matRoughness, SHADER_UNIFORM_FLOAT);
+          SetShaderValue(pbrShader, locPbrMetallic, &matMetallic, SHADER_UNIFORM_FLOAT);
+          SetShaderValue(pbrShader, locPbrAo, &matAo, SHADER_UNIFORM_FLOAT);
+
+          pbrMat.maps[MATERIAL_MAP_DIFFUSE].texture =
+            (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
+
+          for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+            DrawMesh(modelWithColor.model.meshes[i], pbrMat, modelWithColor.model.transform);
+          }
         }
       } else {
         // Toon rendering path (original)
@@ -1200,9 +1360,19 @@ int main(int argc, char *argv[]) {
   UnloadMaterialTextures();
   UnloadRenderTexture(rtColor);
   UnloadRenderTexture(rtNormalDepth);
+  if (shadowsEnabled) {
+    UnloadRenderTexture(shadowMap);
+    UnloadMaterial(pbrShadowMat);
+    UnloadMaterial(shadowDepthMat);
+    UnloadShader(pbrShadowShader);
+    UnloadShader(shadowDepthShader);
+  }
   UnloadMaterial(toonMat);
   UnloadMaterial(normalDepthMat);
   UnloadMaterial(outlineMat);
+  UnloadMaterial(groundPlaneMat);
+  UnloadShader(groundPlaneShader);
+  UnloadMesh(groundPlaneMesh);
   UnloadShader(edgeShader);
   DestroyModels(models);
   if (brandingFontCustom) UnloadFont(brandingFont);
