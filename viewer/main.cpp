@@ -209,10 +209,12 @@ int main(int argc, char *argv[]) {
   // Shadow mapping shaders
   Shader shadowDepthShader = LoadShaderFromMemory(shaders::kShadowDepth_VS, shaders::kShadowDepth_FS);
   Shader pbrShadowShader = LoadShaderFromMemory(shaders::kPBRShadow_VS, shaders::kPBRShadow_FS);
-  bool shadowsEnabled = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
-  if (shadowsEnabled) {
-    TraceLog(LOG_INFO, "Shadow mapping enabled");
-  }
+  // Shadow mapping disabled - causes visual artifacts (minimap bug)
+  bool shadowsEnabled = false;
+  // bool shadowsEnabled = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
+  // if (shadowsEnabled) {
+  //   TraceLog(LOG_INFO, "Shadow mapping enabled");
+  // }
 
   // Ground plane shader
   Shader groundPlaneShader = LoadShaderFromMemory(shaders::kGroundPlane_VS, shaders::kGroundPlane_FS);
@@ -1021,20 +1023,8 @@ int main(int argc, char *argv[]) {
 
     BeginMode3D(camera);
     if (pbrModeEnabled) {
-      // Draw ground plane with shader
-      float gpGroundCol[3] = {0.35f, 0.38f, 0.32f};  // Muted grass green
-      float gpHorizonCol[3] = {0.45f, 0.48f, 0.42f};
-      float gpFadeRadius = groundPlaneSize * 0.45f;
-      float gpSceneCenter[3] = {0.0f, 0.0f, 0.0f};
-
-      SetShaderValue(groundPlaneShader, locGroundColor, gpGroundCol, SHADER_UNIFORM_VEC3);
-      SetShaderValue(groundPlaneShader, locHorizonColor, gpHorizonCol, SHADER_UNIFORM_VEC3);
-      SetShaderValue(groundPlaneShader, locFadeRadius, &gpFadeRadius, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(groundPlaneShader, locSceneCenter, gpSceneCenter, SHADER_UNIFORM_VEC3);
-
-      BeginBlendMode(BLEND_ALPHA);
-      DrawMesh(groundPlaneMesh, groundPlaneMat, groundPlaneTransform);
-      EndBlendMode();
+      // Ground plane disabled - was causing visual artifacts
+      // TODO: Fix ground plane positioning relative to scene bounds
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
       DrawAxes(2.0f);  // Only draw axes in toon mode
