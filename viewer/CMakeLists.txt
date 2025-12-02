@@ -23,6 +23,8 @@ add_executable(dingcad_viewer
   climate_data.cpp
   structural.cpp
   ifc_export.cpp
+  blueprint_export.cpp
+  assembly.cpp
   primitives/wall.cpp
 )
 

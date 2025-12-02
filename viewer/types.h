@@ -2,6 +2,7 @@
 
 #include "raylib.h"
 #include "manifold/manifold.h"
+#include "assembly.h"
 
 #include <array>
 #include <cctype>
@@ -131,7 +132,9 @@ struct ColoredObject {
   std::shared_ptr<manifold::Manifold> geometry;
   Color color;
   std::string materialId;  // Optional reference to material library
+  std::string objectId;    // Optional unique ID for assembly step filtering
   int quantity = 1;        // For BOM calculation
+  bool assemblyOnly = false; // If true, only visible in assembly mode
 };
 
 // Collection of scene objects
@@ -188,6 +191,7 @@ struct LoadResult {
   std::string message;
   std::vector<std::filesystem::path> dependencies;
   std::vector<MaterialItem> materials;
+  AssemblyInstructions assembly;  // Scene-defined assembly (empty if not defined)
 };
 
 // Pre-computed mesh for GPU upload
@@ -195,6 +199,7 @@ struct PrecomputedMesh {
   manifold::MeshGL meshGL;
   Color color;
   std::string materialId;
+  std::string objectId;  // For assembly step filtering
 };
 
 // Result of background loading (JS eval + CSG + tessellation)
@@ -205,6 +210,7 @@ struct BackgroundLoadResult {
   std::vector<PrecomputedMesh> meshes;
   std::vector<std::filesystem::path> dependencies;
   std::vector<MaterialItem> materials;
+  AssemblyInstructions assembly;  // Scene-defined assembly (empty if not defined)
 };
 
 }  // namespace dingcad

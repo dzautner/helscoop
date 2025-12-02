@@ -9,9 +9,63 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <set>
 #include <unordered_map>
 
 namespace dingcad {
+
+// Helper function to wrap text to fit within a given width
+// Returns vector of lines
+static std::vector<std::string> wrapText(const std::string& text, const Font& font, float fontSize, float maxWidth) {
+  std::vector<std::string> lines;
+  if (text.empty()) return lines;
+
+  std::string currentLine;
+  std::string currentWord;
+
+  for (size_t i = 0; i <= text.size(); ++i) {
+    char c = (i < text.size()) ? text[i] : ' ';
+
+    if (c == ' ' || c == '\n' || i == text.size()) {
+      if (!currentWord.empty()) {
+        std::string testLine = currentLine.empty() ? currentWord : currentLine + " " + currentWord;
+        Vector2 testSize = MeasureTextEx(font, testLine.c_str(), fontSize, 0.0f);
+
+        if (testSize.x > maxWidth && !currentLine.empty()) {
+          lines.push_back(currentLine);
+          currentLine = currentWord;
+        } else {
+          currentLine = testLine;
+        }
+        currentWord.clear();
+      }
+      if (c == '\n' && !currentLine.empty()) {
+        lines.push_back(currentLine);
+        currentLine.clear();
+      }
+    } else {
+      currentWord += c;
+    }
+  }
+
+  if (!currentLine.empty()) {
+    lines.push_back(currentLine);
+  }
+
+  return lines;
+}
+
+// Helper to draw wrapped text and return total height used
+static float drawWrappedText(const Font& font, const std::string& text, float x, float y,
+                              float fontSize, float maxWidth, float lineSpacing, Color color) {
+  auto lines = wrapText(text, font, fontSize, maxWidth);
+  float totalHeight = 0.0f;
+  for (const auto& line : lines) {
+    DrawTextEx(font, line.c_str(), {x, y + totalHeight}, fontSize, 0.0f, color);
+    totalHeight += fontSize + lineSpacing;
+  }
+  return totalHeight;
+}
 
 // Helper function to check if a string contains another (case-insensitive)
 static bool containsIgnoreCase(const std::string& haystack, const std::string& needle) {
@@ -77,8 +131,13 @@ static void DrawDragHandle(const Font& uiFont, float panelX, float panelY, float
 void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
                         UIState& uiState,
                         const Font& uiFont,
-                        int screenWidth, int screenHeight) {
+                        int screenWidth, int screenHeight,
+                        const std::vector<std::string>& assemblyFilter) {
   if (materials.empty()) return;
+
+  // Create a set for faster lookup of assembly-filtered materials
+  std::set<std::string> assemblyFilterSet(assemblyFilter.begin(), assemblyFilter.end());
+  bool hasAssemblyFilter = !assemblyFilter.empty();
 
   const float panelWidth = 300.0f;
   const float panelHeight = 550.0f;
@@ -111,21 +170,26 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   Vector2 mousePos = GetMousePosition();
 
   // Calculate totals and content height (only for filtered materials)
-  std::unordered_map<std::string, float> categoryTotals;
+  std::unordered_map<std::string, float> categoryTotals;  // Filtered category totals
   float totalCost = 0.0f;
   float filteredTotalCost = 0.0f;
   float contentHeight = 5.0f;  // Initial padding
   std::string prevCategory;
   int filteredCount = 0;
   for (const auto& mat : materials) {
-    // Always calculate full totals for footer display
-    categoryTotals[mat.category] += mat.unitPrice * mat.quantity;
+    // Always calculate full total for reference
     totalCost += mat.unitPrice * mat.quantity;
 
-    // Calculate content height only for filtered items
-    if (materialMatchesFilter(mat, uiState.materialFilterText)) {
+    // Check assembly filter first (if active), then text filter
+    bool passesAssemblyFilter = !hasAssemblyFilter || assemblyFilterSet.count(mat.materialId) > 0;
+    bool passesTextFilter = materialMatchesFilter(mat, uiState.materialFilterText);
+
+    // Calculate content height and totals only for filtered items
+    if (passesAssemblyFilter && passesTextFilter) {
       filteredCount++;
-      filteredTotalCost += mat.unitPrice * mat.quantity;
+      float itemCost = mat.unitPrice * mat.quantity;
+      filteredTotalCost += itemCost;
+      categoryTotals[mat.category] += itemCost;  // Only count filtered items in category
       if (mat.category != prevCategory) {
         prevCategory = mat.category;
         contentHeight += 5.0f + sectionHeight;  // Category header
@@ -234,7 +298,11 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
   std::string currentCategory;
 
   for (const auto& mat : materials) {
-    // Skip materials that don't match the filter
+    // Skip materials that don't match the assembly filter (if active)
+    if (hasAssemblyFilter && assemblyFilterSet.count(mat.materialId) == 0) {
+      continue;
+    }
+    // Skip materials that don't match the text filter
     if (!materialMatchesFilter(mat, uiState.materialFilterText)) {
       continue;
     }
@@ -275,9 +343,14 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
       bool isSelected = !uiState.selectedMaterialId.empty() &&
                         uiState.selectedMaterialId == mat.materialId;
 
-      // Highlight hovered/selected row
-      if (isHovered || isSelected) {
-        Color highlightColor = isSelected ? Fade(ORANGE, 0.25f) : Fade(SKYBLUE, 0.2f);
+      // Check if this material is being hovered from assembly panel parts list
+      bool isCrossHighlighted = !uiState.hoveredPartMaterialId.empty() &&
+                                uiState.hoveredPartMaterialId == mat.materialId;
+
+      // Highlight hovered/selected/cross-highlighted row
+      if (isHovered || isSelected || isCrossHighlighted) {
+        Color highlightColor = isSelected ? Fade(ORANGE, 0.25f) :
+                               (isCrossHighlighted ? Fade(GREEN, 0.2f) : Fade(SKYBLUE, 0.2f));
         DrawRectangleRec(rowRect, highlightColor);
         if (isHovered) {
           uiState.hoveredMaterialId = mat.materialId;
@@ -370,7 +443,12 @@ void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
 
   // Show filtered or total cost
   char totalText[80];
-  if (uiState.materialFilterText[0] != '\0') {
+  if (hasAssemblyFilter) {
+    // Assembly step filter active - show step cost
+    snprintf(totalText, sizeof(totalText), "STEP COST: %.0f EUR (of %.0f)",
+             filteredTotalCost, totalCost);
+  } else if (uiState.materialFilterText[0] != '\0') {
+    // Text search filter active
     snprintf(totalText, sizeof(totalText), "SHOWING %d/%zu (%.0f EUR)",
              filteredCount, materials.size(), filteredTotalCost);
   } else {
@@ -1078,8 +1156,8 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
                          UIState& uiState,
                          const Font& uiFont,
                          int screenWidth, int screenHeight) {
-  const float panelWidth = 280.0f;
-  const float panelHeight = 250.0f;
+  const float panelWidth = 320.0f;
+  const float panelHeight = 350.0f;
 
   // Initialize default position if not set
   if (!uiState.structuralPos.initialized) {
@@ -1107,29 +1185,38 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
   float yPos = panelY + 10.0f;
 
   // Title with status color and drag handle
-  Color titleColor = structResult.allPassed ? GREEN : (structResult.errorCount > 0 ? RED : ORANGE);
+  Color titleColor = structResult.allPassed ? GREEN : (structResult.criticalCount > 0 ? RED :
+                     (structResult.errorCount > 0 ? ORANGE : YELLOW));
   DrawTextEx(uiFont, "STRUCTURAL CHECK", {panelX + 10.0f, yPos}, 14.0f, 0.0f, titleColor);
   DrawDragHandle(uiFont, panelX, panelY, panelWidth);
   yPos += 22.0f;
 
-  // Summary line
-  char summaryText[64];
+  // Summary counts
+  char summaryText[128];
   if (structResult.allPassed) {
-    snprintf(summaryText, sizeof(summaryText), "All %zu lumber members OK",
-             structResult.checks.size() == 0 ? 0 : structResult.checks.size());
+    snprintf(summaryText, sizeof(summaryText), "All checks passed");
     DrawTextEx(uiFont, summaryText, {panelX + 10.0f, yPos}, 12.0f, 0.0f, GREEN);
   } else {
-    snprintf(summaryText, sizeof(summaryText), "%d span warnings found",
-             structResult.warningCount);
-    DrawTextEx(uiFont, summaryText, {panelX + 10.0f, yPos}, 12.0f, 0.0f, ORANGE);
+    snprintf(summaryText, sizeof(summaryText), "%d critical  %d error  %d warn  %d info",
+             structResult.criticalCount, structResult.errorCount,
+             structResult.warningCount, structResult.infoCount);
+    DrawTextEx(uiFont, summaryText, {panelX + 10.0f, yPos}, 11.0f, 0.0f, LIGHTGRAY);
   }
-  yPos += 20.0f;
+  yPos += 18.0f;
+
+  // Stats line
+  char statsText[128];
+  snprintf(statsText, sizeof(statsText), "%.1fm lumber | %d studs | %d joists | %d rafters",
+           structResult.totalLumberLength_m, structResult.studCount,
+           structResult.joistCount, structResult.rafterCount);
+  DrawTextEx(uiFont, statsText, {panelX + 10.0f, yPos}, 10.0f, 0.0f, GRAY);
+  yPos += 16.0f;
 
   DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
            static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
   yPos += 8.0f;
 
-  // List each warning
+  // List each check (grouped by severity)
   int displayCount = 0;
   for (const auto& check : structResult.checks) {
     if (yPos > panelY + panelHeight - 40.0f) {
@@ -1141,36 +1228,308 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
       break;
     }
 
-    // Member name
-    DrawTextEx(uiFont, check.memberName.c_str(), {panelX + 10.0f, yPos}, 11.0f, 0.0f, WHITE);
+    // Severity indicator color
+    Color sevColor;
+    const char* sevIcon;
+    switch (check.severity) {
+      case StructuralSeverity::Critical: sevColor = RED; sevIcon = "[!]"; break;
+      case StructuralSeverity::Error: sevColor = ORANGE; sevIcon = "[E]"; break;
+      case StructuralSeverity::Warning: sevColor = YELLOW; sevIcon = "[W]"; break;
+      case StructuralSeverity::Info: sevColor = SKYBLUE; sevIcon = "[i]"; break;
+      default: sevColor = WHITE; sevIcon = "[-]"; break;
+    }
+
+    // Issue type and member name
+    char headerText[100];
+    snprintf(headerText, sizeof(headerText), "%s %s", sevIcon, GetIssueTypeString(check.issueType));
+    DrawTextEx(uiFont, headerText, {panelX + 10.0f, yPos}, 11.0f, 0.0f, sevColor);
     yPos += 14.0f;
 
-    // Span info
-    char spanText[80];
-    snprintf(spanText, sizeof(spanText), "  Span: %.0fmm (max %.0fmm)",
-             check.actualSpan_mm, check.maxAllowedSpan_mm);
-    DrawTextEx(uiFont, spanText, {panelX + 10.0f, yPos}, 10.0f, 0.0f, RED);
+    // Description
+    DrawTextEx(uiFont, check.description.c_str(), {panelX + 20.0f, yPos}, 9.0f, 0.0f, LIGHTGRAY);
     yPos += 12.0f;
 
-    // Suggestion
-    char suggestText[80];
-    snprintf(suggestText, sizeof(suggestText), "  -> %s", check.suggestedMaterial.c_str());
-    DrawTextEx(uiFont, suggestText, {panelX + 10.0f, yPos}, 10.0f, 0.0f, YELLOW);
-    yPos += 16.0f;
+    // Suggestion if available
+    if (!check.suggestedFix.empty()) {
+      char suggestText[120];
+      snprintf(suggestText, sizeof(suggestText), "-> %.100s", check.suggestedFix.c_str());
+      DrawTextEx(uiFont, suggestText, {panelX + 20.0f, yPos}, 9.0f, 0.0f, GREEN);
+      yPos += 12.0f;
+    }
 
+    // Reference if available
+    if (!check.reference.empty()) {
+      char refText[60];
+      snprintf(refText, sizeof(refText), "Ref: %s", check.reference.c_str());
+      DrawTextEx(uiFont, refText, {panelX + 20.0f, yPos}, 8.0f, 0.0f, DARKGRAY);
+      yPos += 10.0f;
+    }
+
+    yPos += 4.0f;  // Spacing between checks
     displayCount++;
   }
 
   // If no issues, show helpful text
   if (structResult.checks.empty()) {
     yPos += 10.0f;
-    DrawTextEx(uiFont, "No lumber spans exceed limits.", {panelX + 10.0f, yPos}, 10.0f, 0.0f, GRAY);
+    DrawTextEx(uiFont, "No structural issues detected.", {panelX + 10.0f, yPos}, 10.0f, 0.0f, GREEN);
+    yPos += 16.0f;
+    DrawTextEx(uiFont, "Checks performed:", {panelX + 10.0f, yPos}, 10.0f, 0.0f, GRAY);
     yPos += 14.0f;
-    DrawTextEx(uiFont, "Span data from materials.json", {panelX + 10.0f, yPos}, 9.0f, 0.0f, DARKGRAY);
+    DrawTextEx(uiFont, "- Span limits (EC5 Table 7.2)", {panelX + 15.0f, yPos}, 9.0f, 0.0f, DARKGRAY);
+    yPos += 12.0f;
+    DrawTextEx(uiFont, "- Stud/joist spacing (max 600mm)", {panelX + 15.0f, yPos}, 9.0f, 0.0f, DARKGRAY);
+    yPos += 12.0f;
+    DrawTextEx(uiFont, "- Snow load (Nordic 2 kN/m²)", {panelX + 15.0f, yPos}, 9.0f, 0.0f, DARKGRAY);
+    yPos += 12.0f;
+    DrawTextEx(uiFont, "- Wind bracing/connectors", {panelX + 15.0f, yPos}, 9.0f, 0.0f, DARKGRAY);
   }
 
   // Hotkey hint
   DrawTextEx(uiFont, "[S] TOGGLE", {panelX + 10.0f, panelY + panelHeight - 18.0f}, 10.0f, 0.0f, GRAY);
+}
+
+bool DrawAssemblyPanel(const AssemblyInstructions& assembly,
+                       UIState& uiState,
+                       const Font& uiFont,
+                       int screenWidth, int screenHeight) {
+  bool stepChanged = false;
+
+  if (assembly.steps.empty()) return false;
+
+  const float panelWidth = 450.0f;
+  const float panelHeight = 720.0f;
+  const float contentWidth = panelWidth - 30.0f;  // Padding on both sides
+
+  // Initialize default position if not set
+  if (!uiState.assemblyPos.initialized) {
+    uiState.assemblyPos.x = (static_cast<float>(screenWidth) - panelWidth) / 2.0f;
+    // Position at bottom of screen, but ensure at least toolbar + margin above
+    float preferredY = static_cast<float>(screenHeight) - panelHeight - 40.0f;
+    float minY = kToolbarHeight + 10.0f;  // Don't overlap with toolbar
+    uiState.assemblyPos.y = std::max(preferredY, minY);
+    uiState.assemblyPos.initialized = true;
+  }
+
+  float panelX = uiState.assemblyPos.x;
+  float panelY = uiState.assemblyPos.y;
+
+  // Handle dragging with bounds checking
+  HandlePanelDrag(uiState, 4, uiState.assemblyPos, panelX, panelY, panelWidth, 28.0f);
+  // Clamp panel position to stay on screen
+  uiState.assemblyPos.x = std::max(0.0f, std::min(uiState.assemblyPos.x, static_cast<float>(screenWidth) - panelWidth));
+  uiState.assemblyPos.y = std::max(kToolbarHeight, std::min(uiState.assemblyPos.y, static_cast<float>(screenHeight) - 50.0f));
+  panelX = uiState.assemblyPos.x;
+  panelY = uiState.assemblyPos.y;
+
+  // Panel background
+  DrawRectangle(static_cast<int>(panelX), static_cast<int>(panelY),
+                static_cast<int>(panelWidth), static_cast<int>(panelHeight),
+                Fade(Color{25, 30, 35, 255}, 0.95f));
+  DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
+                     static_cast<int>(panelWidth), static_cast<int>(panelHeight), DARKGRAY);
+
+  Vector2 mousePos = GetMousePosition();
+  float yPos = panelY + 8.0f;
+
+  // Reset hovered part at start of frame
+  uiState.hoveredPartMaterialId.clear();
+
+  // Title with drag handle
+  DrawTextEx(uiFont, "ASSEMBLY INSTRUCTIONS", {panelX + 10, yPos}, 14.0f, 0.0f, SKYBLUE);
+  DrawDragHandle(uiFont, panelX, panelY, panelWidth);
+  yPos += 24.0f;
+
+  // Clamp step to valid range
+  int maxStep = static_cast<int>(assembly.steps.size()) - 1;
+  uiState.currentAssemblyStep = std::clamp(uiState.currentAssemblyStep, 0, maxStep);
+
+  const AssemblyStep& currentStep = assembly.steps[uiState.currentAssemblyStep];
+
+  // Step navigation
+  float navY = yPos;
+  float btnSize = 32.0f;
+
+  // Previous button
+  Rectangle prevBtn = {panelX + 10, navY, btnSize, btnSize};
+  bool prevHovered = CheckCollisionPointRec(mousePos, prevBtn);
+  bool canPrev = uiState.currentAssemblyStep > 0;
+  DrawRectangleRec(prevBtn, canPrev ? (prevHovered ? Color{60, 70, 80, 255} : Color{40, 45, 50, 255}) : Color{30, 30, 35, 255});
+  DrawTextEx(uiFont, "<", {prevBtn.x + 11, prevBtn.y + 6}, 20.0f, 0.0f, canPrev ? WHITE : GRAY);
+  if (canPrev && prevHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    uiState.currentAssemblyStep--;
+    stepChanged = true;
+  }
+
+  // Step indicator
+  char stepText[32];
+  snprintf(stepText, sizeof(stepText), "STEP %d / %zu",
+           currentStep.stepNumber, assembly.steps.size());
+  Vector2 stepSize = MeasureTextEx(uiFont, stepText, 16.0f, 0.0f);
+  float stepX = panelX + (panelWidth - stepSize.x) / 2.0f;
+  DrawTextEx(uiFont, stepText, {stepX, navY + 8}, 16.0f, 0.0f, WHITE);
+
+  // Next button
+  Rectangle nextBtn = {panelX + panelWidth - btnSize - 10, navY, btnSize, btnSize};
+  bool nextHovered = CheckCollisionPointRec(mousePos, nextBtn);
+  bool canNext = uiState.currentAssemblyStep < maxStep;
+  DrawRectangleRec(nextBtn, canNext ? (nextHovered ? Color{60, 70, 80, 255} : Color{40, 45, 50, 255}) : Color{30, 30, 35, 255});
+  DrawTextEx(uiFont, ">", {nextBtn.x + 11, nextBtn.y + 6}, 20.0f, 0.0f, canNext ? WHITE : GRAY);
+  if (canNext && nextHovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    uiState.currentAssemblyStep++;
+    stepChanged = true;
+  }
+
+  yPos += btnSize + 10.0f;
+
+  // Step title (wrapped)
+  float titleHeight = drawWrappedText(uiFont, currentStep.title, panelX + 10, yPos, 18.0f, contentWidth, 2.0f, ORANGE);
+  yPos += titleHeight + 4.0f;
+
+  // Description (wrapped)
+  if (!currentStep.description.empty()) {
+    float descHeight = drawWrappedText(uiFont, currentStep.description, panelX + 10, yPos, 12.0f, contentWidth, 2.0f, LIGHTGRAY);
+    yPos += descHeight + 4.0f;
+  }
+
+  // Time estimate
+  if (currentStep.totalTimeMinutes > 0) {
+    char timeText[32];
+    if (currentStep.totalTimeMinutes >= 60) {
+      snprintf(timeText, sizeof(timeText), "Estimated time: %dh %dm",
+               currentStep.totalTimeMinutes / 60, currentStep.totalTimeMinutes % 60);
+    } else {
+      snprintf(timeText, sizeof(timeText), "Estimated time: %d min", currentStep.totalTimeMinutes);
+    }
+    DrawTextEx(uiFont, timeText, {panelX + 10, yPos}, 11.0f, 0.0f, SKYBLUE);
+    yPos += 16.0f;
+  }
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos + 3),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos + 3), GRAY);
+  yPos += 12.0f;
+
+  // Sub-steps (detailed instructions) with text wrapping
+  if (!currentStep.subSteps.empty()) {
+    DrawTextEx(uiFont, "INSTRUCTIONS:", {panelX + 10, yPos}, 12.0f, 0.0f, Color{120, 120, 130, 255});
+    yPos += 16.0f;
+
+    for (size_t i = 0; i < currentStep.subSteps.size(); ++i) {
+      const auto& subStep = currentStep.subSteps[i];
+
+      // Step number
+      char numStr[8];
+      snprintf(numStr, sizeof(numStr), "%zu.", i + 1);
+      DrawTextEx(uiFont, numStr, {panelX + 12, yPos}, 11.0f, 0.0f, SKYBLUE);
+
+      // Instruction text (wrapped)
+      float instrHeight = drawWrappedText(uiFont, subStep.instruction, panelX + 32, yPos, 11.0f, contentWidth - 25.0f, 1.0f, WHITE);
+      yPos += instrHeight;
+
+      // Show tip if present (wrapped)
+      if (!subStep.tip.empty()) {
+        std::string tipText = "TIP: " + subStep.tip;
+        float tipHeight = drawWrappedText(uiFont, tipText, panelX + 32, yPos, 10.0f, contentWidth - 25.0f, 1.0f, YELLOW);
+        yPos += tipHeight;
+      }
+
+      yPos += 2.0f;  // Small gap between steps
+    }
+
+    DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos + 3),
+             static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos + 3), GRAY);
+    yPos += 12.0f;
+  }
+
+  // Parts list with interactive/hoverable items
+  if (!currentStep.parts.empty()) {
+    DrawTextEx(uiFont, "PARTS & MATERIALS:", {panelX + 10, yPos}, 12.0f, 0.0f, Color{120, 120, 130, 255});
+    yPos += 16.0f;
+
+    for (size_t i = 0; i < currentStep.parts.size(); ++i) {
+      const auto& part = currentStep.parts[i];
+
+      // Calculate row bounds for hover detection
+      float rowHeight = 18.0f;
+      Rectangle rowRect = {panelX + 10, yPos, contentWidth, rowHeight};
+      bool isHovered = CheckCollisionPointRec(mousePos, rowRect);
+
+      // Track hovered material for cross-highlighting
+      if (isHovered && !part.materialId.empty()) {
+        uiState.hoveredPartMaterialId = part.materialId;
+      }
+
+      // Check if this part's material is being hovered (from materials panel or 3D)
+      bool isCrossHighlighted = !part.materialId.empty() &&
+                                (part.materialId == uiState.hoveredMaterialId ||
+                                 part.materialId == uiState.selectedMaterialId);
+
+      // Background highlight on hover or cross-highlight
+      if (isHovered || isCrossHighlighted) {
+        Color highlightColor = isCrossHighlighted ? Fade(ORANGE, 0.2f) : Fade(SKYBLUE, 0.15f);
+        DrawRectangleRec(rowRect, highlightColor);
+      }
+
+      // Part name with underline (indicating it's interactive)
+      Color nameColor = isHovered ? SKYBLUE : (isCrossHighlighted ? ORANGE : WHITE);
+      std::string displayName = part.name;
+      Vector2 nameSize = MeasureTextEx(uiFont, displayName.c_str(), 11.0f, 0.0f);
+      DrawTextEx(uiFont, displayName.c_str(), {panelX + 15, yPos + 2}, 11.0f, 0.0f, nameColor);
+
+      // Underline for interactive parts (those with materialId)
+      if (!part.materialId.empty()) {
+        DrawLine(static_cast<int>(panelX + 15), static_cast<int>(yPos + 14),
+                 static_cast<int>(panelX + 15 + nameSize.x), static_cast<int>(yPos + 14),
+                 Fade(nameColor, 0.5f));
+      }
+
+      // Quantity on the right
+      std::string qtyStr = "x" + part.quantity;
+      if (!part.note.empty()) {
+        qtyStr += " (" + part.note + ")";
+      }
+      Vector2 qtySize = MeasureTextEx(uiFont, qtyStr.c_str(), 10.0f, 0.0f);
+      DrawTextEx(uiFont, qtyStr.c_str(), {panelX + panelWidth - qtySize.x - 15, yPos + 3}, 10.0f, 0.0f, GRAY);
+
+      // Handle click to select material
+      if (isHovered && !part.materialId.empty() && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (uiState.selectedMaterialId == part.materialId) {
+          uiState.selectedMaterialId.clear();
+        } else {
+          uiState.selectedMaterialId = part.materialId;
+        }
+      }
+
+      yPos += rowHeight;
+    }
+    yPos += 8.0f;
+  }
+
+  // Progress section
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), GRAY);
+  yPos += 10.0f;
+
+  // Progress info
+  char progressText[64];
+  snprintf(progressText, sizeof(progressText), "%zu new components | %zu total visible",
+           currentStep.newObjectIndices.size(), currentStep.objectIndices.size());
+  DrawTextEx(uiFont, progressText, {panelX + 10, yPos}, 10.0f, 0.0f, Color{100, 100, 110, 255});
+  yPos += 16.0f;
+
+  // Progress bar
+  float progressWidth = panelWidth - 20.0f;
+  float progress = static_cast<float>(uiState.currentAssemblyStep + 1) / static_cast<float>(assembly.steps.size());
+  DrawRectangle(static_cast<int>(panelX + 10), static_cast<int>(yPos),
+                static_cast<int>(progressWidth), 6, Color{40, 45, 50, 255});
+  DrawRectangle(static_cast<int>(panelX + 10), static_cast<int>(yPos),
+                static_cast<int>(progressWidth * progress), 6, SKYBLUE);
+
+  // Keyboard hint at bottom
+  DrawTextEx(uiFont, "[A] Toggle  [</>] Navigate  Click parts to highlight",
+             {panelX + 10, panelY + panelHeight - 18}, 9.0f, 0.0f, GRAY);
+
+  return stepChanged;
 }
 
 bool DrawToolbar(UIState& uiState,
@@ -1218,6 +1577,7 @@ bool DrawToolbar(UIState& uiState,
     anyToggled = true;
   }
   if (toggleBtn("S", uiState.showStructuralPanel, Color{180, 140, 40, 255})) anyToggled = true;
+  if (toggleBtn("A", uiState.showAssemblyPanel, Color{100, 180, 100, 255})) anyToggled = true;
 
   // Separator
   x += 4.0f;
@@ -1240,6 +1600,9 @@ bool DrawToolbar(UIState& uiState,
 
   if (exportBtn("STL")) uiState.stlExportClicked = true;
   if (exportBtn("IFC")) uiState.ifcExportClicked = true;
+  if (exportBtn("SVG")) uiState.svgExportClicked = true;
+  if (exportBtn("BOM")) uiState.bomExportClicked = true;
+  if (exportBtn("IKEA")) uiState.instructionsExportClicked = true;
 
   // Status message on right side
   if (!statusMessage.empty()) {

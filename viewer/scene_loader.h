@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "assembly.h"
 
 extern "C" {
 #include "quickjs.h"

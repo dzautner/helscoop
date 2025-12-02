@@ -3,6 +3,7 @@
 #include "types.h"
 #include "thermal.h"
 #include "structural.h"
+#include "assembly.h"
 #include "raylib.h"
 
 #include <filesystem>
@@ -35,6 +36,7 @@ struct UIState {
   // Material hover/selection state
   std::string hoveredMaterialId;   // Material being hovered in panel
   std::string selectedMaterialId;  // Material clicked/selected (persistent)
+  std::string hoveredPartMaterialId;  // Part being hovered in assembly panel (for cross-highlighting)
 
   // Scroll offsets for panels
   float materialScrollOffset = 0.0f;
@@ -54,19 +56,29 @@ struct UIState {
   PanelPos structuralPos;
 
   // Panel dragging state
-  int draggingPanel = -1;  // -1=none, 0=materials, 1=params, 2=thermal, 3=structural
+  int draggingPanel = -1;  // -1=none, 0=materials, 1=params, 2=thermal, 3=structural, 4=assembly
   Vector2 dragOffset = {0, 0};
+
+  // Assembly preview state
+  bool showAssemblyPanel = false;
+  int currentAssemblyStep = 0;  // Current step being viewed (0-indexed)
+  PanelPos assemblyPos;
 
   // Export button clicks (set by toolbar, cleared by main after handling)
   bool stlExportClicked = false;
   bool ifcExportClicked = false;
+  bool svgExportClicked = false;
+  bool bomExportClicked = false;
+  bool instructionsExportClicked = false;
 };
 
 // Draw materials panel on left side (updates uiState.hoveredMaterialId)
+// Optional assemblyFilter: when non-empty, only shows materials in that list
 void DrawMaterialsPanel(const std::vector<MaterialItem>& materials,
                         UIState& uiState,
                         const Font& uiFont,
-                        int screenWidth, int screenHeight);
+                        int screenWidth, int screenHeight,
+                        const std::vector<std::string>& assemblyFilter = {});
 
 // Draw parameters panel on right side (returns true if a parameter was modified)
 bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
@@ -100,6 +112,13 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
                          UIState& uiState,
                          const Font& uiFont,
                          int screenWidth, int screenHeight);
+
+// Draw assembly preview panel (IKEA-style step-by-step view)
+// Returns true if the step was changed (so main can update visible objects)
+bool DrawAssemblyPanel(const AssemblyInstructions& assembly,
+                       UIState& uiState,
+                       const Font& uiFont,
+                       int screenWidth, int screenHeight);
 
 // Draw toolbar at top of screen with panel toggles
 // Returns true if any toggle was clicked (for status updates)

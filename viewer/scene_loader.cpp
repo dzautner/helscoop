@@ -7,10 +7,20 @@
 #include "raymath.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <future>
 #include <iostream>
 
 namespace dingcad {
+
+// Replace home directory with ~ for privacy in displayed paths
+static std::string shortenHomePath(const std::string& path) {
+  const char* home = std::getenv("HOME");
+  if (home && path.find(home) == 0) {
+    return "~" + path.substr(std::strlen(home));
+  }
+  return path;
+}
 
 ModuleLoaderData g_moduleLoaderData;
 
@@ -144,6 +154,8 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
 
   JSValue materialsVal = JS_GetPropertyStr(ctx, moduleNamespace, "materials");
   JSValue displayScaleVal = JS_GetPropertyStr(ctx, moduleNamespace, "displayScale");
+  JSValue assemblyVal = JS_GetPropertyStr(ctx, moduleNamespace, "buildGuide");
+
   JS_FreeValue(ctx, moduleNamespace);
 
   // Parse display scale for surface area calculation (default 1.0 if not provided)
@@ -172,7 +184,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     // Case 1: Raw manifold geometry
     auto manifoldHandle = GetManifoldHandle(ctx, objVal);
     if (manifoldHandle) {
-      return ColoredObject{manifoldHandle, kBaseColor, "", 1};
+      return ColoredObject{manifoldHandle, kBaseColor, "", "", 1};
     }
 
     // Case 2: Object with geometry property
@@ -245,7 +257,27 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     }
     JS_FreeValue(ctx, quantityVal);
 
-    return ColoredObject{geom, color, materialId, quantity};
+    // Check for objectId (for assembly step filtering)
+    std::string objectId;
+    JSValue objectIdVal = JS_GetPropertyStr(ctx, objVal, "objectId");
+    if (!JS_IsUndefined(objectIdVal) && JS_IsString(objectIdVal)) {
+      const char* objIdStr = JS_ToCString(ctx, objectIdVal);
+      if (objIdStr) {
+        objectId = objIdStr;
+        JS_FreeCString(ctx, objIdStr);
+      }
+    }
+    JS_FreeValue(ctx, objectIdVal);
+
+    // Check for assemblyOnly flag (only visible in assembly mode)
+    bool assemblyOnly = false;
+    JSValue assemblyOnlyVal = JS_GetPropertyStr(ctx, objVal, "assemblyOnly");
+    if (!JS_IsUndefined(assemblyOnlyVal) && JS_IsBool(assemblyOnlyVal)) {
+      assemblyOnly = JS_ToBool(ctx, assemblyOnlyVal);
+    }
+    JS_FreeValue(ctx, assemblyOnlyVal);
+
+    return ColoredObject{geom, color, materialId, objectId, quantity, assemblyOnly};
   };
 
   if (JS_IsArray(sceneVal)) {
@@ -426,8 +458,215 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     }
   }
 
+  // Parse assembly instructions if exported from scene
+  // Format: export const assembly = {
+  //   projectName: "My Project",
+  //   steps: [
+  //     { title: "Lay Foundation", description: "...", objects: [0, 1, 2],
+  //       parts: [{ name: "Concrete Paver", materialId: "concrete_paver", quantity: 8 }] },
+  //     ...
+  //   ]
+  // };
+  if (!JS_IsUndefined(assemblyVal) && !JS_IsException(assemblyVal) && JS_IsObject(assemblyVal)) {
+    TraceLog(LOG_INFO, "ASSEMBLY: Parsing scene-defined assembly instructions");
+
+    // Get project name
+    JSValue projNameVal = JS_GetPropertyStr(ctx, assemblyVal, "projectName");
+    if (!JS_IsUndefined(projNameVal)) {
+      const char* str = JS_ToCString(ctx, projNameVal);
+      if (str) {
+        result.assembly.projectName = str;
+        JS_FreeCString(ctx, str);
+      }
+    }
+    JS_FreeValue(ctx, projNameVal);
+
+    // Parse steps array
+    JSValue stepsVal = JS_GetPropertyStr(ctx, assemblyVal, "steps");
+    if (!JS_IsUndefined(stepsVal) && JS_IsArray(stepsVal)) {
+      JSValue stepsLenVal = JS_GetPropertyStr(ctx, stepsVal, "length");
+      uint32_t stepsLen = 0;
+      if (JS_ToUint32(ctx, &stepsLen, stepsLenVal) >= 0) {
+        for (uint32_t i = 0; i < stepsLen; ++i) {
+          JSValue stepVal = JS_GetPropertyUint32(ctx, stepsVal, i);
+          AssemblyStep step;
+          step.stepNumber = static_cast<int>(i + 1);
+
+          // Get title
+          JSValue titleVal = JS_GetPropertyStr(ctx, stepVal, "title");
+          if (!JS_IsUndefined(titleVal)) {
+            const char* str = JS_ToCString(ctx, titleVal);
+            if (str) { step.title = str; JS_FreeCString(ctx, str); }
+          }
+          JS_FreeValue(ctx, titleVal);
+
+          // Get description
+          JSValue descVal = JS_GetPropertyStr(ctx, stepVal, "description");
+          if (!JS_IsUndefined(descVal)) {
+            const char* str = JS_ToCString(ctx, descVal);
+            if (str) { step.description = str; JS_FreeCString(ctx, str); }
+          }
+          JS_FreeValue(ctx, descVal);
+
+          // Get showMaterials array (which materials are visible at this step)
+          JSValue matsVal = JS_GetPropertyStr(ctx, stepVal, "showMaterials");
+          if (!JS_IsUndefined(matsVal) && JS_IsArray(matsVal)) {
+            JSValue matsLenVal = JS_GetPropertyStr(ctx, matsVal, "length");
+            uint32_t matsLen = 0;
+            if (JS_ToUint32(ctx, &matsLen, matsLenVal) >= 0) {
+              for (uint32_t j = 0; j < matsLen; ++j) {
+                JSValue matVal = JS_GetPropertyUint32(ctx, matsVal, j);
+                const char* str = JS_ToCString(ctx, matVal);
+                if (str) {
+                  step.showMaterials.push_back(str);
+                  JS_FreeCString(ctx, str);
+                }
+                JS_FreeValue(ctx, matVal);
+              }
+            }
+            JS_FreeValue(ctx, matsLenVal);
+          }
+          JS_FreeValue(ctx, matsVal);
+
+          // Get showObjects array (specific objects to show - more fine-grained than materials)
+          JSValue objsVal = JS_GetPropertyStr(ctx, stepVal, "showObjects");
+          if (!JS_IsUndefined(objsVal) && JS_IsArray(objsVal)) {
+            JSValue objsLenVal = JS_GetPropertyStr(ctx, objsVal, "length");
+            uint32_t objsLen = 0;
+            if (JS_ToUint32(ctx, &objsLen, objsLenVal) >= 0) {
+              for (uint32_t j = 0; j < objsLen; ++j) {
+                JSValue objVal = JS_GetPropertyUint32(ctx, objsVal, j);
+                const char* str = JS_ToCString(ctx, objVal);
+                if (str) {
+                  step.showObjects.push_back(str);
+                  JS_FreeCString(ctx, str);
+                }
+                JS_FreeValue(ctx, objVal);
+              }
+            }
+            JS_FreeValue(ctx, objsLenVal);
+          }
+          JS_FreeValue(ctx, objsVal);
+
+          // Get parts array
+          JSValue partsVal = JS_GetPropertyStr(ctx, stepVal, "parts");
+          if (!JS_IsUndefined(partsVal) && JS_IsArray(partsVal)) {
+            JSValue partsLenVal = JS_GetPropertyStr(ctx, partsVal, "length");
+            uint32_t partsLen = 0;
+            if (JS_ToUint32(ctx, &partsLen, partsLenVal) >= 0) {
+              for (uint32_t j = 0; j < partsLen; ++j) {
+                JSValue partVal = JS_GetPropertyUint32(ctx, partsVal, j);
+                AssemblyPart part;
+
+                JSValue partNameVal = JS_GetPropertyStr(ctx, partVal, "name");
+                if (!JS_IsUndefined(partNameVal)) {
+                  const char* str = JS_ToCString(ctx, partNameVal);
+                  if (str) { part.name = str; JS_FreeCString(ctx, str); }
+                }
+                JS_FreeValue(ctx, partNameVal);
+
+                JSValue partMatVal = JS_GetPropertyStr(ctx, partVal, "materialId");
+                if (!JS_IsUndefined(partMatVal)) {
+                  const char* str = JS_ToCString(ctx, partMatVal);
+                  if (str) { part.materialId = str; JS_FreeCString(ctx, str); }
+                }
+                JS_FreeValue(ctx, partMatVal);
+
+                JSValue partQtyVal = JS_GetPropertyStr(ctx, partVal, "quantity");
+                if (!JS_IsUndefined(partQtyVal)) {
+                  // Quantity can be a number or string
+                  if (JS_IsNumber(partQtyVal)) {
+                    int32_t q = 1;
+                    if (JS_ToInt32(ctx, &q, partQtyVal) >= 0) {
+                      part.quantity = std::to_string(q);
+                    }
+                  } else {
+                    const char* str = JS_ToCString(ctx, partQtyVal);
+                    if (str) { part.quantity = str; JS_FreeCString(ctx, str); }
+                  }
+                }
+                JS_FreeValue(ctx, partQtyVal);
+
+                JSValue partNoteVal = JS_GetPropertyStr(ctx, partVal, "note");
+                if (!JS_IsUndefined(partNoteVal)) {
+                  const char* str = JS_ToCString(ctx, partNoteVal);
+                  if (str) { part.note = str; JS_FreeCString(ctx, str); }
+                }
+                JS_FreeValue(ctx, partNoteVal);
+
+                step.parts.push_back(part);
+                JS_FreeValue(ctx, partVal);
+              }
+            }
+            JS_FreeValue(ctx, partsLenVal);
+          }
+          JS_FreeValue(ctx, partsVal);
+
+          // Get subSteps array (detailed instructions)
+          JSValue subStepsVal = JS_GetPropertyStr(ctx, stepVal, "subSteps");
+          if (!JS_IsUndefined(subStepsVal) && JS_IsArray(subStepsVal)) {
+            JSValue subStepsLenVal = JS_GetPropertyStr(ctx, subStepsVal, "length");
+            uint32_t subStepsLen = 0;
+            if (JS_ToUint32(ctx, &subStepsLen, subStepsLenVal) >= 0) {
+              for (uint32_t j = 0; j < subStepsLen; ++j) {
+                JSValue subStepVal = JS_GetPropertyUint32(ctx, subStepsVal, j);
+                SubStep subStep;
+
+                JSValue instrVal = JS_GetPropertyStr(ctx, subStepVal, "instruction");
+                if (!JS_IsUndefined(instrVal)) {
+                  const char* str = JS_ToCString(ctx, instrVal);
+                  if (str) { subStep.instruction = str; JS_FreeCString(ctx, str); }
+                }
+                JS_FreeValue(ctx, instrVal);
+
+                JSValue tipVal = JS_GetPropertyStr(ctx, subStepVal, "tip");
+                if (!JS_IsUndefined(tipVal)) {
+                  const char* str = JS_ToCString(ctx, tipVal);
+                  if (str) { subStep.tip = str; JS_FreeCString(ctx, str); }
+                }
+                JS_FreeValue(ctx, tipVal);
+
+                JSValue timeVal = JS_GetPropertyStr(ctx, subStepVal, "timeMinutes");
+                if (!JS_IsUndefined(timeVal)) {
+                  int32_t t = 0;
+                  if (JS_ToInt32(ctx, &t, timeVal) >= 0) {
+                    subStep.timeMinutes = t;
+                  }
+                }
+                JS_FreeValue(ctx, timeVal);
+
+                step.subSteps.push_back(subStep);
+                JS_FreeValue(ctx, subStepVal);
+              }
+            }
+            JS_FreeValue(ctx, subStepsLenVal);
+          }
+          JS_FreeValue(ctx, subStepsVal);
+
+          // Get total time for step
+          JSValue totalTimeVal = JS_GetPropertyStr(ctx, stepVal, "timeMinutes");
+          if (!JS_IsUndefined(totalTimeVal)) {
+            int32_t t = 0;
+            if (JS_ToInt32(ctx, &t, totalTimeVal) >= 0) {
+              step.totalTimeMinutes = t;
+            }
+          }
+          JS_FreeValue(ctx, totalTimeVal);
+
+          result.assembly.steps.push_back(step);
+          JS_FreeValue(ctx, stepVal);
+        }
+      }
+      JS_FreeValue(ctx, stepsLenVal);
+    }
+    JS_FreeValue(ctx, stepsVal);
+
+    TraceLog(LOG_INFO, "ASSEMBLY: Parsed %zu scene-defined steps", result.assembly.steps.size());
+  }
+  JS_FreeValue(ctx, assemblyVal);
+
   result.success = true;
-  result.message = "Loaded " + absolutePath.string() + " (" +
+  result.message = "Loaded " + shortenHomePath(absolutePath.string()) + " (" +
                    std::to_string(result.sceneData.objects.size()) + " object(s))";
   assignDependencies();
   JS_FreeValue(ctx, sceneVal);
@@ -471,6 +710,7 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
   result.sceneData = std::move(loadResult.sceneData);
   result.dependencies = std::move(loadResult.dependencies);
   result.materials = std::move(loadResult.materials);
+  result.assembly = std::move(loadResult.assembly);
 
   if (!result.success) {
     JS_FreeRuntime(runtime);
@@ -483,6 +723,7 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
     std::future<manifold::MeshGL> future;
     Color color;
     std::string materialId;
+    std::string objectId;
   };
   std::vector<TessTask> tasks;
   tasks.reserve(result.sceneData.objects.size());
@@ -494,14 +735,15 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
           return geom->GetMeshGL();
         }),
         obj.color,
-        obj.materialId
+        obj.materialId,
+        obj.objectId
       });
     }
   }
 
   result.meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    result.meshes.push_back({task.future.get(), task.color, task.materialId});
+    result.meshes.push_back({task.future.get(), task.color, task.materialId, task.objectId});
   }
 
   auto end = std::chrono::high_resolution_clock::now();

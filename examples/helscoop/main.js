@@ -7,9 +7,9 @@
 // ============================================================================
 
 // Coop dimensions
-const coop_len = 4265;           // Coop length (X direction)
-const coop_w = 3000;             // Coop width (Y direction)
-const wall_h = 2000;             // Wall height (Z direction)
+const coop_len = 2933;           // Coop length (X direction)
+const coop_w = 3246;             // Coop width (Y direction)
+const wall_h = 2404;             // Wall height (Z direction)
 
 // Structural members
 const joist_sec = [48, 98];      // Joist cross-section [thickness, height]
@@ -20,7 +20,7 @@ const floor_th = 18;             // Floor sheet thickness
 
 // Roof
 const roof_pitch_deg = 28;       // Roof pitch in degrees
-const overhang = 150;            // Roof overhang on all sides
+const overhang = 50;            // Roof overhang on all sides
 
 // Base
 const paver_size = [200, 200, 50]; // Paver dimensions [width, depth, height]
@@ -29,10 +29,10 @@ const skid_sec = [148, 148];       // Skid cross-section [thickness, height]
 const skirting_t = 12;             // Skirting panel thickness
 
 // Doors
-const door_w = 1000;              // Human door width
-const door_h = 1700;             // Human door height
-const pop_w = 400;               // Pop door width
-const pop_opening_h = 300;       // Pop door opening height
+const door_w = 588;              // Human door width - Finnish standard 9M
+const door_h = 2100;             // Human door height - Finnish standard 21M
+const pop_w = 150;               // Pop door width
+const pop_opening_h = 261;       // Pop door opening height
 const pop_ramp_angle = 30;       // Ramp angle in degrees
 
 // Calculate pop door height
@@ -47,8 +47,8 @@ const vent_top_clearance = 20;
 const front_vent_clearance_over_door = 20;
 
 // Nesting boxes
-const nest_boxes = 3;
-const nest_box_w = 300;
+const nest_boxes = 2;
+const nest_box_w = 200;
 const nest_box_d = 400;
 const nest_box_h = 350;
 const nest_height_off_floor = 200;  // Lowered from 400mm to 200mm
@@ -88,9 +88,9 @@ const show_chickens = 1;       // 1=show, 0=hide chickens
 // DOOR ANGLES - Simulate doors open/closed (degrees)
 // ============================================================================
 // @param human_door_angle "Doors" Human door swing angle (0-120)
-const human_door_angle = 0;    // 0=closed, 90=fully open
+const human_door_angle = 47;    // 0=closed, 90=fully open
 // @param nest_lid_angle "Doors" Nest box lid angle (0-90)
-const nest_lid_angle = 45;     // 0=closed, 90=fully open
+const nest_lid_angle = 90;     // 0=closed, 90=fully open
 // @param tunnel_door_angle "Doors" Tunnel access door angle (0-90)
 const tunnel_door_angle = 30;  // 0=closed, 90=fully open
 // @param run_gate_angle "Doors" Run gate swing angle (0-120)
@@ -165,48 +165,53 @@ const total_paint_area = wall_area_sqm + roof_area_sqm * 0.3;
 const paint_liters = Math.ceil(total_paint_area / 5);
 
 export const materials = [
-  // Sahatavara - Runko (Finnish C24 lumber, prices in €/jm from Sarokas)
-  { name: "48x98 Runkopuu C24", materialId: "pine_48x98_c24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(studs_jm + plate_length_jm) },
-  { name: "48x148 Lattiavasat C24", materialId: "pine_48x148_c24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x148-c24", unit: "jm", unitPrice: 3.70, quantity: Math.ceil(joists_jm) },
-  { name: "48x98 Kattoristikot C24", materialId: "pine_48x98_c24", category: "Sahatavara", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "jm", unitPrice: 2.60, quantity: Math.ceil(rafters_jm) },
-  { name: "Kestopuu 48x148 (jalat)", materialId: "pressure_treated_48x148", category: "Sahatavara", link: "https://www.sarokas.fi/kestopuu-48-148-vihrea", unit: "jm", unitPrice: 3.80, quantity: 12 },
+  // Foundation
+  { name: "Concrete Paver 400x400x50mm", materialId: "concrete_block", category: "Foundation", link: "https://www.k-rauta.fi/kategoria/piha/betonilaatta", unit: "pcs", unitPrice: 4.50, quantity: 8 },
+  { name: "Pressure Treated Skid 148x148mm", materialId: "pressure_treated_148x148", category: "Foundation", link: "https://www.sarokas.fi/kestopuu-148x148-vihrea", unit: "lm", unitPrice: 12.50, quantity: Math.ceil((coop_len / 1000) * 3) },
+  { name: "Joist Hanger 48mm", materialId: "joist_hanger", category: "Foundation", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pcs", unitPrice: 2.80, quantity: 18 },
 
-  // Levytavara (Finnish panels)
-  { name: "Havuvaneri 18mm lattiaan", materialId: "osb_18mm", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-18mm-iii-iii-2440x1200", unit: "levy", unitPrice: 62.78, quantity: floor_sheets },
-  { name: "Havuvaneri 12mm kattoon", materialId: "galvanized_roofing", category: "Levytavara", link: "https://www.sarokas.fi/vaneri-havu-12mm", unit: "levy", unitPrice: 45.00, quantity: roof_sheets },
-  { name: "Ulkovuoripaneeli 21mm", materialId: "plywood_9mm_exterior", category: "Levytavara", link: "https://www.k-rauta.fi/kategoria/puutavara", unit: "levy", unitPrice: 55.00, quantity: wall_sheets },
+  // Lumber (Finnish C24, prices in EUR/lm from Sarokas)
+  { name: "48x98 Stud C24", materialId: "pine_48x98_c24", category: "Lumber", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "lm", unitPrice: 2.60, quantity: Math.ceil(studs_jm + plate_length_jm) },
+  { name: "48x148 Floor Joist C24", materialId: "pine_48x148_c24", category: "Lumber", link: "https://www.sarokas.fi/mitallistettu-48x148-c24", unit: "lm", unitPrice: 3.70, quantity: Math.ceil(joists_jm) },
+  { name: "48x98 Rafter C24", materialId: "pine_48x98_c24", category: "Lumber", link: "https://www.sarokas.fi/mitallistettu-48x98-c24", unit: "lm", unitPrice: 2.60, quantity: Math.ceil(rafters_jm) },
+  { name: "Pressure Treated 48x148", materialId: "pressure_treated_48x148", category: "Lumber", link: "https://www.sarokas.fi/kestopuu-48-148-vihrea", unit: "lm", unitPrice: 3.80, quantity: 12 },
 
-  // Katto (Roofing)
-  { name: "Katehuopa 15 sqm", materialId: "galvanized_roofing", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "rulla", unitPrice: 35.00, quantity: felt_rolls },
-  { name: "Räystäslista 2m", materialId: "exterior_paint_white", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 8.50, quantity: Math.ceil((coop_len * 2 + coop_w * 4) / 2000) },
-  { name: "Harjalista 2m", materialId: "galvanized_roofing", category: "Katto", link: "https://www.k-rauta.fi/kategoria/katto", unit: "kpl", unitPrice: 12.00, quantity: Math.ceil(coop_len / 2000) },
+  // Sheet Goods
+  { name: "Plywood 18mm Floor", materialId: "osb_18mm", category: "Sheathing", link: "https://www.sarokas.fi/vaneri-havu-18mm-iii-iii-2440x1200", unit: "sheet", unitPrice: 62.78, quantity: floor_sheets },
+  { name: "Plywood 12mm Roof", materialId: "galvanized_roofing", category: "Sheathing", link: "https://www.sarokas.fi/vaneri-havu-12mm", unit: "sheet", unitPrice: 45.00, quantity: roof_sheets },
+  { name: "Exterior Panel 21mm", materialId: "exterior_board_yellow", category: "Sheathing", link: "https://www.k-rauta.fi/kategoria/puutavara", unit: "sheet", unitPrice: 55.00, quantity: wall_sheets },
 
-  // Kiinnitystarvikkeet (Hardware)
-  { name: "Ruuvit 4.5x75 (500kpl)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pak", unitPrice: 24.90, quantity: Math.ceil(wall_studs / 100) },
-  { name: "Kattonaulat (1kg)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pak", unitPrice: 12.90, quantity: Math.ceil(roof_area_sqm / 10) },
-  { name: "Palkkikengät", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 2.50, quantity: floor_joists },
-  { name: "Kulmarauta", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 1.80, quantity: rafter_count * 2 },
-  { name: "Saranat (pari)", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pari", unitPrice: 6.90, quantity: 4 },
-  { name: "Oven salpa", category: "Kiinnitys", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "kpl", unitPrice: 12.90, quantity: 2 },
+  // Roofing
+  { name: "Roofing Felt 15sqm", materialId: "galvanized_roofing", category: "Roofing", link: "https://www.k-rauta.fi/kategoria/katto", unit: "roll", unitPrice: 35.00, quantity: felt_rolls },
+  { name: "Drip Edge 2m", materialId: "exterior_paint_white", category: "Roofing", link: "https://www.k-rauta.fi/kategoria/katto", unit: "pcs", unitPrice: 8.50, quantity: Math.ceil((coop_len * 2 + coop_w * 4) / 2000) },
+  { name: "Ridge Cap 2m", materialId: "galvanized_roofing", category: "Roofing", link: "https://www.k-rauta.fi/kategoria/katto", unit: "pcs", unitPrice: 12.00, quantity: Math.ceil(coop_len / 2000) },
 
-  // Kanalalle (Chicken-specific)
-  { name: "Hitsattu verkko 12mm", materialId: "hardware_cloth", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 89.00, quantity: 2 },
-  { name: "Kanaverkko 50mm", materialId: "hardware_cloth", category: "Kanala", link: "https://www.puuilo.fi/verkkotuotteet", unit: "rulla", unitPrice: 45.00, quantity: 1 },
-  { name: "Automaattinen luukku", category: "Kanala", link: "https://www.amazon.de", unit: "kpl", unitPrice: 85.00, quantity: 1 },
-  { name: "Pesälaatikon pohja", materialId: "nest_box_plywood", category: "Kanala", link: "https://www.puuilo.fi", unit: "kpl", unitPrice: 8.90, quantity: nest_boxes },
-  { name: "Orsi 50mm pyöreä (2m)", materialId: "pine_48x98_c24", category: "Kanala", link: "https://www.k-rauta.fi", unit: "kpl", unitPrice: 6.90, quantity: Math.ceil(coop_len / 800) },
+  // Hardware
+  { name: "Screws 4.5x75 (500pcs)", category: "Hardware", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "box", unitPrice: 24.90, quantity: Math.ceil(wall_studs / 100) },
+  { name: "Roofing Nails (1kg)", category: "Hardware", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "box", unitPrice: 12.90, quantity: Math.ceil(roof_area_sqm / 10) },
+  { name: "Joist Hangers", category: "Hardware", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pcs", unitPrice: 2.50, quantity: floor_joists },
+  { name: "Angle Brackets", category: "Hardware", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pcs", unitPrice: 1.80, quantity: rafter_count * 2 },
+  { name: "Hinges (pair)", category: "Hardware", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pair", unitPrice: 6.90, quantity: 4 },
+  { name: "Door Latch", category: "Hardware", link: "https://www.k-rauta.fi/kategoria/kiinnitystarvikkeet", unit: "pcs", unitPrice: 12.90, quantity: 2 },
 
-  // Maalaus & Pintakäsittely
-  { name: "Ulkomaali (Tikkurila)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 14.90, quantity: paint_liters },
-  { name: "Pohjuste (puulle)", category: "Maalaus", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "litra", unitPrice: 12.90, quantity: Math.ceil(paint_liters * 0.5) },
+  // Chicken Coop Specific
+  { name: "Hardware Cloth 12mm", materialId: "hardware_cloth", category: "Coop", link: "https://www.puuilo.fi/verkkotuotteet", unit: "roll", unitPrice: 89.00, quantity: 2 },
+  { name: "Chicken Wire 50mm", materialId: "hardware_cloth", category: "Coop", link: "https://www.puuilo.fi/verkkotuotteet", unit: "roll", unitPrice: 45.00, quantity: 1 },
+  { name: "Auto Door Opener", category: "Coop", link: "https://www.amazon.de", unit: "pcs", unitPrice: 85.00, quantity: 1 },
+  { name: "Nest Box Base", materialId: "nest_box_plywood", category: "Coop", link: "https://www.puuilo.fi", unit: "pcs", unitPrice: 8.90, quantity: nest_boxes },
+  { name: "Roost Pole 50mm (2m)", materialId: "pine_48x98_c24", category: "Coop", link: "https://www.k-rauta.fi", unit: "pcs", unitPrice: 6.90, quantity: Math.ceil(coop_len / 800) },
 
-  // Eristeet (Insulation)
-  { name: "Mineraalivilla 100mm (seinät)", materialId: "insulation_100mm", category: "Eristeet", link: "https://www.paroc.fi/tuotteet/seinaeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(wall_area_sqm) },
-  { name: "Mineraalivilla 100mm (katto)", materialId: "insulation_100mm", category: "Eristeet", link: "https://www.paroc.fi/tuotteet/kattoeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(roof_area_sqm) },
-  { name: "Mineraalivilla 100mm (lattia)", materialId: "insulation_100mm", category: "Eristeet", link: "https://www.paroc.fi/tuotteet/lattiaeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(floor_area_sqm) },
+  // Paint & Finish
+  { name: "Exterior Paint (Tikkurila)", category: "Paint", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "liter", unitPrice: 14.90, quantity: paint_liters },
+  { name: "Wood Primer", category: "Paint", link: "https://www.k-rauta.fi/kategoria/maalit", unit: "liter", unitPrice: 12.90, quantity: Math.ceil(paint_liters * 0.5) },
 
-  // Lämpösillat (Thermal weak points - for thermal simulation, not BOM)
-  { name: "Ovi (lämpösilta)", materialId: "door_thermal_bridge", category: "Lämpösillat", unit: "kpl", unitPrice: 0, quantity: 1 },
+  // Insulation
+  { name: "Mineral Wool 100mm (walls)", materialId: "insulation_100mm", category: "Insulation", link: "https://www.paroc.fi/tuotteet/seinaeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(wall_area_sqm) },
+  { name: "Mineral Wool 100mm (roof)", materialId: "insulation_100mm", category: "Insulation", link: "https://www.paroc.fi/tuotteet/kattoeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(roof_area_sqm) },
+  { name: "Mineral Wool 100mm (floor)", materialId: "insulation_100mm", category: "Insulation", link: "https://www.paroc.fi/tuotteet/lattiaeristeet", unit: "sqm", unitPrice: 6.50, quantity: Math.ceil(floor_area_sqm) },
+
+  // Thermal Bridges (for simulation, not BOM)
+  { name: "Door (thermal bridge)", materialId: "door_thermal_bridge", category: "Thermal", unit: "pcs", unitPrice: 0, quantity: 1 },
 ];
 
 // ============================================================================
@@ -234,20 +239,22 @@ const CLADDING_MAIN = [0.93, 0.78, 0.18];  // Golden yellow siding
 const CLADDING_TRIM = [1, 1, 1];            // White trim
 
 // Horizontal cladding for walls running along X axis (front/back walls)
-// Creates solid panel with cutouts, plus corner trim boards
-function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45) {
+// Solid backing panel with thin board faces creating shadow lines
+// facing: -1 for front wall (faces -Y), +1 for back wall (faces +Y)
+function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45, facing = -1) {
   const panel_x = base_pos[0] - margin;
   const panel_y = base_pos[1];
   const panel_z = base_pos[2];
   const panel_len = len + 2 * margin;
 
-  // Main cladding panel
-  let panel = translate(
-    cube({ size: [panel_len, thickness, height], center: false }),
+  // Backing panel (wall sheathing) - solid, no gaps
+  const backing_thickness = 12;
+  let backing = translate(
+    cube({ size: [panel_len, backing_thickness, height], center: false }),
     [panel_x, panel_y, panel_z]
   );
 
-  // Apply cutouts
+  // Apply cutouts to backing
   for (const cutout of cutouts) {
     const cutout_pos = cutout[0];
     const cutout_size = cutout[1];
@@ -255,28 +262,72 @@ function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25,
       cube({ size: cutout_size, center: false }),
       cutout_pos
     );
-    panel = difference(panel, cutout_box);
+    backing = difference(backing, cutout_box);
   }
 
-  // Corner trim boards (vertical)
+  // Board dimensions - thin faces mounted on backing
+  const board_height = 145;     // Visible board height
+  const board_thickness = 3;    // Very thin - just a face, no volume gradient
+  const shadow_gap = 6;         // Small gap creates shadow line against backing
+  // Board position depends on facing direction
+  const board_y = facing < 0 ? panel_y - board_thickness : panel_y + backing_thickness;
+
+  // Create thin board faces
+  const boards = [];
+  let z = 0;
+  while (z < height) {
+    const remaining = height - z;
+    const this_height = Math.min(board_height, remaining);
+
+    if (this_height > 20) {
+      let board = translate(
+        cube({ size: [panel_len, board_thickness, this_height], center: false }),
+        [panel_x, board_y, panel_z + z]
+      );
+
+      // Apply cutouts
+      for (const cutout of cutouts) {
+        const cutout_pos = cutout[0];
+        const cutout_size = cutout[1];
+        const cutout_box = translate(
+          cube({ size: cutout_size, center: false }),
+          cutout_pos
+        );
+        board = difference(board, cutout_box);
+      }
+      boards.push(board);
+    }
+    z += board_height + shadow_gap;
+  }
+
+  // Union backing + all boards
+  let panel = backing;
+  for (let i = 0; i < boards.length; i++) {
+    panel = union(panel, boards[i]);
+  }
+
+  // Corner trim boards - thicker to stand proud
+  const trim_thickness = 25;
+  const trim_y = facing < 0 ? board_y - 7 : board_y + board_thickness + 7 - trim_thickness;
+
   const left_trim = translate(
-    cube({ size: [trim_w, thickness, height], center: false }),
-    [base_pos[0] - margin - trim_w, panel_y, panel_z]
+    cube({ size: [trim_w, trim_thickness, height + 40], center: false }),
+    [base_pos[0] - margin - trim_w, trim_y, panel_z - 20]
   );
   const right_trim = translate(
-    cube({ size: [trim_w, thickness, height], center: false }),
-    [base_pos[0] + len + margin, panel_y, panel_z]
+    cube({ size: [trim_w, trim_thickness, height + 40], center: false }),
+    [base_pos[0] + len + margin, trim_y, panel_z - 20]
   );
 
-  // Top and bottom trim (horizontal)
+  // Top and bottom trim
   const trim_total_len = len + 2 * margin + 2 * trim_w;
   const top_trim = translate(
-    cube({ size: [trim_total_len, thickness, 18], center: false }),
-    [base_pos[0] - margin - trim_w, panel_y, panel_z + height]
+    cube({ size: [trim_total_len, trim_thickness, 20], center: false }),
+    [base_pos[0] - margin - trim_w, trim_y, panel_z + height]
   );
   const bottom_trim = translate(
-    cube({ size: [trim_total_len, thickness, 18], center: false }),
-    [base_pos[0] - margin - trim_w, panel_y, panel_z - 18]
+    cube({ size: [trim_total_len, trim_thickness, 20], center: false }),
+    [base_pos[0] - margin - trim_w, trim_y, panel_z - 20]
   );
 
   return {
@@ -286,19 +337,22 @@ function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25,
 }
 
 // Horizontal cladding for walls running along Y axis (left/right walls)
-function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45) {
+// Solid backing panel with thin board faces creating shadow lines
+// facing: -1 for left wall (faces -X), +1 for right wall (faces +X)
+function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45, facing = -1) {
   const panel_x = base_pos[0];
   const panel_y = base_pos[1] - margin;
   const panel_z = base_pos[2];
   const panel_width = width + 2 * margin;
 
-  // Main cladding panel
-  let panel = translate(
-    cube({ size: [thickness, panel_width, height], center: false }),
+  // Backing panel (wall sheathing) - solid, no gaps
+  const backing_thickness = 12;
+  let backing = translate(
+    cube({ size: [backing_thickness, panel_width, height], center: false }),
     [panel_x, panel_y, panel_z]
   );
 
-  // Apply cutouts
+  // Apply cutouts to backing
   for (const cutout of cutouts) {
     const cutout_pos = cutout[0];
     const cutout_size = cutout[1];
@@ -306,28 +360,72 @@ function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 2
       cube({ size: cutout_size, center: false }),
       cutout_pos
     );
-    panel = difference(panel, cutout_box);
+    backing = difference(backing, cutout_box);
   }
 
-  // Corner trim boards (vertical)
+  // Board dimensions - thin faces mounted on backing
+  const board_height = 145;     // Visible board height
+  const board_thickness = 3;    // Very thin - just a face
+  const shadow_gap = 6;         // Small gap creates shadow line
+  // Board position depends on facing direction
+  const board_x = facing < 0 ? panel_x - board_thickness : panel_x + backing_thickness;
+
+  // Create thin board faces
+  const boards = [];
+  let z = 0;
+  while (z < height) {
+    const remaining = height - z;
+    const this_height = Math.min(board_height, remaining);
+
+    if (this_height > 20) {
+      let board = translate(
+        cube({ size: [board_thickness, panel_width, this_height], center: false }),
+        [board_x, panel_y, panel_z + z]
+      );
+
+      // Apply cutouts
+      for (const cutout of cutouts) {
+        const cutout_pos = cutout[0];
+        const cutout_size = cutout[1];
+        const cutout_box = translate(
+          cube({ size: cutout_size, center: false }),
+          cutout_pos
+        );
+        board = difference(board, cutout_box);
+      }
+      boards.push(board);
+    }
+    z += board_height + shadow_gap;
+  }
+
+  // Union backing + all boards
+  let panel = backing;
+  for (let i = 0; i < boards.length; i++) {
+    panel = union(panel, boards[i]);
+  }
+
+  // Corner trim boards - thicker to stand proud
+  const trim_thickness = 25;
+  const trim_x = facing < 0 ? board_x - 7 : board_x + board_thickness + 7 - trim_thickness;
+
   const front_trim = translate(
-    cube({ size: [thickness, trim_w, height], center: false }),
-    [panel_x, base_pos[1] - margin - trim_w, panel_z]
+    cube({ size: [trim_thickness, trim_w, height + 40], center: false }),
+    [trim_x, base_pos[1] - margin - trim_w, panel_z - 20]
   );
   const back_trim = translate(
-    cube({ size: [thickness, trim_w, height], center: false }),
-    [panel_x, base_pos[1] + width + margin, panel_z]
+    cube({ size: [trim_thickness, trim_w, height + 40], center: false }),
+    [trim_x, base_pos[1] + width + margin, panel_z - 20]
   );
 
-  // Top and bottom trim (horizontal)
+  // Top and bottom trim
   const trim_total_width = width + 2 * margin + 2 * trim_w;
   const top_trim = translate(
-    cube({ size: [thickness, trim_total_width, 18], center: false }),
-    [panel_x, base_pos[1] - margin - trim_w, panel_z + height]
+    cube({ size: [trim_thickness, trim_total_width, 20], center: false }),
+    [trim_x, base_pos[1] - margin - trim_w, panel_z + height]
   );
   const bottom_trim = translate(
-    cube({ size: [thickness, trim_total_width, 18], center: false }),
-    [panel_x, base_pos[1] - margin - trim_w, panel_z - 18]
+    cube({ size: [trim_thickness, trim_total_width, 20], center: false }),
+    [trim_x, base_pos[1] - margin - trim_w, panel_z - 20]
   );
 
   return {
@@ -336,9 +434,165 @@ function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 2
   };
 }
 
-// Door panel - hinged door that swings outward
-function door_panel(width, height, thickness = 18) {
-  return cube({ size: [width, thickness, height], center: false });
+// Traditional 4-panel door with proper proportions
+// Classic style: 2 SMALLER panels on TOP, 2 LARGER panels on BOTTOM
+// Returns { body: ..., hardware: ... } for separate material application
+// Based on research from dimensions.com, finewoodworking.com, directdoors.com
+function door_panel(width, height, thickness = 40) {
+  // === FRAME DIMENSIONS (scaled for door size) ===
+  // Standard proportions: stiles ~57mm (2.25"), rails similar, bottom rail wider
+  const stile_w = 57;              // Vertical frame pieces (left/right)
+  const top_rail_h = 57;           // Top rail - same as stiles
+  const bottom_rail_h = 90;        // Bottom rail - wider for kick resistance
+  const mid_rail_h = 57;           // Middle rail at waist height
+
+  // === PANEL LAYOUT ===
+  // Classic 4-panel: smaller panels on top, larger panels on bottom
+  // Mid rail positioned at about 55% of door height (waist height ~1100mm on 2000mm door)
+  const mid_rail_z = height * 0.55;
+
+  // Inner dimensions (where panels go)
+  const inner_w = width - 2 * stile_w;
+
+  // Panel heights
+  const lower_panel_h = mid_rail_z - bottom_rail_h;
+  const upper_panel_h = height - mid_rail_z - mid_rail_h - top_rail_h;
+
+  // Center muntin (vertical divider between left/right panels)
+  const muntin_w = 57;
+  const panel_w = (inner_w - muntin_w) / 2;
+
+  const door_parts = [];
+  const hardware_parts = [];
+
+  // === SOLID DOOR CORE ===
+  const core = cube({ size: [width, thickness, height], center: false });
+  door_parts.push(core);
+
+  // === FRAME PIECES (stand proud of panels) ===
+  const frame_proud = 8;  // Frame stands 8mm proud of panel surface
+
+  // Left stile (full height)
+  door_parts.push(translate(
+    cube({ size: [stile_w, frame_proud, height], center: false }),
+    [0, -frame_proud, 0]
+  ));
+
+  // Right stile (full height)
+  door_parts.push(translate(
+    cube({ size: [stile_w, frame_proud, height], center: false }),
+    [width - stile_w, -frame_proud, 0]
+  ));
+
+  // Center muntin
+  door_parts.push(translate(
+    cube({ size: [muntin_w, frame_proud, height - top_rail_h - bottom_rail_h], center: false }),
+    [stile_w + panel_w, -frame_proud, bottom_rail_h]
+  ));
+
+  // Top rail
+  door_parts.push(translate(
+    cube({ size: [width, frame_proud, top_rail_h], center: false }),
+    [0, -frame_proud, height - top_rail_h]
+  ));
+
+  // Bottom rail
+  door_parts.push(translate(
+    cube({ size: [width, frame_proud, bottom_rail_h], center: false }),
+    [0, -frame_proud, 0]
+  ));
+
+  // Mid rail
+  door_parts.push(translate(
+    cube({ size: [inner_w, frame_proud, mid_rail_h], center: false }),
+    [stile_w, -frame_proud, mid_rail_z]
+  ));
+
+  // === RAISED PANEL CENTERS ===
+  const left_panel_x = stile_w;
+  const right_panel_x = stile_w + panel_w + muntin_w;
+  const lower_panel_z = bottom_rail_h;
+  const upper_panel_z = mid_rail_z + mid_rail_h;
+  const panel_face_y = -frame_proud;
+  const field_margin = 20;
+  const field_proud = 4;
+
+  // Helper for raised panel center field
+  function add_panel_field(px, pz, pw, ph) {
+    if (pw > 2 * field_margin && ph > 2 * field_margin) {
+      door_parts.push(translate(
+        cube({ size: [pw - 2 * field_margin, field_proud, ph - 2 * field_margin], center: false }),
+        [px + field_margin, panel_face_y - field_proud, pz + field_margin]
+      ));
+    }
+  }
+
+  add_panel_field(left_panel_x, lower_panel_z, panel_w, lower_panel_h);
+  add_panel_field(right_panel_x, lower_panel_z, panel_w, lower_panel_h);
+  add_panel_field(left_panel_x, upper_panel_z, panel_w, upper_panel_h);
+  add_panel_field(right_panel_x, upper_panel_z, panel_w, upper_panel_h);
+
+  // === DOOR HANDLE (on LEFT side - opposite hinge at right edge X=width) ===
+  // Hinge is at X=width of door, so handle must be on LEFT side near X=0
+  const handle_x = stile_w / 2;  // Center of LEFT stile
+  const handle_z = mid_rail_z + mid_rail_h / 2;  // Lock height
+
+  // Backplate
+  const bp_w = 35;
+  const bp_h = 160;
+  const bp_d = 6;
+  hardware_parts.push(translate(
+    cube({ size: [bp_w, bp_d, bp_h], center: false }),
+    [handle_x - bp_w / 2, -frame_proud - bp_d, handle_z - bp_h / 2]
+  ));
+
+  // Lever rose
+  const rose_r = 20;
+  const rose_d = 3;
+  hardware_parts.push(translate(
+    rotate(cylinder({ height: rose_d, radius: rose_r, center: false }), [90, 0, 0]),
+    [handle_x, -frame_proud - bp_d, handle_z + 25]
+  ));
+
+  // Lever spindle
+  const spindle_len = 18;
+  const spindle_r = 6;
+  hardware_parts.push(translate(
+    rotate(cylinder({ height: spindle_len, radius: spindle_r, center: false }), [90, 0, 0]),
+    [handle_x, -frame_proud - bp_d - rose_d, handle_z + 25]
+  ));
+
+  // Lever arm (pointing toward +X, toward hinge/center of door)
+  const lever_len = 95;
+  const lever_r = 8;
+  hardware_parts.push(translate(
+    rotate(cylinder({ height: lever_len, radius: lever_r, center: false }), [0, 90, 0]),
+    [handle_x, -frame_proud - bp_d - rose_d - spindle_len, handle_z + 25]
+  ));
+
+  // Lever end
+  hardware_parts.push(translate(
+    sphere({ radius: lever_r + 1, center: true }),
+    [handle_x + lever_len, -frame_proud - bp_d - rose_d - spindle_len, handle_z + 25]
+  ));
+
+  // Key escutcheon
+  const esc_r = 16;
+  hardware_parts.push(translate(
+    rotate(cylinder({ height: 2, radius: esc_r, center: false }), [90, 0, 0]),
+    [handle_x, -frame_proud - bp_d, handle_z - 30]
+  ));
+
+  // Key cylinder
+  hardware_parts.push(translate(
+    rotate(cylinder({ height: 10, radius: 9, center: false }), [90, 0, 0]),
+    [handle_x, -frame_proud - bp_d - 2, handle_z - 30]
+  ));
+
+  return {
+    body: union(...door_parts),
+    hardware: union(...hardware_parts)
+  };
 }
 
 // Pop door panel - bottom-hinged ramp with grip cleats
@@ -369,6 +623,63 @@ function roosting_perch(length, diameter = 50) {
 }
 
 // ============================================================================
+// HARDWARE PRIMITIVES (bolts, screws, hangers)
+// ============================================================================
+
+// Hex bolt with head - length is shaft length, diameter is shaft diameter
+function hex_bolt(length, diameter = 8) {
+  const head_height = diameter * 0.7;
+  const head_width = diameter * 1.8;
+  // Hexagonal head approximated as cylinder (6-sided)
+  const head = cylinder({ height: head_height, radius: head_width / 2, center: false });
+  const shaft = translate(
+    cylinder({ height: length, radius: diameter / 2, center: false }),
+    [0, 0, head_height]
+  );
+  return union(head, shaft);
+}
+
+// Wood screw with countersunk head
+function wood_screw(length, diameter = 4) {
+  const head_height = diameter * 0.5;
+  const head_radius = diameter * 1.2;
+  // Countersunk head (cone shape approximated)
+  const head = cylinder({ height: head_height, radius: head_radius, center: false });
+  const shaft = translate(
+    cylinder({ height: length - head_height, radius: diameter / 2, center: false }),
+    [0, 0, head_height]
+  );
+  return union(head, shaft);
+}
+
+// Joist hanger - U-shaped metal bracket
+function joist_hanger_3d(joist_width, joist_height, thickness = 2) {
+  const flange_height = 30;
+  // Bottom plate
+  const bottom = cube({ size: [joist_width + 2 * thickness, thickness, joist_height], center: false });
+  // Left side
+  const left = translate(
+    cube({ size: [thickness, joist_height * 0.8, flange_height], center: false }),
+    [0, thickness, 0]
+  );
+  // Right side
+  const right = translate(
+    cube({ size: [thickness, joist_height * 0.8, flange_height], center: false }),
+    [joist_width + thickness, thickness, 0]
+  );
+  // Top flanges for nailing
+  const flange_l = translate(
+    cube({ size: [25, thickness, flange_height], center: false }),
+    [-25, 0, 0]
+  );
+  const flange_r = translate(
+    cube({ size: [25, thickness, flange_height], center: false }),
+    [joist_width + 2 * thickness, 0, 0]
+  );
+  return union(bottom, left, right, flange_l, flange_r);
+}
+
+// ============================================================================
 // COMPONENTS
 // ============================================================================
 
@@ -388,14 +699,18 @@ function paver_row(len, paver, max_spacing, y) {
   return union(...pavers);
 }
 
-// Skid base - three parallel skids on paver rows
-function skid_base(len, width, skid, paver, max_spacing) {
+// Foundation pavers only (concrete blocks)
+function foundation_pavers(len, width, paver, max_spacing) {
   // Three rows of pavers
   const paver1 = paver_row(len, paver, max_spacing, paver[1] / 2);
   const paver2 = paver_row(len, paver, max_spacing, width / 2);
   const paver3 = paver_row(len, paver, max_spacing, width - paver[1] / 2);
+  return union(paver1, paver2, paver3);
+}
 
-  // Three skids
+// Foundation skids only (pressure-treated timber beams)
+function foundation_skids(len, width, skid, paver) {
+  // Three skids sitting on top of pavers
   const skid1 = translate(
     cube({ size: [len, skid[0], skid[1]], center: false }),
     [0, skid[0] / 2, paver[2]]
@@ -408,8 +723,14 @@ function skid_base(len, width, skid, paver, max_spacing) {
     cube({ size: [len, skid[0], skid[1]], center: false }),
     [0, width - skid[0] - skid[0] / 2, paver[2]]
   );
+  return union(skid1, skid2, skid3);
+}
 
-  return union(paver1, paver2, paver3, skid1, skid2, skid3);
+// Skid base - combined (for backwards compatibility if needed)
+function skid_base(len, width, skid, paver, max_spacing) {
+  const pavers = foundation_pavers(len, width, paver, max_spacing);
+  const skids = foundation_skids(len, width, skid, paver);
+  return union(pavers, skids);
 }
 
 // Skirting around base
@@ -689,14 +1010,104 @@ function gable_roof(len, width, wall_h, floor_stack, pitch_deg, overhang, roof_t
 // MAIN ASSEMBLY
 // ============================================================================
 
-// Build the foundation
-const foundation = skid_base(coop_len, coop_w, skid_sec, paver_size, max_paver_spacing);
+// Build the foundation - separate pavers and skids for material tracking
+const foundationPavers = foundation_pavers(coop_len, coop_w, paver_size, max_paver_spacing);
+const foundationSkids = foundation_skids(coop_len, coop_w, skid_sec, paver_size);
 
 // Build the skirting
 const skirting = coop_skirting(coop_len, coop_w, floor_stack, skirting_t, 25);
 
 // Build the floor frame
 const floor = floor_frame(coop_len, coop_w, joist_sec, joist_sp, paver_size[2], skid_sec[1], floor_th);
+
+// Build joist hangers for floor joists
+// Hangers attach to inside faces of front/back rim joists, opening toward floor joist
+function build_floor_hangers(coop_len, coop_w, joist_sec, joist_sp, paver_z, skid_h) {
+  const hangers = [];
+  const joist_count = Math.floor((coop_w - joist_sec[0]) / joist_sp);
+  const hanger_z = paver_z + skid_h;  // Bottom of rim joist
+  const thickness = 1.5;
+  const flange_w = 20;
+  const hanger_depth = joist_sec[1] * 0.7;  // How deep the U is
+
+  // Build properly oriented hanger - U-shape opening along +X (toward back)
+  function make_front_hanger() {
+    // Back plate (attaches to rim joist) - vertical plate in YZ plane
+    const back = cube({ size: [thickness, joist_sec[0] + 4, hanger_depth], center: false });
+    // Bottom plate - horizontal, extends into floor area
+    const bottom = translate(
+      cube({ size: [joist_sec[1] + thickness, joist_sec[0] + 4, thickness], center: false }),
+      [thickness, 0, 0]
+    );
+    // Left side
+    const left = translate(
+      cube({ size: [joist_sec[1] * 0.7, thickness, hanger_depth], center: false }),
+      [thickness, 0, 0]
+    );
+    // Right side
+    const right = translate(
+      cube({ size: [joist_sec[1] * 0.7, thickness, hanger_depth], center: false }),
+      [thickness, joist_sec[0] + 4 - thickness, 0]
+    );
+    // Top flanges for nailing to rim joist
+    const flange_l = cube({ size: [thickness, flange_w, hanger_depth], center: false });
+    const flange_r = translate(
+      cube({ size: [thickness, flange_w, hanger_depth], center: false }),
+      [0, joist_sec[0] + 4 - flange_w, 0]
+    );
+    return union(back, bottom, left, right, flange_l, flange_r);
+  }
+
+  // Build hanger opening toward -X (for back rim joist)
+  function make_back_hanger() {
+    // Back plate - vertical plate in YZ plane
+    const back = cube({ size: [thickness, joist_sec[0] + 4, hanger_depth], center: false });
+    // Bottom plate - horizontal, extends into floor area (toward -X)
+    const bottom = translate(
+      cube({ size: [joist_sec[1] + thickness, joist_sec[0] + 4, thickness], center: false }),
+      [-(joist_sec[1]), 0, 0]
+    );
+    // Left side
+    const left = translate(
+      cube({ size: [joist_sec[1] * 0.7, thickness, hanger_depth], center: false }),
+      [-(joist_sec[1] * 0.7), 0, 0]
+    );
+    // Right side
+    const right = translate(
+      cube({ size: [joist_sec[1] * 0.7, thickness, hanger_depth], center: false }),
+      [-(joist_sec[1] * 0.7), joist_sec[0] + 4 - thickness, 0]
+    );
+    // Top flanges
+    const flange_l = cube({ size: [thickness, flange_w, hanger_depth], center: false });
+    const flange_r = translate(
+      cube({ size: [thickness, flange_w, hanger_depth], center: false }),
+      [0, joist_sec[0] + 4 - flange_w, 0]
+    );
+    return union(back, bottom, left, right, flange_l, flange_r);
+  }
+
+  // Place hangers at each floor joist position
+  for (let i = 1; i <= joist_count; i++) {
+    const y_pos = i * joist_sp - joist_sec[0] / 2 - 2;  // Center on joist
+
+    // Front hanger - attaches to inside of front rim joist (at X = joist_sec[0])
+    const front_hanger = translate(
+      make_front_hanger(),
+      [joist_sec[0], y_pos, hanger_z]
+    );
+    hangers.push(front_hanger);
+
+    // Back hanger - attaches to inside of back rim joist (at X = coop_len - joist_sec[0])
+    const back_hanger = translate(
+      make_back_hanger(),
+      [coop_len - joist_sec[0], y_pos, hanger_z]
+    );
+    hangers.push(back_hanger);
+  }
+  return union(...hangers);
+}
+
+const floor_hangers = build_floor_hangers(coop_len, coop_w, joist_sec, joist_sp, paver_size[2], skid_sec[1]);
 
 // Door and vent cutouts
 const door_cutout = translate(
@@ -987,13 +1398,15 @@ const cladding_th = 18;
 const cladding_margin = 25;
 
 // Front wall cladding (at Y = -cladding_th, facing outward)
+// Cutouts need to extend far enough in Y to cut through both backing panel and board faces
+// Backing is at panel_y, boards are at panel_y - 3 (board_thickness)
 const front_cladding_cutouts = [
-  // Human door cutout
-  [[coop_len / 2 - door_w / 2, -cladding_th - 1, floor_stack + stud_sec[0]],
-   [door_w, cladding_th + 2, door_h]],
+  // Human door cutout - make wider to accommodate door frame
+  [[coop_len / 2 - door_w / 2 - 10, -cladding_th - 20, floor_stack + stud_sec[0] - 5],
+   [door_w + 20, 40, door_h + 10]],
   // Nesting box access cutout
-  [[nest_cutout_x, -cladding_th - 1, floor_stack + nest_cutout_bottom_z],
-   [nest_cutout_w, cladding_th + 2, nest_cutout_height]]
+  [[nest_cutout_x, -cladding_th - 20, floor_stack + nest_cutout_bottom_z],
+   [nest_cutout_w, 40, nest_cutout_height]]
 ];
 const front_cladding = horizontal_cladding_x(
   coop_len, wall_h,
@@ -1012,7 +1425,8 @@ const back_cladding_cutouts = [
 const back_cladding = horizontal_cladding_x(
   coop_len, wall_h,
   [0, back_cladding_y, floor_stack],
-  back_cladding_cutouts
+  back_cladding_cutouts,
+  25, 18, 45, +1  // facing = +1 for back wall (faces +Y)
 );
 
 // Left wall cladding (at X = -cladding_th)
@@ -1027,7 +1441,8 @@ const pop_door_y = stud_sec[1] + 50;  // Used for tunnel positioning
 const right_cladding = horizontal_cladding_y(
   coop_w, wall_h,
   [coop_len + stud_sec[1], 0, floor_stack],  // Outside the wall studs (stud depth is 98mm)
-  []  // No cutouts - pop door removed, tunnel exits to run
+  [],  // No cutouts - pop door removed, tunnel exits to run
+  25, 18, 45, +1  // facing = +1 for right wall (faces +X)
 );
 
 // ============================================================================
@@ -1036,16 +1451,112 @@ const right_cladding = horizontal_cladding_y(
 
 // Human door - positioned at front wall, hinged on left edge
 // Rotates around the left hinge point based on human_door_angle parameter
-const human_door_panel = door_panel(door_w, door_h, 18);
+const human_door_parts = door_panel(door_w, door_h, 18);
 const human_door_hinge_x = coop_len / 2 - door_w / 2;
 const human_door_hinge_y = -cladding_th - 18;
-const human_door = translate(
+const human_door_body = translate(
   rotate(
-    human_door_panel,
+    human_door_parts.body,
     [0, 0, -human_door_angle]  // Swing outward (negative Y direction)
   ),
   [human_door_hinge_x, human_door_hinge_y, floor_stack + stud_sec[0]]
 );
+const human_door_hardware = translate(
+  rotate(
+    human_door_parts.hardware,
+    [0, 0, -human_door_angle]
+  ),
+  [human_door_hinge_x, human_door_hinge_y, floor_stack + stud_sec[0]]
+);
+// Combined for thermal calculations (backwards compat)
+const human_door = union(human_door_body, human_door_hardware);
+
+// Door frame/casing - surrounds the door opening
+// Frame sits on the cladding surface, door swings within it
+const door_frame_w = 60;          // Width of frame pieces
+const door_frame_d = 20;          // Depth (how much it stands proud)
+const door_frame_reveal = 3;      // Gap between frame and door edge
+const door_opening_w = door_w + 2 * door_frame_reveal;
+const door_opening_h = door_h + door_frame_reveal;  // No reveal at bottom (threshold)
+// Frame position - directly around the door opening
+const door_frame_x = human_door_hinge_x - door_frame_reveal;
+const door_frame_y = -cladding_th - door_frame_d - 3;  // In front of cladding boards
+const door_frame_z = floor_stack + stud_sec[0];  // Door bottom position
+const door_frame_floor_z = floor_stack;  // Jambs extend to floor level (not below skirting)
+
+// Frame pieces
+const door_frame_parts = [];
+
+// Jamb height - from floor to top of door opening plus head height
+const jamb_full_height = door_frame_z + door_opening_h + door_frame_w - door_frame_floor_z;
+
+// Left jamb (extends to floor level)
+door_frame_parts.push(translate(
+  cube({ size: [door_frame_w, door_frame_d, jamb_full_height], center: false }),
+  [door_frame_x - door_frame_w, door_frame_y, door_frame_floor_z]
+));
+
+// Right jamb (extends to floor level)
+door_frame_parts.push(translate(
+  cube({ size: [door_frame_w, door_frame_d, jamb_full_height], center: false }),
+  [door_frame_x + door_opening_w, door_frame_y, door_frame_floor_z]
+));
+
+// Head (top piece, spans the full width including jambs)
+door_frame_parts.push(translate(
+  cube({ size: [door_opening_w + 2 * door_frame_w, door_frame_d, door_frame_w], center: false }),
+  [door_frame_x - door_frame_w, door_frame_y, door_frame_z + door_opening_h]
+));
+
+// Threshold/sill (bottom piece at door level)
+const threshold_h = 15;
+door_frame_parts.push(translate(
+  cube({ size: [door_opening_w + 2 * door_frame_w, door_frame_d + 20, threshold_h], center: false }),
+  [door_frame_x - door_frame_w, door_frame_y - 10, door_frame_z - threshold_h]
+));
+
+const human_door_frame = union(...door_frame_parts);
+
+// ============================================================================
+// NESTING BOX OPENING FRAME
+// ============================================================================
+// Trim around the nesting box access opening - similar construction to door frame
+const nest_frame_w = 40;          // Width of frame pieces (slightly narrower than door)
+const nest_frame_d = 20;          // Depth (how much it stands proud)
+const nest_frame_opening_w = nest_cutout_w;
+const nest_frame_opening_h = nest_cutout_height;
+// Frame position - around the nesting box opening
+const nest_frame_x = nest_cutout_x;
+const nest_frame_y = -cladding_th - nest_frame_d - 3;  // In front of cladding boards
+const nest_frame_z = floor_stack + nest_cutout_bottom_z;
+
+const nest_frame_parts = [];
+
+// Left jamb
+nest_frame_parts.push(translate(
+  cube({ size: [nest_frame_w, nest_frame_d, nest_frame_opening_h + nest_frame_w], center: false }),
+  [nest_frame_x - nest_frame_w, nest_frame_y, nest_frame_z - nest_frame_w / 2]
+));
+
+// Right jamb
+nest_frame_parts.push(translate(
+  cube({ size: [nest_frame_w, nest_frame_d, nest_frame_opening_h + nest_frame_w], center: false }),
+  [nest_frame_x + nest_frame_opening_w, nest_frame_y, nest_frame_z - nest_frame_w / 2]
+));
+
+// Head (top piece)
+nest_frame_parts.push(translate(
+  cube({ size: [nest_frame_opening_w + 2 * nest_frame_w, nest_frame_d, nest_frame_w], center: false }),
+  [nest_frame_x - nest_frame_w, nest_frame_y, nest_frame_z + nest_frame_opening_h]
+));
+
+// Sill (bottom piece)
+nest_frame_parts.push(translate(
+  cube({ size: [nest_frame_opening_w + 2 * nest_frame_w, nest_frame_d + 15, nest_frame_w], center: false }),
+  [nest_frame_x - nest_frame_w, nest_frame_y - 5, nest_frame_z - nest_frame_w]
+));
+
+const nest_box_frame = union(...nest_frame_parts);
 
 
 // ============================================================================
@@ -1320,7 +1831,29 @@ for (let x_offset = 0; x_offset <= run_length; x_offset += beam_spacing) {
   run_rafters.push(left_beam, right_beam);
 }
 
-// Combine run structure
+// Export individual run components for step-by-step assembly
+// Corner posts as separate union (4 posts)
+const run_corner_posts = union(...run_posts);
+
+// Gate post (single post at gate opening)
+const run_gate_post = gate_post;
+
+// Top rails connecting posts (all 4 rails)
+const run_top_rails_combined = union(...run_top_rails);
+
+// Lower rails for mesh attachment
+const run_lower_rails_combined = union(...run_lower_rails);
+
+// Gate top beam
+const run_gate_beam = gate_beam;
+
+// Ridge beam at roof peak
+const run_ridge_beam = ridge_beam;
+
+// A-frame rafters (all paired rafters)
+const run_roof_rafters_combined = union(...run_rafters);
+
+// Full frame for backwards compatibility
 const run_frame = union(
   ...run_posts, ...run_top_rails, ...run_lower_rails,
   gate_post, gate_beam, ridge_beam, ...run_rafters
@@ -1808,12 +2341,242 @@ const lounge_table = l_extension_enabled ? union(table_top, table_pedestal) : cu
 const lounge_chairs = l_extension_enabled ? union(chair1, chair2, chair3, chair4) : cube({ size: [1, 1, 1], center: false });
 
 // ============================================================================
+// LUMBER PILE - Cut wall lumber visualization for assembly step 3
+// Shows studs and plates stacked next to the floor deck
+// ============================================================================
+
+function build_lumber_pile(num_studs, stud_length, stud_w, stud_h, num_plates, plate_lengths) {
+  const pieces = [];
+  const gap = 5;  // Small gap between stacked pieces
+  const pile_x = -400;  // Position to the left of the building
+  const pile_y = 200;
+  const pile_z = floor_stack + 50;  // Slightly above floor level (on sawhorses)
+
+  // Stack studs (horizontal pile)
+  let stud_z = pile_z;
+  let studs_per_layer = 6;
+  for (let i = 0; i < Math.min(num_studs, 24); i++) {  // Cap at 24 for visual clarity
+    const layer = Math.floor(i / studs_per_layer);
+    const pos_in_layer = i % studs_per_layer;
+    const x = pile_x;
+    const y = pile_y + pos_in_layer * (stud_w + gap);
+    const z = stud_z + layer * (stud_h + gap);
+
+    // Stud lying horizontally (length along X)
+    const stud = translate(
+      cube({ size: [stud_length, stud_w, stud_h], center: false }),
+      [x, y, z]
+    );
+    pieces.push(stud);
+  }
+
+  // Stack plates (separate pile, slightly offset)
+  const plate_pile_y = pile_y + 600;
+  let plate_z = pile_z;
+  for (let i = 0; i < plate_lengths.length && i < 8; i++) {  // Cap at 8 plates
+    const layer = Math.floor(i / 2);
+    const pos_in_layer = i % 2;
+    const x = pile_x - 100;  // Offset X a bit
+    const y = plate_pile_y + pos_in_layer * (stud_w + gap);
+    const z = plate_z + layer * (stud_h + gap);
+
+    // Plate lying horizontally
+    const plate = translate(
+      cube({ size: [plate_lengths[i], stud_w, stud_h], center: false }),
+      [x, y, z]
+    );
+    pieces.push(plate);
+  }
+
+  // Add sawhorses (simple support structure)
+  const sawhorse_h = 50;
+  const sawhorse_w = 60;
+  const sawhorse1 = translate(
+    cube({ size: [sawhorse_w, 800, sawhorse_h], center: false }),
+    [pile_x + 200, pile_y - 50, floor_stack]
+  );
+  const sawhorse2 = translate(
+    cube({ size: [sawhorse_w, 800, sawhorse_h], center: false }),
+    [pile_x + stud_length - 200, pile_y - 50, floor_stack]
+  );
+  pieces.push(sawhorse1, sawhorse2);
+
+  return union(...pieces);
+}
+
+// Calculate lumber pile parameters
+const stud_cut_length = wall_h - 2 * stud_sec[0];  // Wall height minus two plates (top and bottom)
+const plate_cut_lengths = [
+  coop_len,  // Front/back plates
+  coop_len,  // Front/back plates
+  coop_w - 2 * stud_sec[1],  // Side plates (fit between front/back)
+  coop_w - 2 * stud_sec[1]   // Side plates
+];
+
+// Build the lumber pile
+const lumber_pile = build_lumber_pile(
+  wall_studs,        // Number of studs
+  stud_cut_length,   // Stud length
+  stud_sec[0],       // Stud width (48mm)
+  stud_sec[1],       // Stud height (98mm)
+  8,                 // Number of plates (4 bottom + 4 top)
+  plate_cut_lengths  // Plate lengths
+);
+
+// ============================================================================
+// WALL ASSEMBLY COMPONENTS - Step-by-step wall construction visualization
+// Shows individual components for IKEA-style progressive assembly
+// ============================================================================
+
+// Front wall parameters
+const front_wall_length = coop_len;
+const front_wall_stud_count = Math.floor(front_wall_length / stud_sp) + 1;
+const front_stud_height = wall_h - 2 * stud_sec[0];  // Height minus top and bottom plates
+
+// Position for wall assembly (flat on floor deck, in front of building)
+const wall_assembly_y = -500;  // In front of the floor deck
+const wall_assembly_z = floor_stack + stud_sec[1];  // Lying flat on floor
+
+// Step 1: Bottom plate laid flat on floor deck (ready for marking)
+function build_front_bottom_plate() {
+  return translate(
+    cube({ size: [front_wall_length, stud_sec[0], stud_sec[1]], center: false }),
+    [0, wall_assembly_y, floor_stack]
+  );
+}
+
+// Step 2: Top plate laid parallel to bottom plate (spaced for studs)
+function build_front_top_plate() {
+  return translate(
+    cube({ size: [front_wall_length, stud_sec[0], stud_sec[1]], center: false }),
+    [0, wall_assembly_y - front_stud_height - stud_sec[0], floor_stack]
+  );
+}
+
+// Door opening boundaries (for stud placement)
+const door_center_x = front_wall_length / 2;
+const door_opening_left = door_center_x - door_w / 2 - stud_sec[0] * 2;  // King stud position
+const door_opening_right = door_center_x + door_w / 2 + stud_sec[0];     // After right king stud
+
+// Step 3: Individual studs positioned between plates (laying flat)
+// SKIP the door opening area - those studs are part of door framing
+function build_front_studs_flat() {
+  const studs = [];
+
+  // Always add end studs (required for proper wall framing)
+  // Left end stud at x=0
+  studs.push(translate(
+    cube({ size: [stud_sec[0], front_stud_height, stud_sec[1]], center: false }),
+    [0, wall_assembly_y - front_stud_height, floor_stack]
+  ));
+
+  // Right end stud at wall end
+  studs.push(translate(
+    cube({ size: [stud_sec[0], front_stud_height, stud_sec[1]], center: false }),
+    [front_wall_length - stud_sec[0], wall_assembly_y - front_stud_height, floor_stack]
+  ));
+
+  // Interior studs at regular spacing, skipping door area
+  for (let i = 1; i < front_wall_stud_count - 1; i++) {
+    const x = i * stud_sp;
+    if (x + stud_sec[0] <= front_wall_length - stud_sec[0]) {
+      // Skip studs in door opening area (will be handled by door framing)
+      if (x >= door_opening_left && x <= door_opening_right) {
+        continue;
+      }
+      // Stud lying flat, spanning from bottom plate to top plate
+      const stud = translate(
+        cube({ size: [stud_sec[0], front_stud_height, stud_sec[1]], center: false }),
+        [x, wall_assembly_y - front_stud_height, floor_stack]
+      );
+      studs.push(stud);
+    }
+  }
+  return union(...studs);
+}
+
+// Step 4: Door header components (king studs, jack studs, header)
+function build_door_framing() {
+  const pieces = [];
+  // door_center_x already defined above
+  const king_stud_left_x = door_center_x - door_w / 2 - stud_sec[0];
+  const king_stud_right_x = door_center_x + door_w / 2;
+  const jack_stud_height = door_h - stud_sec[0];  // Height to bottom of header
+  const header_height = front_stud_height - jack_stud_height;
+
+  // King studs (full height, next to door opening)
+  pieces.push(translate(
+    cube({ size: [stud_sec[0], front_stud_height, stud_sec[1]], center: false }),
+    [king_stud_left_x, wall_assembly_y - front_stud_height, floor_stack]
+  ));
+  pieces.push(translate(
+    cube({ size: [stud_sec[0], front_stud_height, stud_sec[1]], center: false }),
+    [king_stud_right_x, wall_assembly_y - front_stud_height, floor_stack]
+  ));
+
+  // Jack studs (trimmer studs, support header)
+  const jack_left_x = king_stud_left_x + stud_sec[0];
+  const jack_right_x = king_stud_right_x - stud_sec[0];
+  pieces.push(translate(
+    cube({ size: [stud_sec[0], jack_stud_height, stud_sec[1]], center: false }),
+    [jack_left_x, wall_assembly_y - jack_stud_height, floor_stack]
+  ));
+  pieces.push(translate(
+    cube({ size: [stud_sec[0], jack_stud_height, stud_sec[1]], center: false }),
+    [jack_right_x, wall_assembly_y - jack_stud_height, floor_stack]
+  ));
+
+  // Header (double 2x, spans door opening, sits on jack studs)
+  const header_width = door_w + 2 * stud_sec[0];  // Spans between king studs
+  pieces.push(translate(
+    cube({ size: [header_width, stud_sec[0] * 2, stud_sec[1]], center: false }),
+    [jack_left_x, wall_assembly_y - jack_stud_height - stud_sec[0] * 2, floor_stack]
+  ));
+
+  // Cripple studs above header
+  const cripple_height = header_height - stud_sec[0] * 2;
+  if (cripple_height > 50) {
+    const cripple_x = door_center_x - stud_sec[0] / 2;
+    pieces.push(translate(
+      cube({ size: [stud_sec[0], cripple_height, stud_sec[1]], center: false }),
+      [cripple_x, wall_assembly_y - front_stud_height, floor_stack]
+    ));
+  }
+
+  return union(...pieces);
+}
+
+// Step 5: Complete front wall frame (lying flat, ready to raise)
+// Includes plates, regular studs, AND door framing
+function build_front_wall_flat() {
+  return union(
+    build_front_bottom_plate(),
+    build_front_top_plate(),
+    build_front_studs_flat(),
+    build_door_framing()
+  );
+}
+
+// Step 6: Front wall raised (vertical, in final position)
+// This is the existing front_wall geometry
+
+// Build all wall assembly components
+const front_bottom_plate = build_front_bottom_plate();
+const front_top_plate = build_front_top_plate();
+const front_studs_flat = build_front_studs_flat();
+const front_door_framing = build_door_framing();
+const front_wall_flat = build_front_wall_flat();
+
+// ============================================================================
 // MATERIAL HELPER - Use material references from materials.json database
 // ============================================================================
 
 // Helper to create object with material reference (colors auto-loaded from materials.json)
-function withMaterial(geometry, materialId) {
-  return { geometry: geometry, material: materialId };
+// Optional objectId for fine-grained assembly step filtering
+function withMaterial(geometry, materialId, objectId = null) {
+  const obj = { geometry: geometry, material: materialId };
+  if (objectId) obj.objectId = objectId;
+  return obj;
 }
 
 // Define realistic colors for architectural elements (fallback for non-material items)
@@ -1830,29 +2593,46 @@ const RAMP_WOOD = [0.65, 0.50, 0.32];         // Ramps
 
 // Scale down for display and apply colors/materials
 // Using material references from materials.json where applicable
-const scaledFoundation = withMaterial(scale(foundation, DISPLAY_SCALE), 'concrete_block');
+const scaledFoundationPavers = withMaterial(scale(foundationPavers, DISPLAY_SCALE), 'concrete_block', 'foundation_pavers');
+const scaledFoundationSkids = withMaterial(scale(foundationSkids, DISPLAY_SCALE), 'pressure_treated_148x148', 'foundation_skids');
 const scaledSkirting = withColor(scale(skirting, DISPLAY_SCALE), SKIRTING_DARK);
-const scaledFloor = withMaterial(scale(floor, DISPLAY_SCALE), 'osb_18mm');
-const scaledFrontWall = withMaterial(scale(front_wall, DISPLAY_SCALE), 'pine_48x98_c24');
-const scaledBackWall = withMaterial(scale(back_wall, DISPLAY_SCALE), 'pine_48x98_c24');
-const scaledLeftWall = withMaterial(scale(left_wall, DISPLAY_SCALE), 'pine_48x98_c24');
-const scaledRightWall = withMaterial(scale(right_wall, DISPLAY_SCALE), 'pine_48x98_c24');
-const scaledRoof = withMaterial(scale(roof, DISPLAY_SCALE), 'galvanized_roofing');
+const scaledFloor = withMaterial(scale(floor, DISPLAY_SCALE), 'osb_18mm', 'floor_deck');
+const scaledFloorHangers = withMaterial(scale(floor_hangers, DISPLAY_SCALE), 'joist_hanger', 'floor_hangers');
+const scaledLumberPile = withMaterial(scale(lumber_pile, DISPLAY_SCALE), 'assembly_lumber_preview', 'lumber_pile');
+
+// Wall assembly step-by-step components (use assembly_lumber_preview material to avoid showing in later steps)
+const scaledFrontBottomPlate = withMaterial(scale(front_bottom_plate, DISPLAY_SCALE), 'assembly_lumber_preview', 'front_bottom_plate');
+const scaledFrontTopPlate = withMaterial(scale(front_top_plate, DISPLAY_SCALE), 'assembly_lumber_preview', 'front_top_plate');
+const scaledFrontStudsFlat = withMaterial(scale(front_studs_flat, DISPLAY_SCALE), 'assembly_lumber_preview', 'front_studs_flat');
+const scaledFrontDoorFraming = withMaterial(scale(front_door_framing, DISPLAY_SCALE), 'assembly_lumber_preview', 'front_door_framing');
+const scaledFrontWallFlat = withMaterial(scale(front_wall_flat, DISPLAY_SCALE), 'assembly_lumber_preview', 'front_wall_flat');
+
+const scaledFrontWall = withMaterial(scale(front_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'front_wall');
+const scaledBackWall = withMaterial(scale(back_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'back_wall');
+const scaledLeftWall = withMaterial(scale(left_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'left_wall');
+const scaledRightWall = withMaterial(scale(right_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'right_wall');
+const scaledRoof = withMaterial(scale(roof, DISPLAY_SCALE), 'galvanized_roofing', 'roof');
 const scaledNestSupport = withMaterial(scale(nest_support_structure, DISPLAY_SCALE), 'pine_48x98_c24');
 const scaledNestingBoxes = withMaterial(scale(nesting_box_array, DISPLAY_SCALE), 'nest_box_plywood');
 const scaledNestDoors = withColor(scale(nesting_box_doors, DISPLAY_SCALE), DOOR_WOOD);
 
 // Cladding - using plywood for exterior panels, trim for trim boards
-const scaledFrontCladding = withMaterial(scale(front_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledFrontCladding = withMaterial(scale(front_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
 const scaledFrontTrim = withMaterial(scale(front_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledBackCladding = withMaterial(scale(back_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledBackCladding = withMaterial(scale(back_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
 const scaledBackTrim = withMaterial(scale(back_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledLeftCladding = withMaterial(scale(left_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledLeftCladding = withMaterial(scale(left_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
 const scaledLeftTrim = withMaterial(scale(left_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledRightCladding = withMaterial(scale(right_cladding.panel, DISPLAY_SCALE), 'plywood_9mm_exterior');
+const scaledRightCladding = withMaterial(scale(right_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
 const scaledRightTrim = withMaterial(scale(right_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
 
-// Doors
+// Doors - Finnish gray painted wood with metal hardware
+const DOOR_NAVY = [0.12, 0.17, 0.30];  // Navy blue - classic complement to yellow
+const HARDWARE_METAL = [0.25, 0.25, 0.27];  // Dark metal/iron
+const scaledHumanDoorBody = withColor(scale(human_door_body, DISPLAY_SCALE), DOOR_NAVY);
+const scaledHumanDoorHardware = withColor(scale(human_door_hardware, DISPLAY_SCALE), HARDWARE_METAL);
+const scaledHumanDoorFrame = withMaterial(scale(human_door_frame, DISPLAY_SCALE), 'exterior_paint_white');
+const scaledNestBoxFrame = withMaterial(scale(nest_box_frame, DISPLAY_SCALE), 'exterior_paint_white');
 const scaledHumanDoor = withMaterial(scale(human_door, DISPLAY_SCALE), 'door_thermal_bridge');
 
 // Roosting perches
@@ -1867,13 +2647,19 @@ const scaledTunnelRoof = withColor(scale(tunnel_roof, DISPLAY_SCALE), ROOF_CHARC
 const scaledTunnelSkid = withColor(scale(tunnel_skid, DISPLAY_SCALE), WOOD_TAN);
 const scaledTunnelAccessDoor = withColor(scale(tunnel_access_door_panel, DISPLAY_SCALE), DOOR_WOOD);
 
-// Run structure
-const RUN_FRAME_COLOR = [0.55, 0.45, 0.35];  // Cedar-ish brown
-const scaledRunFrame = withColor(scale(run_frame, DISPLAY_SCALE), RUN_FRAME_COLOR);
+// Run structure - individual components for step-by-step assembly
+const scaledRunCornerPosts = withMaterial(scale(run_corner_posts, DISPLAY_SCALE), 'cedar_post_98x98', 'run_corner_posts');
+const scaledRunGatePost = withMaterial(scale(run_gate_post, DISPLAY_SCALE), 'cedar_post_98x98', 'run_gate_post');
+const scaledRunTopRails = withMaterial(scale(run_top_rails_combined, DISPLAY_SCALE), 'cedar_post_98x98', 'run_top_rails');
+const scaledRunLowerRails = withMaterial(scale(run_lower_rails_combined, DISPLAY_SCALE), 'cedar_post_98x98', 'run_lower_rails');
+const scaledRunGateBeam = withMaterial(scale(run_gate_beam, DISPLAY_SCALE), 'cedar_post_98x98', 'run_gate_beam');
+const scaledRunRidgeBeam = withMaterial(scale(run_ridge_beam, DISPLAY_SCALE), 'cedar_post_98x98', 'run_ridge_beam');
+const scaledRunRoofRafters = withMaterial(scale(run_roof_rafters_combined, DISPLAY_SCALE), 'cedar_post_98x98', 'run_roof_rafters');
+// Full frame for backwards compatibility (hidden in favor of components)
+const scaledRunFrame = withMaterial(scale(run_frame, DISPLAY_SCALE), 'cedar_post_98x98', 'run_frame');
 
 // Chicken gym
-const GYM_WOOD = [0.87, 0.72, 0.53];  // BurlyWood
-const scaledChickenGym = withColor(scale(chicken_gym, DISPLAY_SCALE), GYM_WOOD);
+const scaledChickenGym = withMaterial(scale(chicken_gym, DISPLAY_SCALE), 'cedar_post_98x98', 'chicken_gym');
 
 // Bushes
 const BUSH_GREEN = [0.33, 0.42, 0.18];  // DarkOliveGreen
@@ -1888,19 +2674,19 @@ const WATERER_BLUE = [0.2, 0.4, 0.8];
 const scaledFeeder = withColor(scale(feeder, DISPLAY_SCALE), FEEDER_RED);
 const scaledWaterer = withColor(scale(waterer, DISPLAY_SCALE), WATERER_BLUE);
 
-// Run gate
-const GATE_WOOD = [0.5, 0.35, 0.2];
-const scaledRunGate = withColor(scale(run_gate, DISPLAY_SCALE), GATE_WOOD);
+// Run gate (the swinging door, not the frame)
+const scaledRunGate = withMaterial(scale(run_gate, DISPLAY_SCALE), 'cedar_post_98x98', 'run_gate');
 
-// Run roof rafters
-const scaledRunRafters = withColor(scale(run_roof_rafters, DISPLAY_SCALE), RUN_FRAME_COLOR);
+// L-extension frame - now with objectId
+const scaledLExtension = withMaterial(scale(l_extension_frame, DISPLAY_SCALE), 'cedar_post_98x98', 'l_extension');
 
-// Chickens
+// Chickens - decorative but need objectId for final assembly stage
 const CHICKEN_WHITE = [0.95, 0.95, 0.9];
-const scaledChickens = withColor(scale(all_chickens, DISPLAY_SCALE), CHICKEN_WHITE);
+const scaledChickensGeom = scale(all_chickens, DISPLAY_SCALE);
+const scaledChickens = { geometry: scaledChickensGeom, color: CHICKEN_WHITE, objectId: 'chickens' };
 
 // Mesh apron - hardware cloth for predator protection
-const scaledMeshApron = withMaterial(scale(mesh_apron, DISPLAY_SCALE), 'hardware_cloth');
+const scaledMeshApron = withMaterial(scale(mesh_apron, DISPLAY_SCALE), 'hardware_cloth', 'mesh_apron');
 
 // Insulation - 100mm mineral wool batts
 const scaledRoofInsulation = withMaterial(scale(roof_insulation, DISPLAY_SCALE), 'insulation_100mm');
@@ -1911,18 +2697,31 @@ const scaledLeftWallInsulation = withMaterial(scale(left_wall_insulation, DISPLA
 const scaledRightWallInsulation = withMaterial(scale(right_wall_insulation, DISPLAY_SCALE), 'insulation_100mm');
 const scaledFloorInsulation = withMaterial(scale(floor_insulation, DISPLAY_SCALE), 'insulation_100mm');
 
-// L-extension
-const scaledLExtension = withColor(scale(l_extension_frame, DISPLAY_SCALE), RUN_FRAME_COLOR);
-
 // Lounge area
 const TABLE_WOOD = [0.87, 0.72, 0.53];
 const scaledLoungeTable = withColor(scale(lounge_table, DISPLAY_SCALE), TABLE_WOOD);
 const scaledLoungeChairs = withColor(scale(lounge_chairs, DISPLAY_SCALE), TABLE_WOOD);
 
+// Assembly preview objects - these are ONLY visible in assembly mode via showObjects
+// They must be in the scene array for the assembly panel to reference them by objectId,
+// but they have a special "assemblyOnly" flag that tells the viewer to hide them in normal view
+const assemblyOnlyObjects = [
+  scaledLumberPile,
+  scaledFrontBottomPlate,
+  scaledFrontTopPlate,
+  scaledFrontStudsFlat,
+  scaledFrontDoorFraming,
+  scaledFrontWallFlat,
+];
+// Mark these objects as assembly-only (hidden in normal view)
+assemblyOnlyObjects.forEach(obj => { obj.assemblyOnly = true; });
+
 // Export as array of colored objects (with visibility toggles)
 export const scene = [
   // Foundation & base (conditional)
-  ...(show_floor ? [scaledFoundation, scaledSkirting, scaledFloor] : []),
+  ...(show_floor ? [scaledFoundationPavers, scaledFoundationSkids, scaledSkirting, scaledFloor, scaledFloorHangers] : []),
+  // Assembly preview components (only visible in assembly mode via showObjects)
+  ...assemblyOnlyObjects,
   // Wall framing (conditional)
   ...(show_walls ? [scaledFrontWall, scaledBackWall, scaledLeftWall, scaledRightWall] : []),
   // Cladding (conditional)
@@ -1948,7 +2747,7 @@ export const scene = [
     scaledUpperRoost
   ] : []),
   // Doors (show with cladding OR insulation for thermal calculation)
-  ...((show_cladding || show_insulation) ? [scaledHumanDoor] : []),
+  ...((show_cladding || show_insulation) ? [scaledHumanDoorBody, scaledHumanDoorHardware, scaledHumanDoorFrame, scaledNestBoxFrame] : []),
   // Viewing tunnel (conditional)
   ...(show_tunnel ? [
     scaledTunnelWalls,
@@ -1959,11 +2758,16 @@ export const scene = [
     scaledWaterer
   ] : []),
   ...(show_tunnel && show_roof ? [scaledTunnelRoof] : []),
-  // Attached run (conditional)
+  // Attached run (conditional) - individual components for step-by-step assembly
   ...(show_run ? [
-    scaledRunFrame,
+    scaledRunCornerPosts,
+    scaledRunGatePost,
+    scaledRunTopRails,
+    scaledRunLowerRails,
+    scaledRunGateBeam,
+    scaledRunRidgeBeam,
+    scaledRunRoofRafters,
     scaledRunGate,
-    scaledRunRafters,
     scaledMeshApron,
     scaledChickenGym,
     scaledLExtension
@@ -1976,3 +2780,181 @@ export const scene = [
   scaledLoungeTable,
   scaledLoungeChairs
 ];
+
+// ============================================================================
+// ASSEMBLY INSTRUCTIONS - Step-by-step build guide
+// Uses materialId references - resolved to objects at runtime
+// ============================================================================
+
+// Pre-compute values used in assembly (needed for proper module initialization)
+const _floor_joists_str = String(floor_joists);
+const _floor_joists_x2_str = String(floor_joists * 2);
+const _floor_sheets_str = String(floor_sheets);
+const _wall_studs_str = String(wall_studs);
+const _rafter_count_x2_str = String(rafter_count * 2);
+const _rafter_ties_str = String(Math.ceil(rafter_count / 2));
+const _roof_sheets_str = String(roof_sheets);
+const _felt_rolls_str = String(felt_rolls) + " rolls";
+const _ridge_caps_str = String(Math.ceil(coop_len / 2000));
+const _drip_edge_str = String(Math.ceil((coop_len * 2 + coop_w * 4) / 2000));
+const _wall_area_str = String(Math.ceil(wall_area_sqm)) + " m²";
+const _wall_sheets_str = String(wall_sheets);
+const _nest_boxes_str = String(nest_boxes);
+const _paint_liters_str = String(paint_liters) + " L";
+const _primer_liters_str = String(Math.ceil(paint_liters * 0.5)) + " L";
+const _coop_w_str = Math.round(coop_w) + "mm";
+const _coop_len_str = Math.round(coop_len) + "mm";
+const _wall_h_str = Math.round(wall_h) + "mm";
+const _roof_pitch_str = roof_pitch_deg + "°";
+
+// Assembly is now defined in scene.js
+const _mainjs_assembly = {
+  projectName: "HELSCOOP - Nordic Chicken Coop",
+  steps: [
+    // STEP 1: Foundation
+    {
+      title: "1. Prepare Site & Lay Foundation",
+      description: "Clear and level the ground. Position concrete pavers in a grid pattern.",
+      showMaterials: ["concrete_block"],
+      parts: [
+        { name: "Concrete Paver 400×400×50mm", quantity: "8" },
+        { name: "Builder's Sand", quantity: "2 bags", note: "For leveling" },
+        { name: "String Line", quantity: "1", note: "For alignment" },
+        { name: "Spirit Level", quantity: "1" }
+      ]
+    },
+
+    // STEP 2: Floor Frame
+    {
+      title: "2. Build Floor Frame",
+      description: "Attach floor joists to skids using joist hangers. Install OSB subfloor.",
+      showMaterials: ["concrete_block", "osb_18mm", "joist_hanger"],
+      parts: [
+        { name: "48×148 Floor Joist C24", quantity: _floor_joists_str, note: "Cut to " + _coop_w_str },
+        { name: "48×148 Rim Joist C24", quantity: "2", note: "Cut to " + _coop_len_str },
+        { name: "Joist Hanger 48mm", quantity: _floor_joists_x2_str },
+        { name: "OSB 18mm Panel 2440×1220", quantity: _floor_sheets_str },
+        { name: "Structural Screws 5×70mm", quantity: "100" },
+        { name: "Flooring Screws 4×50mm", quantity: "200" }
+      ]
+    },
+
+    // STEP 3: Wall Framing
+    {
+      title: "3. Frame the Walls",
+      description: "Build wall frames flat, then raise and brace. Connect with top plates.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24"],
+      parts: [
+        { name: "48×98 Wall Stud C24", quantity: _wall_studs_str, note: "Cut to " + _wall_h_str },
+        { name: "48×98 Bottom Plate", quantity: "4", note: "Perimeter" },
+        { name: "48×98 Top Plate", quantity: "4", note: "Double at top" },
+        { name: "48×98 Header", quantity: "2", note: "For door opening" },
+        { name: "Framing Nails 90mm", quantity: "2 kg" },
+        { name: "Structural Screws 5×90mm", quantity: "100" },
+        { name: "Temporary Brace 25×50", quantity: "4", note: "Reusable" }
+      ]
+    },
+
+    // STEP 4: Roof Structure
+    {
+      title: "4. Install Roof Structure",
+      description: "Set ridge board, install rafter pairs at 600mm spacing. Add roof sheathing.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing"],
+      parts: [
+        { name: "48×98 Rafter C24", quantity: _rafter_count_x2_str, note: "Cut at " + _roof_pitch_str + " angle" },
+        { name: "48×98 Ridge Board", quantity: "1", note: _coop_len_str },
+        { name: "48×148 Collar Tie", quantity: _rafter_ties_str },
+        { name: "12mm Roof Sheathing 2440×1220", quantity: _roof_sheets_str },
+        { name: "Rafter Tie Bracket", quantity: _rafter_count_x2_str },
+        { name: "Hurricane Clip", quantity: _rafter_count_x2_str },
+        { name: "Roofing Nails 40mm", quantity: "1 kg" }
+      ]
+    },
+
+    // STEP 5: Roofing Finish
+    {
+      title: "5. Install Roofing & Flashing",
+      description: "Apply underlayment, then metal roofing panels. Seal all penetrations.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing"],
+      parts: [
+        { name: "Roofing Felt 15m²", quantity: _felt_rolls_str },
+        { name: "Ridge Cap 2m", quantity: _ridge_caps_str },
+        { name: "Drip Edge 2m", quantity: _drip_edge_str },
+        { name: "Roofing Screws with Washer", quantity: "100" },
+        { name: "Roof Sealant", quantity: "1 tube" }
+      ]
+    },
+
+    // STEP 6: Wall Insulation
+    {
+      title: "6. Insulate Walls",
+      description: "Press mineral wool batts between studs. Ensure tight fit, no gaps.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing", "insulation_100mm"],
+      parts: [
+        { name: "Mineral Wool 100mm (565mm wide)", quantity: _wall_area_str },
+        { name: "Vapor Barrier 50m²", quantity: "1 roll" },
+        { name: "Acoustic Sealant", quantity: "2 tubes" },
+        { name: "Staples 10mm", quantity: "1 box" }
+      ]
+    },
+
+    // STEP 7: Exterior Cladding
+    {
+      title: "7. Install Exterior Cladding",
+      description: "Attach horizontal siding from bottom up. Install corner trim boards.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing", "insulation_100mm", "exterior_board_yellow", "exterior_paint_white"],
+      parts: [
+        { name: "21mm Exterior Panel 2440×1220", quantity: _wall_sheets_str },
+        { name: "45×45 Corner Trim", quantity: "8", note: "Cut to wall height" },
+        { name: "20×95 Window Trim", quantity: "8m" },
+        { name: "Stainless Steel Screws 4×40", quantity: "500" },
+        { name: "Exterior Wood Filler", quantity: "1 tub" }
+      ]
+    },
+
+    // STEP 8: Door & Hardware
+    {
+      title: "8. Install Door & Hardware",
+      description: "Hang access door. Install predator-proof latches and weather stripping.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing", "insulation_100mm", "exterior_board_yellow", "exterior_paint_white", "door_thermal_bridge"],
+      parts: [
+        { name: "Access Door 600×1800mm", quantity: "1", note: "Pre-hung or build from plywood" },
+        { name: "Heavy Duty Hinge", quantity: "3 pairs" },
+        { name: "Predator-Proof Latch", quantity: "2", note: "Top and bottom" },
+        { name: "Door Sweep", quantity: "1" },
+        { name: "Weather Stripping 5m", quantity: "1" },
+        { name: "Door Stop", quantity: "1" }
+      ]
+    },
+
+    // STEP 9: Interior Fittings
+    {
+      title: "9. Install Nesting Boxes & Roosts",
+      description: "Mount nesting boxes at 400mm height. Install roosts at graduated heights.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing", "insulation_100mm", "exterior_board_yellow", "exterior_paint_white", "door_thermal_bridge", "nest_box_plywood"],
+      parts: [
+        { name: "Nesting Box 300×300×300mm", quantity: _nest_boxes_str },
+        { name: "50mm Round Roost Pole", quantity: "3", note: "Full coop width" },
+        { name: "Roost Bracket", quantity: "6" },
+        { name: "Droppings Board 12mm Ply", quantity: "1", note: "Under roosts" },
+        { name: "Screws 4×50mm", quantity: "50" },
+        { name: "Nest Box Bedding (straw)", quantity: "1 bale" }
+      ]
+    },
+
+    // STEP 10: Ventilation & Finishing
+    {
+      title: "10. Ventilation & Paint",
+      description: "Install vents near ridge. Apply 2 coats exterior paint. Let cure 24h between coats.",
+      showMaterials: ["concrete_block", "osb_18mm", "pine_48x98_c24", "galvanized_roofing", "insulation_100mm", "exterior_board_yellow", "exterior_paint_white", "door_thermal_bridge", "nest_box_plywood", "hardware_cloth"],
+      parts: [
+        { name: "Soffit Vent 150×300mm", quantity: "4" },
+        { name: "Hardware Cloth 12mm (for vents)", quantity: "0.5 m²" },
+        { name: "Exterior Paint (Tikkurila)", quantity: _paint_liters_str },
+        { name: "Wood Primer", quantity: _primer_liters_str },
+        { name: "Paint Brush 100mm", quantity: "2" },
+        { name: "Paint Roller + Tray", quantity: "1 set" }
+      ]
+    }
+  ]
+};
