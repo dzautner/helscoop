@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iostream>
 #include <regex>
 #include <sstream>
 
@@ -115,11 +116,12 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
   if (!source) return params;
 
   // Check for re-export pattern: export { ... } from './path/to/file.js'
-  // If found, parse that file instead
-  std::regex reexportRegex(R"(export\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"])");
+  // Or import pattern: import { ... } from './path/to/file.js'
+  // If found, parse that file instead (it contains the actual parameter definitions)
+  std::regex reexportRegex(R"((export|import)\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"])");
   std::smatch match;
   if (std::regex_search(*source, match, reexportRegex)) {
-    std::string importPath = match[1].str();
+    std::string importPath = match[2].str();  // Changed from match[1] to match[2] due to extra group
     std::filesystem::path resolvedPath = path.parent_path() / importPath;
     if (std::filesystem::exists(resolvedPath)) {
       source = ReadTextFile(resolvedPath);
@@ -220,21 +222,32 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
 bool WriteParameterToFile(const std::filesystem::path& path, const SceneParameter& param) {
   // First check if this file re-exports from another file
   auto source = ReadTextFile(path);
-  if (!source) return false;
+  if (!source) {
+    std::cerr << "WriteParameterToFile: Failed to read " << path << std::endl;
+    return false;
+  }
 
   std::filesystem::path actualPath = path;
 
-  // Check for re-export pattern
-  std::regex reexportRegex(R"(export\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"])");
+  // Check for re-export or import pattern
+  std::regex reexportRegex(R"((export|import)\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"])");
   std::smatch match;
   if (std::regex_search(*source, match, reexportRegex)) {
-    std::string importPath = match[1].str();
+    std::string importPath = match[2].str();
     std::filesystem::path resolvedPath = path.parent_path() / importPath;
+    std::cerr << "WriteParameterToFile: Found import, resolved to " << resolvedPath << std::endl;
     if (std::filesystem::exists(resolvedPath)) {
       actualPath = resolvedPath;
       source = ReadTextFile(actualPath);
-      if (!source) return false;
+      if (!source) {
+        std::cerr << "WriteParameterToFile: Failed to read resolved file" << std::endl;
+        return false;
+      }
+    } else {
+      std::cerr << "WriteParameterToFile: Resolved file does not exist" << std::endl;
     }
+  } else {
+    std::cerr << "WriteParameterToFile: No import pattern found in " << path << std::endl;
   }
 
   std::ostringstream result;
@@ -261,9 +274,16 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
     result << line << "\n";
   }
 
+  std::cerr << "WriteParameterToFile: Writing param '" << param.name << "' = " << param.value
+            << " at line " << param.lineNumber << " to " << actualPath << std::endl;
+
   std::ofstream out(actualPath);
-  if (!out) return false;
+  if (!out) {
+    std::cerr << "WriteParameterToFile: Failed to open file for writing" << std::endl;
+    return false;
+  }
   out << result.str();
+  std::cerr << "WriteParameterToFile: Success" << std::endl;
   return true;
 }
 
