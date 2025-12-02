@@ -189,4 +189,465 @@ void main(){
 }
 )glsl";
 
+// ============================================================================
+// PBR (Physically Based Rendering) Shader
+// Cook-Torrance BRDF with GGX distribution, Schlick-GGX geometry, Fresnel-Schlick
+// ============================================================================
+
+inline const char* kPBR_VS = R"glsl(
+#version 330
+
+in vec3 vertexPosition;
+in vec3 vertexNormal;
+in vec2 vertexTexCoord;
+
+uniform mat4 mvp;
+uniform mat4 matModel;
+uniform mat4 matView;
+uniform mat4 matNormal;
+
+out vec3 fragPos;       // World position
+out vec3 fragNormal;    // World normal
+out vec2 fragTexCoord;
+out vec3 viewPos;       // Camera position in world space
+
+void main() {
+    vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
+    fragPos = worldPos.xyz;
+
+    // Transform normal to world space (using normal matrix for non-uniform scaling)
+    fragNormal = normalize(mat3(matModel) * vertexNormal);
+
+    fragTexCoord = vertexTexCoord;
+
+    // Get camera position (inverse of view translation)
+    viewPos = -vec3(matView[3]) * mat3(matView);
+
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)glsl";
+
+inline const char* kPBR_FS = R"glsl(
+#version 330
+
+in vec3 fragPos;
+in vec3 fragNormal;
+in vec2 fragTexCoord;
+in vec3 viewPos;
+
+out vec4 finalColor;
+
+// Material properties
+uniform vec4 albedoColor;
+uniform float metallic;
+uniform float roughness;
+uniform float ao;  // ambient occlusion
+
+// Textures
+uniform sampler2D albedoTex;
+uniform int useAlbedoTex;
+
+// Lighting
+uniform vec3 lightDir;      // Directional light direction (normalized, pointing TO light)
+uniform vec3 lightColor;    // Light color/intensity
+uniform vec3 ambientColor;  // Ambient light color
+
+// Environment approximation (simple gradient sky)
+uniform vec3 skyColorTop;
+uniform vec3 skyColorBottom;
+uniform vec3 groundColor;
+
+const float PI = 3.14159265359;
+
+// Normal Distribution Function (GGX/Trowbridge-Reitz)
+float DistributionGGX(vec3 N, vec3 H, float rough) {
+    float a = rough * rough;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / max(denom, 0.0001);
+}
+
+// Geometry function (Schlick-GGX)
+float GeometrySchlickGGX(float NdotV, float rough) {
+    float r = rough + 1.0;
+    float k = (r * r) / 8.0;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / max(denom, 0.0001);
+}
+
+// Smith's method for geometry
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float rough) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, rough);
+    float ggx1 = GeometrySchlickGGX(NdotL, rough);
+
+    return ggx1 * ggx2;
+}
+
+// Fresnel equation (Schlick approximation)
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// Fresnel with roughness (for IBL)
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
+    return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// Simple environment lighting (hemisphere approximation)
+vec3 getEnvironmentLight(vec3 N, float rough) {
+    float skyFactor = N.y * 0.5 + 0.5;  // 0 at bottom, 1 at top
+    vec3 skyColor = mix(groundColor, mix(skyColorBottom, skyColorTop, skyFactor), max(0.0, N.y));
+
+    // Rough surfaces see more averaged environment
+    float mip = rough * 4.0;
+    return mix(skyColor, (skyColorTop + skyColorBottom + groundColor) / 3.0, rough * 0.5);
+}
+
+void main() {
+    // Get albedo
+    vec3 albedo = albedoColor.rgb;
+    if (useAlbedoTex > 0) {
+        albedo *= texture(albedoTex, fragTexCoord).rgb;
+    }
+
+    // Calculate vectors
+    vec3 N = normalize(fragNormal);
+    vec3 V = normalize(viewPos - fragPos);
+    vec3 L = normalize(lightDir);
+    vec3 H = normalize(V + L);
+
+    // Calculate reflectance at normal incidence (F0)
+    // Dielectrics: 0.04, Metals: albedo color
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, albedo, metallic);
+
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    // Specular contribution
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    // Energy conservation: diffuse + specular = 1
+    vec3 kS = F;  // Specular contribution
+    vec3 kD = vec3(1.0) - kS;  // Diffuse contribution
+    kD *= 1.0 - metallic;  // Metals have no diffuse
+
+    // Direct lighting
+    float NdotL = max(dot(N, L), 0.0);
+    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
+
+    // Ambient/Environment lighting (simplified IBL)
+    vec3 F_env = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kS_env = F_env;
+    vec3 kD_env = (1.0 - kS_env) * (1.0 - metallic);
+
+    vec3 irradiance = getEnvironmentLight(N, 1.0);  // Diffuse uses fully rough
+    vec3 diffuseEnv = irradiance * albedo;
+
+    vec3 R = reflect(-V, N);
+    vec3 prefilteredColor = getEnvironmentLight(R, roughness);  // Specular uses reflection
+    vec2 envBRDF = vec2(1.0 - roughness * 0.5, roughness * 0.1);  // Approximation
+    vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
+
+    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao;
+
+    // Final color
+    vec3 color = ambient + Lo;
+
+    // HDR tone mapping (Reinhard)
+    color = color / (color + vec3(1.0));
+
+    // Gamma correction
+    color = pow(color, vec3(1.0 / 2.2));
+
+    finalColor = vec4(color, 1.0);
+}
+)glsl";
+
+// ============================================================================
+// Gradient Sky Shader
+// Renders a gradient sky background
+// ============================================================================
+
+inline const char* kSky_VS = R"glsl(
+#version 330
+
+in vec3 vertexPosition;
+
+out vec2 uv;
+
+void main() {
+    uv = vertexPosition.xy * 0.5 + 0.5;
+    gl_Position = vec4(vertexPosition.xy, 0.9999, 1.0);  // Far plane
+}
+)glsl";
+
+inline const char* kSky_FS = R"glsl(
+#version 330
+
+in vec2 uv;
+out vec4 finalColor;
+
+uniform vec3 skyTop;
+uniform vec3 skyHorizon;
+uniform vec3 groundColor;
+uniform float sunSize;
+uniform vec3 sunDir;
+
+void main() {
+    // Gradient based on vertical position
+    float t = uv.y;
+
+    vec3 color;
+    if (t > 0.5) {
+        // Sky (above horizon)
+        float skyT = (t - 0.5) * 2.0;
+        color = mix(skyHorizon, skyTop, pow(skyT, 0.7));
+    } else {
+        // Ground (below horizon)
+        float groundT = (0.5 - t) * 2.0;
+        color = mix(skyHorizon, groundColor, pow(groundT, 0.5));
+    }
+
+    // Horizon glow
+    float horizonDist = abs(t - 0.5);
+    float horizonGlow = exp(-horizonDist * 15.0) * 0.3;
+    color += vec3(1.0, 0.95, 0.9) * horizonGlow;
+
+    // Gamma correction
+    color = pow(color, vec3(1.0 / 2.2));
+
+    finalColor = vec4(color, 1.0);
+}
+)glsl";
+
+// ============================================================================
+// Shadow Map Depth Shader
+// Renders depth from light's perspective for shadow mapping
+// ============================================================================
+
+inline const char* kShadowDepth_VS = R"glsl(
+#version 330
+
+in vec3 vertexPosition;
+
+uniform mat4 lightMVP;
+
+void main() {
+    gl_Position = lightMVP * vec4(vertexPosition, 1.0);
+}
+)glsl";
+
+inline const char* kShadowDepth_FS = R"glsl(
+#version 330
+
+out vec4 fragColor;
+
+void main() {
+    // Just output depth (automatically written to depth buffer)
+    fragColor = vec4(1.0);
+}
+)glsl";
+
+// ============================================================================
+// PBR with Shadows Shader
+// Cook-Torrance BRDF with shadow mapping
+// ============================================================================
+
+inline const char* kPBRShadow_VS = R"glsl(
+#version 330
+
+in vec3 vertexPosition;
+in vec3 vertexNormal;
+in vec2 vertexTexCoord;
+
+uniform mat4 mvp;
+uniform mat4 matModel;
+uniform mat4 matView;
+uniform mat4 lightSpaceMatrix;
+
+out vec3 fragPos;
+out vec3 fragNormal;
+out vec2 fragTexCoord;
+out vec3 viewPos;
+out vec4 fragPosLightSpace;
+
+void main() {
+    vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
+    fragPos = worldPos.xyz;
+    fragNormal = normalize(mat3(matModel) * vertexNormal);
+    fragTexCoord = vertexTexCoord;
+    viewPos = -vec3(matView[3]) * mat3(matView);
+    fragPosLightSpace = lightSpaceMatrix * worldPos;
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)glsl";
+
+inline const char* kPBRShadow_FS = R"glsl(
+#version 330
+
+in vec3 fragPos;
+in vec3 fragNormal;
+in vec2 fragTexCoord;
+in vec3 viewPos;
+in vec4 fragPosLightSpace;
+
+out vec4 finalColor;
+
+// Material properties
+uniform vec4 albedoColor;
+uniform float metallic;
+uniform float roughness;
+uniform float ao;
+
+// Textures
+uniform sampler2D albedoTex;
+uniform int useAlbedoTex;
+uniform sampler2D shadowMap;
+
+// Lighting
+uniform vec3 lightDir;
+uniform vec3 lightColor;
+
+// Environment
+uniform vec3 skyColorTop;
+uniform vec3 skyColorBottom;
+uniform vec3 groundColor;
+
+const float PI = 3.14159265359;
+
+float DistributionGGX(vec3 N, vec3 H, float rough) {
+    float a = rough * rough;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    return nom / max(denom, 0.0001);
+}
+
+float GeometrySchlickGGX(float NdotV, float rough) {
+    float r = rough + 1.0;
+    float k = (r * r) / 8.0;
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+    return nom / max(denom, 0.0001);
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float rough) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    return GeometrySchlickGGX(NdotV, rough) * GeometrySchlickGGX(NdotL, rough);
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
+    return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 getEnvironmentLight(vec3 N, float rough) {
+    float skyFactor = N.y * 0.5 + 0.5;
+    vec3 skyColor = mix(groundColor, mix(skyColorBottom, skyColorTop, skyFactor), max(0.0, N.y));
+    return mix(skyColor, (skyColorTop + skyColorBottom + groundColor) / 3.0, rough * 0.5);
+}
+
+float calculateShadow(vec4 fragPosLS) {
+    // Perspective divide
+    vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Outside shadow map
+    if (projCoords.z > 1.0) return 0.0;
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
+
+    float currentDepth = projCoords.z;
+    float bias = 0.005;
+
+    // PCF soft shadows (3x3 kernel)
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
+
+    return shadow;
+}
+
+void main() {
+    vec3 albedo = albedoColor.rgb;
+    if (useAlbedoTex > 0) {
+        albedo *= texture(albedoTex, fragTexCoord).rgb;
+    }
+
+    vec3 N = normalize(fragNormal);
+    vec3 V = normalize(viewPos - fragPos);
+    vec3 L = normalize(lightDir);
+    vec3 H = normalize(V + L);
+
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    vec3 kS = F;
+    vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+
+    float NdotL = max(dot(N, L), 0.0);
+
+    // Shadow calculation
+    float shadow = calculateShadow(fragPosLightSpace);
+
+    // Direct lighting with shadows
+    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
+
+    // Ambient/Environment lighting (not shadowed)
+    vec3 F_env = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kD_env = (1.0 - F_env) * (1.0 - metallic);
+    vec3 irradiance = getEnvironmentLight(N, 1.0);
+    vec3 diffuseEnv = irradiance * albedo;
+    vec3 R = reflect(-V, N);
+    vec3 prefilteredColor = getEnvironmentLight(R, roughness);
+    vec2 envBRDF = vec2(1.0 - roughness * 0.5, roughness * 0.1);
+    vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
+    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao;
+
+    vec3 color = ambient + Lo;
+
+    // Tone mapping
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0 / 2.2));
+
+    finalColor = vec4(color, 1.0);
+}
+)glsl";
+
 }  // namespace shaders

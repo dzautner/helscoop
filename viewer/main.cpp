@@ -8,6 +8,7 @@
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <set>
 #include <thread>
 #include <unordered_map>
 
@@ -28,6 +29,8 @@ extern "C" {
 #include "thermal.h"
 #include "structural.h"
 #include "ifc_export.h"
+#include "blueprint_export.h"
+#include "assembly.h"
 
 using namespace dingcad;
 
@@ -128,12 +131,14 @@ int main(int argc, char *argv[]) {
   };
 
   std::vector<MaterialItem> initialMaterials;
+  AssemblyInstructions initialAssembly;
   if (defaultScript) {
     scriptPath = std::filesystem::absolute(*defaultScript);
     auto load = LoadSceneFromFile(runtime, scriptPath);
     if (load.success) {
       sceneData = load.sceneData;
       initialMaterials = std::move(load.materials);
+      initialAssembly = std::move(load.assembly);
       reportStatus(load.message);
     } else {
       reportStatus(load.message);
@@ -166,6 +171,11 @@ int main(int argc, char *argv[]) {
   bool thermalResultDirty = true;  // Flag to recalculate when scene changes
   StructuralAnalysisResult structuralResult;
   bool structuralResultDirty = true;  // Flag to recalculate when scene changes
+  AssemblyInstructions assemblyInstructions = std::move(initialAssembly);
+  if (!assemblyInstructions.steps.empty()) {
+    ResolveAssemblyMaterials(assemblyInstructions, sceneData);
+  }
+  bool assemblyDirty = assemblyInstructions.steps.empty();  // Only regenerate if not scene-defined
 
   auto refreshParameters = [&]() {
     if (!scriptPath.empty()) {
@@ -183,8 +193,10 @@ int main(int argc, char *argv[]) {
   Shader toonShader = LoadShaderFromMemory(shaders::kToonVS, shaders::kToonFS);
   Shader normalDepthShader = LoadShaderFromMemory(shaders::kNormalDepthVS, shaders::kNormalDepthFS);
   Shader edgeShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kEdgeFS);
+  Shader pbrShader = LoadShaderFromMemory(shaders::kPBR_VS, shaders::kPBR_FS);
+  Shader skyShader = LoadShaderFromMemory(shaders::kSky_VS, shaders::kSky_FS);
 
-  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0) {
+  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0) {
     TraceLog(LOG_ERROR, "Failed to load one or more shaders.");
     DestroyModels(models);
     if (brandingFontCustom) UnloadFont(brandingFont);
@@ -237,6 +249,61 @@ int main(int argc, char *argv[]) {
   const int locEdgeIntensity = GetShaderLocation(edgeShader, "edgeIntensity");
   const int locInkColor = GetShaderLocation(edgeShader, "inkColor");
 
+  // PBR shader setup
+  const int locPbrAlbedoColor = GetShaderLocation(pbrShader, "albedoColor");
+  const int locPbrMetallic = GetShaderLocation(pbrShader, "metallic");
+  const int locPbrRoughness = GetShaderLocation(pbrShader, "roughness");
+  const int locPbrAo = GetShaderLocation(pbrShader, "ao");
+  const int locPbrAlbedoTex = GetShaderLocation(pbrShader, "albedoTex");
+  const int locPbrUseAlbedoTex = GetShaderLocation(pbrShader, "useAlbedoTex");
+  const int locPbrLightDir = GetShaderLocation(pbrShader, "lightDir");
+  const int locPbrLightColor = GetShaderLocation(pbrShader, "lightColor");
+  const int locPbrSkyTop = GetShaderLocation(pbrShader, "skyColorTop");
+  const int locPbrSkyBottom = GetShaderLocation(pbrShader, "skyColorBottom");
+  const int locPbrGround = GetShaderLocation(pbrShader, "groundColor");
+
+  Material pbrMat = LoadMaterialDefault();
+  pbrMat.shader = pbrShader;
+  pbrShader.locs[SHADER_LOC_MAP_DIFFUSE] = locPbrAlbedoTex;
+
+  // PBR environment colors (soft outdoor lighting)
+  const float pbrSkyTop[3] = {0.5f, 0.7f, 1.0f};     // Light blue sky
+  const float pbrSkyBottom[3] = {0.9f, 0.9f, 0.95f}; // Pale horizon
+  const float pbrGround[3] = {0.3f, 0.35f, 0.25f};   // Grass/ground reflection
+  SetShaderValue(pbrShader, locPbrSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
+  SetShaderValue(pbrShader, locPbrSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
+  SetShaderValue(pbrShader, locPbrGround, pbrGround, SHADER_UNIFORM_VEC3);
+
+  // PBR light (sun-like directional)
+  const float pbrLightColor[3] = {3.0f, 2.9f, 2.7f}; // Warm sunlight (HDR intensity)
+  SetShaderValue(pbrShader, locPbrLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
+
+  // Rendering mode toggle
+  bool pbrModeEnabled = true;  // Start with PBR enabled for realistic look
+
+  // Sky shader setup
+  const int locSkyTop = GetShaderLocation(skyShader, "skyTop");
+  const int locSkyHorizon = GetShaderLocation(skyShader, "skyHorizon");
+  const int locSkyGround = GetShaderLocation(skyShader, "groundColor");
+
+  // Sky colors - soft outdoor lighting
+  const float skyTopCol[3] = {0.35f, 0.55f, 0.85f};     // Deep blue sky
+  const float skyHorizonCol[3] = {0.75f, 0.82f, 0.92f}; // Pale blue horizon
+  const float skyGroundCol[3] = {0.25f, 0.30f, 0.22f};  // Dark grass/ground
+  SetShaderValue(skyShader, locSkyTop, skyTopCol, SHADER_UNIFORM_VEC3);
+  SetShaderValue(skyShader, locSkyHorizon, skyHorizonCol, SHADER_UNIFORM_VEC3);
+  SetShaderValue(skyShader, locSkyGround, skyGroundCol, SHADER_UNIFORM_VEC3);
+
+  Material skyMat = LoadMaterialDefault();
+  skyMat.shader = skyShader;
+
+  // Create fullscreen quad mesh for sky rendering (in clip space XY plane)
+  // GenMeshPlane creates in XZ, so we rotate the transform when drawing
+  Mesh skyQuad = GenMeshPlane(2.0f, 2.0f, 1, 1);
+  UploadMesh(&skyQuad, false);
+  // Transform to put plane in XY (rotate -90 degrees around X axis)
+  Matrix skyTransform = MatrixRotateX(-90.0f * DEG2RAD);
+
   // Static toon lighting configuration
   const Vector3 lightDirWS = Vector3Normalize({0.45f, 0.85f, 0.35f});
   const float baseCol[4] = {kBaseColor.r / 255.0f, kBaseColor.g / 255.0f, kBaseColor.b / 255.0f, 1.0f};
@@ -269,6 +336,7 @@ int main(int argc, char *argv[]) {
   // Set fallback texture on toon material - raylib will handle texture unit binding
   // Use MATERIAL_MAP_DIFFUSE (index 0) which raylib binds to texture unit 0
   toonMat.maps[MATERIAL_MAP_DIFFUSE].texture = fallbackTexture;
+  pbrMat.maps[MATERIAL_MAP_DIFFUSE].texture = fallbackTexture;
 
   float normalThreshold = 0.25f;
   float depthThreshold = 0.002f;
@@ -345,8 +413,18 @@ int main(int argc, char *argv[]) {
       reportStatus(result.message);
       sceneParameters = ParseSceneParameters(scriptPath);
       sceneMaterials = std::move(result.materials);
+      // Use scene-defined assembly if available, otherwise regenerate
+      if (!result.assembly.steps.empty()) {
+        assemblyInstructions = std::move(result.assembly);
+        ResolveAssemblyMaterials(assemblyInstructions, sceneData);
+        assemblyDirty = false;
+        TraceLog(LOG_INFO, "Using scene-defined assembly: %zu steps", assemblyInstructions.steps.size());
+      } else {
+        assemblyDirty = true;  // Regenerate assembly after scene reload
+      }
       thermalResultDirty = true;  // Recalculate thermal after scene reload
       structuralResultDirty = true;  // Recalculate structural after scene reload
+      uiState.currentAssemblyStep = 0;  // Reset to first step
       TraceLog(LOG_INFO, "Updated %zu parameters and %zu materials from reload",
                sceneParameters.size(), sceneMaterials.size());
       TraceLog(LOG_INFO, "PROFILE: Background load completed, total wall time: %lld ms", totalMs);
@@ -412,6 +490,26 @@ int main(int argc, char *argv[]) {
         uiState.showStructuralPanel = !uiState.showStructuralPanel;
         if (uiState.showStructuralPanel) {
           structuralResultDirty = true;  // Recalculate on toggle
+        }
+      }
+      if (IsKeyPressed(KEY_A)) {
+        uiState.showAssemblyPanel = !uiState.showAssemblyPanel;
+        // Only regenerate if no scene-defined assembly exists
+        if (uiState.showAssemblyPanel && assemblyInstructions.steps.empty()) {
+          assemblyDirty = true;
+        }
+      }
+      if (IsKeyPressed(KEY_P)) {
+        pbrModeEnabled = !pbrModeEnabled;
+        TraceLog(LOG_INFO, "Rendering mode: %s", pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
+      }
+      // Assembly step navigation with arrow keys (when panel is visible)
+      if (uiState.showAssemblyPanel) {
+        if (IsKeyPressed(KEY_LEFT) && uiState.currentAssemblyStep > 0) {
+          uiState.currentAssemblyStep--;
+        }
+        if (IsKeyPressed(KEY_RIGHT) && uiState.currentAssemblyStep < static_cast<int>(assemblyInstructions.steps.size()) - 1) {
+          uiState.currentAssemblyStep++;
         }
       }
     }
@@ -498,6 +596,88 @@ int main(int argc, char *argv[]) {
           reportStatus("Saved ~/Downloads/helscoop.ifc");
         } else {
           reportStatus("IFC export failed: " + error);
+        }
+      }
+    }
+
+    // SVG Blueprint Export handling - toolbar button
+    if (uiState.svgExportClicked) {
+      uiState.svgExportClicked = false;
+      if (!sceneData.objects.empty()) {
+        std::filesystem::path downloads;
+        if (const char *home = std::getenv("HOME")) {
+          downloads = std::filesystem::path(home) / "Downloads";
+        } else {
+          downloads = std::filesystem::current_path();
+        }
+
+        std::error_code dirErr;
+        std::filesystem::create_directories(downloads, dirErr);
+        if (dirErr && !std::filesystem::exists(downloads)) {
+          reportStatus("SVG export failed: cannot access Downloads");
+        } else {
+          std::filesystem::path svgPath = downloads / "helscoop_blueprint.svg";
+          BlueprintOptions options;
+          std::string error;
+          if (ExportToSVG(sceneData, sceneMaterials, g_materialLibrary, svgPath, options, error)) {
+            reportStatus("Saved ~/Downloads/helscoop_blueprint.svg");
+          } else {
+            reportStatus("SVG export failed: " + error);
+          }
+        }
+      }
+    }
+
+    // BOM/Parts List Export handling - toolbar button
+    if (uiState.bomExportClicked) {
+      uiState.bomExportClicked = false;
+      if (!sceneMaterials.empty()) {
+        std::filesystem::path downloads;
+        if (const char *home = std::getenv("HOME")) {
+          downloads = std::filesystem::path(home) / "Downloads";
+        } else {
+          downloads = std::filesystem::current_path();
+        }
+
+        std::error_code dirErr;
+        std::filesystem::create_directories(downloads, dirErr);
+        if (dirErr && !std::filesystem::exists(downloads)) {
+          reportStatus("BOM export failed: cannot access Downloads");
+        } else {
+          std::filesystem::path csvPath = downloads / "helscoop_parts.csv";
+          std::string error;
+          if (ExportPartsList(sceneMaterials, g_materialLibrary, csvPath, error)) {
+            reportStatus("Saved ~/Downloads/helscoop_parts.csv");
+          } else {
+            reportStatus("BOM export failed: " + error);
+          }
+        }
+      }
+    }
+
+    // IKEA-style Assembly Instructions Export handling - toolbar button
+    if (uiState.instructionsExportClicked) {
+      uiState.instructionsExportClicked = false;
+      if (!sceneData.objects.empty()) {
+        // Regenerate assembly if needed
+        if (assemblyInstructions.steps.empty()) {
+          assemblyInstructions = GenerateDefaultAssembly(sceneData, sceneMaterials);
+        }
+
+        std::filesystem::path downloads;
+        if (const char *home = std::getenv("HOME")) {
+          downloads = std::filesystem::path(home) / "Downloads";
+        } else {
+          downloads = std::filesystem::current_path();
+        }
+
+        std::filesystem::path instructionsDir = downloads / "helscoop_instructions";
+        std::string error;
+        if (ExportAssemblyInstructions(sceneData, sceneMaterials, g_materialLibrary,
+                                       assemblyInstructions, instructionsDir, error)) {
+          reportStatus("Saved ~/Downloads/helscoop_instructions/");
+        } else {
+          reportStatus("Instructions export failed: " + error);
         }
       }
     }
@@ -628,6 +808,9 @@ int main(int argc, char *argv[]) {
     lightDirVS = Vector3Normalize(lightDirVS);
     SetShaderValue(toonShader, locLightDirVS, &lightDirVS.x, SHADER_UNIFORM_VEC3);
 
+    // Update PBR shader light direction (world space)
+    SetShaderValue(pbrShader, locPbrLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+
     float outlineThickness = 0.0f;
     {
       const float pixels = 2.0f;
@@ -654,11 +837,19 @@ int main(int argc, char *argv[]) {
 
     // Recalculate structural analysis if needed
     if (uiState.showStructuralPanel && structuralResultDirty) {
-      structuralResult = AnalyzeStructure(models, g_materialLibrary, kSceneScale);
+      structuralResult = AnalyzeStructure(models, sceneData, g_materialLibrary, kSceneScale);
       structuralResultDirty = false;
       TraceLog(LOG_INFO, "Structural analysis: %d warnings, %s",
                structuralResult.warningCount,
                structuralResult.allPassed ? "all OK" : "issues found");
+    }
+
+    // Regenerate assembly instructions if needed
+    if (assemblyDirty && !sceneData.objects.empty()) {
+      assemblyInstructions = GenerateDefaultAssembly(sceneData, sceneMaterials);
+      assemblyDirty = false;
+      uiState.currentAssemblyStep = 0;  // Reset to first step
+      TraceLog(LOG_INFO, "Generated %zu assembly steps", assemblyInstructions.steps.size());
     }
 
     // Build thermal color lookup map for rendering
@@ -673,8 +864,35 @@ int main(int argc, char *argv[]) {
     // Render to color texture
     BeginTextureMode(rtColor);
     ClearBackground(RAYWHITE);
+
+    // Render sky gradient background (only in PBR mode)
+    if (pbrModeEnabled) {
+      // Draw gradient sky using simple 2D rects
+      // Sky top to horizon
+      Color skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
+                       static_cast<unsigned char>(skyTopCol[1] * 255),
+                       static_cast<unsigned char>(skyTopCol[2] * 255), 255};
+      Color skyHorizC = {static_cast<unsigned char>(skyHorizonCol[0] * 255),
+                         static_cast<unsigned char>(skyHorizonCol[1] * 255),
+                         static_cast<unsigned char>(skyHorizonCol[2] * 255), 255};
+      Color skyGroundC = {static_cast<unsigned char>(skyGroundCol[0] * 255),
+                          static_cast<unsigned char>(skyGroundCol[1] * 255),
+                          static_cast<unsigned char>(skyGroundCol[2] * 255), 255};
+      int h = GetScreenHeight();
+      int w = GetScreenWidth();
+      // Upper half: sky gradient
+      DrawRectangleGradientV(0, 0, w, h/2, skyTopC, skyHorizC);
+      // Lower half: ground gradient
+      DrawRectangleGradientV(0, h/2, w, h/2, skyHorizC, skyGroundC);
+    }
+
     BeginMode3D(camera);
-    DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
+    if (pbrModeEnabled) {
+      // Subtle ground grid for PBR mode
+      DrawXZGrid(60, 0.5f, Fade(GRAY, 0.15f));
+    } else {
+      DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
+    }
     DrawAxes(2.0f);
 
     // Determine which material ID to highlight (hover takes precedence)
@@ -682,16 +900,48 @@ int main(int argc, char *argv[]) {
         ? uiState.hoveredMaterialId
         : uiState.selectedMaterialId;
 
+    // Build assembly visibility set if in assembly mode
+    std::set<size_t> assemblyVisibleSet;
+    std::set<size_t> assemblyNewSet;
+    if (uiState.showAssemblyPanel && !assemblyInstructions.steps.empty()) {
+      int stepIdx = std::clamp(uiState.currentAssemblyStep, 0,
+                               static_cast<int>(assemblyInstructions.steps.size()) - 1);
+      const auto& step = assemblyInstructions.steps[stepIdx];
+      assemblyVisibleSet.insert(step.objectIndices.begin(), step.objectIndices.end());
+      assemblyNewSet.insert(step.newObjectIndices.begin(), step.newObjectIndices.end());
+    }
+
     // Outline pass - use bright highlight for hovered/selected material
     rlDisableBackfaceCulling();
-    for (const auto &modelWithColor : models) {
+    for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
+      const auto &modelWithColor = models[modelIdx];
+
+      // Skip assemblyOnly objects when NOT in assembly mode
+      if (!uiState.showAssemblyPanel && modelIdx < sceneData.objects.size() &&
+          sceneData.objects[modelIdx].assemblyOnly) {
+        continue;
+      }
+
+      // Skip objects not visible in current assembly step
+      if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
+        if (assemblyVisibleSet.find(modelIdx) == assemblyVisibleSet.end()) {
+          continue;
+        }
+      }
+
       // Check if this object should be highlighted
       bool shouldHighlight = !highlightMatId.empty() &&
                              modelWithColor.materialId == highlightMatId;
 
+      // In assembly mode, highlight new parts
+      bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(modelIdx) != assemblyNewSet.end();
+
       if (shouldHighlight) {
-        // Bright cyan outline for highlighted objects
+        // Bright orange outline for highlighted objects
         setOutlineUniforms(outlineThickness * 2.5f, ORANGE);
+      } else if (isNewPart) {
+        // Green outline for new assembly parts
+        setOutlineUniforms(outlineThickness * 2.0f, GREEN);
       } else {
         // Normal black outline
         setOutlineUniforms(outlineThickness, outlineColor);
@@ -707,7 +957,22 @@ int main(int argc, char *argv[]) {
     setOutlineUniforms(outlineThickness, outlineColor);
 
     // Toon shading pass
-    for (const auto &modelWithColor : models) {
+    for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
+      const auto &modelWithColor = models[modelIdx];
+
+      // Skip assemblyOnly objects when NOT in assembly mode
+      if (!uiState.showAssemblyPanel && modelIdx < sceneData.objects.size() &&
+          sceneData.objects[modelIdx].assemblyOnly) {
+        continue;
+      }
+
+      // Skip objects not visible in current assembly step
+      if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
+        if (assemblyVisibleSet.find(modelIdx) == assemblyVisibleSet.end()) {
+          continue;
+        }
+      }
+
       // In thermal view, hide exterior layers that cover insulation
       // This makes the thermal visualization visible
       if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
@@ -721,6 +986,9 @@ int main(int argc, char *argv[]) {
         }
       }
 
+      // Check if this is a new part in assembly mode (for color modification)
+      bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(modelIdx) != assemblyNewSet.end();
+
       // Use thermal color if thermal view is enabled and material has thermal data
       Color renderColor = modelWithColor.color;
       if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
@@ -730,40 +998,73 @@ int main(int argc, char *argv[]) {
         }
       }
 
+      // In assembly mode: new parts are bright, old parts are faded
+      float alpha = 1.0f;
+      if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
+        if (isNewPart) {
+          // Brighten new parts slightly
+          renderColor.r = std::min(255, renderColor.r + 30);
+          renderColor.g = std::min(255, renderColor.g + 30);
+          renderColor.b = std::min(255, renderColor.b + 30);
+        } else {
+          // Fade old parts
+          alpha = 0.4f;
+        }
+      }
+
       const float modelColor[4] = {
         renderColor.r / 255.0f,
         renderColor.g / 255.0f,
         renderColor.b / 255.0f,
-        1.0f
+        alpha
       };
-      SetShaderValue(toonShader, locBaseColor, modelColor, SHADER_UNIFORM_VEC4);
 
       // Get material texture or use fallback
       Texture2D* materialTex = nullptr;
       if (!modelWithColor.materialId.empty()) {
         materialTex = g_materialLibrary.getTexture(modelWithColor.materialId);
       }
-
-      // Set texture on material and update useTexture uniform
       int useTex = (materialTex && materialTex->id != 0) ? 1 : 0;
 
-      // Debug log on first frame only - log ALL materials
-      static bool loggedOnce = false;
-      if (frameCount == 0 && !loggedOnce) {
-        TraceLog(LOG_INFO, "RENDER-CHECK: matId='%s' useTex=%d (first obj)",
-                 modelWithColor.materialId.empty() ? "(empty)" : modelWithColor.materialId.c_str(),
-                 useTex);
-        loggedOnce = true;
-      }
+      if (pbrModeEnabled) {
+        // PBR rendering path
+        SetShaderValue(pbrShader, locPbrAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
+        SetShaderValue(pbrShader, locPbrUseAlbedoTex, &useTex, SHADER_UNIFORM_INT);
 
-      SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
+        // Get material PBR properties (roughness, metallic)
+        float matRoughness = 0.5f;
+        float matMetallic = 0.0f;
+        float matAo = 1.0f;
 
-      // Update material's diffuse map with either material texture or fallback
-      toonMat.maps[MATERIAL_MAP_DIFFUSE].texture =
-        (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
+        if (!modelWithColor.materialId.empty()) {
+          const PBRMaterial* mat = g_materialLibrary.get(modelWithColor.materialId);
+          if (mat) {
+            matRoughness = mat->visual.roughness;
+            matMetallic = mat->visual.metallic;
+          }
+        }
 
-      for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
-        DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
+        SetShaderValue(pbrShader, locPbrRoughness, &matRoughness, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(pbrShader, locPbrMetallic, &matMetallic, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(pbrShader, locPbrAo, &matAo, SHADER_UNIFORM_FLOAT);
+
+        pbrMat.maps[MATERIAL_MAP_DIFFUSE].texture =
+          (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
+
+        for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+          DrawMesh(modelWithColor.model.meshes[i], pbrMat, modelWithColor.model.transform);
+        }
+      } else {
+        // Toon rendering path (original)
+        SetShaderValue(toonShader, locBaseColor, modelColor, SHADER_UNIFORM_VEC4);
+        SetShaderValue(toonShader, locUseTexture, &useTex, SHADER_UNIFORM_INT);
+
+        toonMat.maps[MATERIAL_MAP_DIFFUSE].texture =
+          (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
+
+        for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
+          DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
+        }
       }
     }
     EndMode3D();
@@ -819,7 +1120,39 @@ int main(int argc, char *argv[]) {
 
     // Draw UI panels (positioned below toolbar)
     if (uiState.showMaterialsPanel) {
-      DrawMaterialsPanel(sceneMaterials, uiState, uiFont, screenWidth, screenHeight);
+      // When assembly panel is active, filter materials to show only materials visible in current step
+      std::vector<std::string> assemblyMaterialFilter;
+      if (uiState.showAssemblyPanel && !assemblyInstructions.steps.empty()) {
+        int stepIdx = std::clamp(uiState.currentAssemblyStep, 0,
+                                 static_cast<int>(assemblyInstructions.steps.size()) - 1);
+        const auto& currentStep = assemblyInstructions.steps[stepIdx];
+
+        // Collect materials from visible objects in this step
+        std::set<std::string> visibleMaterials;
+
+        // If step uses showObjects, get materials from those object indices
+        if (!currentStep.objectIndices.empty()) {
+          for (size_t objIdx : currentStep.objectIndices) {
+            if (objIdx < sceneData.objects.size()) {
+              const auto& obj = sceneData.objects[objIdx];
+              if (!obj.materialId.empty()) {
+                visibleMaterials.insert(obj.materialId);
+              }
+            }
+          }
+        }
+
+        // Also include explicitly listed showMaterials (for steps that use material-based filtering)
+        for (const auto& mat : currentStep.showMaterials) {
+          visibleMaterials.insert(mat);
+        }
+
+        // Convert set to vector for the filter
+        for (const auto& mat : visibleMaterials) {
+          assemblyMaterialFilter.push_back(mat);
+        }
+      }
+      DrawMaterialsPanel(sceneMaterials, uiState, uiFont, screenWidth, screenHeight, assemblyMaterialFilter);
     }
 
     if (uiState.showParametersPanel) {
@@ -844,6 +1177,11 @@ int main(int argc, char *argv[]) {
     // Draw structural panel
     if (uiState.showStructuralPanel) {
       DrawStructuralPanel(structuralResult, uiState, uiFont, screenWidth, screenHeight);
+    }
+
+    // Draw assembly preview panel
+    if (uiState.showAssemblyPanel) {
+      DrawAssemblyPanel(assemblyInstructions, uiState, uiFont, screenWidth, screenHeight);
     }
 
     EndDrawing();
