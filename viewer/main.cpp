@@ -1047,6 +1047,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Outline pass - use bright highlight for hovered/selected material
+    // Skip outlines in PBR mode for cleaner look (outlines are toon-style)
+    if (!pbrModeEnabled) {
     rlDisableBackfaceCulling();
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
@@ -1090,6 +1092,7 @@ int main(int argc, char *argv[]) {
 
     // Reset outline uniforms for consistency
     setOutlineUniforms(outlineThickness, outlineColor);
+    } // end of !pbrModeEnabled outline pass
 
     // Toon shading pass
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
