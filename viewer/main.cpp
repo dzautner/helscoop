@@ -44,6 +44,13 @@ int main(int argc, char *argv[]) {
   bool renderMode = false;
   std::string renderScenePath;
   std::string renderOutputPath;
+  int renderWidth = 1024;
+  int renderHeight = 768;
+  float camYaw = 0.7f;      // Default camera yaw (radians)
+  float camPitch = 0.4f;    // Default camera pitch (radians)
+  float camDist = 0.0f;     // 0 = auto-calculate based on scene
+  float camTargetX = 0.0f, camTargetY = 0.0f, camTargetZ = 0.0f;
+  bool camTargetSet = false;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -52,11 +59,34 @@ int main(int argc, char *argv[]) {
       renderScenePath = argv[i + 1];
       renderOutputPath = argv[i + 2];
       i += 2;
+    } else if (arg == "--size" && i + 2 < argc) {
+      renderWidth = std::atoi(argv[i + 1]);
+      renderHeight = std::atoi(argv[i + 2]);
+      i += 2;
+    } else if (arg == "--yaw" && i + 1 < argc) {
+      camYaw = std::atof(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--pitch" && i + 1 < argc) {
+      camPitch = std::atof(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--dist" && i + 1 < argc) {
+      camDist = std::atof(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--target" && i + 3 < argc) {
+      camTargetX = std::atof(argv[i + 1]);
+      camTargetY = std::atof(argv[i + 2]);
+      camTargetZ = std::atof(argv[i + 3]);
+      camTargetSet = true;
+      i += 3;
     }
   }
 
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
-  InitWindow(1280, 720, "dingcad");
+  if (renderMode) {
+    InitWindow(renderWidth, renderHeight, "dingcad");
+  } else {
+    InitWindow(1280, 720, "dingcad");
+  }
   SetTargetFPS(60);
 
   Font brandingFont = GetFontDefault();
@@ -167,6 +197,55 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<ModelWithColor> models = CreateModelsFromScene(sceneData);
+
+  // In render mode, set up camera based on command line args and scene bounds
+  if (renderMode && !models.empty()) {
+    // Calculate scene bounding box
+    BoundingBox sceneBounds = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
+    for (const auto& m : models) {
+      BoundingBox bbox = GetModelBoundingBox(m.model);
+      sceneBounds.min.x = std::min(sceneBounds.min.x, bbox.min.x);
+      sceneBounds.min.y = std::min(sceneBounds.min.y, bbox.min.y);
+      sceneBounds.min.z = std::min(sceneBounds.min.z, bbox.min.z);
+      sceneBounds.max.x = std::max(sceneBounds.max.x, bbox.max.x);
+      sceneBounds.max.y = std::max(sceneBounds.max.y, bbox.max.y);
+      sceneBounds.max.z = std::max(sceneBounds.max.z, bbox.max.z);
+    }
+    Vector3 sceneCenter = {
+      (sceneBounds.min.x + sceneBounds.max.x) * 0.5f,
+      (sceneBounds.min.y + sceneBounds.max.y) * 0.5f,
+      (sceneBounds.min.z + sceneBounds.max.z) * 0.5f
+    };
+    float sceneSize = Vector3Distance(sceneBounds.min, sceneBounds.max);
+
+    // Set camera target
+    if (camTargetSet) {
+      camera.target = {camTargetX, camTargetY, camTargetZ};
+    } else {
+      camera.target = sceneCenter;
+    }
+
+    // Set orbit distance (auto or manual)
+    if (camDist > 0.0f) {
+      orbitDistance = camDist;
+    } else {
+      orbitDistance = sceneSize * 0.8f;  // Auto-fit to scene
+    }
+
+    // Apply yaw and pitch from command line
+    orbitYaw = camYaw;
+    orbitPitch = camPitch;
+
+    // Update camera position
+    camera.position = Vector3Add(camera.target, {
+      orbitDistance * cosf(orbitPitch) * sinf(orbitYaw),
+      orbitDistance * sinf(orbitPitch),
+      orbitDistance * cosf(orbitPitch) * cosf(orbitYaw)
+    });
+
+    TraceLog(LOG_INFO, "Render mode camera: yaw=%.2f pitch=%.2f dist=%.2f target=(%.2f,%.2f,%.2f)",
+             orbitYaw, orbitPitch, orbitDistance, camera.target.x, camera.target.y, camera.target.z);
+  }
 
   // UI State
   UIState uiState;
