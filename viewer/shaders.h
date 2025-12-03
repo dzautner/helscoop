@@ -399,28 +399,50 @@ void main() {
     vec2 envBRDF = approximateBRDF(NdotV, roughness);
     vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
 
-    // Improved ambient occlusion
-    // 1. Surfaces facing down get more occlusion (ground bounce is darker)
-    float normalAO = 0.4 + 0.6 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
+    // === SOFT DIRECTIONAL SHADOW WITH FILL LIGHT ===
+    float NdotL_shadow = dot(N, L);
 
-    // 2. Surfaces facing away from light get subtle darkening (fake shadow)
-    float shadowFactor = clamp(dot(N, L) * 0.3 + 0.7, 0.5, 1.0);
+    // Soft shadow terminator - gradual transition for natural look
+    float shadowTerminator = smoothstep(-0.2, 0.5, NdotL_shadow);
 
-    // 3. Height-based contact shadow (objects near ground are darker at bottom)
-    float heightAO = clamp(fragPos.y * 0.5 + 0.7, 0.5, 1.0);
+    // Wrap lighting for softer shadows (simulates subsurface/fill)
+    float wrapLight = (NdotL_shadow + 0.5) / 1.5;
+    wrapLight = clamp(wrapLight, 0.0, 1.0);
 
-    // Combine all AO factors
-    float fakeAO = normalAO * shadowFactor * heightAO;
-    fakeAO = mix(fakeAO, 1.0, metallic * 0.3);  // Metals less affected
+    // Combine for soft shadow factor (never fully black)
+    float shadowFactor = mix(0.35, 1.0, shadowTerminator * wrapLight);
 
-    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao * fakeAO;
+    // Subtle height-based darkening (very gentle)
+    float heightAO = clamp(fragPos.y * 0.15 + 0.9, 0.7, 1.0);
 
-    // Add subtle rim lighting for depth
-    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
-    vec3 rimColor = skyColorTop * rim;
+    // Normal-based AO (bottom-facing slightly darker)
+    float normalAO = 0.7 + 0.3 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
 
-    // Final color with rim
-    vec3 color = ambient + Lo + rimColor;
+    // Final AO - keep it subtle
+    float finalAO = ao * normalAO * heightAO;
+
+    // === IMPROVED ENVIRONMENT REFLECTIONS ===
+    // Increase specular environment contribution for shinier look
+    vec3 ambientDiffuse = kD_env * diffuseEnv * shadowFactor;
+    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);  // Boost metallic reflections
+
+    vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
+
+    // === FILL LIGHT (simulates sky bounce) ===
+    // Add soft fill from opposite direction (sky bounce)
+    vec3 fillDir = normalize(vec3(-L.x, 0.3, -L.z));
+    float fillNdotL = max(dot(N, fillDir), 0.0) * 0.15;
+    vec3 fillLight = skyColorBottom * albedo * fillNdotL * (1.0 - metallic);
+
+    // Direct lighting with shadow
+    vec3 directLighting = Lo * shadowFactor;
+
+    // Rim/fresnel lighting for depth (catches light at edges)
+    float rim = pow(1.0 - NdotV, 3.0) * 0.2;
+    vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
+
+    // === FINAL COMPOSITION ===
+    vec3 color = ambient + directLighting + fillLight + rimColor;
 
     // ACES Filmic tone mapping (better contrast and color preservation than Reinhard)
     // From: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
