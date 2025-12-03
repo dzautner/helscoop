@@ -820,4 +820,51 @@ void main() {
 }
 )glsl";
 
+// ============================================================================
+// Debug visualization shaders
+// ============================================================================
+
+// Debug shader to visualize depth buffer (uses same VS as edge shader)
+// Note: texture0 is automatically bound by DrawTextureRec
+inline const char* kDebugDepthFS = R"glsl(
+#version 330
+in vec2 uv;
+out vec4 finalColor;
+
+uniform sampler2D texture0;  // Bound automatically by DrawTextureRec
+uniform int debugMode;  // 0=depth, 1=normals, 2=normal+depth
+
+void main() {
+    vec4 nd = texture(texture0, uv);
+
+    // Background has depth=1.0 (far), geometry has depth < 1.0
+    bool isBackground = nd.a > 0.99;
+
+    if (debugMode == 0) {
+        // Depth visualization with gamma expansion
+        // Linear depth compresses most values to 0-0.1 range
+        // Use pow(d, 0.15) to expand: 0.01->0.5, 0.1->0.7, 1.0->1.0
+        float d = pow(nd.a, 0.15);
+        // Near objects = dark, far/background = bright
+        finalColor = vec4(d, d, d, 1.0);
+    } else if (debugMode == 1) {
+        // Normals visualization - RGB encodes XYZ direction
+        if (isBackground) {
+            finalColor = vec4(0.3, 0.3, 0.4, 1.0);  // Gray for sky
+        } else {
+            finalColor = vec4(nd.rgb, 1.0);
+        }
+    } else {
+        // Combined: normals with depth shading
+        float d = pow(nd.a, 0.15);
+        if (isBackground) {
+            finalColor = vec4(0.3, 0.3, 0.4, 1.0);
+        } else {
+            // Darken normals based on depth (near = full color, far = darker)
+            finalColor = vec4(nd.rgb * (1.0 - d * 0.7), 1.0);
+        }
+    }
+}
+)glsl";
+
 }  // namespace shaders

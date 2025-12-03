@@ -200,8 +200,9 @@ int main(int argc, char *argv[]) {
   Shader edgeShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kEdgeFS);
   Shader pbrShader = LoadShaderFromMemory(shaders::kPBR_VS, shaders::kPBR_FS);
   Shader skyShader = LoadShaderFromMemory(shaders::kSky_VS, shaders::kSky_FS);
+  Shader debugShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kDebugDepthFS);
 
-  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0) {
+  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0 || debugShader.id == 0) {
     TraceLog(LOG_ERROR, "Failed to load one or more shaders.");
     DestroyModels(models);
     if (brandingFontCustom) UnloadFont(brandingFont);
@@ -274,6 +275,10 @@ int main(int argc, char *argv[]) {
   const int locEdgeIntensity = GetShaderLocation(edgeShader, "edgeIntensity");
   const int locInkColor = GetShaderLocation(edgeShader, "inkColor");
 
+  // Debug shader setup
+  const int locDebugNormDepthTex = GetShaderLocation(debugShader, "normDepthTex");
+  const int locDebugMode = GetShaderLocation(debugShader, "debugMode");
+
   // PBR shader setup
   const int locPbrAlbedoColor = GetShaderLocation(pbrShader, "albedoColor");
   const int locPbrMetallic = GetShaderLocation(pbrShader, "metallic");
@@ -310,6 +315,7 @@ int main(int argc, char *argv[]) {
 
   // Rendering mode toggle
   bool pbrModeEnabled = true;  // Start with PBR enabled for realistic look
+  int debugViewMode = 0;  // 0=off, 1=depth, 2=normals, 3=combined (cycle with D)
 
   // Sky shader setup
   const int locSkyTop = GetShaderLocation(skyShader, "skyTop");
@@ -588,6 +594,11 @@ int main(int argc, char *argv[]) {
       if (IsKeyPressed(KEY_P)) {
         pbrModeEnabled = !pbrModeEnabled;
         TraceLog(LOG_INFO, "Rendering mode: %s", pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
+      }
+      if (IsKeyPressed(KEY_F9)) {
+        debugViewMode = (debugViewMode + 1) % 4;  // Cycle: off -> depth -> normals -> combined -> off
+        const char* modeNames[] = {"Off", "Depth", "Normals", "Combined"};
+        TraceLog(LOG_INFO, "Debug view: %s (F9 to cycle)", modeNames[debugViewMode]);
       }
       // Assembly step navigation with arrow keys (when panel is visible)
       if (uiState.showAssemblyPanel) {
@@ -1293,8 +1304,10 @@ int main(int argc, char *argv[]) {
     EndTextureMode();
 
     // Render normal/depth buffer
+    // Clear with alpha=255 (far depth) so background appears as "far away" for SSAO
     BeginTextureMode(rtNormalDepth);
-    ClearBackground({127, 127, 255, 0});
+    ClearBackground({127, 127, 255, 255});
+    rlDisableColorBlend();  // Disable blending so alpha (depth) is written correctly
     BeginMode3D(camera);
     for (const auto &modelWithColor : models) {
       // Skip exterior layers in thermal view (same filter as toon shading pass)
@@ -1312,6 +1325,7 @@ int main(int argc, char *argv[]) {
       }
     }
     EndMode3D();
+    rlEnableColorBlend();  // Re-enable blending for subsequent draws
     EndTextureMode();
 
     // Rebind normal/depth texture in case texture slots were modified by per-object bindings
@@ -1326,11 +1340,22 @@ int main(int argc, char *argv[]) {
         1.0f / static_cast<float>(rtNormalDepth.texture.height)};
     SetShaderValue(edgeShader, locTexel, texel, SHADER_UNIFORM_VEC2);
 
-    BeginShaderMode(edgeShader);
     const Rectangle srcRect = {0.0f, 0.0f, static_cast<float>(rtColor.texture.width),
                                -static_cast<float>(rtColor.texture.height)};
-    DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
-    EndShaderMode();
+
+    if (debugViewMode > 0) {
+      // Debug visualization mode - texture0 is auto-bound by DrawTextureRec
+      int shaderDebugMode = debugViewMode - 1;  // 0=depth, 1=normals, 2=combined
+      SetShaderValue(debugShader, locDebugMode, &shaderDebugMode, SHADER_UNIFORM_INT);
+      BeginShaderMode(debugShader);
+      DrawTextureRec(rtNormalDepth.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      EndShaderMode();
+    } else {
+      // Normal rendering with edge detection
+      BeginShaderMode(edgeShader);
+      DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      EndShaderMode();
+    }
 
     // Draw toolbar at top (includes panel toggles and status)
     DrawToolbar(uiState, uiFont, screenWidth, statusMessage);
