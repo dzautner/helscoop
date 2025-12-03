@@ -88,13 +88,13 @@ const show_chickens = 1;       // 1=show, 0=hide chickens
 // DOOR ANGLES - Simulate doors open/closed (degrees)
 // ============================================================================
 // @param human_door_angle "Doors" Human door swing angle (0-120)
-const human_door_angle = 47;    // 0=closed, 90=fully open
+const human_door_angle = 0;    // 0=closed, 90=fully open
 // @param nest_lid_angle "Doors" Nest box lid angle (0-90)
 const nest_lid_angle = 90;     // 0=closed, 90=fully open
 // @param tunnel_door_angle "Doors" Tunnel access door angle (0-90)
 const tunnel_door_angle = 30;  // 0=closed, 90=fully open
 // @param run_gate_angle "Doors" Run gate swing angle (0-120)
-const run_gate_angle = 0;      // 0=closed, 90=open
+const run_gate_angle = 44;      // 0=closed, 90=open
 
 // ============================================================================
 // ELECTRICITY & HEATING COSTS (Finland 2024)

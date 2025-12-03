@@ -633,7 +633,8 @@ int main(int argc, char *argv[]) {
       if (IsKeyPressed(KEY_F9)) {
         debugViewMode = (debugViewMode + 1) % 6;  // Cycle: off -> depth -> normals -> combined -> SSAO raw -> SSAO blur -> off
         const char* modeNames[] = {"Off", "Depth", "Normals", "Combined", "SSAO Raw", "SSAO Blur"};
-        TraceLog(LOG_INFO, "Debug view: %s (F9 to cycle)", modeNames[debugViewMode]);
+        TraceLog(LOG_INFO, "Debug view: %s, Render mode: %s (F9 to cycle)",
+                 modeNames[debugViewMode], pbrModeEnabled ? "PBR" : "Toon");
       }
       // Assembly step navigation with arrow keys (when panel is visible)
       if (uiState.showAssemblyPanel) {
