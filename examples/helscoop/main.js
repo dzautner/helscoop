@@ -2712,6 +2712,7 @@ const assemblyOnlyObjects = [
   scaledFrontStudsFlat,
   scaledFrontDoorFraming,
   scaledFrontWallFlat,
+  scaledMeshApron,  // Mesh apron only visible in assembly mode
 ];
 // Mark these objects as assembly-only (hidden in normal view)
 assemblyOnlyObjects.forEach(obj => { obj.assemblyOnly = true; });
@@ -2768,7 +2769,7 @@ export const scene = [
     scaledRunRidgeBeam,
     scaledRunRoofRafters,
     scaledRunGate,
-    scaledMeshApron,
+    // scaledMeshApron moved to assemblyOnlyObjects
     scaledChickenGym,
     scaledLExtension
   ] : []),

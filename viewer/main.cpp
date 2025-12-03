@@ -631,8 +631,8 @@ int main(int argc, char *argv[]) {
         TraceLog(LOG_INFO, "Rendering mode: %s", pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
       }
       if (IsKeyPressed(KEY_F9)) {
-        debugViewMode = (debugViewMode + 1) % 6;  // Cycle: off -> depth -> normals -> combined -> SSAO raw -> SSAO blur -> off
-        const char* modeNames[] = {"Off", "Depth", "Normals", "Combined", "SSAO Raw", "SSAO Blur"};
+        debugViewMode = (debugViewMode + 1) % 7;  // Cycle: normal -> raw -> depth -> normals -> combined -> SSAO raw -> SSAO blur -> normal
+        const char* modeNames[] = {"Normal", "Raw (no post)", "Depth", "Normals", "Combined", "SSAO Raw", "SSAO Blur"};
         TraceLog(LOG_INFO, "Debug view: %s, Render mode: %s (F9 to cycle)",
                  modeNames[debugViewMode], pbrModeEnabled ? "PBR" : "Toon");
       }
@@ -1441,21 +1441,24 @@ int main(int argc, char *argv[]) {
     const Rectangle srcRect = {0.0f, 0.0f, static_cast<float>(rtColor.texture.width),
                                -static_cast<float>(rtColor.texture.height)};
 
-    if (debugViewMode > 0 && debugViewMode <= 3) {
+    if (debugViewMode == 1) {
+      // Raw mode - show pure 3D render without any post-processing
+      DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
+    } else if (debugViewMode >= 2 && debugViewMode <= 4) {
       // Debug visualization mode - texture0 is auto-bound by DrawTextureRec
-      int shaderDebugMode = debugViewMode - 1;  // 0=depth, 1=normals, 2=combined
+      int shaderDebugMode = debugViewMode - 2;  // 0=depth, 1=normals, 2=combined
       SetShaderValue(debugShader, locDebugMode, &shaderDebugMode, SHADER_UNIFORM_INT);
       BeginShaderMode(debugShader);
       DrawTextureRec(rtNormalDepth.texture, srcRect, {0.0f, 0.0f}, WHITE);
       EndShaderMode();
-    } else if (debugViewMode == 4) {
+    } else if (debugViewMode == 5) {
       // SSAO debug view - show raw SSAO buffer
       DrawTextureRec(rtSSAORaw.texture, srcRect, {0.0f, 0.0f}, WHITE);
-    } else if (debugViewMode == 5) {
+    } else if (debugViewMode == 6) {
       // SSAO blurred debug view
       DrawTextureRec(rtSSAOBlur.texture, srcRect, {0.0f, 0.0f}, WHITE);
     } else {
-      // Normal rendering with edge detection and SSAO
+      // Normal rendering (mode 0) with edge detection and SSAO
       BeginShaderMode(edgeShader);
       DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
       EndShaderMode();
