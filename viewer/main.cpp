@@ -201,8 +201,10 @@ int main(int argc, char *argv[]) {
   Shader pbrShader = LoadShaderFromMemory(shaders::kPBR_VS, shaders::kPBR_FS);
   Shader skyShader = LoadShaderFromMemory(shaders::kSky_VS, shaders::kSky_FS);
   Shader debugShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kDebugDepthFS);
+  Shader ssaoShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kSSAOFS);
+  Shader ssaoBlurShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kSSAOBlurFS);
 
-  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0 || debugShader.id == 0) {
+  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0 || debugShader.id == 0 || ssaoShader.id == 0 || ssaoBlurShader.id == 0) {
     TraceLog(LOG_ERROR, "Failed to load one or more shaders.");
     DestroyModels(models);
     if (brandingFontCustom) UnloadFont(brandingFont);
@@ -274,10 +276,22 @@ int main(int argc, char *argv[]) {
   const int locDepthThreshold = GetShaderLocation(edgeShader, "depthThreshold");
   const int locEdgeIntensity = GetShaderLocation(edgeShader, "edgeIntensity");
   const int locInkColor = GetShaderLocation(edgeShader, "inkColor");
+  const int locEdgeSSAOTex = GetShaderLocation(edgeShader, "ssaoTex");
+  const int locEdgeSSAOStrength = GetShaderLocation(edgeShader, "ssaoStrength");
 
   // Debug shader setup
   const int locDebugNormDepthTex = GetShaderLocation(debugShader, "normDepthTex");
   const int locDebugMode = GetShaderLocation(debugShader, "debugMode");
+
+  // SSAO shader setup (texture0 is auto-bound by raylib)
+  const int locSSAOTexelSize = GetShaderLocation(ssaoShader, "texelSize");
+  const int locSSAORadius = GetShaderLocation(ssaoShader, "ssaoRadius");
+  const int locSSAOIntensity = GetShaderLocation(ssaoShader, "ssaoIntensity");
+  const int locSSAOZNear = GetShaderLocation(ssaoShader, "zNear");
+  const int locSSAOZFar = GetShaderLocation(ssaoShader, "zFar");
+
+  // SSAO blur shader setup (texture0 is auto-bound by raylib)
+  const int locSSAOBlurTexelSize = GetShaderLocation(ssaoBlurShader, "texelSize");
 
   // PBR shader setup
   const int locPbrAlbedoColor = GetShaderLocation(pbrShader, "albedoColor");
@@ -442,15 +456,29 @@ int main(int argc, char *argv[]) {
   SetShaderValue(edgeShader, locInkColor, inkColor, SHADER_UNIFORM_VEC4);
 
   // Render targets
+  struct RenderTargets {
+    RenderTexture2D color;
+    RenderTexture2D normDepth;
+    RenderTexture2D ssaoRaw;
+    RenderTexture2D ssaoBlur;
+  };
+
   auto makeRenderTargets = [&]() {
     const int width = std::max(GetScreenWidth(), 1);
     const int height = std::max(GetScreenHeight(), 1);
-    RenderTexture2D color = LoadRenderTexture(width, height);
-    RenderTexture2D normDepth = LoadRenderTexture(width, height);
-    return std::make_pair(color, normDepth);
+    RenderTargets rt;
+    rt.color = LoadRenderTexture(width, height);
+    rt.normDepth = LoadRenderTexture(width, height);
+    rt.ssaoRaw = LoadRenderTexture(width, height);
+    rt.ssaoBlur = LoadRenderTexture(width, height);
+    return rt;
   };
 
-  auto [rtColor, rtNormalDepth] = makeRenderTargets();
+  RenderTargets rt = makeRenderTargets();
+  auto& rtColor = rt.color;
+  auto& rtNormalDepth = rt.normDepth;
+  auto& rtSSAORaw = rt.ssaoRaw;
+  auto& rtSSAOBlur = rt.ssaoBlur;
   SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
   const float initialTexel[2] = {
       1.0f / static_cast<float>(rtNormalDepth.texture.width),
@@ -459,8 +487,8 @@ int main(int argc, char *argv[]) {
 
   int prevScreenWidth = GetScreenWidth();
   int prevScreenHeight = GetScreenHeight();
-  const float zNear = 0.01f;
-  const float zFar = 1000.0f;
+  const float zNear = 0.1f;
+  const float zFar = 1000.0f;  // Restored to allow distant objects
 
   int frameCount = 0;
   bool screenshotTaken = false;
@@ -596,8 +624,8 @@ int main(int argc, char *argv[]) {
         TraceLog(LOG_INFO, "Rendering mode: %s", pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
       }
       if (IsKeyPressed(KEY_F9)) {
-        debugViewMode = (debugViewMode + 1) % 4;  // Cycle: off -> depth -> normals -> combined -> off
-        const char* modeNames[] = {"Off", "Depth", "Normals", "Combined"};
+        debugViewMode = (debugViewMode + 1) % 6;  // Cycle: off -> depth -> normals -> combined -> SSAO raw -> SSAO blur -> off
+        const char* modeNames[] = {"Off", "Depth", "Normals", "Combined", "SSAO Raw", "SSAO Blur"};
         TraceLog(LOG_INFO, "Debug view: %s (F9 to cycle)", modeNames[debugViewMode]);
       }
       // Assembly step navigation with arrow keys (when panel is visible)
@@ -884,9 +912,13 @@ int main(int argc, char *argv[]) {
     if (screenWidth != prevScreenWidth || screenHeight != prevScreenHeight) {
       UnloadRenderTexture(rtColor);
       UnloadRenderTexture(rtNormalDepth);
+      UnloadRenderTexture(rtSSAORaw);
+      UnloadRenderTexture(rtSSAOBlur);
       auto resizedTargets = makeRenderTargets();
-      rtColor = resizedTargets.first;
-      rtNormalDepth = resizedTargets.second;
+      rtColor = resizedTargets.color;
+      rtNormalDepth = resizedTargets.normDepth;
+      rtSSAORaw = resizedTargets.ssaoRaw;
+      rtSSAOBlur = resizedTargets.ssaoBlur;
       SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
       const float texel[2] = {
           1.0f / static_cast<float>(rtNormalDepth.texture.width),
@@ -1328,8 +1360,58 @@ int main(int argc, char *argv[]) {
     rlEnableColorBlend();  // Re-enable blending for subsequent draws
     EndTextureMode();
 
+    // ============ SSAO Pass ============
+    // Render raw SSAO using normal/depth buffer
+    BeginTextureMode(rtSSAORaw);
+    ClearBackground(WHITE);  // White = no occlusion
+
+    // Set SSAO uniforms
+    const float ssaoTexelSize[2] = {
+        1.0f / static_cast<float>(rtNormalDepth.texture.width),
+        1.0f / static_cast<float>(rtNormalDepth.texture.height)
+    };
+    SetShaderValue(ssaoShader, locSSAOTexelSize, ssaoTexelSize, SHADER_UNIFORM_VEC2);
+    const float ssaoRadius = 0.3f;   // Sample radius in normalized depth space
+    const float ssaoIntensity = 1.0f; // Occlusion intensity multiplier (reduced to avoid overly dark)
+    SetShaderValue(ssaoShader, locSSAORadius, &ssaoRadius, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(ssaoShader, locSSAOIntensity, &ssaoIntensity, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(ssaoShader, locSSAOZNear, &zNear, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(ssaoShader, locSSAOZFar, &zFar, SHADER_UNIFORM_FLOAT);
+
+    BeginShaderMode(ssaoShader);
+    // Draw fullscreen quad - texture0 is auto-bound
+    const Rectangle ssaoSrcRect = {0.0f, 0.0f,
+        static_cast<float>(rtNormalDepth.texture.width),
+        -static_cast<float>(rtNormalDepth.texture.height)};
+    DrawTextureRec(rtNormalDepth.texture, ssaoSrcRect, {0.0f, 0.0f}, WHITE);
+    EndShaderMode();
+    EndTextureMode();
+
+    // ============ SSAO Blur Pass ============
+    // Blur the raw SSAO to remove noise
+    BeginTextureMode(rtSSAOBlur);
+    ClearBackground(WHITE);
+
+    const float ssaoBlurTexelSize[2] = {
+        1.0f / static_cast<float>(rtSSAORaw.texture.width),
+        1.0f / static_cast<float>(rtSSAORaw.texture.height)
+    };
+    SetShaderValue(ssaoBlurShader, locSSAOBlurTexelSize, ssaoBlurTexelSize, SHADER_UNIFORM_VEC2);
+
+    BeginShaderMode(ssaoBlurShader);
+    const Rectangle blurSrcRect = {0.0f, 0.0f,
+        static_cast<float>(rtSSAORaw.texture.width),
+        -static_cast<float>(rtSSAORaw.texture.height)};
+    DrawTextureRec(rtSSAORaw.texture, blurSrcRect, {0.0f, 0.0f}, WHITE);
+    EndShaderMode();
+    EndTextureMode();
+
     // Rebind normal/depth texture in case texture slots were modified by per-object bindings
     SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
+    // Bind SSAO texture and set strength for final composite
+    SetShaderValueTexture(edgeShader, locEdgeSSAOTex, rtSSAOBlur.texture);
+    const float ssaoStrength = 0.15f;  // Subtle SSAO effect
+    SetShaderValue(edgeShader, locEdgeSSAOStrength, &ssaoStrength, SHADER_UNIFORM_FLOAT);
 
     // Final composite
     BeginDrawing();
@@ -1343,15 +1425,21 @@ int main(int argc, char *argv[]) {
     const Rectangle srcRect = {0.0f, 0.0f, static_cast<float>(rtColor.texture.width),
                                -static_cast<float>(rtColor.texture.height)};
 
-    if (debugViewMode > 0) {
+    if (debugViewMode > 0 && debugViewMode <= 3) {
       // Debug visualization mode - texture0 is auto-bound by DrawTextureRec
       int shaderDebugMode = debugViewMode - 1;  // 0=depth, 1=normals, 2=combined
       SetShaderValue(debugShader, locDebugMode, &shaderDebugMode, SHADER_UNIFORM_INT);
       BeginShaderMode(debugShader);
       DrawTextureRec(rtNormalDepth.texture, srcRect, {0.0f, 0.0f}, WHITE);
       EndShaderMode();
+    } else if (debugViewMode == 4) {
+      // SSAO debug view - show raw SSAO buffer
+      DrawTextureRec(rtSSAORaw.texture, srcRect, {0.0f, 0.0f}, WHITE);
+    } else if (debugViewMode == 5) {
+      // SSAO blurred debug view
+      DrawTextureRec(rtSSAOBlur.texture, srcRect, {0.0f, 0.0f}, WHITE);
     } else {
-      // Normal rendering with edge detection
+      // Normal rendering with edge detection and SSAO
       BeginShaderMode(edgeShader);
       DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
       EndShaderMode();

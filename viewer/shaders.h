@@ -154,12 +154,14 @@ out vec4 finalColor;
 
 uniform sampler2D texture0;
 uniform sampler2D normDepthTex;
+uniform sampler2D ssaoTex;
 uniform vec2 texel;
 
 uniform float normalThreshold;
 uniform float depthThreshold;
 uniform float edgeIntensity;
 uniform vec4 inkColor;
+uniform float ssaoStrength;  // 0=no SSAO, 1=full SSAO
 
 vec3 decodeN(vec3 c){ return normalize(c*2.0 - 1.0); }
 
@@ -168,6 +170,11 @@ void main(){
     vec4 nd  = texture(normDepthTex, uv);
     vec3 n   = decodeN(nd.rgb);
     float d  = nd.a;
+
+    // Sample SSAO (white=1=no occlusion, black=0=full occlusion)
+    float ssao = texture(ssaoTex, uv).r;
+    // Blend between no SSAO (1.0) and full SSAO based on strength
+    float ssaoFactor = mix(1.0, ssao, ssaoStrength);
 
     const vec2 offs[8] = vec2[](vec2(-1,-1), vec2(0,-1), vec2(1,-1),
                                 vec2(-1, 0),              vec2(1, 0),
@@ -184,7 +191,9 @@ void main(){
     float eD = smoothstep(depthThreshold,  depthThreshold*6.0,  maxDDiff);
     float edge = clamp(max(eN, eD)*edgeIntensity, 0.0, 1.0);
 
-    vec3 inked = mix(col.rgb, inkColor.rgb, edge);
+    // Apply SSAO to color before edge overlay
+    vec3 aoColor = col.rgb * ssaoFactor;
+    vec3 inked = mix(aoColor, inkColor.rgb, edge);
     finalColor = vec4(inked, col.a);
 }
 )glsl";
@@ -821,6 +830,118 @@ void main() {
 )glsl";
 
 // ============================================================================
+// SSAO (Screen Space Ambient Occlusion) shader
+// ============================================================================
+
+// SSAO shader - samples depth around each pixel to compute occlusion
+inline const char* kSSAOFS = R"glsl(
+#version 330
+in vec2 uv;
+out vec4 finalColor;
+
+uniform sampler2D texture0;  // RGB=normal, A=linear depth (auto-bound by raylib)
+uniform vec2 texelSize;
+uniform float ssaoRadius;
+uniform float ssaoIntensity;
+uniform float zNear;
+uniform float zFar;
+
+float random(vec2 co) {
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+void main() {
+    vec4 nd = texture(texture0, uv);
+    float depth = nd.a;
+
+    // Skip background
+    if (depth > 0.99) {
+        finalColor = vec4(1.0);
+        return;
+    }
+
+    vec3 normal = normalize(nd.rgb * 2.0 - 1.0);
+    float linearDepth = depth * (zFar - zNear) + zNear;
+
+    // Sample radius scales with depth - larger radius when zoomed out
+    float sampleRadius = ssaoRadius * 50.0 * (linearDepth / 10.0);
+    sampleRadius = clamp(sampleRadius, 10.0, 100.0);
+
+    const int SAMPLES = 12;
+    float occlusion = 0.0;
+    float validSamples = 0.0;
+
+    float rotAngle = random(uv * 1000.0) * 6.283185;
+
+    for (int i = 0; i < SAMPLES; i++) {
+        float angle = float(i) * 2.399963 + rotAngle;
+        float r = (float(i) + 1.0) / float(SAMPLES);
+        r = sqrt(r) * sampleRadius;
+
+        vec2 offset = vec2(cos(angle), sin(angle)) * r * texelSize;
+        vec4 neighborND = texture(texture0, uv + offset);
+        float neighborDepth = neighborND.a;
+
+        // Skip background
+        if (neighborDepth > 0.99) continue;
+
+        // Normal-based: only trigger at real corners (normals must differ significantly)
+        vec3 neighborNormal = normalize(neighborND.rgb * 2.0 - 1.0);
+        float normalDot = max(0.0, dot(normal, neighborNormal));
+        float normalDiff = 1.0 - normalDot;
+
+        // Only count as occlusion at real corners (threshold 0.3 = ~70 degree difference)
+        float occlusionContrib = 0.0;
+        if (normalDiff > 0.3) {
+            // Strong corners get full occlusion, weaker get less
+            occlusionContrib = smoothstep(0.3, 0.7, normalDiff);
+        }
+
+        occlusion += occlusionContrib;
+        validSamples += 1.0;
+    }
+
+    // Normalize
+    if (validSamples > 0.0) {
+        occlusion = occlusion / validSamples;
+    }
+
+    // Apply intensity - output: 1=bright/no occlusion, 0=dark/full occlusion
+    float ao = 1.0 - occlusion * ssaoIntensity * 0.5;
+    ao = clamp(ao, 0.0, 1.0);
+
+    finalColor = vec4(ao, ao, ao, 1.0);
+}
+)glsl";
+
+// SSAO blur shader - simple box blur to smooth the noisy SSAO
+inline const char* kSSAOBlurFS = R"glsl(
+#version 330
+in vec2 uv;
+out vec4 finalColor;
+
+uniform sampler2D texture0;  // SSAO raw texture (auto-bound by raylib)
+uniform vec2 texelSize;
+
+void main() {
+    float result = 0.0;
+    const int BLUR_SIZE = 2;
+    float count = 0.0;
+
+    for (int x = -BLUR_SIZE; x <= BLUR_SIZE; x++) {
+        for (int y = -BLUR_SIZE; y <= BLUR_SIZE; y++) {
+            vec2 offset = vec2(float(x), float(y)) * texelSize;
+            result += texture(texture0, uv + offset).r;
+            count += 1.0;
+        }
+    }
+
+    result /= count;
+    finalColor = vec4(result, result, result, 1.0);
+}
+)glsl";
+
+// ============================================================================
 // Debug visualization shaders
 // ============================================================================
 
@@ -841,11 +962,13 @@ void main() {
     bool isBackground = nd.a > 0.99;
 
     if (debugMode == 0) {
-        // Depth visualization with gamma expansion
-        // Linear depth compresses most values to 0-0.1 range
-        // Use pow(d, 0.15) to expand: 0.01->0.5, 0.1->0.7, 1.0->1.0
-        float d = pow(nd.a, 0.15);
-        // Near objects = dark, far/background = bright
+        // Depth visualization with logarithmic mapping
+        // With zFar=1000, linear depth compresses to tiny range
+        // Log scale spreads values more evenly across visual range
+        float logScale = 50.0;  // Controls compression (higher = more spread for near)
+        float logDepth = log(1.0 + nd.a * logScale) / log(1.0 + logScale);
+        // Invert: near objects = bright, far = dark (more intuitive)
+        float d = 1.0 - logDepth;
         finalColor = vec4(d, d, d, 1.0);
     } else if (debugMode == 1) {
         // Normals visualization - RGB encodes XYZ direction
@@ -856,12 +979,14 @@ void main() {
         }
     } else {
         // Combined: normals with depth shading
-        float d = pow(nd.a, 0.15);
+        float logScale = 50.0;
+        float logDepth = log(1.0 + nd.a * logScale) / log(1.0 + logScale);
+        float d = 1.0 - logDepth;  // near=bright, far=dark
         if (isBackground) {
             finalColor = vec4(0.3, 0.3, 0.4, 1.0);
         } else {
-            // Darken normals based on depth (near = full color, far = darker)
-            finalColor = vec4(nd.rgb * (1.0 - d * 0.7), 1.0);
+            // Brighten normals based on proximity (near = full color, far = darker)
+            finalColor = vec4(nd.rgb * (0.3 + d * 0.7), 1.0);
         }
     }
 }
