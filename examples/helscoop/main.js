@@ -1860,6 +1860,46 @@ const run_frame = union(
 );
 
 // ============================================================================
+// HARDWARE CLOTH WALLS - Mesh enclosure for run
+// ============================================================================
+
+const mesh_thickness = 5;  // Thin panel representing hardware cloth
+const mesh_bottom_z = lower_rail_z + post_sec[0] / 2;  // Start above lower rails
+const mesh_top_z = run_base_z + run_height - post_sec[0];  // Stop below top rails
+const mesh_height = mesh_top_z - mesh_bottom_z;
+
+// Front wall (south side, Y = run_base_y) - with gate opening
+// Section from gate post to far right corner
+const run_mesh_front = translate(
+  cube({ size: [run_length - gate_width - post_sec[0] * 2, mesh_thickness, mesh_height], center: false }),
+  [run_base_x + gate_width + post_sec[0], run_base_y + post_sec[1] / 2 - mesh_thickness / 2, mesh_bottom_z]
+);
+
+// Back wall (north side, Y = run_base_y + run_width) - full length
+const run_mesh_back = translate(
+  cube({ size: [run_length - post_sec[0] * 2, mesh_thickness, mesh_height], center: false }),
+  [run_base_x + post_sec[0], run_base_y + run_width - post_sec[1] / 2 - mesh_thickness / 2, mesh_bottom_z]
+);
+
+// Right wall (east side, X = run_base_x + run_length) - full width
+const run_mesh_right = translate(
+  cube({ size: [mesh_thickness, run_width - post_sec[1] * 2, mesh_height], center: false }),
+  [run_base_x + run_length - post_sec[0] / 2 - mesh_thickness / 2, run_base_y + post_sec[1], mesh_bottom_z]
+);
+
+// Left wall (west side, X = run_base_x) - sections above/below tunnel connection
+// Top section above tunnel opening
+const tunnel_connect_height = 800;  // Height of tunnel opening
+const left_wall_top_height = mesh_height - tunnel_connect_height;
+const run_mesh_left_top = translate(
+  cube({ size: [mesh_thickness, run_width - post_sec[1] * 2, left_wall_top_height], center: false }),
+  [run_base_x + post_sec[0] / 2 - mesh_thickness / 2, run_base_y + post_sec[1], mesh_bottom_z + tunnel_connect_height]
+);
+
+// Combine all mesh walls
+const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top);
+
+// ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
 // ============================================================================
 
@@ -2123,7 +2163,7 @@ function chicken(scale_factor = 1.0, pose = 0) {
 }
 
 // Place chickens around the scene
-const chicken_scale = 2.5;
+const chicken_scale = 4.0;  // Increased for better visibility in renders
 
 // Chicken in run near entrance
 const chicken1 = translate(
@@ -2677,6 +2717,9 @@ const scaledWaterer = withColor(scale(waterer, DISPLAY_SCALE), WATERER_BLUE);
 // Run gate (the swinging door, not the frame)
 const scaledRunGate = withMaterial(scale(run_gate, DISPLAY_SCALE), 'cedar_post_98x98', 'run_gate');
 
+// Hardware cloth mesh walls for run enclosure
+const scaledRunMeshWalls = withMaterial(scale(run_mesh_walls, DISPLAY_SCALE), 'hardware_cloth', 'run_mesh_walls');
+
 // L-extension frame - now with objectId
 const scaledLExtension = withMaterial(scale(l_extension_frame, DISPLAY_SCALE), 'cedar_post_98x98', 'l_extension');
 
@@ -2769,6 +2812,7 @@ export const scene = [
     scaledRunRidgeBeam,
     scaledRunRoofRafters,
     scaledRunGate,
+    scaledRunMeshWalls,  // Hardware cloth enclosure walls
     // scaledMeshApron moved to assemblyOnlyObjects
     scaledChickenGym,
     scaledLExtension
