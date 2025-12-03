@@ -737,9 +737,8 @@ void main() {
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // Shadow calculation (disabled for now - needs coordinate system debugging)
-    // float shadow = calculateShadow(fragPosLightSpace, N, L);
-    float shadow = 0.0;
+    // Shadow calculation
+    float shadow = calculateShadow(fragPosLightSpace, N, L);
 
     // Direct lighting with shadows
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);

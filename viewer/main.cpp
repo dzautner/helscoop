@@ -217,12 +217,8 @@ int main(int argc, char *argv[]) {
   // Shadow mapping shaders
   Shader shadowDepthShader = LoadShaderFromMemory(shaders::kShadowDepth_VS, shaders::kShadowDepth_FS);
   Shader pbrShadowShader = LoadShaderFromMemory(shaders::kPBRShadow_VS, shaders::kPBRShadow_FS);
-  // Shadow mapping disabled - causes visual artifacts (minimap bug)
-  bool shadowsEnabled = false;
-  // bool shadowsEnabled = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
-  // if (shadowsEnabled) {
-  //   TraceLog(LOG_INFO, "Shadow mapping enabled");
-  // }
+  // Enable shadow mapping if both shaders loaded successfully
+  bool shadowsEnabled = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
 
   // Ground plane shader
   Shader groundPlaneShader = LoadShaderFromMemory(shaders::kGroundPlane_VS, shaders::kGroundPlane_FS);
@@ -397,16 +393,27 @@ int main(int argc, char *argv[]) {
   SetShaderValue(pbrShadowShader, locPbrShadowGround, pbrGround, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShadowShader, locPbrShadowLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
-  // Set shadow map sampler to use texture unit 1
-  int shadowMapTexUnit = 1;
+  // Set shadow map sampler to use texture unit 3 (units 0-2 used by post-processing)
+  int shadowMapTexUnit = 3;
   SetShaderValue(pbrShadowShader, locPbrShadowShadowMap, &shadowMapTexUnit, SHADER_UNIFORM_INT);
 
   Material pbrShadowMat = LoadMaterialDefault();
   pbrShadowMat.shader = pbrShadowShader;
   pbrShadowShader.locs[SHADER_LOC_MAP_DIFFUSE] = locPbrShadowAlbedoTex;
+  // Disable automatic texture binding for unused slots (prevents Apple Metal errors)
+  // Clear all material map textures except diffuse to prevent raylib from binding them
+  // Raylib has 12 material map slots (MATERIAL_MAP_BRDF = 11 is the last)
+  for (int i = 1; i <= MATERIAL_MAP_BRDF; i++) {
+    pbrShadowMat.maps[i].texture.id = 0;
+  }
+  // Shadow map will be manually bound via rlActiveTextureSlot in draw loop
 
   Material shadowDepthMat = LoadMaterialDefault();
   shadowDepthMat.shader = shadowDepthShader;
+  // Clear unused texture slots for shadowDepthMat too
+  for (int i = 1; i <= MATERIAL_MAP_BRDF; i++) {
+    shadowDepthMat.maps[i].texture.id = 0;
+  }
 
   // Static toon lighting configuration
   const Vector3 lightDirWS = Vector3Normalize({0.45f, 0.85f, 0.35f});
@@ -1044,9 +1051,7 @@ int main(int argc, char *argv[]) {
       SetShaderValueMatrix(pbrShadowShader, locPbrShadowLightSpaceMatrix, lightSpaceMatrix);
       SetShaderValue(pbrShadowShader, locPbrShadowLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
 
-      // Bind shadow map to texture unit 1
-      rlActiveTextureSlot(1);
-      rlEnableTexture(shadowMap.texture.id);
+      // Shadow map is manually bound to texture unit 3 in the draw loop below
     }
 
     // ========================================================================
@@ -1293,9 +1298,19 @@ int main(int argc, char *argv[]) {
           pbrShadowMat.maps[MATERIAL_MAP_DIFFUSE].texture =
             (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
 
+          // Bind shadow map to texture unit 3 once for all meshes
+          rlActiveTextureSlot(3);
+          rlEnableTexture(shadowMap.texture.id);
+          rlActiveTextureSlot(0);  // Reset to slot 0 so DrawMesh binds diffuse correctly
+
           for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
             DrawMesh(modelWithColor.model.meshes[i], pbrShadowMat, modelWithColor.model.transform);
           }
+
+          // Unbind shadow map from unit 3 to avoid interfering with post-processing
+          rlActiveTextureSlot(3);
+          rlDisableTexture();
+          rlActiveTextureSlot(0);
         } else {
           // PBR without shadows (fallback)
           SetShaderValue(pbrShader, locPbrAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
