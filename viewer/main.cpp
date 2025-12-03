@@ -3,6 +3,7 @@
 #include "rlgl.h"
 
 #include <atomic>
+#include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <future>
@@ -1023,8 +1024,47 @@ int main(int argc, char *argv[]) {
 
     BeginMode3D(camera);
     if (pbrModeEnabled) {
-      // Ground plane disabled - was causing visual artifacts
-      // TODO: Fix ground plane positioning relative to scene bounds
+      // Draw a simple ground plane using the PBR shader
+      // Calculate scene bounds to position and center ground correctly
+      float minY = 0.0f, centerX = 0.0f, centerZ = 0.0f;
+      float minX = FLT_MAX, maxX = -FLT_MAX, minZ = FLT_MAX, maxZ = -FLT_MAX;
+      for (const auto& m : models) {
+        BoundingBox bbox = GetModelBoundingBox(m.model);
+        Vector3 corners[8] = {
+          {bbox.min.x, bbox.min.y, bbox.min.z}, {bbox.max.x, bbox.min.y, bbox.min.z},
+          {bbox.min.x, bbox.min.y, bbox.max.z}, {bbox.max.x, bbox.min.y, bbox.max.z},
+          {bbox.min.x, bbox.max.y, bbox.min.z}, {bbox.max.x, bbox.max.y, bbox.min.z},
+          {bbox.min.x, bbox.max.y, bbox.max.z}, {bbox.max.x, bbox.max.y, bbox.max.z},
+        };
+        for (int i = 0; i < 8; i++) {
+          Vector3 p = Vector3Transform(corners[i], m.model.transform);
+          if (p.y < minY) minY = p.y;
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.z < minZ) minZ = p.z;
+          if (p.z > maxZ) maxZ = p.z;
+        }
+      }
+      centerX = (minX + maxX) * 0.5f;
+      centerZ = (minZ + maxZ) * 0.5f;
+
+      // Set ground material properties (earthy brown-grey, rough, non-metallic)
+      float groundAlbedo[4] = {0.32f, 0.30f, 0.25f, 1.0f};  // Earthy brown
+      float groundRoughness = 0.95f;
+      float groundMetallic = 0.0f;
+      float groundAo = 1.0f;
+      int noTex = 0;
+      SetShaderValue(pbrShader, locPbrAlbedoColor, groundAlbedo, SHADER_UNIFORM_VEC4);
+      SetShaderValue(pbrShader, locPbrRoughness, &groundRoughness, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(pbrShader, locPbrMetallic, &groundMetallic, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(pbrShader, locPbrAo, &groundAo, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(pbrShader, locPbrUseAlbedoTex, &noTex, SHADER_UNIFORM_INT);
+
+      // Draw ground plane centered on scene, slightly below
+      rlPushMatrix();
+      rlTranslatef(centerX, minY - 0.002f, centerZ);
+      DrawMesh(groundPlaneMesh, pbrMat, MatrixIdentity());
+      rlPopMatrix();
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
       DrawAxes(2.0f);  // Only draw axes in toon mode
