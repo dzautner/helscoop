@@ -147,6 +147,7 @@ struct ModelWithColor {
   Model model;
   Color color;
   std::string materialId;  // For texture lookup
+  size_t sceneObjectIndex = 0;  // Index into sceneData.objects (for assemblyOnly check)
 };
 
 // Module loader state for QuickJS
@@ -200,6 +201,7 @@ struct PrecomputedMesh {
   Color color;
   std::string materialId;
   std::string objectId;  // For assembly step filtering
+  size_t sceneObjectIndex = 0;  // Index into sceneData.objects (for assemblyOnly check)
 };
 
 // Result of background loading (JS eval + CSG + tessellation)

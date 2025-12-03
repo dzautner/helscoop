@@ -1235,14 +1235,15 @@ int main(int argc, char *argv[]) {
       const auto &modelWithColor = models[modelIdx];
 
       // Skip assemblyOnly objects when NOT in assembly mode
-      if (!uiState.showAssemblyPanel && modelIdx < sceneData.objects.size() &&
-          sceneData.objects[modelIdx].assemblyOnly) {
+      size_t objIdx = modelWithColor.sceneObjectIndex;
+      if (!uiState.showAssemblyPanel && objIdx < sceneData.objects.size() &&
+          sceneData.objects[objIdx].assemblyOnly) {
         continue;
       }
 
       // Skip objects not visible in current assembly step
       if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
-        if (assemblyVisibleSet.find(modelIdx) == assemblyVisibleSet.end()) {
+        if (assemblyVisibleSet.find(objIdx) == assemblyVisibleSet.end()) {
           continue;
         }
       }
@@ -1252,7 +1253,7 @@ int main(int argc, char *argv[]) {
                              modelWithColor.materialId == highlightMatId;
 
       // In assembly mode, highlight new parts
-      bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(modelIdx) != assemblyNewSet.end();
+      bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(objIdx) != assemblyNewSet.end();
 
       if (shouldHighlight) {
         // Bright orange outline for highlighted objects
@@ -1288,14 +1289,15 @@ int main(int argc, char *argv[]) {
       const auto &modelWithColor = models[modelIdx];
 
       // Skip assemblyOnly objects when NOT in assembly mode
-      if (!uiState.showAssemblyPanel && modelIdx < sceneData.objects.size() &&
-          sceneData.objects[modelIdx].assemblyOnly) {
+      size_t objIdx = modelWithColor.sceneObjectIndex;
+      if (!uiState.showAssemblyPanel && objIdx < sceneData.objects.size() &&
+          sceneData.objects[objIdx].assemblyOnly) {
         continue;
       }
 
       // Skip objects not visible in current assembly step
       if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
-        if (assemblyVisibleSet.find(modelIdx) == assemblyVisibleSet.end()) {
+        if (assemblyVisibleSet.find(objIdx) == assemblyVisibleSet.end()) {
           continue;
         }
       }
@@ -1314,7 +1316,7 @@ int main(int argc, char *argv[]) {
       }
 
       // Check if this is a new part in assembly mode (for color modification)
-      bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(modelIdx) != assemblyNewSet.end();
+      bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(objIdx) != assemblyNewSet.end();
 
       // Use thermal color if thermal view is enabled and material has thermal data
       Color renderColor = modelWithColor.color;

@@ -236,18 +236,21 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
     std::future<manifold::MeshGL> future;
     Color color;
     std::string materialId;
+    size_t sceneObjectIndex;  // Track original index for assemblyOnly check
   };
   std::vector<MeshTask> tasks;
   tasks.reserve(sceneData.objects.size());
 
-  for (const auto& obj : sceneData.objects) {
+  for (size_t i = 0; i < sceneData.objects.size(); ++i) {
+    const auto& obj = sceneData.objects[i];
     if (obj.geometry) {
       tasks.push_back({
         std::async(std::launch::async, [geom = obj.geometry]() {
           return geom->GetMeshGL();
         }),
         obj.color,
-        obj.materialId
+        obj.materialId,
+        i  // Store original scene object index
       });
     }
   }
@@ -256,11 +259,12 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
     manifold::MeshGL meshGL;
     Color color;
     std::string materialId;
+    size_t sceneObjectIndex;
   };
   std::vector<MeshResult> meshes;
   meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    meshes.push_back({task.future.get(), task.color, std::move(task.materialId)});
+    meshes.push_back({task.future.get(), task.color, std::move(task.materialId), task.sceneObjectIndex});
   }
 
   auto meshEnd = std::chrono::high_resolution_clock::now();
@@ -270,7 +274,7 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
   result.reserve(meshes.size());
   for (auto& mesh : meshes) {
     Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
-    result.push_back({model, mesh.color, std::move(mesh.materialId)});
+    result.push_back({model, mesh.color, std::move(mesh.materialId), mesh.sceneObjectIndex});
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -289,7 +293,7 @@ std::vector<ModelWithColor> CreateModelsFromPrecomputed(std::vector<PrecomputedM
 
   for (auto& mesh : meshes) {
     Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
-    result.push_back({model, mesh.color, mesh.materialId});
+    result.push_back({model, mesh.color, mesh.materialId, mesh.sceneObjectIndex});
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(

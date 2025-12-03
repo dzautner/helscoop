@@ -724,11 +724,13 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
     Color color;
     std::string materialId;
     std::string objectId;
+    size_t sceneObjectIndex;  // Track original index for assemblyOnly check
   };
   std::vector<TessTask> tasks;
   tasks.reserve(result.sceneData.objects.size());
 
-  for (const auto& obj : result.sceneData.objects) {
+  for (size_t i = 0; i < result.sceneData.objects.size(); ++i) {
+    const auto& obj = result.sceneData.objects[i];
     if (obj.geometry) {
       tasks.push_back({
         std::async(std::launch::async, [geom = obj.geometry]() {
@@ -736,14 +738,15 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
         }),
         obj.color,
         obj.materialId,
-        obj.objectId
+        obj.objectId,
+        i  // Store original scene object index
       });
     }
   }
 
   result.meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    result.meshes.push_back({task.future.get(), task.color, task.materialId, task.objectId});
+    result.meshes.push_back({task.future.get(), task.color, task.materialId, task.objectId, task.sceneObjectIndex});
   }
 
   auto end = std::chrono::high_resolution_clock::now();
