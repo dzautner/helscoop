@@ -2,6 +2,10 @@
 #include "raymath.h"
 #include "rlgl.h"
 
+#ifdef __APPLE__
+#include <OpenGL/gl3.h>
+#endif
+
 #include <atomic>
 #include <cfloat>
 #include <chrono>
@@ -279,6 +283,8 @@ int main(int argc, char *argv[]) {
   const int locPbrUseAlbedoTex = GetShaderLocation(pbrShader, "useAlbedoTex");
   const int locPbrLightDir = GetShaderLocation(pbrShader, "lightDir");
   const int locPbrLightColor = GetShaderLocation(pbrShader, "lightColor");
+  const int locPbrLightDir2 = GetShaderLocation(pbrShader, "lightDir2");
+  const int locPbrLightColor2 = GetShaderLocation(pbrShader, "lightColor2");
   const int locPbrSkyTop = GetShaderLocation(pbrShader, "skyColorTop");
   const int locPbrSkyBottom = GetShaderLocation(pbrShader, "skyColorBottom");
   const int locPbrGround = GetShaderLocation(pbrShader, "groundColor");
@@ -298,6 +304,9 @@ int main(int argc, char *argv[]) {
   // PBR light (sun-like directional) - bright for good contrast
   const float pbrLightColor[3] = {4.5f, 4.3f, 3.8f}; // Bright warm sunlight (HDR intensity)
   SetShaderValue(pbrShader, locPbrLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
+
+  // Secondary light (cool fill from opposite side) - fills in shadows
+  const float pbrLightColor2[3] = {0.8f, 0.9f, 1.2f}; // Cool blue-ish fill light
 
   // Rendering mode toggle
   bool pbrModeEnabled = true;  // Start with PBR enabled for realistic look
@@ -381,6 +390,8 @@ int main(int argc, char *argv[]) {
 
   // Static toon lighting configuration
   const Vector3 lightDirWS = Vector3Normalize({0.45f, 0.85f, 0.35f});
+  // Secondary fill light - comes from opposite side, lower angle (simulates sky bounce)
+  const Vector3 lightDir2WS = Vector3Normalize({-0.6f, 0.4f, -0.5f});
   const float baseCol[4] = {kBaseColor.r / 255.0f, kBaseColor.g / 255.0f, kBaseColor.b / 255.0f, 1.0f};
   SetShaderValue(toonShader, locBaseColor, baseCol, SHADER_UNIFORM_VEC4);
 
@@ -883,8 +894,10 @@ int main(int argc, char *argv[]) {
     lightDirVS = Vector3Normalize(lightDirVS);
     SetShaderValue(toonShader, locLightDirVS, &lightDirVS.x, SHADER_UNIFORM_VEC3);
 
-    // Update PBR shader light direction (world space)
+    // Update PBR shader light directions (world space)
     SetShaderValue(pbrShader, locPbrLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShader, locPbrLightDir2, &lightDir2WS.x, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShader, locPbrLightColor2, pbrLightColor2, SHADER_UNIFORM_VEC3);
 
     float outlineThickness = 0.0f;
     {
@@ -1134,6 +1147,14 @@ int main(int argc, char *argv[]) {
     setOutlineUniforms(outlineThickness, outlineColor);
     } // end of !pbrModeEnabled outline pass
 
+    // Enable polygon offset to fix z-fighting on coplanar surfaces (door panels, cladding)
+#ifdef __APPLE__
+    if (pbrModeEnabled) {
+      glEnable(GL_POLYGON_OFFSET_FILL);
+      glPolygonOffset(1.0f, 1.0f);
+    }
+#endif
+
     // Toon shading pass
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
@@ -1260,6 +1281,14 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+
+    // Disable polygon offset after rendering
+#ifdef __APPLE__
+    if (pbrModeEnabled) {
+      glDisable(GL_POLYGON_OFFSET_FILL);
+    }
+#endif
+
     EndMode3D();
     EndTextureMode();
 

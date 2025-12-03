@@ -42,3 +42,9 @@ target_link_libraries(dingcad_viewer
     raylib
     dingcad_quickjs
 )
+
+# Link OpenGL framework on macOS for direct GL function access
+if(APPLE)
+  target_link_libraries(dingcad_viewer PRIVATE "-framework OpenGL")
+  target_compile_definitions(dingcad_viewer PRIVATE GL_SILENCE_DEPRECATION)
+endif()

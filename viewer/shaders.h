@@ -252,6 +252,10 @@ uniform vec3 lightDir;      // Directional light direction (normalized, pointing
 uniform vec3 lightColor;    // Light color/intensity
 uniform vec3 ambientColor;  // Ambient light color
 
+// Secondary light (fill/rim)
+uniform vec3 lightDir2;     // Secondary light direction
+uniform vec3 lightColor2;   // Secondary light color (usually dimmer, cooler)
+
 // Environment approximation (simple gradient sky)
 uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
@@ -377,9 +381,21 @@ void main() {
     vec3 kD = vec3(1.0) - kS;  // Diffuse contribution
     kD *= 1.0 - metallic;  // Metals have no diffuse
 
-    // Direct lighting
+    // Direct lighting from primary light
     float NdotL = max(dot(N, L), 0.0);
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
+
+    // === SECONDARY LIGHT (fill/rim light) ===
+    vec3 L2 = normalize(lightDir2);
+    vec3 H2 = normalize(V + L2);
+    float NDF2 = DistributionGGX(N, H2, roughness);
+    float G2 = GeometrySmith(N, V, L2, roughness);
+    vec3 F2 = fresnelSchlick(max(dot(H2, V), 0.0), F0);
+    vec3 spec2 = (NDF2 * G2 * F2) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L2), 0.0) + 0.0001);
+    vec3 kD2 = (vec3(1.0) - F2) * (1.0 - metallic);
+    float NdotL2 = max(dot(N, L2), 0.0);
+    vec3 Lo2 = (kD2 * albedo / PI + spec2) * lightColor2 * NdotL2;
+    Lo += Lo2;
 
     // Ambient/Environment lighting (improved IBL approximation)
     float NdotV = max(dot(N, V), 0.0);
@@ -428,21 +444,15 @@ void main() {
 
     vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
 
-    // === FILL LIGHT (simulates sky bounce) ===
-    // Add soft fill from opposite direction (sky bounce)
-    vec3 fillDir = normalize(vec3(-L.x, 0.3, -L.z));
-    float fillNdotL = max(dot(N, fillDir), 0.0) * 0.15;
-    vec3 fillLight = skyColorBottom * albedo * fillNdotL * (1.0 - metallic);
-
-    // Direct lighting with shadow
+    // Direct lighting with shadow (both primary and secondary lights)
     vec3 directLighting = Lo * shadowFactor;
 
     // Rim/fresnel lighting for depth (catches light at edges)
-    float rim = pow(1.0 - NdotV, 3.0) * 0.2;
+    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     // === FINAL COMPOSITION ===
-    vec3 color = ambient + directLighting + fillLight + rimColor;
+    vec3 color = ambient + directLighting + rimColor;
 
     // ACES Filmic tone mapping (better contrast and color preservation than Reinhard)
     // From: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
