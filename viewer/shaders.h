@@ -399,15 +399,28 @@ void main() {
     vec2 envBRDF = approximateBRDF(NdotV, roughness);
     vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
 
-    // Fake ambient occlusion based on normal direction
-    // Surfaces facing down get more occlusion (ground bounce is darker)
-    float fakeAO = 0.5 + 0.5 * clamp(N.y * 0.7 + 0.3, 0.0, 1.0);
-    fakeAO = mix(fakeAO, 1.0, metallic * 0.5);  // Metals less affected
+    // Improved ambient occlusion
+    // 1. Surfaces facing down get more occlusion (ground bounce is darker)
+    float normalAO = 0.4 + 0.6 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
+
+    // 2. Surfaces facing away from light get subtle darkening (fake shadow)
+    float shadowFactor = clamp(dot(N, L) * 0.3 + 0.7, 0.5, 1.0);
+
+    // 3. Height-based contact shadow (objects near ground are darker at bottom)
+    float heightAO = clamp(fragPos.y * 0.5 + 0.7, 0.5, 1.0);
+
+    // Combine all AO factors
+    float fakeAO = normalAO * shadowFactor * heightAO;
+    fakeAO = mix(fakeAO, 1.0, metallic * 0.3);  // Metals less affected
 
     vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao * fakeAO;
 
-    // Final color
-    vec3 color = ambient + Lo;
+    // Add subtle rim lighting for depth
+    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
+    vec3 rimColor = skyColorTop * rim;
+
+    // Final color with rim
+    vec3 color = ambient + Lo + rimColor;
 
     // ACES Filmic tone mapping (better contrast and color preservation than Reinhard)
     // From: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
