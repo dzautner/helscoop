@@ -304,14 +304,44 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
     return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// Simple environment lighting (hemisphere approximation)
+// Improved environment lighting with horizon band and proper hemisphere sampling
 vec3 getEnvironmentLight(vec3 N, float rough) {
-    float skyFactor = N.y * 0.5 + 0.5;  // 0 at bottom, 1 at top
-    vec3 skyColor = mix(groundColor, mix(skyColorBottom, skyColorTop, skyFactor), max(0.0, N.y));
+    // Smoother hemisphere interpolation
+    float upFactor = N.y * 0.5 + 0.5;  // 0 at bottom, 1 at top
+    upFactor = clamp(upFactor, 0.0, 1.0);
 
-    // Rough surfaces see more averaged environment
-    float mip = rough * 4.0;
-    return mix(skyColor, (skyColorTop + skyColorBottom + groundColor) / 3.0, rough * 0.5);
+    // Three-way blend: ground -> horizon -> sky
+    vec3 skyColor;
+    if (N.y > 0.0) {
+        // Above horizon: blend horizon to sky top
+        float t = pow(upFactor, 0.6);  // Non-linear for softer gradient
+        skyColor = mix(skyColorBottom, skyColorTop, t);
+    } else {
+        // Below horizon: blend ground to horizon
+        float t = pow(1.0 - upFactor, 0.8);
+        skyColor = mix(skyColorBottom, groundColor, t);
+    }
+
+    // Add subtle horizon glow (brighter at horizon)
+    float horizonDist = abs(N.y);
+    float horizonGlow = exp(-horizonDist * 3.0) * 0.15;
+    skyColor += vec3(1.0, 0.95, 0.9) * horizonGlow;
+
+    // Roughness-based blur simulation (rough surfaces see averaged environment)
+    vec3 avgEnv = (skyColorTop + skyColorBottom * 2.0 + groundColor) * 0.25;
+    skyColor = mix(skyColor, avgEnv, rough * rough * 0.6);
+
+    return skyColor;
+}
+
+// Approximate the split-sum BRDF LUT for specular IBL
+vec2 approximateBRDF(float NdotV, float roughness) {
+    // Approximation from "Real Shading in Unreal Engine 4" by Brian Karis
+    vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+    vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+    vec4 r = roughness * c0 + c1;
+    float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
+    return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
 void main() {
@@ -351,20 +381,30 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
 
-    // Ambient/Environment lighting (simplified IBL)
-    vec3 F_env = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    // Ambient/Environment lighting (improved IBL approximation)
+    float NdotV = max(dot(N, V), 0.0);
+    vec3 F_env = fresnelSchlickRoughness(NdotV, F0, roughness);
     vec3 kS_env = F_env;
     vec3 kD_env = (1.0 - kS_env) * (1.0 - metallic);
 
-    vec3 irradiance = getEnvironmentLight(N, 1.0);  // Diffuse uses fully rough
+    // Diffuse irradiance (sample environment at normal direction, fully rough)
+    vec3 irradiance = getEnvironmentLight(N, 1.0);
     vec3 diffuseEnv = irradiance * albedo;
 
+    // Specular reflection (sample environment at reflection direction)
     vec3 R = reflect(-V, N);
-    vec3 prefilteredColor = getEnvironmentLight(R, roughness);  // Specular uses reflection
-    vec2 envBRDF = vec2(1.0 - roughness * 0.5, roughness * 0.1);  // Approximation
+    vec3 prefilteredColor = getEnvironmentLight(R, roughness);
+
+    // Use proper BRDF LUT approximation instead of guessed values
+    vec2 envBRDF = approximateBRDF(NdotV, roughness);
     vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
 
-    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao;
+    // Fake ambient occlusion based on normal direction
+    // Surfaces facing down get more occlusion (ground bounce is darker)
+    float fakeAO = 0.5 + 0.5 * clamp(N.y * 0.7 + 0.3, 0.0, 1.0);
+    fakeAO = mix(fakeAO, 1.0, metallic * 0.5);  // Metals less affected
+
+    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao * fakeAO;
 
     // Final color
     vec3 color = ambient + Lo;
