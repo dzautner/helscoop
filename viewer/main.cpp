@@ -295,8 +295,8 @@ int main(int argc, char *argv[]) {
   SetShaderValue(pbrShader, locPbrSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrGround, pbrGround, SHADER_UNIFORM_VEC3);
 
-  // PBR light (sun-like directional)
-  const float pbrLightColor[3] = {3.0f, 2.9f, 2.7f}; // Warm sunlight (HDR intensity)
+  // PBR light (sun-like directional) - bright for good contrast
+  const float pbrLightColor[3] = {4.5f, 4.3f, 3.8f}; // Bright warm sunlight (HDR intensity)
   SetShaderValue(pbrShader, locPbrLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
   // Rendering mode toggle
