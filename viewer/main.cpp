@@ -126,6 +126,10 @@ int main(int argc, char *argv[]) {
   const float initialYaw = orbitYaw;
   const float initialPitch = orbitPitch;
 
+  // User-placed spotlights (press L to place at camera position)
+  std::vector<Spotlight> spotlights;
+  const int MAX_SPOTLIGHTS = 8;  // Shader limit
+
   JSRuntime *runtime = JS_NewRuntime();
   EnsureManifoldClass(runtime);
   JS_SetModuleLoaderFunc(runtime, nullptr, FilesystemModuleLoader, &g_moduleLoaderData);
@@ -296,15 +300,17 @@ int main(int argc, char *argv[]) {
   // Shadow mapping shaders
   Shader shadowDepthShader = LoadShaderFromMemory(shaders::kShadowDepth_VS, shaders::kShadowDepth_FS);
   Shader pbrShadowShader = LoadShaderFromMemory(shaders::kPBRShadow_VS, shaders::kPBRShadow_FS);
-  // Enable shadow mapping if both shaders loaded successfully
-  bool shadowsEnabled = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
+  // Shadow mapping capability check (shaders must load successfully)
+  const bool shadowsCapable = (shadowDepthShader.id != 0 && pbrShadowShader.id != 0);
 
-  // Ground plane shader
+  // Ground plane shader (procedural forest floor)
   Shader groundPlaneShader = LoadShaderFromMemory(shaders::kGroundPlane_VS, shaders::kGroundPlane_FS);
   const int locGroundColor = GetShaderLocation(groundPlaneShader, "groundColor");
   const int locHorizonColor = GetShaderLocation(groundPlaneShader, "horizonColor");
   const int locFadeRadius = GetShaderLocation(groundPlaneShader, "fadeRadius");
   const int locSceneCenter = GetShaderLocation(groundPlaneShader, "sceneCenter");
+  const int locGroundLightDir = GetShaderLocation(groundPlaneShader, "lightDir");
+  const int locGroundAmbient = GetShaderLocation(groundPlaneShader, "ambientLevel");
 
   Material groundPlaneMat = LoadMaterialDefault();
   groundPlaneMat.shader = groundPlaneShader;
@@ -402,9 +408,8 @@ int main(int argc, char *argv[]) {
   // Secondary light (cool fill from opposite side) - fills in shadows
   const float pbrLightColor2[3] = {0.8f, 0.9f, 1.2f}; // Cool blue-ish fill light
 
-  // Rendering mode toggle
-  bool pbrModeEnabled = true;  // Start with PBR enabled for realistic look
-  int debugViewMode = 0;  // 0=off, 1=depth, 2=normals, 3=combined (cycle with D)
+  // Rendering mode toggle - now controlled via UI panel (uiState.lightingSettings)
+  // NOTE: uiState.lightingSettings.pbrModeEnabled and uiState.lightingSettings.debugViewMode are accessed via uiState.lightingSettings
 
   // Sky shader setup
   const int locSkyTop = GetShaderLocation(skyShader, "skyTop");
@@ -440,7 +445,7 @@ int main(int argc, char *argv[]) {
   // ============================================================================
   const int SHADOW_MAP_SIZE = 2048;
   RenderTexture2D shadowMap = {0};
-  if (shadowsEnabled) {
+  if (shadowsCapable) {
     shadowMap = LoadRenderTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     // Set texture filtering for shadow map
     SetTextureFilter(shadowMap.texture, TEXTURE_FILTER_BILINEAR);
@@ -465,6 +470,30 @@ int main(int argc, char *argv[]) {
   const int locPbrShadowSkyBottom = GetShaderLocation(pbrShadowShader, "skyColorBottom");
   const int locPbrShadowGround = GetShaderLocation(pbrShadowShader, "groundColor");
   const int locPbrShadowLightSpaceMatrix = GetShaderLocation(pbrShadowShader, "lightSpaceMatrix");
+
+  // Spotlight uniform locations
+  const int locNumSpotlights = GetShaderLocation(pbrShadowShader, "numSpotlights");
+  int locSpotlightPos[MAX_SPOTLIGHTS];
+  int locSpotlightDir[MAX_SPOTLIGHTS];
+  int locSpotlightColor[MAX_SPOTLIGHTS];
+  int locSpotlightIntensity[MAX_SPOTLIGHTS];
+  int locSpotlightInnerCone[MAX_SPOTLIGHTS];
+  int locSpotlightOuterCone[MAX_SPOTLIGHTS];
+  for (int i = 0; i < MAX_SPOTLIGHTS; i++) {
+    char name[64];
+    snprintf(name, sizeof(name), "spotlightPos[%d]", i);
+    locSpotlightPos[i] = GetShaderLocation(pbrShadowShader, name);
+    snprintf(name, sizeof(name), "spotlightDir[%d]", i);
+    locSpotlightDir[i] = GetShaderLocation(pbrShadowShader, name);
+    snprintf(name, sizeof(name), "spotlightColor[%d]", i);
+    locSpotlightColor[i] = GetShaderLocation(pbrShadowShader, name);
+    snprintf(name, sizeof(name), "spotlightIntensity[%d]", i);
+    locSpotlightIntensity[i] = GetShaderLocation(pbrShadowShader, name);
+    snprintf(name, sizeof(name), "spotlightInnerCone[%d]", i);
+    locSpotlightInnerCone[i] = GetShaderLocation(pbrShadowShader, name);
+    snprintf(name, sizeof(name), "spotlightOuterCone[%d]", i);
+    locSpotlightOuterCone[i] = GetShaderLocation(pbrShadowShader, name);
+  }
 
   // Set PBR shadow shader environment colors (same as regular PBR)
   SetShaderValue(pbrShadowShader, locPbrShadowSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
@@ -494,17 +523,14 @@ int main(int argc, char *argv[]) {
     shadowDepthMat.maps[i].texture.id = 0;
   }
 
-  // Static toon lighting configuration
-  const Vector3 lightDirWS = Vector3Normalize({0.45f, 0.85f, 0.35f});
-  // Secondary fill light - comes from opposite side, lower angle (simulates sky bounce)
-  const Vector3 lightDir2WS = Vector3Normalize({-0.6f, 0.4f, -0.5f});
+  // Light directions are now computed dynamically from UI settings each frame
+  // (see lightDirWS and lightDir2WS computed in main loop)
   const float baseCol[4] = {kBaseColor.r / 255.0f, kBaseColor.g / 255.0f, kBaseColor.b / 255.0f, 1.0f};
   SetShaderValue(toonShader, locBaseColor, baseCol, SHADER_UNIFORM_VEC4);
 
   int toonSteps = 4;
   SetShaderValue(toonShader, locToonSteps, &toonSteps, SHADER_UNIFORM_INT);
-  float ambient = 0.35f;
-  SetShaderValue(toonShader, locAmbient, &ambient, SHADER_UNIFORM_FLOAT);
+  // Note: ambient is now set dynamically in render loop from uiState.lightingSettings.ambientIntensity
   float diffuseWeight = 0.75f;
   SetShaderValue(toonShader, locDiffuseWeight, &diffuseWeight, SHADER_UNIFORM_FLOAT);
   float rimWeight = 0.25f;
@@ -706,14 +732,37 @@ int main(int argc, char *argv[]) {
         }
       }
       if (IsKeyPressed(KEY_P)) {
-        pbrModeEnabled = !pbrModeEnabled;
-        TraceLog(LOG_INFO, "Rendering mode: %s", pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
+        uiState.lightingSettings.pbrModeEnabled = !uiState.lightingSettings.pbrModeEnabled;
+        TraceLog(LOG_INFO, "Rendering mode: %s", uiState.lightingSettings.pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
       }
       if (IsKeyPressed(KEY_F9)) {
-        debugViewMode = (debugViewMode + 1) % 7;  // Cycle: normal -> raw -> depth -> normals -> combined -> SSAO raw -> SSAO blur -> normal
+        uiState.lightingSettings.debugViewMode = (uiState.lightingSettings.debugViewMode + 1) % 7;  // Cycle: normal -> raw -> depth -> normals -> combined -> SSAO raw -> SSAO blur -> normal
         const char* modeNames[] = {"Normal", "Raw (no post)", "Depth", "Normals", "Combined", "SSAO Raw", "SSAO Blur"};
         TraceLog(LOG_INFO, "Debug view: %s, Render mode: %s (F9 to cycle)",
-                 modeNames[debugViewMode], pbrModeEnabled ? "PBR" : "Toon");
+                 modeNames[uiState.lightingSettings.debugViewMode], uiState.lightingSettings.pbrModeEnabled ? "PBR" : "Toon");
+      }
+      // Spotlight controls - L to place, Shift+L to clear all
+      if (IsKeyPressed(KEY_L)) {
+        if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
+          // Shift+L: Clear all spotlights
+          spotlights.clear();
+          TraceLog(LOG_INFO, "All spotlights cleared");
+        } else if (static_cast<int>(spotlights.size()) < MAX_SPOTLIGHTS) {
+          // L: Place new spotlight at camera position
+          Spotlight newSpot;
+          newSpot.position = camera.position;
+          newSpot.direction = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+          newSpot.intensity = 5.0f;
+          newSpot.innerCone = 15.0f;
+          newSpot.outerCone = 30.0f;
+          newSpot.color = WHITE;
+          spotlights.push_back(newSpot);
+          TraceLog(LOG_INFO, "Spotlight %zu placed at (%.1f, %.1f, %.1f) -> (%.1f, %.1f, %.1f)",
+                   spotlights.size(), newSpot.position.x, newSpot.position.y, newSpot.position.z,
+                   newSpot.direction.x, newSpot.direction.y, newSpot.direction.z);
+        } else {
+          TraceLog(LOG_WARNING, "Max spotlights (%d) reached - cannot place more", MAX_SPOTLIGHTS);
+        }
       }
       // Assembly step navigation with arrow keys (when panel is visible)
       if (uiState.showAssemblyPanel) {
@@ -1015,6 +1064,11 @@ int main(int argc, char *argv[]) {
       prevScreenHeight = screenHeight;
     }
 
+    // Compute dynamic light directions from UI settings each frame
+    const Vector3 lightDirWS = uiState.lightingSettings.getSunDirection();
+    // Fill light: opposite side, computed from sun direction
+    const Vector3 lightDir2WS = Vector3Normalize(Vector3{-lightDirWS.x * 0.7f, lightDirWS.y * 0.5f, -lightDirWS.z * 0.7f});
+
     // Update shader uniforms
     Matrix view = GetCameraMatrix(camera);
     Vector3 lightDirVS = {
@@ -1024,10 +1078,20 @@ int main(int argc, char *argv[]) {
     lightDirVS = Vector3Normalize(lightDirVS);
     SetShaderValue(toonShader, locLightDirVS, &lightDirVS.x, SHADER_UNIFORM_VEC3);
 
+    // Update toon shader ambient with UI setting
+    float ambient = uiState.lightingSettings.ambientIntensity;
+    SetShaderValue(toonShader, locAmbient, &ambient, SHADER_UNIFORM_FLOAT);
+
     // Update PBR shader light directions (world space)
     SetShaderValue(pbrShader, locPbrLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
     SetShaderValue(pbrShader, locPbrLightDir2, &lightDir2WS.x, SHADER_UNIFORM_VEC3);
-    SetShaderValue(pbrShader, locPbrLightColor2, pbrLightColor2, SHADER_UNIFORM_VEC3);
+    // Compute fill light color/intensity from UI settings
+    float fillColor[3] = {
+      uiState.lightingSettings.fillColor[0] * uiState.lightingSettings.fillIntensity,
+      uiState.lightingSettings.fillColor[1] * uiState.lightingSettings.fillIntensity,
+      uiState.lightingSettings.fillColor[2] * uiState.lightingSettings.fillIntensity
+    };
+    SetShaderValue(pbrShader, locPbrLightColor2, fillColor, SHADER_UNIFORM_VEC3);
 
     float outlineThickness = 0.0f;
     {
@@ -1083,9 +1147,12 @@ int main(int argc, char *argv[]) {
     // SHADOW MAP PASS - Render depth from light's perspective
     // ========================================================================
     Matrix lightSpaceMatrix = MatrixIdentity();
-    if (shadowsEnabled && pbrModeEnabled) {
+    // Effective shadow state: capable AND enabled in UI
+    const bool shadowsActive = shadowsCapable && uiState.lightingSettings.shadowsEnabled;
+    if (shadowsActive && uiState.lightingSettings.pbrModeEnabled) {
       // Calculate light space matrix for shadow mapping
-      Vector3 lightDir = lightDirWS;
+      // Use dynamic light direction from UI settings
+      Vector3 lightDir = uiState.lightingSettings.getSunDirection();
       Vector3 sceneCenter = {0.0f, 1.5f, 0.0f};  // Approximate scene center
       float sceneRadius = 12.0f;  // Approximate scene radius
 
@@ -1134,6 +1201,25 @@ int main(int argc, char *argv[]) {
       // Shadow map is manually bound to texture unit 3 in the draw loop below
     }
 
+    // Update spotlight uniforms
+    {
+      int numLights = static_cast<int>(spotlights.size());
+      SetShaderValue(pbrShadowShader, locNumSpotlights, &numLights, SHADER_UNIFORM_INT);
+      for (int i = 0; i < numLights && i < MAX_SPOTLIGHTS; i++) {
+        const Spotlight& spot = spotlights[i];
+        SetShaderValue(pbrShadowShader, locSpotlightPos[i], &spot.position.x, SHADER_UNIFORM_VEC3);
+        SetShaderValue(pbrShadowShader, locSpotlightDir[i], &spot.direction.x, SHADER_UNIFORM_VEC3);
+        float color[3] = {spot.color.r / 255.0f, spot.color.g / 255.0f, spot.color.b / 255.0f};
+        SetShaderValue(pbrShadowShader, locSpotlightColor[i], color, SHADER_UNIFORM_VEC3);
+        SetShaderValue(pbrShadowShader, locSpotlightIntensity[i], &spot.intensity, SHADER_UNIFORM_FLOAT);
+        // Convert cone angles from degrees to cosines for shader
+        float innerCos = cosf(spot.innerCone * DEG2RAD);
+        float outerCos = cosf(spot.outerCone * DEG2RAD);
+        SetShaderValue(pbrShadowShader, locSpotlightInnerCone[i], &innerCos, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(pbrShadowShader, locSpotlightOuterCone[i], &outerCos, SHADER_UNIFORM_FLOAT);
+      }
+    }
+
     // ========================================================================
     // MAIN COLOR PASS
     // ========================================================================
@@ -1143,7 +1229,7 @@ int main(int argc, char *argv[]) {
     ClearBackground(RAYWHITE);
 
     // Render sky gradient background (only in PBR mode)
-    if (pbrModeEnabled) {
+    if (uiState.lightingSettings.pbrModeEnabled) {
       // Draw gradient sky using simple 2D rects
       // Sky top to horizon
       Color skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
@@ -1164,7 +1250,7 @@ int main(int argc, char *argv[]) {
     }
 
     BeginMode3D(camera);
-    if (pbrModeEnabled) {
+    if (uiState.lightingSettings.pbrModeEnabled) {
       // Draw a simple ground plane using the PBR shader
       // Calculate scene bounds to position and center ground correctly
       float minY = 0.0f, centerX = 0.0f, centerZ = 0.0f;
@@ -1189,22 +1275,24 @@ int main(int argc, char *argv[]) {
       centerX = (minX + maxX) * 0.5f;
       centerZ = (minZ + maxZ) * 0.5f;
 
-      // Set ground material properties (earthy brown-grey, rough, non-metallic)
-      float groundAlbedo[4] = {0.32f, 0.30f, 0.25f, 1.0f};  // Earthy brown
-      float groundRoughness = 0.95f;
-      float groundMetallic = 0.0f;
-      float groundAo = 1.0f;
-      int noTex = 0;
-      SetShaderValue(pbrShader, locPbrAlbedoColor, groundAlbedo, SHADER_UNIFORM_VEC4);
-      SetShaderValue(pbrShader, locPbrRoughness, &groundRoughness, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(pbrShader, locPbrMetallic, &groundMetallic, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(pbrShader, locPbrAo, &groundAo, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(pbrShader, locPbrUseAlbedoTex, &noTex, SHADER_UNIFORM_INT);
+      // Set procedural forest floor shader uniforms
+      float groundCol[3] = {0.25f, 0.22f, 0.15f};  // Soil base (not really used, shader is procedural)
+      float horizonCol[3] = {0.3f, 0.35f, 0.25f};  // Slightly greenish horizon
+      float fadeRad = groundPlaneSize * 0.4f;
+      float scenePos[3] = {centerX, 0.0f, centerZ};
+      SetShaderValue(groundPlaneShader, locGroundColor, groundCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locHorizonColor, horizonCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locFadeRadius, &fadeRad, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(groundPlaneShader, locSceneCenter, scenePos, SHADER_UNIFORM_VEC3);
+      // Pass light direction and ambient for forest floor lighting
+      SetShaderValue(groundPlaneShader, locGroundLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+      float groundAmbient = uiState.lightingSettings.ambientIntensity + 0.3f;  // Forest floor needs more ambient
+      SetShaderValue(groundPlaneShader, locGroundAmbient, &groundAmbient, SHADER_UNIFORM_FLOAT);
 
-      // Draw ground plane centered on scene, slightly below
+      // Draw forest floor ground plane centered on scene, slightly below
       rlPushMatrix();
       rlTranslatef(centerX, minY - 0.002f, centerZ);
-      DrawMesh(groundPlaneMesh, pbrMat, MatrixIdentity());
+      DrawMesh(groundPlaneMesh, groundPlaneMat, MatrixIdentity());
       rlPopMatrix();
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
@@ -1229,7 +1317,7 @@ int main(int argc, char *argv[]) {
 
     // Outline pass - use bright highlight for hovered/selected material
     // Skip outlines in PBR mode for cleaner look (outlines are toon-style)
-    if (!pbrModeEnabled) {
+    if (!uiState.lightingSettings.pbrModeEnabled) {
     rlDisableBackfaceCulling();
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
@@ -1274,11 +1362,11 @@ int main(int argc, char *argv[]) {
 
     // Reset outline uniforms for consistency
     setOutlineUniforms(outlineThickness, outlineColor);
-    } // end of !pbrModeEnabled outline pass
+    } // end of !uiState.lightingSettings.pbrModeEnabled outline pass
 
     // Enable polygon offset to fix z-fighting on coplanar surfaces (door panels, cladding)
 #ifdef __APPLE__
-    if (pbrModeEnabled) {
+    if (uiState.lightingSettings.pbrModeEnabled) {
       glEnable(GL_POLYGON_OFFSET_FILL);
       glPolygonOffset(1.0f, 1.0f);
     }
@@ -1355,7 +1443,7 @@ int main(int argc, char *argv[]) {
       }
       int useTex = (materialTex && materialTex->id != 0) ? 1 : 0;
 
-      if (pbrModeEnabled) {
+      if (uiState.lightingSettings.pbrModeEnabled) {
         // Get material PBR properties (roughness, metallic)
         float matRoughness = 0.5f;
         float matMetallic = 0.0f;
@@ -1369,7 +1457,7 @@ int main(int argc, char *argv[]) {
           }
         }
 
-        if (shadowsEnabled) {
+        if (shadowsActive) {
           // PBR with shadows rendering path
           SetShaderValue(pbrShadowShader, locPbrShadowAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
           SetShaderValue(pbrShadowShader, locPbrShadowUseAlbedoTex, &useTex, SHADER_UNIFORM_INT);
@@ -1424,10 +1512,18 @@ int main(int argc, char *argv[]) {
 
     // Disable polygon offset after rendering
 #ifdef __APPLE__
-    if (pbrModeEnabled) {
+    if (uiState.lightingSettings.pbrModeEnabled) {
       glDisable(GL_POLYGON_OFFSET_FILL);
     }
 #endif
+
+    // Draw spotlight position indicators (small bright spheres)
+    for (const auto& spot : spotlights) {
+      DrawSphere(spot.position, 0.08f, YELLOW);
+      // Draw a small line indicating direction
+      Vector3 dirEnd = Vector3Add(spot.position, Vector3Scale(spot.direction, 0.5f));
+      DrawLine3D(spot.position, dirEnd, ORANGE);
+    }
 
     EndMode3D();
     EndTextureMode();
@@ -1468,8 +1564,9 @@ int main(int argc, char *argv[]) {
         1.0f / static_cast<float>(rtNormalDepth.texture.height)
     };
     SetShaderValue(ssaoShader, locSSAOTexelSize, ssaoTexelSize, SHADER_UNIFORM_VEC2);
-    const float ssaoRadius = 0.3f;   // Sample radius in normalized depth space
-    const float ssaoIntensity = 1.0f; // Occlusion intensity multiplier (reduced to avoid overly dark)
+    // Use SSAO settings from UI if enabled, otherwise disable effect
+    const float ssaoRadius = uiState.lightingSettings.ssaoEnabled ? uiState.lightingSettings.ssaoRadius : 0.0f;
+    const float ssaoIntensity = uiState.lightingSettings.ssaoEnabled ? 1.0f : 0.0f;
     SetShaderValue(ssaoShader, locSSAORadius, &ssaoRadius, SHADER_UNIFORM_FLOAT);
     SetShaderValue(ssaoShader, locSSAOIntensity, &ssaoIntensity, SHADER_UNIFORM_FLOAT);
     SetShaderValue(ssaoShader, locSSAOZNear, &zNear, SHADER_UNIFORM_FLOAT);
@@ -1507,7 +1604,8 @@ int main(int argc, char *argv[]) {
     SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
     // Bind SSAO texture and set strength for final composite
     SetShaderValueTexture(edgeShader, locEdgeSSAOTex, rtSSAOBlur.texture);
-    const float ssaoStrength = 0.15f;  // Subtle SSAO effect
+    // Use SSAO strength from UI settings
+    const float ssaoStrength = uiState.lightingSettings.ssaoEnabled ? uiState.lightingSettings.ssaoStrength : 0.0f;
     SetShaderValue(edgeShader, locEdgeSSAOStrength, &ssaoStrength, SHADER_UNIFORM_FLOAT);
 
     // Final composite
@@ -1522,20 +1620,20 @@ int main(int argc, char *argv[]) {
     const Rectangle srcRect = {0.0f, 0.0f, static_cast<float>(rtColor.texture.width),
                                -static_cast<float>(rtColor.texture.height)};
 
-    if (debugViewMode == 1) {
+    if (uiState.lightingSettings.debugViewMode == 1) {
       // Raw mode - show pure 3D render without any post-processing
       DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
-    } else if (debugViewMode >= 2 && debugViewMode <= 4) {
+    } else if (uiState.lightingSettings.debugViewMode >= 2 && uiState.lightingSettings.debugViewMode <= 4) {
       // Debug visualization mode - texture0 is auto-bound by DrawTextureRec
-      int shaderDebugMode = debugViewMode - 2;  // 0=depth, 1=normals, 2=combined
+      int shaderDebugMode = uiState.lightingSettings.debugViewMode - 2;  // 0=depth, 1=normals, 2=combined
       SetShaderValue(debugShader, locDebugMode, &shaderDebugMode, SHADER_UNIFORM_INT);
       BeginShaderMode(debugShader);
       DrawTextureRec(rtNormalDepth.texture, srcRect, {0.0f, 0.0f}, WHITE);
       EndShaderMode();
-    } else if (debugViewMode == 5) {
+    } else if (uiState.lightingSettings.debugViewMode == 5) {
       // SSAO debug view - show raw SSAO buffer
       DrawTextureRec(rtSSAORaw.texture, srcRect, {0.0f, 0.0f}, WHITE);
-    } else if (debugViewMode == 6) {
+    } else if (uiState.lightingSettings.debugViewMode == 6) {
       // SSAO blurred debug view
       DrawTextureRec(rtSSAOBlur.texture, srcRect, {0.0f, 0.0f}, WHITE);
     } else {
@@ -1619,6 +1717,11 @@ int main(int argc, char *argv[]) {
       DrawAssemblyPanel(assemblyInstructions, uiState, uiFont, screenWidth, screenHeight);
     }
 
+    // Draw lighting control panel
+    if (uiState.showLightingPanel) {
+      DrawLightingPanel(uiState, spotlights, uiFont, screenWidth, screenHeight);
+    }
+
     EndDrawing();
 
     // Screenshot for render mode
@@ -1635,7 +1738,7 @@ int main(int argc, char *argv[]) {
   UnloadMaterialTextures();
   UnloadRenderTexture(rtColor);
   UnloadRenderTexture(rtNormalDepth);
-  if (shadowsEnabled) {
+  if (shadowsCapable) {
     UnloadRenderTexture(shadowMap);
     UnloadMaterial(pbrShadowMat);
     UnloadMaterial(shadowDepthMat);

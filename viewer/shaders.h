@@ -637,6 +637,16 @@ uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
 uniform vec3 groundColor;
 
+// Spotlights (up to 8)
+#define MAX_SPOTLIGHTS 8
+uniform int numSpotlights;
+uniform vec3 spotlightPos[MAX_SPOTLIGHTS];
+uniform vec3 spotlightDir[MAX_SPOTLIGHTS];
+uniform vec3 spotlightColor[MAX_SPOTLIGHTS];
+uniform float spotlightIntensity[MAX_SPOTLIGHTS];
+uniform float spotlightInnerCone[MAX_SPOTLIGHTS];  // cos of inner angle
+uniform float spotlightOuterCone[MAX_SPOTLIGHTS];  // cos of outer angle
+
 const float PI = 3.14159265359;
 
 float DistributionGGX(vec3 N, vec3 H, float rough) {
@@ -710,6 +720,42 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     return shadow;
 }
 
+// Calculate spotlight contribution using Cook-Torrance BRDF
+vec3 calculateSpotlight(int i, vec3 N, vec3 V, vec3 fragPosition, vec3 albedo, vec3 F0, float rough, float metal) {
+    vec3 lightVec = spotlightPos[i] - fragPosition;
+    float distance = length(lightVec);
+    vec3 L = normalize(lightVec);
+
+    // Spotlight cone attenuation
+    float theta = dot(L, normalize(-spotlightDir[i]));
+    float epsilon = spotlightInnerCone[i] - spotlightOuterCone[i];
+    float spotAttenuation = clamp((theta - spotlightOuterCone[i]) / max(epsilon, 0.0001), 0.0, 1.0);
+
+    // Skip if outside cone
+    if (spotAttenuation <= 0.0) return vec3(0.0);
+
+    // Distance attenuation (quadratic falloff)
+    float attenuation = spotlightIntensity[i] / (1.0 + 0.09 * distance + 0.032 * distance * distance);
+    attenuation *= spotAttenuation;
+
+    // Cook-Torrance BRDF
+    vec3 H = normalize(V + L);
+    float NDF = DistributionGGX(N, H, rough);
+    float G = GeometrySmith(N, V, L, rough);
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    vec3 kS = F;
+    vec3 kD = (vec3(1.0) - kS) * (1.0 - metal);
+
+    float NdotL = max(dot(N, L), 0.0);
+
+    return (kD * albedo / PI + specular) * spotlightColor[i] * NdotL * attenuation;
+}
+
 void main() {
     vec3 albedo = albedoColor.rgb;
     if (useAlbedoTex > 0) {
@@ -742,6 +788,11 @@ void main() {
 
     // Direct lighting with shadows
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
+
+    // Add spotlight contributions
+    for (int i = 0; i < numSpotlights && i < MAX_SPOTLIGHTS; i++) {
+        Lo += calculateSpotlight(i, N, V, fragPos, albedo, F0, roughness, metallic);
+    }
 
     // Ambient/Environment lighting (not shadowed)
     vec3 F_env = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
@@ -808,23 +859,162 @@ uniform vec3 groundColor;
 uniform vec3 horizonColor;
 uniform float fadeRadius;
 uniform vec3 sceneCenter;
+uniform vec3 lightDir;       // Sun direction for lighting
+uniform float ambientLevel;  // Ambient light level
+
+// Noise functions for procedural texturing
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
+        f.y
+    );
+}
+
+float fbm(vec2 p, int octaves) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    for (int i = 0; i < octaves; i++) {
+        value += amplitude * noise(p * frequency);
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+    return value;
+}
+
+// Voronoi for leaf/stone patterns
+float voronoi(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float minDist = 1.0;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            vec2 neighbor = vec2(float(x), float(y));
+            vec2 point = hash(i + neighbor) * vec2(0.8) + vec2(0.1);
+            float d = length(neighbor + point - f);
+            minDist = min(minDist, d);
+        }
+    }
+    return minDist;
+}
 
 void main() {
+    vec2 pos = fragWorldPos.xz;
+
     // Distance from scene center for fade
-    float dist = length(fragWorldPos.xz - sceneCenter.xz);
-    float fade = 1.0 - smoothstep(fadeRadius * 0.5, fadeRadius, dist);
+    float dist = length(pos - sceneCenter.xz);
+    float fade = 1.0 - smoothstep(fadeRadius * 0.6, fadeRadius, dist);
 
-    // Grid pattern (subtle)
-    vec2 grid = abs(fract(fragWorldPos.xz * 0.5) - 0.5);
-    float gridLine = smoothstep(0.48, 0.5, max(grid.x, grid.y));
-    float gridAlpha = gridLine * 0.08;
+    // === Finnish Forest Floor Colors ===
+    // Base soil/dirt
+    vec3 soilColor = vec3(0.25, 0.18, 0.12);
+    // Green moss (typical Sipoonkorpi)
+    vec3 mossColor = vec3(0.22, 0.35, 0.15);
+    // Dry moss/lichen
+    vec3 lichenColor = vec3(0.45, 0.52, 0.35);
+    // Pine needles/dead leaves
+    vec3 needleColor = vec3(0.35, 0.25, 0.15);
+    // Blueberry plant dark green
+    vec3 blueberryColor = vec3(0.15, 0.28, 0.12);
+    // Lingonberry lighter
+    vec3 lingonColor = vec3(0.25, 0.32, 0.18);
 
-    // Base color with slight gradient toward horizon
-    vec3 color = mix(groundColor, horizonColor, smoothstep(0.0, fadeRadius, dist) * 0.3);
-    color = mix(color, color * 0.92, gridAlpha);
+    // === Multi-layer Procedural Texture ===
 
-    // Output with fade to transparent at edges
-    finalColor = vec4(color, fade * 0.85);
+    // Large-scale terrain variation
+    float largeNoise = fbm(pos * 0.15, 4);
+
+    // Medium moss patches
+    float mossPatch = fbm(pos * 0.4 + vec2(50.0), 5);
+    mossPatch = smoothstep(0.35, 0.65, mossPatch);
+
+    // Small grass/plant tufts
+    float grassNoise = fbm(pos * 2.0, 3);
+    float grassTuft = smoothstep(0.55, 0.7, grassNoise);
+
+    // Pine needle clusters (elongated noise)
+    float needleNoise = fbm(pos * vec2(1.5, 0.8) * 1.2, 4);
+    float needlePatch = smoothstep(0.4, 0.55, needleNoise) * (1.0 - mossPatch * 0.7);
+
+    // Fallen leaves using voronoi
+    float leafPattern = voronoi(pos * 3.0);
+    float leaves = smoothstep(0.1, 0.25, leafPattern) * smoothstep(0.5, 0.3, leafPattern);
+    leaves *= fbm(pos * 0.8, 2);  // Cluster leaves
+
+    // Blueberry/lingonberry patches
+    float berryNoise = fbm(pos * 0.6 + vec2(100.0), 4);
+    float berryPatch = smoothstep(0.5, 0.7, berryNoise) * mossPatch;
+
+    // Small stones/pebbles
+    float stoneVoronoi = voronoi(pos * 8.0);
+    float stones = 1.0 - smoothstep(0.0, 0.12, stoneVoronoi);
+    stones *= step(0.7, hash(floor(pos * 8.0)));  // Sparse stones
+    vec3 stoneColor = vec3(0.4, 0.38, 0.35) * (0.8 + 0.4 * hash(floor(pos * 8.0) + vec2(5.0)));
+
+    // === Combine Layers ===
+
+    // Start with soil
+    vec3 groundCol = soilColor;
+
+    // Add moss (dominant in Finnish forest)
+    groundCol = mix(groundCol, mossColor, mossPatch * 0.85);
+
+    // Dry lichen patches on top of moss
+    float lichenPatch = fbm(pos * 0.7 + vec2(200.0), 3);
+    lichenPatch = smoothstep(0.55, 0.75, lichenPatch) * mossPatch * 0.5;
+    groundCol = mix(groundCol, lichenColor, lichenPatch);
+
+    // Berry plants in moss areas
+    groundCol = mix(groundCol, mix(blueberryColor, lingonColor, hash(floor(pos * 2.0))), berryPatch * 0.6);
+
+    // Pine needles
+    groundCol = mix(groundCol, needleColor, needlePatch * 0.5);
+
+    // Fallen leaves (autumn touch)
+    vec3 leafCol = mix(vec3(0.5, 0.3, 0.1), vec3(0.6, 0.4, 0.15), hash(floor(pos * 3.0)));
+    groundCol = mix(groundCol, leafCol, leaves * 0.3);
+
+    // Grass tufts
+    vec3 grassCol = mix(mossColor, vec3(0.3, 0.45, 0.2), 0.3);
+    groundCol = mix(groundCol, grassCol, grassTuft * 0.4);
+
+    // Stones
+    groundCol = mix(groundCol, stoneColor, stones);
+
+    // === Micro Detail ===
+    float microDetail = fbm(pos * 15.0, 2);
+    groundCol *= 0.9 + microDetail * 0.2;
+
+    // === Lighting ===
+    // Fake normal from height variation
+    float h = fbm(pos * 0.5, 3);
+    float hx = fbm((pos + vec2(0.01, 0.0)) * 0.5, 3);
+    float hz = fbm((pos + vec2(0.0, 0.01)) * 0.5, 3);
+    vec3 normal = normalize(vec3(h - hx, 0.15, h - hz));
+
+    // Diffuse lighting from sun
+    float NdotL = max(dot(normal, lightDir), 0.0);
+    float diffuse = NdotL * 0.6 + ambientLevel;
+
+    // Soft shadows in crevices (fake AO)
+    float ao = 0.7 + 0.3 * largeNoise;
+    ao *= 0.85 + 0.15 * mossPatch;  // Moss areas slightly darker
+
+    groundCol *= diffuse * ao;
+
+    // Slight color variation with distance (atmospheric)
+    groundCol = mix(groundCol, groundCol * vec3(0.95, 0.97, 1.0), smoothstep(0.0, fadeRadius, dist) * 0.15);
+
+    // Output with fade at edges
+    finalColor = vec4(groundCol, fade * 0.95);
 }
 )glsl";
 

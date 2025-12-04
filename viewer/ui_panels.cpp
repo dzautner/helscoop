@@ -1532,6 +1532,242 @@ bool DrawAssemblyPanel(const AssemblyInstructions& assembly,
   return stepChanged;
 }
 
+bool DrawLightingPanel(UIState& uiState,
+                       std::vector<Spotlight>& spotlights,
+                       const Font& uiFont,
+                       int screenWidth, int screenHeight) {
+  bool settingsChanged = false;
+  LightingSettings& settings = uiState.lightingSettings;
+
+  const float panelWidth = 280.0f;
+  const float panelHeight = 580.0f;
+
+  // Initialize default position if not set
+  if (!uiState.lightingPos.initialized) {
+    uiState.lightingPos.x = static_cast<float>(screenWidth) - panelWidth - 10.0f;
+    uiState.lightingPos.y = kToolbarHeight + 200.0f;
+    uiState.lightingPos.initialized = true;
+  }
+
+  float panelX = uiState.lightingPos.x;
+  float panelY = uiState.lightingPos.y;
+
+  // Handle dragging
+  HandlePanelDrag(uiState, 5, uiState.lightingPos, panelX, panelY, panelWidth, 28.0f);
+  panelX = uiState.lightingPos.x;
+  panelY = uiState.lightingPos.y;
+  const float sliderWidth = panelWidth - 100.0f;
+
+  // Panel background
+  DrawRectangle(static_cast<int>(panelX), static_cast<int>(panelY),
+                static_cast<int>(panelWidth), static_cast<int>(panelHeight),
+                Fade(Color{25, 28, 35, 255}, 0.95f));
+  DrawRectangleLines(static_cast<int>(panelX), static_cast<int>(panelY),
+                     static_cast<int>(panelWidth), static_cast<int>(panelHeight), Color{60, 60, 70, 255});
+
+  float yPos = panelY + 10.0f;
+
+  // Title with drag handle
+  DrawTextEx(uiFont, "LIGHTING", {panelX + 10, yPos}, 14.0f, 0.0f, WHITE);
+  DrawDragHandle(uiFont, panelX, panelY, panelWidth);
+  yPos += 24.0f;
+
+  // === RENDER MODE ===
+  DrawTextEx(uiFont, "RENDER MODE", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  // PBR / Toon toggle buttons
+  float btnWidth = 60.0f;
+  float btnHeight = 20.0f;
+  Rectangle pbrBtn = {panelX + 10, yPos, btnWidth, btnHeight};
+  Rectangle toonBtn = {panelX + 75, yPos, btnWidth, btnHeight};
+
+  bool pbrHovered = CheckCollisionPointRec(GetMousePosition(), pbrBtn);
+  bool toonHovered = CheckCollisionPointRec(GetMousePosition(), toonBtn);
+
+  Color pbrColor = settings.pbrModeEnabled ? Color{60, 120, 180, 255} : (pbrHovered ? Color{50, 55, 65, 255} : Color{40, 45, 55, 255});
+  Color toonColor = !settings.pbrModeEnabled ? Color{180, 100, 60, 255} : (toonHovered ? Color{50, 55, 65, 255} : Color{40, 45, 55, 255});
+
+  DrawRectangleRec(pbrBtn, pbrColor);
+  DrawRectangleRec(toonBtn, toonColor);
+  DrawTextEx(uiFont, "PBR", {panelX + 27, yPos + 5}, 11.0f, 0.0f, settings.pbrModeEnabled ? WHITE : LIGHTGRAY);
+  DrawTextEx(uiFont, "Toon", {panelX + 90, yPos + 5}, 11.0f, 0.0f, !settings.pbrModeEnabled ? WHITE : LIGHTGRAY);
+
+  if (pbrHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !settings.pbrModeEnabled) {
+    settings.pbrModeEnabled = true;
+    settingsChanged = true;
+  }
+  if (toonHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && settings.pbrModeEnabled) {
+    settings.pbrModeEnabled = false;
+    settingsChanged = true;
+  }
+  yPos += 30.0f;
+
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), Color{50, 50, 60, 255});
+  yPos += 8.0f;
+
+  // === AMBIENT LIGHT ===
+  DrawTextEx(uiFont, "AMBIENT", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  char label[32];
+  snprintf(label, sizeof(label), "%.0f%%", settings.ambientIntensity * 100.0f);
+  DrawTextEx(uiFont, label, {panelX + 10, yPos + 1}, 10.0f, 0.0f, Color{150, 170, 200, 255});
+  Rectangle ambientSlider = {panelX + 55, yPos, sliderWidth, 12};
+  float oldAmbient = settings.ambientIntensity;
+  GuiSlider(ambientSlider, "", "", &settings.ambientIntensity, 0.0f, 1.0f);
+  if (settings.ambientIntensity != oldAmbient) settingsChanged = true;
+  yPos += 20.0f;
+
+  // === SUN (MAIN LIGHT) ===
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), Color{50, 50, 60, 255});
+  yPos += 8.0f;
+
+  DrawTextEx(uiFont, "SUN (MAIN LIGHT)", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  // Sun intensity
+  snprintf(label, sizeof(label), "Int: %.0f%%", settings.sunIntensity * 100.0f);
+  DrawTextEx(uiFont, label, {panelX + 10, yPos + 1}, 10.0f, 0.0f, Color{255, 240, 200, 255});
+  Rectangle sunIntSlider = {panelX + 70, yPos, sliderWidth - 15, 12};
+  float oldSunInt = settings.sunIntensity;
+  GuiSlider(sunIntSlider, "", "", &settings.sunIntensity, 0.0f, 2.0f);
+  if (settings.sunIntensity != oldSunInt) settingsChanged = true;
+  yPos += 18.0f;
+
+  // Sun azimuth (horizontal angle)
+  snprintf(label, sizeof(label), "Az: %.0f\xc2\xb0", settings.sunAzimuth);
+  DrawTextEx(uiFont, label, {panelX + 10, yPos + 1}, 10.0f, 0.0f, Color{200, 200, 150, 255});
+  Rectangle azSlider = {panelX + 70, yPos, sliderWidth - 15, 12};
+  float oldAz = settings.sunAzimuth;
+  GuiSlider(azSlider, "", "", &settings.sunAzimuth, 0.0f, 360.0f);
+  if (settings.sunAzimuth != oldAz) settingsChanged = true;
+  yPos += 18.0f;
+
+  // Sun elevation (vertical angle)
+  snprintf(label, sizeof(label), "El: %.0f\xc2\xb0", settings.sunElevation);
+  DrawTextEx(uiFont, label, {panelX + 10, yPos + 1}, 10.0f, 0.0f, Color{200, 200, 150, 255});
+  Rectangle elSlider = {panelX + 70, yPos, sliderWidth - 15, 12};
+  float oldEl = settings.sunElevation;
+  GuiSlider(elSlider, "", "", &settings.sunElevation, 5.0f, 85.0f);
+  if (settings.sunElevation != oldEl) settingsChanged = true;
+  yPos += 22.0f;
+
+  // === SHADOWS ===
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), Color{50, 50, 60, 255});
+  yPos += 8.0f;
+
+  DrawTextEx(uiFont, "SHADOWS", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  // Shadows toggle
+  Rectangle shadowBtn = {panelX + 10, yPos, 50, 18};
+  bool shadowHovered = CheckCollisionPointRec(GetMousePosition(), shadowBtn);
+  Color shadowColor = settings.shadowsEnabled ? Color{80, 140, 80, 255} : (shadowHovered ? Color{70, 50, 50, 255} : Color{50, 40, 40, 255});
+  DrawRectangleRec(shadowBtn, shadowColor);
+  DrawTextEx(uiFont, settings.shadowsEnabled ? "ON" : "OFF", {panelX + 22, yPos + 4}, 10.0f, 0.0f, WHITE);
+  if (shadowHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    settings.shadowsEnabled = !settings.shadowsEnabled;
+    settingsChanged = true;
+  }
+
+  // Shadow bias (small adjustment)
+  snprintf(label, sizeof(label), "Bias: %.4f", settings.shadowBias);
+  DrawTextEx(uiFont, label, {panelX + 70, yPos + 3}, 9.0f, 0.0f, Color{120, 120, 130, 255});
+  yPos += 22.0f;
+
+  // === SSAO ===
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), Color{50, 50, 60, 255});
+  yPos += 8.0f;
+
+  DrawTextEx(uiFont, "SSAO (Ambient Occlusion)", {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+  yPos += 14.0f;
+
+  // SSAO toggle
+  Rectangle ssaoBtn = {panelX + 10, yPos, 50, 18};
+  bool ssaoHovered = CheckCollisionPointRec(GetMousePosition(), ssaoBtn);
+  Color ssaoColor = settings.ssaoEnabled ? Color{80, 100, 140, 255} : (ssaoHovered ? Color{50, 50, 60, 255} : Color{40, 40, 50, 255});
+  DrawRectangleRec(ssaoBtn, ssaoColor);
+  DrawTextEx(uiFont, settings.ssaoEnabled ? "ON" : "OFF", {panelX + 22, yPos + 4}, 10.0f, 0.0f, WHITE);
+  if (ssaoHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    settings.ssaoEnabled = !settings.ssaoEnabled;
+    settingsChanged = true;
+  }
+  yPos += 22.0f;
+
+  // SSAO strength
+  snprintf(label, sizeof(label), "Str: %.0f%%", settings.ssaoStrength * 100.0f);
+  DrawTextEx(uiFont, label, {panelX + 10, yPos + 1}, 10.0f, 0.0f, Color{140, 160, 200, 255});
+  Rectangle ssaoStrSlider = {panelX + 70, yPos, sliderWidth - 15, 12};
+  float oldSSAOStr = settings.ssaoStrength;
+  GuiSlider(ssaoStrSlider, "", "", &settings.ssaoStrength, 0.0f, 1.0f);
+  if (settings.ssaoStrength != oldSSAOStr) settingsChanged = true;
+  yPos += 22.0f;
+
+  // === SPOTLIGHTS ===
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), Color{50, 50, 60, 255});
+  yPos += 8.0f;
+
+  char spotHeader[64];
+  snprintf(spotHeader, sizeof(spotHeader), "SPOTLIGHTS (%zu/8)", spotlights.size());
+  DrawTextEx(uiFont, spotHeader, {panelX + 10, yPos}, 10.0f, 0.0f, DARKGRAY);
+
+  // Clear all button
+  if (spotlights.size() > 0) {
+    Rectangle clearBtn = {panelX + panelWidth - 60, yPos - 2, 50, 16};
+    bool clearHovered = CheckCollisionPointRec(GetMousePosition(), clearBtn);
+    DrawRectangleRec(clearBtn, clearHovered ? Color{120, 60, 60, 255} : Color{80, 50, 50, 255});
+    DrawTextEx(uiFont, "Clear", {panelX + panelWidth - 52, yPos}, 9.0f, 0.0f, WHITE);
+    if (clearHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      spotlights.clear();
+      settingsChanged = true;
+    }
+  }
+  yPos += 16.0f;
+
+  // List spotlights with delete buttons
+  for (size_t i = 0; i < spotlights.size() && i < 8; ++i) {
+    Spotlight& spot = spotlights[i];
+    char spotInfo[64];
+    snprintf(spotInfo, sizeof(spotInfo), "%zu: (%.1f,%.1f,%.1f) I=%.0f",
+             i + 1, spot.position.x, spot.position.y, spot.position.z, spot.intensity);
+    DrawTextEx(uiFont, spotInfo, {panelX + 15, yPos}, 9.0f, 0.0f, Color{255, 240, 150, 255});
+
+    // Delete button for this spotlight
+    Rectangle delBtn = {panelX + panelWidth - 30, yPos - 1, 20, 14};
+    bool delHovered = CheckCollisionPointRec(GetMousePosition(), delBtn);
+    DrawRectangleRec(delBtn, delHovered ? Color{180, 60, 60, 255} : Color{100, 50, 50, 255});
+    DrawTextEx(uiFont, "X", {panelX + panelWidth - 24, yPos}, 9.0f, 0.0f, WHITE);
+    if (delHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      spotlights.erase(spotlights.begin() + static_cast<long>(i));
+      settingsChanged = true;
+      break;  // Exit loop since vector was modified
+    }
+    yPos += 16.0f;
+  }
+
+  if (spotlights.empty()) {
+    DrawTextEx(uiFont, "Press L to place spotlight", {panelX + 15, yPos}, 9.0f, 0.0f, Color{80, 80, 90, 255});
+    yPos += 14.0f;
+  }
+
+  // Keyboard hints at bottom
+  yPos = panelY + panelHeight - 36.0f;
+  DrawLine(static_cast<int>(panelX + 5), static_cast<int>(yPos),
+           static_cast<int>(panelX + panelWidth - 5), static_cast<int>(yPos), Color{50, 50, 60, 255});
+  yPos += 6.0f;
+  DrawTextEx(uiFont, "[L] Place spotlight  [Shift+L] Clear", {panelX + 10, yPos}, 9.0f, 0.0f, Color{80, 80, 90, 255});
+  yPos += 12.0f;
+  DrawTextEx(uiFont, "[P] Toggle PBR  [F9] Debug views", {panelX + 10, yPos}, 9.0f, 0.0f, Color{80, 80, 90, 255});
+
+  return settingsChanged;
+}
+
 bool DrawToolbar(UIState& uiState,
                  const Font& uiFont,
                  int screenWidth,
@@ -1578,6 +1814,7 @@ bool DrawToolbar(UIState& uiState,
   }
   if (toggleBtn("S", uiState.showStructuralPanel, Color{180, 140, 40, 255})) anyToggled = true;
   if (toggleBtn("A", uiState.showAssemblyPanel, Color{100, 180, 100, 255})) anyToggled = true;
+  if (toggleBtn("L", uiState.showLightingPanel, Color{255, 200, 100, 255})) anyToggled = true;
 
   // Separator
   x += 4.0f;

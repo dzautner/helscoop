@@ -56,13 +56,18 @@ struct UIState {
   PanelPos structuralPos;
 
   // Panel dragging state
-  int draggingPanel = -1;  // -1=none, 0=materials, 1=params, 2=thermal, 3=structural, 4=assembly
+  int draggingPanel = -1;  // -1=none, 0=materials, 1=params, 2=thermal, 3=structural, 4=assembly, 5=lighting
   Vector2 dragOffset = {0, 0};
 
   // Assembly preview state
   bool showAssemblyPanel = false;
   int currentAssemblyStep = 0;  // Current step being viewed (0-indexed)
   PanelPos assemblyPos;
+
+  // Lighting panel state
+  bool showLightingPanel = false;
+  PanelPos lightingPos;
+  LightingSettings lightingSettings;
 
   // Export button clicks (set by toolbar, cleared by main after handling)
   bool stlExportClicked = false;
@@ -117,6 +122,13 @@ void DrawStructuralPanel(const StructuralAnalysisResult& structResult,
 // Returns true if the step was changed (so main can update visible objects)
 bool DrawAssemblyPanel(const AssemblyInstructions& assembly,
                        UIState& uiState,
+                       const Font& uiFont,
+                       int screenWidth, int screenHeight);
+
+// Draw lighting control panel
+// Returns true if any lighting setting was modified
+bool DrawLightingPanel(UIState& uiState,
+                       std::vector<Spotlight>& spotlights,
                        const Font& uiFont,
                        int screenWidth, int screenHeight);
 

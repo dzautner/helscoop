@@ -37,6 +37,60 @@ struct Vec3f {
   float x, y, z;
 };
 
+// Spotlight placed by user at camera position
+struct Spotlight {
+  Vector3 position;
+  Vector3 direction;
+  float intensity = 5.0f;
+  float innerCone = 15.0f;  // degrees
+  float outerCone = 30.0f;  // degrees
+  Color color = WHITE;
+};
+
+// Lighting and render settings (controlled via Lighting panel)
+struct LightingSettings {
+  // Render mode
+  bool pbrModeEnabled = true;  // false = toon shading
+
+  // Ambient light
+  float ambientIntensity = 0.15f;  // 0.0-1.0
+  std::array<float, 3> ambientColor = {0.6f, 0.7f, 1.0f};  // Sky blue tint
+
+  // Main directional light (sun)
+  float sunIntensity = 1.0f;
+  std::array<float, 3> sunColor = {1.0f, 0.95f, 0.9f};  // Warm white
+  float sunAzimuth = 45.0f;    // Horizontal angle in degrees
+  float sunElevation = 45.0f;  // Vertical angle in degrees
+
+  // Secondary fill light
+  float fillIntensity = 0.3f;
+  std::array<float, 3> fillColor = {0.7f, 0.8f, 1.0f};  // Cool blue
+
+  // Shadows
+  bool shadowsEnabled = true;
+  float shadowBias = 0.0005f;
+  int shadowMapSize = 2048;  // 512, 1024, 2048, 4096
+
+  // SSAO (Screen Space Ambient Occlusion)
+  bool ssaoEnabled = true;
+  float ssaoStrength = 0.5f;  // 0.0-1.0
+  float ssaoRadius = 0.3f;    // Sample radius
+
+  // Debug visualization
+  int debugViewMode = 0;  // 0=normal, 1=raw, 2=depth, 3=normals, etc.
+
+  // Convert sun azimuth/elevation to direction vector
+  Vector3 getSunDirection() const {
+    float azRad = sunAzimuth * DEG2RAD;
+    float elRad = sunElevation * DEG2RAD;
+    return Vector3{
+      cosf(elRad) * sinf(azRad),
+      sinf(elRad),
+      cosf(elRad) * cosf(azRad)
+    };
+  }
+};
+
 // PBR Visual properties for materials
 struct PBRVisual {
   std::array<float, 3> albedo = {0.8f, 0.8f, 0.8f};  // RGB [0-1]
