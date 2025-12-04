@@ -1981,29 +1981,30 @@ const run_mesh_left_top = translate(
 );
 
 // Roof mesh - two sloped panels following the A-frame roof structure
-// Use run roof geometry: 30° pitch, ridge at center
-const roof_mesh_length = run_length - post_sec[0] * 2;
-const roof_mesh_slope_width = beam_length;  // Width of sloped panel (from rail to ridge)
-const roof_base_z_mesh = run_base_z + run_height;  // Top of corner posts
+// Copy exact rotation approach used for rafters
+const roof_mesh_x_start = run_base_x + post_sec[0];
+const roof_mesh_len = run_length - post_sec[0] * 2;
 
-// Left (front) roof panel - slopes up from front rail to ridge
-let left_roof_mesh = createWireMesh(roof_mesh_length, roof_mesh_slope_width, wire_diameter, 'xy');
-left_roof_mesh = rotate(left_roof_mesh, [-beam_angle, 0, 0]);  // Tilt up toward ridge
-const run_mesh_roof_left = translate(
-  left_roof_mesh,
-  [run_base_x + post_sec[0], run_base_y, roof_base_z_mesh]
-);
+// LEFT (front) roof mesh - same rotation as left rafters
+let left_roof_mesh = createWireMesh(roof_mesh_len, beam_length, wire_diameter, 'xy');
+left_roof_mesh = translate(left_roof_mesh, [0, -wire_diameter / 2, 0]);  // Center on Y
+left_roof_mesh = rotate(left_roof_mesh, [beam_angle, 0, 0]);  // Same angle as rafters
+left_roof_mesh = translate(left_roof_mesh, [0, wire_diameter / 2, 0]);  // Uncenter
+const run_mesh_roof_left = translate(left_roof_mesh, [roof_mesh_x_start, run_base_y, beam_base_z]);
 
-// Right (back) roof panel - slopes up from back rail to ridge (mirrored)
-let right_roof_mesh = createWireMesh(roof_mesh_length, roof_mesh_slope_width, wire_diameter, 'xy');
-right_roof_mesh = rotate(right_roof_mesh, [beam_angle, 0, 0]);  // Tilt up toward ridge
-const run_mesh_roof_right = translate(
-  right_roof_mesh,
-  [run_base_x + post_sec[0], run_base_y + run_width, roof_base_z_mesh]
-);
+// RIGHT (back) roof mesh - mirror the left mesh around run center (same as right rafters)
+let right_roof_mesh = createWireMesh(roof_mesh_len, beam_length, wire_diameter, 'xy');
+right_roof_mesh = translate(right_roof_mesh, [0, -wire_diameter / 2, 0]);
+right_roof_mesh = rotate(right_roof_mesh, [beam_angle, 0, 0]);
+right_roof_mesh = translate(right_roof_mesh, [0, wire_diameter / 2, 0]);
+right_roof_mesh = translate(right_roof_mesh, [roof_mesh_x_start, run_base_y, beam_base_z]);
+// Mirror around run center
+right_roof_mesh = translate(right_roof_mesh, [0, -run_center_y, 0]);
+right_roof_mesh = scale(right_roof_mesh, [1, -1, 1]);
+right_roof_mesh = translate(right_roof_mesh, [0, run_center_y, 0]);
 
 // Combine all mesh walls including sloped roof panels
-const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top, run_mesh_roof_left, run_mesh_roof_right);
+const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top, run_mesh_roof_left, right_roof_mesh);
 
 // ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
