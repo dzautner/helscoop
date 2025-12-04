@@ -1950,12 +1950,21 @@ function createWireMesh(width, height, thickness, orientation) {
   return wires.length > 0 ? union(...wires) : cube({ size: [1, 1, 1], center: false });
 }
 
-// Front wall mesh (south side) - from gate post to far right corner
+// Front wall mesh (south side) - sections around gate opening
+// Main section: from gate post to far right corner (full height)
 const front_width = run_length - gate_width - post_sec[0] * 2;
 const run_mesh_front = translate(
   createWireMesh(front_width, mesh_height, wire_diameter, 'xz'),
   [run_base_x + gate_width + post_sec[0], run_base_y + post_sec[1] / 2 - wire_diameter / 2, mesh_bottom_z]
 );
+
+// Above gate section: mesh above the gate beam
+const gate_beam_top_z = run_base_z + run_height - post_sec[0];
+const above_gate_height = mesh_top_z - gate_beam_top_z;
+const run_mesh_front_above_gate = above_gate_height > 0 ? translate(
+  createWireMesh(gate_width - post_sec[0], above_gate_height, wire_diameter, 'xz'),
+  [run_base_x + post_sec[0], run_base_y + post_sec[1] / 2 - wire_diameter / 2, gate_beam_top_z]
+) : null;
 
 // Back wall mesh (north side) - full length
 const back_width = run_length - post_sec[0] * 2;
@@ -2029,7 +2038,9 @@ right_roof_mesh = translate(right_roof_mesh, [0, run_center_y, 0]);
 const left_wall_parts = [run_mesh_left_top];
 if (run_mesh_left_front_lower) left_wall_parts.push(run_mesh_left_front_lower);
 if (run_mesh_left_back_lower) left_wall_parts.push(run_mesh_left_back_lower);
-const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, ...left_wall_parts, run_mesh_roof_left, right_roof_mesh);
+const front_wall_parts = [run_mesh_front];
+if (run_mesh_front_above_gate) front_wall_parts.push(run_mesh_front_above_gate);
+const run_mesh_walls = union(...front_wall_parts, run_mesh_back, run_mesh_right, ...left_wall_parts, run_mesh_roof_left, right_roof_mesh);
 
 // ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
