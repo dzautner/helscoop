@@ -2034,13 +2034,75 @@ right_roof_mesh = translate(right_roof_mesh, [0, -run_center_y, 0]);
 right_roof_mesh = scale(right_roof_mesh, [1, -1, 1]);
 right_roof_mesh = translate(right_roof_mesh, [0, run_center_y, 0]);
 
-// Combine all mesh walls including sloped roof panels
+// Gable end mesh - triangular sections at each end of run
+// Gable geometry: triangle from post_top_z up to ridge_z, spanning run_width
+const gable_base_z = post_top_z;
+const gable_peak_z = ridge_z;
+const gable_height = gable_peak_z - gable_base_z;
+const gable_base_width = run_width - post_sec[1] * 2;
+
+// Create triangular gable mesh with horizontal wires
+function createGableMesh(baseWidth, height, thickness) {
+  const wires = [];
+  const numHorizontal = Math.floor(height / wire_spacing);
+
+  for (let i = 0; i <= numHorizontal; i++) {
+    const z = i * wire_spacing;
+    if (z <= height) {
+      // Width decreases linearly as we go up
+      const widthAtHeight = baseWidth * (1 - z / height);
+      const offset = (baseWidth - widthAtHeight) / 2;
+      if (widthAtHeight > wire_diameter) {
+        wires.push(translate(
+          cube({ size: [thickness, widthAtHeight, wire_diameter], center: false }),
+          [0, offset, z]
+        ));
+      }
+    }
+  }
+
+  // Vertical wires
+  const numVertical = Math.floor(baseWidth / wire_spacing);
+  for (let i = 0; i <= numVertical; i++) {
+    const y = i * wire_spacing;
+    // Calculate height at this Y position (triangle shape)
+    const distFromCenter = Math.abs(y - baseWidth / 2);
+    const maxHeightAtY = height * (1 - distFromCenter / (baseWidth / 2));
+    if (maxHeightAtY > wire_diameter) {
+      wires.push(translate(
+        cube({ size: [thickness, wire_diameter, maxHeightAtY], center: false }),
+        [0, y, 0]
+      ));
+    }
+  }
+
+  return wires.length > 0 ? union(...wires) : null;
+}
+
+// Right gable (east end of run)
+const right_gable_mesh = createGableMesh(gable_base_width, gable_height, wire_diameter);
+const run_mesh_gable_right = right_gable_mesh ? translate(
+  right_gable_mesh,
+  [run_base_x + run_length - post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], gable_base_z]
+) : null;
+
+// Left gable (west end) - note: this overlaps with tunnel area but above mesh_height it's open
+const left_gable_mesh = createGableMesh(gable_base_width, gable_height, wire_diameter);
+const run_mesh_gable_left = left_gable_mesh ? translate(
+  left_gable_mesh,
+  [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], gable_base_z]
+) : null;
+
+// Combine all mesh walls including sloped roof panels and gables
 const left_wall_parts = [run_mesh_left_top];
 if (run_mesh_left_front_lower) left_wall_parts.push(run_mesh_left_front_lower);
 if (run_mesh_left_back_lower) left_wall_parts.push(run_mesh_left_back_lower);
 const front_wall_parts = [run_mesh_front];
 if (run_mesh_front_above_gate) front_wall_parts.push(run_mesh_front_above_gate);
-const run_mesh_walls = union(...front_wall_parts, run_mesh_back, run_mesh_right, ...left_wall_parts, run_mesh_roof_left, right_roof_mesh);
+const gable_parts = [];
+if (run_mesh_gable_right) gable_parts.push(run_mesh_gable_right);
+if (run_mesh_gable_left) gable_parts.push(run_mesh_gable_left);
+const run_mesh_walls = union(...front_wall_parts, run_mesh_back, run_mesh_right, ...left_wall_parts, run_mesh_roof_left, right_roof_mesh, ...gable_parts);
 
 // ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
