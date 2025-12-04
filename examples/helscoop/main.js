@@ -1971,14 +1971,36 @@ const run_mesh_right = translate(
   [run_base_x + run_length - post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z]
 );
 
-// Left wall mesh (west side) - top section above tunnel connection
+// Left wall mesh (west side) - sections around tunnel opening
 const tunnel_connect_height = 800;
 const left_wall_top_height = mesh_height - tunnel_connect_height;
 const left_width = run_width - post_sec[1] * 2;
+
+// Top section - full width above tunnel
 const run_mesh_left_top = translate(
   createWireMesh(left_width, left_wall_top_height, wire_diameter, 'yz'),
   [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z + tunnel_connect_height]
 );
+
+// Lower sections around tunnel opening
+// Tunnel opening: from tunnel_base_y to tunnel_base_y + tunnel_width, height 0 to tunnel_connect_height
+const tunnel_opening_start_y = tunnel_base_y - run_base_y;  // Relative to run
+const tunnel_opening_end_y = tunnel_opening_start_y + tunnel_width;
+
+// Front lower section (from front post to tunnel opening)
+const front_lower_width = tunnel_opening_start_y - post_sec[1];
+const run_mesh_left_front_lower = front_lower_width > 0 ? translate(
+  createWireMesh(front_lower_width, tunnel_connect_height, wire_diameter, 'yz'),
+  [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z]
+) : null;
+
+// Back lower section (from tunnel opening to back post)
+const back_lower_start = tunnel_opening_end_y;
+const back_lower_width = run_width - post_sec[1] - back_lower_start;
+const run_mesh_left_back_lower = back_lower_width > 0 ? translate(
+  createWireMesh(back_lower_width, tunnel_connect_height, wire_diameter, 'yz'),
+  [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + back_lower_start, mesh_bottom_z]
+) : null;
 
 // Roof mesh - two sloped panels following the A-frame roof structure
 // Copy exact rotation approach used for rafters
@@ -2004,7 +2026,10 @@ right_roof_mesh = scale(right_roof_mesh, [1, -1, 1]);
 right_roof_mesh = translate(right_roof_mesh, [0, run_center_y, 0]);
 
 // Combine all mesh walls including sloped roof panels
-const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top, run_mesh_roof_left, right_roof_mesh);
+const left_wall_parts = [run_mesh_left_top];
+if (run_mesh_left_front_lower) left_wall_parts.push(run_mesh_left_front_lower);
+if (run_mesh_left_back_lower) left_wall_parts.push(run_mesh_left_back_lower);
+const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, ...left_wall_parts, run_mesh_roof_left, right_roof_mesh);
 
 // ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
