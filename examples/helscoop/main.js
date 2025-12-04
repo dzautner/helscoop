@@ -1864,15 +1864,15 @@ const run_frame = union(
 // ============================================================================
 
 // Wire mesh grid - visible frame with horizontal/vertical wires
-const wire_diameter = 8;  // Individual wire thickness
-const wire_spacing = 150;  // Grid spacing (represents 12.5mm hardware cloth scaled up for visibility)
+const wire_diameter = 6;  // Individual wire thickness
+const wire_spacing = 50;  // Dense grid spacing for realistic hardware cloth look
 const mesh_bottom_z = lower_rail_z + post_sec[0] / 2;
 const mesh_top_z = run_base_z + run_height - post_sec[0];
 const mesh_height = mesh_top_z - mesh_bottom_z;
 
 // Helper to create a wire mesh grid for a wall panel
 function createWireMesh(width, height, thickness, orientation) {
-  // orientation: 'xz' for front/back walls (along X), 'yz' for side walls (along Y)
+  // orientation: 'xz' for front/back walls, 'yz' for side walls, 'xy' for roof
   const wires = [];
 
   if (orientation === 'xz') {
@@ -1898,7 +1898,7 @@ function createWireMesh(width, height, thickness, orientation) {
         ));
       }
     }
-  } else {
+  } else if (orientation === 'yz') {
     // YZ orientation - horizontal wires (along Y)
     const numHorizontal = Math.floor(height / wire_spacing);
     for (let i = 0; i <= numHorizontal; i++) {
@@ -1918,6 +1918,30 @@ function createWireMesh(width, height, thickness, orientation) {
         wires.push(translate(
           cube({ size: [thickness, wire_diameter, height], center: false }),
           [0, y, 0]
+        ));
+      }
+    }
+  } else if (orientation === 'xy') {
+    // XY orientation for roof - horizontal mesh
+    // Wires along X axis
+    const numAlongY = Math.floor(height / wire_spacing);  // height = depth in this case
+    for (let i = 0; i <= numAlongY; i++) {
+      const y = i * wire_spacing;
+      if (y <= height) {
+        wires.push(translate(
+          cube({ size: [width, wire_diameter, thickness], center: false }),
+          [0, y, 0]
+        ));
+      }
+    }
+    // Wires along Y axis
+    const numAlongX = Math.floor(width / wire_spacing);
+    for (let i = 0; i <= numAlongX; i++) {
+      const x = i * wire_spacing;
+      if (x <= width) {
+        wires.push(translate(
+          cube({ size: [wire_diameter, height, thickness], center: false }),
+          [x, 0, 0]
         ));
       }
     }
@@ -1956,8 +1980,17 @@ const run_mesh_left_top = translate(
   [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z + tunnel_connect_height]
 );
 
-// Combine all mesh walls
-const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top);
+// Roof mesh - covers the top of the run between rafters
+const roof_mesh_length = run_length - post_sec[0] * 2;
+const roof_mesh_width = run_width - post_sec[1] * 2;
+const roof_mesh_z = run_base_z + run_height - post_sec[0] / 2;  // Just below top rails
+const run_mesh_roof = translate(
+  createWireMesh(roof_mesh_length, roof_mesh_width, wire_diameter, 'xy'),
+  [run_base_x + post_sec[0], run_base_y + post_sec[1], roof_mesh_z]
+);
+
+// Combine all mesh walls including roof
+const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top, run_mesh_roof);
 
 // ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
