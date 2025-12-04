@@ -1980,17 +1980,30 @@ const run_mesh_left_top = translate(
   [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z + tunnel_connect_height]
 );
 
-// Roof mesh - covers the top of the run between rafters
+// Roof mesh - two sloped panels following the A-frame roof structure
+// Use run roof geometry: 30° pitch, ridge at center
 const roof_mesh_length = run_length - post_sec[0] * 2;
-const roof_mesh_width = run_width - post_sec[1] * 2;
-const roof_mesh_z = run_base_z + run_height - post_sec[0] / 2;  // Just below top rails
-const run_mesh_roof = translate(
-  createWireMesh(roof_mesh_length, roof_mesh_width, wire_diameter, 'xy'),
-  [run_base_x + post_sec[0], run_base_y + post_sec[1], roof_mesh_z]
+const roof_mesh_slope_width = beam_length;  // Width of sloped panel (from rail to ridge)
+const roof_base_z_mesh = run_base_z + run_height;  // Top of corner posts
+
+// Left (front) roof panel - slopes up from front rail to ridge
+let left_roof_mesh = createWireMesh(roof_mesh_length, roof_mesh_slope_width, wire_diameter, 'xy');
+left_roof_mesh = rotate(left_roof_mesh, [-beam_angle, 0, 0]);  // Tilt up toward ridge
+const run_mesh_roof_left = translate(
+  left_roof_mesh,
+  [run_base_x + post_sec[0], run_base_y, roof_base_z_mesh]
 );
 
-// Combine all mesh walls including roof
-const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top, run_mesh_roof);
+// Right (back) roof panel - slopes up from back rail to ridge (mirrored)
+let right_roof_mesh = createWireMesh(roof_mesh_length, roof_mesh_slope_width, wire_diameter, 'xy');
+right_roof_mesh = rotate(right_roof_mesh, [beam_angle, 0, 0]);  // Tilt up toward ridge
+const run_mesh_roof_right = translate(
+  right_roof_mesh,
+  [run_base_x + post_sec[0], run_base_y + run_width, roof_base_z_mesh]
+);
+
+// Combine all mesh walls including sloped roof panels
+const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top, run_mesh_roof_left, run_mesh_roof_right);
 
 // ============================================================================
 // CHICKEN GYM - Multi-level enrichment structure inside run
