@@ -1863,66 +1863,100 @@ const run_frame = union(
 // HARDWARE CLOTH WALLS - Wire frame showing mesh enclosure boundaries
 // ============================================================================
 
-// Create frame borders instead of solid panels (allows seeing through)
-const wire_diameter = 12;  // Wire frame thickness (represents stapled-on hardware cloth edge)
+// Wire mesh grid - visible frame with horizontal/vertical wires
+const wire_diameter = 8;  // Individual wire thickness
+const wire_spacing = 150;  // Grid spacing (represents 12.5mm hardware cloth scaled up for visibility)
 const mesh_bottom_z = lower_rail_z + post_sec[0] / 2;
 const mesh_top_z = run_base_z + run_height - post_sec[0];
 const mesh_height = mesh_top_z - mesh_bottom_z;
 
-// Helper to create a rectangular frame (4 edges) for a wall panel
-function createWireFrame(width, height, thickness, orientation) {
+// Helper to create a wire mesh grid for a wall panel
+function createWireMesh(width, height, thickness, orientation) {
   // orientation: 'xz' for front/back walls (along X), 'yz' for side walls (along Y)
-  const w = wire_diameter;
+  const wires = [];
+
   if (orientation === 'xz') {
-    // Frame lies in XZ plane (for walls along X axis)
-    const top = cube({ size: [width, thickness, w], center: false });
-    const bottom = cube({ size: [width, thickness, w], center: false });
-    const left = cube({ size: [w, thickness, height], center: false });
-    const right = translate(cube({ size: [w, thickness, height], center: false }), [width - w, 0, 0]);
-    const topPlaced = translate(top, [0, 0, height - w]);
-    return union(topPlaced, bottom, left, right);
+    // Horizontal wires (along X)
+    const numHorizontal = Math.floor(height / wire_spacing);
+    for (let i = 0; i <= numHorizontal; i++) {
+      const z = i * wire_spacing;
+      if (z <= height) {
+        wires.push(translate(
+          cube({ size: [width, thickness, wire_diameter], center: false }),
+          [0, 0, z]
+        ));
+      }
+    }
+    // Vertical wires (along Z)
+    const numVertical = Math.floor(width / wire_spacing);
+    for (let i = 0; i <= numVertical; i++) {
+      const x = i * wire_spacing;
+      if (x <= width) {
+        wires.push(translate(
+          cube({ size: [wire_diameter, thickness, height], center: false }),
+          [x, 0, 0]
+        ));
+      }
+    }
   } else {
-    // Frame lies in YZ plane (for walls along Y axis)
-    const top = cube({ size: [thickness, width, w], center: false });
-    const bottom = cube({ size: [thickness, width, w], center: false });
-    const left = cube({ size: [thickness, w, height], center: false });
-    const right = translate(cube({ size: [thickness, w, height], center: false }), [0, width - w, 0]);
-    const topPlaced = translate(top, [0, 0, height - w]);
-    return union(topPlaced, bottom, left, right);
+    // YZ orientation - horizontal wires (along Y)
+    const numHorizontal = Math.floor(height / wire_spacing);
+    for (let i = 0; i <= numHorizontal; i++) {
+      const z = i * wire_spacing;
+      if (z <= height) {
+        wires.push(translate(
+          cube({ size: [thickness, width, wire_diameter], center: false }),
+          [0, 0, z]
+        ));
+      }
+    }
+    // Vertical wires (along Z)
+    const numVertical = Math.floor(width / wire_spacing);
+    for (let i = 0; i <= numVertical; i++) {
+      const y = i * wire_spacing;
+      if (y <= width) {
+        wires.push(translate(
+          cube({ size: [thickness, wire_diameter, height], center: false }),
+          [0, y, 0]
+        ));
+      }
+    }
   }
+
+  return wires.length > 0 ? union(...wires) : cube({ size: [1, 1, 1], center: false });
 }
 
-// Front wall frame (south side) - from gate post to far right corner
+// Front wall mesh (south side) - from gate post to far right corner
 const front_width = run_length - gate_width - post_sec[0] * 2;
 const run_mesh_front = translate(
-  createWireFrame(front_width, mesh_height, wire_diameter, 'xz'),
+  createWireMesh(front_width, mesh_height, wire_diameter, 'xz'),
   [run_base_x + gate_width + post_sec[0], run_base_y + post_sec[1] / 2 - wire_diameter / 2, mesh_bottom_z]
 );
 
-// Back wall frame (north side) - full length
+// Back wall mesh (north side) - full length
 const back_width = run_length - post_sec[0] * 2;
 const run_mesh_back = translate(
-  createWireFrame(back_width, mesh_height, wire_diameter, 'xz'),
+  createWireMesh(back_width, mesh_height, wire_diameter, 'xz'),
   [run_base_x + post_sec[0], run_base_y + run_width - post_sec[1] / 2 - wire_diameter / 2, mesh_bottom_z]
 );
 
-// Right wall frame (east side) - full width
+// Right wall mesh (east side) - full width
 const right_width = run_width - post_sec[1] * 2;
 const run_mesh_right = translate(
-  createWireFrame(right_width, mesh_height, wire_diameter, 'yz'),
+  createWireMesh(right_width, mesh_height, wire_diameter, 'yz'),
   [run_base_x + run_length - post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z]
 );
 
-// Left wall frame (west side) - top section above tunnel connection
+// Left wall mesh (west side) - top section above tunnel connection
 const tunnel_connect_height = 800;
 const left_wall_top_height = mesh_height - tunnel_connect_height;
 const left_width = run_width - post_sec[1] * 2;
 const run_mesh_left_top = translate(
-  createWireFrame(left_width, left_wall_top_height, wire_diameter, 'yz'),
+  createWireMesh(left_width, left_wall_top_height, wire_diameter, 'yz'),
   [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z + tunnel_connect_height]
 );
 
-// Combine all mesh wall frames
+// Combine all mesh walls
 const run_mesh_walls = union(run_mesh_front, run_mesh_back, run_mesh_right, run_mesh_left_top);
 
 // ============================================================================
