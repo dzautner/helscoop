@@ -835,14 +835,17 @@ in vec2 vertexTexCoord;
 
 uniform mat4 mvp;
 uniform mat4 matModel;
+uniform mat4 lightSpaceMatrix;
 
 out vec3 fragWorldPos;
 out vec2 fragTexCoord;
+out vec4 fragPosLightSpace;
 
 void main() {
     vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
     fragWorldPos = worldPos.xyz;
     fragTexCoord = vertexTexCoord;
+    fragPosLightSpace = lightSpaceMatrix * worldPos;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )glsl";
@@ -852,6 +855,7 @@ inline const char* kGroundPlane_FS = R"glsl(
 
 in vec3 fragWorldPos;
 in vec2 fragTexCoord;
+in vec4 fragPosLightSpace;
 
 out vec4 finalColor;
 
@@ -861,6 +865,45 @@ uniform float fadeRadius;
 uniform vec3 sceneCenter;
 uniform vec3 lightDir;       // Sun direction for lighting
 uniform float ambientLevel;  // Ambient light level
+uniform sampler2D shadowMap;
+uniform float shadowBias;
+
+// Spotlight uniforms (same as PBR shader)
+#define MAX_SPOTLIGHTS 8
+uniform int numSpotlights;
+uniform vec3 spotlightPos[MAX_SPOTLIGHTS];
+uniform vec3 spotlightDir[MAX_SPOTLIGHTS];
+uniform vec3 spotlightColor[MAX_SPOTLIGHTS];
+uniform float spotlightIntensity[MAX_SPOTLIGHTS];
+uniform float spotlightInnerCone[MAX_SPOTLIGHTS];  // cos of inner angle
+uniform float spotlightOuterCone[MAX_SPOTLIGHTS];  // cos of outer angle
+
+// Shadow calculation with PCF soft shadows
+float calculateShadow(vec4 fragPosLS) {
+    vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Flip Y for render texture coordinate system (raylib uses flipped textures)
+    projCoords.y = 1.0 - projCoords.y;
+
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0) {
+        return 0.0;
+    }
+
+    float currentDepth = projCoords.z;
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+
+    // PCF with 5x5 kernel for soft shadows
+    for (int x = -2; x <= 2; x++) {
+        for (int y = -2; y <= 2; y++) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - shadowBias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 25.0;
+}
 
 // Noise functions for procedural texturing
 float hash(vec2 p) {
@@ -913,19 +956,19 @@ void main() {
     float dist = length(pos - sceneCenter.xz);
     float fade = 1.0 - smoothstep(fadeRadius * 0.6, fadeRadius, dist);
 
-    // === Finnish Forest Floor Colors ===
+    // === Finnish Forest Floor Colors (brighter for visibility) ===
     // Base soil/dirt
-    vec3 soilColor = vec3(0.25, 0.18, 0.12);
+    vec3 soilColor = vec3(0.35, 0.28, 0.18);
     // Green moss (typical Sipoonkorpi)
-    vec3 mossColor = vec3(0.22, 0.35, 0.15);
+    vec3 mossColor = vec3(0.32, 0.50, 0.22);
     // Dry moss/lichen
-    vec3 lichenColor = vec3(0.45, 0.52, 0.35);
+    vec3 lichenColor = vec3(0.55, 0.60, 0.42);
     // Pine needles/dead leaves
-    vec3 needleColor = vec3(0.35, 0.25, 0.15);
+    vec3 needleColor = vec3(0.45, 0.35, 0.22);
     // Blueberry plant dark green
-    vec3 blueberryColor = vec3(0.15, 0.28, 0.12);
+    vec3 blueberryColor = vec3(0.22, 0.38, 0.18);
     // Lingonberry lighter
-    vec3 lingonColor = vec3(0.25, 0.32, 0.18);
+    vec3 lingonColor = vec3(0.35, 0.45, 0.25);
 
     // === Multi-layer Procedural Texture ===
 
@@ -1000,15 +1043,48 @@ void main() {
     float hz = fbm((pos + vec2(0.0, 0.01)) * 0.5, 3);
     vec3 normal = normalize(vec3(h - hx, 0.15, h - hz));
 
-    // Diffuse lighting from sun
+    // Calculate shadow from objects (sun only)
+    float shadow = calculateShadow(fragPosLightSpace);
+
+    // Diffuse lighting from sun (reduced in shadow)
     float NdotL = max(dot(normal, lightDir), 0.0);
-    float diffuse = NdotL * 0.6 + ambientLevel;
+    float shadowFactor = 1.0 - shadow * 0.7;  // Softer shadows
+    float sunDiffuse = NdotL * 0.6 * shadowFactor;
+
+    // Calculate spotlight contributions
+    vec3 spotlightContrib = vec3(0.0);
+    for (int i = 0; i < numSpotlights && i < MAX_SPOTLIGHTS; i++) {
+        vec3 lightVec = spotlightPos[i] - fragWorldPos;
+        float dist = length(lightVec);
+        vec3 L = normalize(lightVec);
+
+        // Spotlight cone attenuation
+        float theta = dot(L, normalize(-spotlightDir[i]));
+        float epsilon = spotlightInnerCone[i] - spotlightOuterCone[i];
+        float spotAtten = clamp((theta - spotlightOuterCone[i]) / max(epsilon, 0.001), 0.0, 1.0);
+
+        // Distance attenuation
+        float distAtten = 1.0 / (1.0 + 0.09 * dist + 0.032 * dist * dist);
+
+        // Diffuse lighting
+        float NdotL_spot = max(dot(vec3(0.0, 1.0, 0.0), L), 0.0);  // Ground normal is up
+
+        spotlightContrib += spotlightColor[i] * spotlightIntensity[i] * NdotL_spot * spotAtten * distAtten;
+    }
+
+    // Combine sun and spotlight lighting
+    float totalDiffuse = sunDiffuse + ambientLevel * 0.5;
+    totalDiffuse = max(totalDiffuse, 0.1);  // Minimum ambient
 
     // Soft shadows in crevices (fake AO)
     float ao = 0.7 + 0.3 * largeNoise;
     ao *= 0.85 + 0.15 * mossPatch;  // Moss areas slightly darker
 
-    groundCol *= diffuse * ao;
+    // Apply lighting
+    groundCol = groundCol * totalDiffuse * ao + groundCol * spotlightContrib;
+
+    // Minimum floor brightness
+    groundCol = max(groundCol, vec3(0.02));
 
     // Slight color variation with distance (atmospheric)
     groundCol = mix(groundCol, groundCol * vec3(0.95, 0.97, 1.0), smoothstep(0.0, fadeRadius, dist) * 0.15);

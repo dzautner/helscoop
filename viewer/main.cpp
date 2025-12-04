@@ -311,6 +311,17 @@ int main(int argc, char *argv[]) {
   const int locSceneCenter = GetShaderLocation(groundPlaneShader, "sceneCenter");
   const int locGroundLightDir = GetShaderLocation(groundPlaneShader, "lightDir");
   const int locGroundAmbient = GetShaderLocation(groundPlaneShader, "ambientLevel");
+  const int locGroundShadowMap = GetShaderLocation(groundPlaneShader, "shadowMap");
+  const int locGroundShadowBias = GetShaderLocation(groundPlaneShader, "shadowBias");
+  const int locGroundLightSpaceMatrix = GetShaderLocation(groundPlaneShader, "lightSpaceMatrix");
+  // Ground plane spotlight uniforms
+  const int locGroundNumSpotlights = GetShaderLocation(groundPlaneShader, "numSpotlights");
+  const int locGroundSpotlightPos = GetShaderLocation(groundPlaneShader, "spotlightPos");
+  const int locGroundSpotlightDir = GetShaderLocation(groundPlaneShader, "spotlightDir");
+  const int locGroundSpotlightColor = GetShaderLocation(groundPlaneShader, "spotlightColor");
+  const int locGroundSpotlightIntensity = GetShaderLocation(groundPlaneShader, "spotlightIntensity");
+  const int locGroundSpotlightInnerCone = GetShaderLocation(groundPlaneShader, "spotlightInnerCone");
+  const int locGroundSpotlightOuterCone = GetShaderLocation(groundPlaneShader, "spotlightOuterCone");
 
   Material groundPlaneMat = LoadMaterialDefault();
   groundPlaneMat.shader = groundPlaneShader;
@@ -1144,6 +1155,47 @@ int main(int argc, char *argv[]) {
     }
 
     // ========================================================================
+    // COMPUTE SCENE BOUNDS - needed for shadow mapping and ground plane
+    // ========================================================================
+    float sceneBoundsMinX = 0.0f, sceneBoundsMaxX = 0.0f;
+    float sceneBoundsMinY = 0.0f, sceneBoundsMaxY = 0.0f;
+    float sceneBoundsMinZ = 0.0f, sceneBoundsMaxZ = 0.0f;
+    bool boundsInitialized = false;
+
+    for (const auto& modelWithColor : models) {
+      for (int mi = 0; mi < modelWithColor.model.meshCount; ++mi) {
+        Mesh& mesh = modelWithColor.model.meshes[mi];
+        for (int vi = 0; vi < mesh.vertexCount; ++vi) {
+          Vector3 v = {mesh.vertices[vi*3], mesh.vertices[vi*3+1], mesh.vertices[vi*3+2]};
+          // Transform by model matrix
+          Vector3 p = Vector3Transform(v, modelWithColor.model.transform);
+          if (!boundsInitialized) {
+            sceneBoundsMinX = sceneBoundsMaxX = p.x;
+            sceneBoundsMinY = sceneBoundsMaxY = p.y;
+            sceneBoundsMinZ = sceneBoundsMaxZ = p.z;
+            boundsInitialized = true;
+          } else {
+            if (p.x < sceneBoundsMinX) sceneBoundsMinX = p.x;
+            if (p.x > sceneBoundsMaxX) sceneBoundsMaxX = p.x;
+            if (p.y < sceneBoundsMinY) sceneBoundsMinY = p.y;
+            if (p.y > sceneBoundsMaxY) sceneBoundsMaxY = p.y;
+            if (p.z < sceneBoundsMinZ) sceneBoundsMinZ = p.z;
+            if (p.z > sceneBoundsMaxZ) sceneBoundsMaxZ = p.z;
+          }
+        }
+      }
+    }
+
+    float sceneCenterX = (sceneBoundsMinX + sceneBoundsMaxX) * 0.5f;
+    float sceneCenterY = (sceneBoundsMinY + sceneBoundsMaxY) * 0.5f;
+    float sceneCenterZ = (sceneBoundsMinZ + sceneBoundsMaxZ) * 0.5f;
+    float sceneExtentX = sceneBoundsMaxX - sceneBoundsMinX;
+    float sceneExtentY = sceneBoundsMaxY - sceneBoundsMinY;
+    float sceneExtentZ = sceneBoundsMaxZ - sceneBoundsMinZ;
+    float sceneRadius = sqrtf(sceneExtentX*sceneExtentX + sceneExtentY*sceneExtentY + sceneExtentZ*sceneExtentZ) * 0.5f;
+    if (sceneRadius < 1.0f) sceneRadius = 1.0f;  // Minimum radius
+
+    // ========================================================================
     // SHADOW MAP PASS - Render depth from light's perspective
     // ========================================================================
     Matrix lightSpaceMatrix = MatrixIdentity();
@@ -1153,8 +1205,7 @@ int main(int argc, char *argv[]) {
       // Calculate light space matrix for shadow mapping
       // Use dynamic light direction from UI settings
       Vector3 lightDir = uiState.lightingSettings.getSunDirection();
-      Vector3 sceneCenter = {0.0f, 1.5f, 0.0f};  // Approximate scene center
-      float sceneRadius = 12.0f;  // Approximate scene radius
+      Vector3 sceneCenter = {sceneCenterX, sceneCenterY, sceneCenterZ};
 
       // Light view matrix - looking at scene from light direction
       Vector3 lightPos = Vector3Add(sceneCenter, Vector3Scale(lightDir, sceneRadius * 2.0f));
@@ -1252,28 +1303,10 @@ int main(int argc, char *argv[]) {
     BeginMode3D(camera);
     if (uiState.lightingSettings.pbrModeEnabled) {
       // Draw a simple ground plane using the PBR shader
-      // Calculate scene bounds to position and center ground correctly
-      float minY = 0.0f, centerX = 0.0f, centerZ = 0.0f;
-      float minX = FLT_MAX, maxX = -FLT_MAX, minZ = FLT_MAX, maxZ = -FLT_MAX;
-      for (const auto& m : models) {
-        BoundingBox bbox = GetModelBoundingBox(m.model);
-        Vector3 corners[8] = {
-          {bbox.min.x, bbox.min.y, bbox.min.z}, {bbox.max.x, bbox.min.y, bbox.min.z},
-          {bbox.min.x, bbox.min.y, bbox.max.z}, {bbox.max.x, bbox.min.y, bbox.max.z},
-          {bbox.min.x, bbox.max.y, bbox.min.z}, {bbox.max.x, bbox.max.y, bbox.min.z},
-          {bbox.min.x, bbox.max.y, bbox.max.z}, {bbox.max.x, bbox.max.y, bbox.max.z},
-        };
-        for (int i = 0; i < 8; i++) {
-          Vector3 p = Vector3Transform(corners[i], m.model.transform);
-          if (p.y < minY) minY = p.y;
-          if (p.x < minX) minX = p.x;
-          if (p.x > maxX) maxX = p.x;
-          if (p.z < minZ) minZ = p.z;
-          if (p.z > maxZ) maxZ = p.z;
-        }
-      }
-      centerX = (minX + maxX) * 0.5f;
-      centerZ = (minZ + maxZ) * 0.5f;
+      // Use pre-computed scene bounds (calculated earlier for shadow mapping)
+      float minY = sceneBoundsMinY;
+      float centerX = sceneCenterX;
+      float centerZ = sceneCenterZ;
 
       // Set procedural forest floor shader uniforms
       float groundCol[3] = {0.25f, 0.22f, 0.15f};  // Soil base (not really used, shader is procedural)
@@ -1289,11 +1322,62 @@ int main(int argc, char *argv[]) {
       float groundAmbient = uiState.lightingSettings.ambientIntensity + 0.3f;  // Forest floor needs more ambient
       SetShaderValue(groundPlaneShader, locGroundAmbient, &groundAmbient, SHADER_UNIFORM_FLOAT);
 
+      // Pass shadow map for ground plane shadows
+      if (shadowsActive) {
+        SetShaderValueMatrix(groundPlaneShader, locGroundLightSpaceMatrix, lightSpaceMatrix);
+        float groundShadowBias = uiState.lightingSettings.shadowBias;
+        SetShaderValue(groundPlaneShader, locGroundShadowBias, &groundShadowBias, SHADER_UNIFORM_FLOAT);
+        int groundShadowTexUnit = 3;
+        SetShaderValue(groundPlaneShader, locGroundShadowMap, &groundShadowTexUnit, SHADER_UNIFORM_INT);
+        rlActiveTextureSlot(3);
+        rlEnableTexture(shadowMap.texture.id);
+      }
+
+      // Pass spotlight data to ground plane shader
+      {
+        int numLights = static_cast<int>(spotlights.size());
+        SetShaderValue(groundPlaneShader, locGroundNumSpotlights, &numLights, SHADER_UNIFORM_INT);
+
+        // Prepare arrays for all spotlights
+        float spotPos[MAX_SPOTLIGHTS * 3] = {0};
+        float spotDir[MAX_SPOTLIGHTS * 3] = {0};
+        float spotColor[MAX_SPOTLIGHTS * 3] = {0};
+        float spotIntensity[MAX_SPOTLIGHTS] = {0};
+        float spotInnerCone[MAX_SPOTLIGHTS] = {0};
+        float spotOuterCone[MAX_SPOTLIGHTS] = {0};
+
+        for (int i = 0; i < numLights && i < MAX_SPOTLIGHTS; i++) {
+          const Spotlight& spot = spotlights[i];
+          spotPos[i*3] = spot.position.x;
+          spotPos[i*3+1] = spot.position.y;
+          spotPos[i*3+2] = spot.position.z;
+          spotDir[i*3] = spot.direction.x;
+          spotDir[i*3+1] = spot.direction.y;
+          spotDir[i*3+2] = spot.direction.z;
+          spotColor[i*3] = spot.color.r / 255.0f;
+          spotColor[i*3+1] = spot.color.g / 255.0f;
+          spotColor[i*3+2] = spot.color.b / 255.0f;
+          spotIntensity[i] = spot.intensity;
+          spotInnerCone[i] = cosf(spot.innerCone * DEG2RAD);
+          spotOuterCone[i] = cosf(spot.outerCone * DEG2RAD);
+        }
+
+        SetShaderValueV(groundPlaneShader, locGroundSpotlightPos, spotPos, SHADER_UNIFORM_VEC3, MAX_SPOTLIGHTS);
+        SetShaderValueV(groundPlaneShader, locGroundSpotlightDir, spotDir, SHADER_UNIFORM_VEC3, MAX_SPOTLIGHTS);
+        SetShaderValueV(groundPlaneShader, locGroundSpotlightColor, spotColor, SHADER_UNIFORM_VEC3, MAX_SPOTLIGHTS);
+        SetShaderValueV(groundPlaneShader, locGroundSpotlightIntensity, spotIntensity, SHADER_UNIFORM_FLOAT, MAX_SPOTLIGHTS);
+        SetShaderValueV(groundPlaneShader, locGroundSpotlightInnerCone, spotInnerCone, SHADER_UNIFORM_FLOAT, MAX_SPOTLIGHTS);
+        SetShaderValueV(groundPlaneShader, locGroundSpotlightOuterCone, spotOuterCone, SHADER_UNIFORM_FLOAT, MAX_SPOTLIGHTS);
+      }
+
       // Draw forest floor ground plane centered on scene, slightly below
-      rlPushMatrix();
-      rlTranslatef(centerX, minY - 0.002f, centerZ);
-      DrawMesh(groundPlaneMesh, groundPlaneMat, MatrixIdentity());
-      rlPopMatrix();
+      Matrix groundTransform = MatrixTranslate(centerX, minY - 0.002f, centerZ);
+      DrawMesh(groundPlaneMesh, groundPlaneMat, groundTransform);
+
+      if (shadowsActive) {
+        rlActiveTextureSlot(3);
+        rlDisableTexture();
+      }
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
       DrawAxes(2.0f);  // Only draw axes in toon mode
