@@ -454,6 +454,7 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double radius = 0.5;
   double radiusTop = -1.0;
   bool center = false;
+  int segments = 0;
   if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
     if (!JS_IsUndefined(heightVal)) {
@@ -492,10 +493,19 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
       center = c == 1;
     }
     JS_FreeValue(ctx, centerVal);
+
+    JSValue segmentsVal = JS_GetPropertyStr(ctx, argv[0], "segments");
+    if (!JS_IsUndefined(segmentsVal)) {
+      if (JS_ToInt32(ctx, &segments, segmentsVal) < 0) {
+        JS_FreeValue(ctx, segmentsVal);
+        return JS_EXCEPTION;
+      }
+    }
+    JS_FreeValue(ctx, segmentsVal);
   }
   double radiusHigh = (radiusTop < 0.0) ? radius : radiusTop;
   auto manifold = std::make_shared<manifold::Manifold>(
-      manifold::Manifold::Cylinder(height, radius, radiusHigh, 0, center));
+      manifold::Manifold::Cylinder(height, radius, radiusHigh, segments, center));
   return WrapManifold(ctx, std::move(manifold));
 }
 
