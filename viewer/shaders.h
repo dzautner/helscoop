@@ -808,23 +808,47 @@ uniform vec3 groundColor;
 uniform vec3 horizonColor;
 uniform float fadeRadius;
 uniform vec3 sceneCenter;
+uniform vec3 lightDir;      // Main directional light (world space)
+uniform vec3 lightColor;    // Main light color/intensity
+uniform vec3 cameraPos;     // Camera position for specular
 
 void main() {
     // Distance from scene center for fade
     float dist = length(fragWorldPos.xz - sceneCenter.xz);
-    float fade = 1.0 - smoothstep(fadeRadius * 0.5, fadeRadius, dist);
+    float fade = 1.0 - smoothstep(fadeRadius * 0.3, fadeRadius, dist);
 
-    // Grid pattern (subtle)
-    vec2 grid = abs(fract(fragWorldPos.xz * 0.5) - 0.5);
-    float gridLine = smoothstep(0.48, 0.5, max(grid.x, grid.y));
-    float gridAlpha = gridLine * 0.08;
+    vec3 N = vec3(0.0, 1.0, 0.0);  // Ground normal (up)
 
-    // Base color with slight gradient toward horizon
-    vec3 color = mix(groundColor, horizonColor, smoothstep(0.0, fadeRadius, dist) * 0.3);
-    color = mix(color, color * 0.92, gridAlpha);
+    // Diffuse lighting
+    float NdotL = max(dot(N, lightDir), 0.0);
+    vec3 ambient = vec3(0.35);
+    vec3 diffuse = lightColor * NdotL * 0.65;
+    vec3 lighting = ambient + diffuse;
+
+    // Grid pattern - two scales for depth perception
+    // Fine grid (1-unit spacing)
+    vec2 gridFine = abs(fract(fragWorldPos.xz) - 0.5);
+    float fineGridLine = 1.0 - smoothstep(0.47, 0.50, max(gridFine.x, gridFine.y));
+    // Fade fine grid with distance
+    float fineFade = 1.0 - smoothstep(5.0, 20.0, dist);
+    float fineGrid = fineGridLine * 0.12 * fineFade;
+
+    // Coarse grid (5-unit spacing)
+    vec2 gridCoarse = abs(fract(fragWorldPos.xz * 0.2) - 0.5);
+    float coarseGridLine = 1.0 - smoothstep(0.47, 0.50, max(gridCoarse.x, gridCoarse.y));
+    float coarseGrid = coarseGridLine * 0.10;
+
+    float gridDarken = max(fineGrid, coarseGrid);
+
+    // Base color with gradient toward horizon color at edges
+    vec3 baseColor = mix(groundColor, horizonColor, smoothstep(0.0, fadeRadius, dist) * 0.5);
+
+    // Apply lighting and grid
+    vec3 color = baseColor * lighting;
+    color = mix(color, color * 0.75, gridDarken);
 
     // Output with fade to transparent at edges
-    finalColor = vec4(color, fade * 0.85);
+    finalColor = vec4(color, fade);
 }
 )glsl";
 
@@ -987,6 +1011,77 @@ void main() {
             // Brighten normals based on proximity (near = full color, far = darker)
             finalColor = vec4(nd.rgb * (0.3 + d * 0.7), 1.0);
         }
+    }
+}
+)glsl";
+
+// ============================================================================
+// FXAA (Fast Approximate Anti-Aliasing) shader
+// Based on NVIDIA FXAA 3.11 by Timothy Lottes
+// Smooths aliased edges based on luminance contrast detection
+// ============================================================================
+
+inline const char* kFXAA_FS = R"glsl(
+#version 330
+in vec2 uv;
+out vec4 finalColor;
+
+uniform sampler2D texture0;
+uniform vec2 texelSize;
+
+// FXAA settings
+const float FXAA_REDUCE_MIN = 1.0/128.0;
+const float FXAA_REDUCE_MUL = 1.0/8.0;
+const float FXAA_SPAN_MAX = 8.0;
+
+float luma(vec3 color) {
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+    // Sample center and 4 corners
+    vec3 rgbNW = texture(texture0, uv + vec2(-1.0, -1.0) * texelSize).rgb;
+    vec3 rgbNE = texture(texture0, uv + vec2( 1.0, -1.0) * texelSize).rgb;
+    vec3 rgbSW = texture(texture0, uv + vec2(-1.0,  1.0) * texelSize).rgb;
+    vec3 rgbSE = texture(texture0, uv + vec2( 1.0,  1.0) * texelSize).rgb;
+    vec3 rgbM  = texture(texture0, uv).rgb;
+
+    // Convert to luminance
+    float lumaNW = luma(rgbNW);
+    float lumaNE = luma(rgbNE);
+    float lumaSW = luma(rgbSW);
+    float lumaSE = luma(rgbSE);
+    float lumaM  = luma(rgbM);
+
+    // Find luminance range
+    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+
+    // Compute edge direction
+    vec2 dir;
+    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+    dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+
+    // Scale direction by inverse of smallest component
+    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+    dir = min(vec2(FXAA_SPAN_MAX), max(vec2(-FXAA_SPAN_MAX), dir * rcpDirMin)) * texelSize;
+
+    // Sample along the detected edge direction
+    vec3 rgbA = 0.5 * (
+        texture(texture0, uv + dir * (1.0/3.0 - 0.5)).rgb +
+        texture(texture0, uv + dir * (2.0/3.0 - 0.5)).rgb);
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (
+        texture(texture0, uv + dir * -0.5).rgb +
+        texture(texture0, uv + dir *  0.5).rgb);
+
+    float lumaB = luma(rgbB);
+
+    // Use rgbB if within range, otherwise rgbA (avoid artifacts)
+    if (lumaB < lumaMin || lumaB > lumaMax) {
+        finalColor = vec4(rgbA, 1.0);
+    } else {
+        finalColor = vec4(rgbB, 1.0);
     }
 }
 )glsl";

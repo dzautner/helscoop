@@ -282,8 +282,9 @@ int main(int argc, char *argv[]) {
   Shader debugShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kDebugDepthFS);
   Shader ssaoShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kSSAOFS);
   Shader ssaoBlurShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kSSAOBlurFS);
+  Shader fxaaShader = LoadShaderFromMemory(shaders::kEdgeQuadVS, shaders::kFXAA_FS);
 
-  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0 || debugShader.id == 0 || ssaoShader.id == 0 || ssaoBlurShader.id == 0) {
+  if (outlineShader.id == 0 || toonShader.id == 0 || normalDepthShader.id == 0 || edgeShader.id == 0 || pbrShader.id == 0 || skyShader.id == 0 || debugShader.id == 0 || ssaoShader.id == 0 || ssaoBlurShader.id == 0 || fxaaShader.id == 0) {
     TraceLog(LOG_ERROR, "Failed to load one or more shaders.");
     DestroyModels(models);
     if (brandingFontCustom) UnloadFont(brandingFont);
@@ -305,6 +306,9 @@ int main(int argc, char *argv[]) {
   const int locHorizonColor = GetShaderLocation(groundPlaneShader, "horizonColor");
   const int locFadeRadius = GetShaderLocation(groundPlaneShader, "fadeRadius");
   const int locSceneCenter = GetShaderLocation(groundPlaneShader, "sceneCenter");
+  const int locGPLightDir = GetShaderLocation(groundPlaneShader, "lightDir");
+  const int locGPLightColor = GetShaderLocation(groundPlaneShader, "lightColor");
+  const int locGPCameraPos = GetShaderLocation(groundPlaneShader, "cameraPos");
 
   Material groundPlaneMat = LoadMaterialDefault();
   groundPlaneMat.shader = groundPlaneShader;
@@ -368,6 +372,9 @@ int main(int argc, char *argv[]) {
   // SSAO blur shader setup (texture0 is auto-bound by raylib)
   const int locSSAOBlurTexelSize = GetShaderLocation(ssaoBlurShader, "texelSize");
 
+  // FXAA shader setup
+  const int locFXAATexelSize = GetShaderLocation(fxaaShader, "texelSize");
+
   // PBR shader setup
   const int locPbrAlbedoColor = GetShaderLocation(pbrShader, "albedoColor");
   const int locPbrMetallic = GetShaderLocation(pbrShader, "metallic");
@@ -429,8 +436,8 @@ int main(int argc, char *argv[]) {
   // Transform to put plane in XY (rotate -90 degrees around X axis)
   Matrix skyTransform = MatrixRotateX(-90.0f * DEG2RAD);
 
-  // Create ground plane mesh for PBR mode (large, high-res for smooth fade)
-  const float groundPlaneSize = 60.0f;
+  // Create ground plane mesh for PBR mode (large enough to fill view at typical zoom)
+  const float groundPlaneSize = 200.0f;
   Mesh groundPlaneMesh = GenMeshPlane(groundPlaneSize, groundPlaneSize, 1, 1);
   UploadMesh(&groundPlaneMesh, false);
   Matrix groundPlaneTransform = MatrixTranslate(0.0f, -0.01f, 0.0f);  // Slightly below origin
@@ -547,16 +554,24 @@ int main(int argc, char *argv[]) {
     RenderTexture2D normDepth;
     RenderTexture2D ssaoRaw;
     RenderTexture2D ssaoBlur;
+    RenderTexture2D fxaa;  // For FXAA anti-aliasing pass
   };
+
+  // Supersampling factor for anti-aliasing (2 = render at 2x resolution)
+  const int ssaaFactor = 2;
 
   auto makeRenderTargets = [&]() {
     const int width = std::max(GetScreenWidth(), 1);
     const int height = std::max(GetScreenHeight(), 1);
+    // Main render targets at supersampled resolution
+    const int ssWidth = width * ssaaFactor;
+    const int ssHeight = height * ssaaFactor;
     RenderTargets rt;
-    rt.color = LoadRenderTexture(width, height);
-    rt.normDepth = LoadRenderTexture(width, height);
-    rt.ssaoRaw = LoadRenderTexture(width, height);
-    rt.ssaoBlur = LoadRenderTexture(width, height);
+    rt.color = LoadRenderTexture(ssWidth, ssHeight);
+    rt.normDepth = LoadRenderTexture(ssWidth, ssHeight);
+    rt.ssaoRaw = LoadRenderTexture(ssWidth, ssHeight);
+    rt.ssaoBlur = LoadRenderTexture(ssWidth, ssHeight);
+    rt.fxaa = LoadRenderTexture(width, height);  // FXAA at screen resolution
     return rt;
   };
 
@@ -565,6 +580,7 @@ int main(int argc, char *argv[]) {
   auto& rtNormalDepth = rt.normDepth;
   auto& rtSSAORaw = rt.ssaoRaw;
   auto& rtSSAOBlur = rt.ssaoBlur;
+  auto& rtFXAA = rt.fxaa;
   SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
   const float initialTexel[2] = {
       1.0f / static_cast<float>(rtNormalDepth.texture.width),
@@ -1001,11 +1017,13 @@ int main(int argc, char *argv[]) {
       UnloadRenderTexture(rtNormalDepth);
       UnloadRenderTexture(rtSSAORaw);
       UnloadRenderTexture(rtSSAOBlur);
+      UnloadRenderTexture(rtFXAA);
       auto resizedTargets = makeRenderTargets();
       rtColor = resizedTargets.color;
       rtNormalDepth = resizedTargets.normDepth;
       rtSSAORaw = resizedTargets.ssaoRaw;
       rtSSAOBlur = resizedTargets.ssaoBlur;
+      rtFXAA = resizedTargets.fxaa;
       SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
       const float texel[2] = {
           1.0f / static_cast<float>(rtNormalDepth.texture.width),
@@ -1144,8 +1162,6 @@ int main(int argc, char *argv[]) {
 
     // Render sky gradient background (only in PBR mode)
     if (pbrModeEnabled) {
-      // Draw gradient sky using simple 2D rects
-      // Sky top to horizon
       Color skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
                        static_cast<unsigned char>(skyTopCol[1] * 255),
                        static_cast<unsigned char>(skyTopCol[2] * 255), 255};
@@ -1155,12 +1171,27 @@ int main(int argc, char *argv[]) {
       Color skyGroundC = {static_cast<unsigned char>(skyGroundCol[0] * 255),
                           static_cast<unsigned char>(skyGroundCol[1] * 255),
                           static_cast<unsigned char>(skyGroundCol[2] * 255), 255};
-      int h = GetScreenHeight();
-      int w = GetScreenWidth();
-      // Upper half: sky gradient
-      DrawRectangleGradientV(0, 0, w, h/2, skyTopC, skyHorizC);
-      // Lower half: ground gradient
-      DrawRectangleGradientV(0, h/2, w, h/2, skyHorizC, skyGroundC);
+      // Use render texture dimensions (supersampled), not screen dimensions,
+      // so the gradient fills the entire render target
+      int h = rtColor.texture.height;
+      int w = rtColor.texture.width;
+
+      // Calculate where the horizon actually projects to screen space
+      // based on camera pitch, so the gradient tracks the 3D view
+      Vector3 camFwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+      float pitch = asinf(camFwd.y);  // Positive = looking up
+      float fovY = camera.fovy * DEG2RAD;
+      int horizonY = (int)(h * 0.5f + (h * 0.5f) * tanf(pitch) / tanf(fovY * 0.5f));
+      horizonY = Clamp(horizonY, 0, h);
+
+      // Sky gradient above horizon
+      if (horizonY > 0) {
+        DrawRectangleGradientV(0, 0, w, horizonY, skyTopC, skyHorizC);
+      }
+      // Ground gradient below horizon
+      if (horizonY < h) {
+        DrawRectangleGradientV(0, horizonY, w, h - horizonY, skyHorizC, skyGroundC);
+      }
     }
 
     BeginMode3D(camera);
@@ -1189,23 +1220,27 @@ int main(int argc, char *argv[]) {
       centerX = (minX + maxX) * 0.5f;
       centerZ = (minZ + maxZ) * 0.5f;
 
-      // Set ground material properties (earthy brown-grey, rough, non-metallic)
-      float groundAlbedo[4] = {0.32f, 0.30f, 0.25f, 1.0f};  // Earthy brown
-      float groundRoughness = 0.95f;
-      float groundMetallic = 0.0f;
-      float groundAo = 1.0f;
-      int noTex = 0;
-      SetShaderValue(pbrShader, locPbrAlbedoColor, groundAlbedo, SHADER_UNIFORM_VEC4);
-      SetShaderValue(pbrShader, locPbrRoughness, &groundRoughness, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(pbrShader, locPbrMetallic, &groundMetallic, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(pbrShader, locPbrAo, &groundAo, SHADER_UNIFORM_FLOAT);
-      SetShaderValue(pbrShader, locPbrUseAlbedoTex, &noTex, SHADER_UNIFORM_INT);
+      // Set ground plane shader uniforms
+      float gpGroundCol[3] = {0.42f, 0.43f, 0.38f};   // Warm grey-green
+      float gpHorizonCol[3] = {skyGroundCol[0], skyGroundCol[1], skyGroundCol[2]};
+      float gpFadeRadius = groundPlaneSize * 0.5f;
+      float gpCenter[3] = {centerX, 0.0f, centerZ};
+      float gpLightCol[3] = {1.0f, 0.95f, 0.9f};      // Warm white light
+      float gpCamPos[3] = {camera.position.x, camera.position.y, camera.position.z};
+      SetShaderValue(groundPlaneShader, locGroundColor, gpGroundCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locHorizonColor, gpHorizonCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locFadeRadius, &gpFadeRadius, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(groundPlaneShader, locSceneCenter, gpCenter, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPLightColor, gpLightCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPCameraPos, gpCamPos, SHADER_UNIFORM_VEC3);
 
-      // Draw ground plane centered on scene, slightly below
-      rlPushMatrix();
-      rlTranslatef(centerX, minY - 0.002f, centerZ);
-      DrawMesh(groundPlaneMesh, pbrMat, MatrixIdentity());
-      rlPopMatrix();
+      // Draw ground plane with alpha blending so edges fade into sky
+      rlEnableColorBlend();
+      rlSetBlendMode(RL_BLEND_ALPHA);
+      Matrix groundTransform = MatrixTranslate(centerX, minY - 0.002f, centerZ);
+      DrawMesh(groundPlaneMesh, groundPlaneMat, groundTransform);
+      rlSetBlendMode(RL_BLEND_ALPHA);  // Reset blend mode
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
       DrawAxes(2.0f);  // Only draw axes in toon mode
@@ -1539,9 +1574,30 @@ int main(int argc, char *argv[]) {
       // SSAO blurred debug view
       DrawTextureRec(rtSSAOBlur.texture, srcRect, {0.0f, 0.0f}, WHITE);
     } else {
-      // Normal rendering (mode 0) with edge detection and SSAO
+      // Normal rendering (mode 0) with edge detection, SSAO, and FXAA
+      // Step 1: Apply edge shader and downsample to rtFXAA (screen resolution)
+      BeginTextureMode(rtFXAA);
+      ClearBackground(BLACK);
       BeginShaderMode(edgeShader);
-      DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      // Downsample from supersampled buffer to screen resolution
+      // Negative height in source rect flips Y (raylib render texture convention)
+      const Rectangle ssSrcRect = {0.0f, 0.0f, static_cast<float>(rtColor.texture.width),
+                                   -static_cast<float>(rtColor.texture.height)};
+      const Rectangle dstRect = {0.0f, 0.0f, static_cast<float>(rtFXAA.texture.width),
+                                 static_cast<float>(rtFXAA.texture.height)};
+      DrawTexturePro(rtColor.texture, ssSrcRect, dstRect, {0.0f, 0.0f}, 0.0f, WHITE);
+      EndShaderMode();
+      EndTextureMode();
+
+      // Step 2: Apply FXAA and draw to screen
+      const float fxaaTexel[2] = {
+          1.0f / static_cast<float>(rtFXAA.texture.width),
+          1.0f / static_cast<float>(rtFXAA.texture.height)};
+      SetShaderValue(fxaaShader, locFXAATexelSize, fxaaTexel, SHADER_UNIFORM_VEC2);
+      BeginShaderMode(fxaaShader);
+      const Rectangle fxaaSrcRect = {0.0f, 0.0f, static_cast<float>(rtFXAA.texture.width),
+                                     -static_cast<float>(rtFXAA.texture.height)};
+      DrawTextureRec(rtFXAA.texture, fxaaSrcRect, {0.0f, 0.0f}, WHITE);
       EndShaderMode();
     }
 
