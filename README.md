@@ -38,6 +38,46 @@ const wall_height = 2400;
 
 Format: `// @param <name> "<section>" <label> (<min>-<max>)`
 
+### Scene API
+
+Scene files are ES modules exporting `scene` (geometry array) and optionally `displayScale`.
+
+```javascript
+// Primitives
+cube([width, height, depth])            // or cube({size: [w,h,d], center: true})
+sphere({radius: 10})
+cylinder({height: 50, radius: 10})      // radiusTop for cones
+Wall({start: [x,z], end: [x,z], height: h, thickness: t})
+
+// Boolean operations (variadic or array)
+union(a, b, c)                          // or union([a, b, c])
+difference(base, cutout)
+intersection(a, b)
+
+// Transforms
+translate(geometry, [x, y, z])
+rotate(geometry, [degX, degY, degZ])
+scale(geometry, factor)                 // or scale(geometry, [sx, sy, sz])
+mirror(geometry, [nx, ny, nz])
+
+// Color & materials
+withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
+withMaterial(geometry, "material_id")   // references materials/materials.json
+
+// Queries
+volume(geometry)
+surfaceArea(geometry)
+boundingBox(geometry)                   // returns {min, max}
+```
+
+See `examples/table/main.js` for a minimal parametric example.
+
+### Render Mode
+
+```
+./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720 [--yaw Y --pitch P --dist D]
+```
+
 Architecture visual doc pipeline:
 
 ```
@@ -45,5 +85,3 @@ Architecture visual doc pipeline:
 ```
 
 See `docs/ARCHITECTURE_DOC_PIPELINE.md` for shot presets and output structure.
-
-
