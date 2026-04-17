@@ -720,15 +720,31 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     float cosTheta = max(dot(normal, lightDir), 0.0);
     float bias = max(0.01 * (1.0 - cosTheta), 0.003);
 
+    // Poisson disk samples for soft shadow edges
+    const vec2 poissonDisk[12] = vec2[](
+        vec2(-0.94201624, -0.39906216),
+        vec2( 0.94558609, -0.76890725),
+        vec2(-0.09418410, -0.92938870),
+        vec2( 0.34495938,  0.29387760),
+        vec2(-0.91588581,  0.45771432),
+        vec2(-0.81544232, -0.87912464),
+        vec2(-0.38277543,  0.27676845),
+        vec2( 0.97484398,  0.75648379),
+        vec2( 0.44323325, -0.97511554),
+        vec2( 0.53742981, -0.47373420),
+        vec2(-0.26496911, -0.41893023),
+        vec2( 0.79197514,  0.19090188)
+    );
+
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for (int x = -1; x <= 1; ++x) {
-        for (int y = -1; y <= 1; ++y) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-        }
+    float spread = 1.5;
+
+    for (int i = 0; i < 12; i++) {
+        float pcfDepth = texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread).r;
+        shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
     }
-    shadow /= 9.0;
+    shadow /= 12.0;
 
     return shadow;
 }
