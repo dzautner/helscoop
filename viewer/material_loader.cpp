@@ -4,6 +4,7 @@
 #include "quickjs.h"
 
 #include <iostream>
+#include <set>
 
 namespace dingcad {
 
@@ -229,7 +230,6 @@ bool InitMaterialLibrary(const std::filesystem::path& basePath) {
 }
 
 void LoadMaterialTextures() {
-  int loadedCount = 0;
   int materialsWithTex = 0;
   TraceLog(LOG_INFO, "LoadMaterialTextures: checking %zu materials in library", g_materialLibrary.materials.size());
   for (auto& [id, mat] : g_materialLibrary.materials) {
@@ -239,22 +239,32 @@ void LoadMaterialTextures() {
     }
   }
   TraceLog(LOG_INFO, "Found %d materials with texture paths", materialsWithTex);
+
+  // Deduplicate: load each unique texture file once, share across materials
+  std::unordered_map<std::string, Texture2D> textureCache;
+  int filesLoaded = 0;
+
   for (auto& [id, mat] : g_materialLibrary.materials) {
     if (!mat.visual.albedoTexture.empty()) {
       std::filesystem::path texPath = mat.visual.albedoTexture;
-
-      // If relative path, resolve against material library base path
       if (texPath.is_relative()) {
         texPath = g_materialLibrary.basePath / texPath;
+      }
+
+      std::string canonical = std::filesystem::weakly_canonical(texPath).string();
+      auto cached = textureCache.find(canonical);
+      if (cached != textureCache.end()) {
+        g_materialLibrary.loadedTextures[id] = cached->second;
+        continue;
       }
 
       if (std::filesystem::exists(texPath)) {
         Texture2D tex = LoadTexture(texPath.string().c_str());
         if (tex.id != 0) {
-          // Set texture wrapping mode to repeat for tiling
           SetTextureWrap(tex, TEXTURE_WRAP_REPEAT);
+          textureCache[canonical] = tex;
           g_materialLibrary.loadedTextures[id] = tex;
-          loadedCount++;
+          filesLoaded++;
           TraceLog(LOG_INFO, "Loaded texture for material '%s': %s", id.c_str(), texPath.string().c_str());
         } else {
           TraceLog(LOG_WARNING, "Failed to load texture for material '%s': %s", id.c_str(), texPath.string().c_str());
@@ -265,14 +275,18 @@ void LoadMaterialTextures() {
     }
   }
 
-  if (loadedCount > 0) {
-    std::cout << "Loaded " << loadedCount << " material textures" << std::endl;
+  if (filesLoaded > 0) {
+    TraceLog(LOG_INFO, "Loaded %d unique texture files for %zu materials",
+             filesLoaded, g_materialLibrary.loadedTextures.size());
   }
 }
 
 void UnloadMaterialTextures() {
+  std::set<unsigned int> freed;
   for (auto& [id, tex] : g_materialLibrary.loadedTextures) {
-    UnloadTexture(tex);
+    if (freed.insert(tex.id).second) {
+      UnloadTexture(tex);
+    }
   }
   g_materialLibrary.loadedTextures.clear();
 }
