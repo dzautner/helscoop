@@ -59,10 +59,8 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
   }
 
   std::vector<Vector3> normals(vertexCount);
-  std::vector<Color> colors(vertexCount);
   std::vector<Vector2> texcoords(vertexCount);
-  const Vector3 lightDir = Vector3Normalize({0.45f, 0.85f, 0.35f});
-  const float textureScale = 1.0f;  // 1 meter per texture repeat
+  const float textureScale = 1.0f;
 
   for (int v = 0; v < vertexCount; ++v) {
     const Vector3 n = accum[v];
@@ -82,35 +80,13 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
 
     Vector2 uv;
     if (absX >= absY && absX >= absZ) {
-      // X-facing: project onto YZ plane
       uv = {pos.z * textureScale, pos.y * textureScale};
     } else if (absY >= absX && absY >= absZ) {
-      // Y-facing: project onto XZ plane
       uv = {pos.x * textureScale, pos.z * textureScale};
     } else {
-      // Z-facing: project onto XY plane
       uv = {pos.x * textureScale, pos.y * textureScale};
     }
     texcoords[v] = uv;
-
-    float intensity = Vector3DotProduct(normal, lightDir);
-    intensity = Clamp(intensity, 0.0f, 1.0f);
-    constexpr int toonSteps = 3;
-    int level = static_cast<int>(std::floor(intensity * toonSteps));
-    if (level >= toonSteps) level = toonSteps - 1;
-    const float toon = (toonSteps > 1)
-                           ? static_cast<float>(level) / static_cast<float>(toonSteps - 1)
-                           : intensity;
-    const float ambient = 0.3f;
-    const float diffuse = 0.7f;
-    float finalIntensity = Clamp(ambient + diffuse * toon, 0.0f, 1.0f);
-
-    Color color = {0};
-    color.r = static_cast<unsigned char>(Clamp(baseColor.r * finalIntensity, 0.0f, 255.0f));
-    color.g = static_cast<unsigned char>(Clamp(baseColor.g * finalIntensity, 0.0f, 255.0f));
-    color.b = static_cast<unsigned char>(Clamp(baseColor.b * finalIntensity, 0.0f, 255.0f));
-    color.a = baseColor.a;
-    colors[v] = color;
   }
 
   constexpr int kMaxVerticesPerMesh = std::numeric_limits<unsigned short>::max();
@@ -127,13 +103,11 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
     int chunkVertexCount = 0;
     std::vector<Vector3> chunkPositions;
     std::vector<Vector3> chunkNormals;
-    std::vector<Color> chunkColors;
     std::vector<Vector2> chunkTexcoords;
     std::vector<unsigned short> chunkIndices;
 
     chunkPositions.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
     chunkNormals.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
-    chunkColors.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
     chunkTexcoords.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
     chunkIndices.reserve(std::min(kMaxVerticesPerMesh, vertexCount) * 3);
 
@@ -162,7 +136,6 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
           remap[original] = chunkVertexCount++;
           chunkPositions.push_back(positions[original]);
           chunkNormals.push_back(normals[original]);
-          chunkColors.push_back(colors[original]);
           chunkTexcoords.push_back(texcoords[original]);
         }
         chunkIndices.push_back(static_cast<unsigned short>(remap[original]));
@@ -175,9 +148,9 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
     chunkMesh.triangleCount = static_cast<int>(chunkIndices.size() / 3);
     chunkMesh.vertices = static_cast<float*>(MemAlloc(chunkVertexCount * 3 * sizeof(float)));
     chunkMesh.normals = static_cast<float*>(MemAlloc(chunkVertexCount * 3 * sizeof(float)));
-    chunkMesh.colors = static_cast<unsigned char*>(MemAlloc(chunkVertexCount * 4 * sizeof(unsigned char)));
     chunkMesh.texcoords = static_cast<float*>(MemAlloc(chunkVertexCount * 2 * sizeof(float)));
     chunkMesh.indices = static_cast<unsigned short*>(MemAlloc(chunkIndices.size() * sizeof(unsigned short)));
+    chunkMesh.colors = nullptr;
     chunkMesh.texcoords2 = nullptr;
     chunkMesh.tangents = nullptr;
 
@@ -191,12 +164,6 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
       chunkMesh.normals[v * 3 + 0] = normal.x;
       chunkMesh.normals[v * 3 + 1] = normal.y;
       chunkMesh.normals[v * 3 + 2] = normal.z;
-
-      const Color color = chunkColors[v];
-      chunkMesh.colors[v * 4 + 0] = color.r;
-      chunkMesh.colors[v * 4 + 1] = color.g;
-      chunkMesh.colors[v * 4 + 2] = color.b;
-      chunkMesh.colors[v * 4 + 3] = color.a;
 
       const Vector2& uv = chunkTexcoords[v];
       chunkMesh.texcoords[v * 2 + 0] = uv.x;

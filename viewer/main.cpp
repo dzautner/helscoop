@@ -946,13 +946,13 @@ int main(int argc, char *argv[]) {
           thermalResultDirty = true;  // Recalculate on toggle
         }
       }
-      if (IsKeyPressed(KEY_S)) {
+      if (IsKeyPressed(KEY_F3)) {
         uiState.showStructuralPanel = !uiState.showStructuralPanel;
         if (uiState.showStructuralPanel) {
-          structuralResultDirty = true;  // Recalculate on toggle
+          structuralResultDirty = true;
         }
       }
-      if (IsKeyPressed(KEY_A)) {
+      if (IsKeyPressed(KEY_F4)) {
         uiState.showAssemblyPanel = !uiState.showAssemblyPanel;
         // Only regenerate if no scene-defined assembly exists
         if (uiState.showAssemblyPanel && assemblyInstructions.steps.empty()) {
@@ -980,22 +980,13 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // STL Export handling - keyboard [P] or toolbar button
-    static bool prevPDown = false;
+    // STL Export handling - Ctrl+E or toolbar button
     bool exportRequested = uiState.stlExportClicked;
-    uiState.stlExportClicked = false;  // Clear the flag
-
+    uiState.stlExportClicked = false;
     if (!uiState.materialFilterActive && !exportRequested) {
-      for (int key = GetKeyPressed(); key != 0; key = GetKeyPressed()) {
-        if (key == KEY_P) exportRequested = true;
+      if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_E)) {
+        exportRequested = true;
       }
-      for (int ch = GetCharPressed(); ch != 0; ch = GetCharPressed()) {
-        if (ch == 'p' || ch == 'P') exportRequested = true;
-      }
-      const bool pDown = IsKeyDown(KEY_P);
-      if (pDown && !prevPDown) exportRequested = true;
-      prevPDown = pDown;
-      if (!exportRequested && IsKeyPressed(KEY_P)) exportRequested = true;
     }
 
     if (exportRequested && !sceneData.objects.empty()) {
@@ -1031,16 +1022,13 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // IFC Export handling - keyboard [I] or toolbar button
-    static bool prevIDown = false;
+    // IFC Export handling - Ctrl+I or toolbar button
     bool ifcExportRequested = uiState.ifcExportClicked;
-    uiState.ifcExportClicked = false;  // Clear the flag
-
+    uiState.ifcExportClicked = false;
     if (!uiState.materialFilterActive && !ifcExportRequested) {
-      const bool iDown = IsKeyDown(KEY_I);
-      if (iDown && !prevIDown) ifcExportRequested = true;
-      prevIDown = iDown;
-      if (!ifcExportRequested && IsKeyPressed(KEY_I)) ifcExportRequested = true;
+      if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_I)) {
+        ifcExportRequested = true;
+      }
     }
 
     if (ifcExportRequested && !sceneData.objects.empty()) {
