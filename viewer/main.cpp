@@ -488,7 +488,7 @@ int main(int argc, char *argv[]) {
     if (camDist > 0.0f) {
       orbitDistance = camDist;
     } else {
-      orbitDistance = std::max(cameraFitSize * 0.8f * camDistScale, 0.22f);  // Auto-fit scaled by CLI
+      orbitDistance = std::max(cameraFitSize * 1.2f * camDistScale, 0.01f);
     }
 
     // Apply yaw and pitch from command line by default.
