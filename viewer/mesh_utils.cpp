@@ -203,7 +203,9 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
     std::future<manifold::MeshGL> future;
     Color color;
     std::string materialId;
-    size_t sceneObjectIndex;  // Track original index for assemblyOnly check
+    size_t sceneObjectIndex;
+    float roughness;
+    float metallic;
   };
   std::vector<MeshTask> tasks;
   tasks.reserve(sceneData.objects.size());
@@ -217,7 +219,9 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
         }),
         obj.color,
         obj.materialId,
-        i  // Store original scene object index
+        i,
+        obj.roughness,
+        obj.metallic
       });
     }
   }
@@ -227,11 +231,13 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
     Color color;
     std::string materialId;
     size_t sceneObjectIndex;
+    float roughness;
+    float metallic;
   };
   std::vector<MeshResult> meshes;
   meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    meshes.push_back({task.future.get(), task.color, std::move(task.materialId), task.sceneObjectIndex});
+    meshes.push_back({task.future.get(), task.color, std::move(task.materialId), task.sceneObjectIndex, task.roughness, task.metallic});
   }
 
   auto meshEnd = std::chrono::high_resolution_clock::now();
@@ -241,7 +247,7 @@ std::vector<ModelWithColor> CreateModelsFromScene(const SceneData& sceneData) {
   result.reserve(meshes.size());
   for (auto& mesh : meshes) {
     Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
-    result.push_back({model, mesh.color, std::move(mesh.materialId), mesh.sceneObjectIndex});
+    result.push_back({model, mesh.color, std::move(mesh.materialId), mesh.sceneObjectIndex, mesh.roughness, mesh.metallic});
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
