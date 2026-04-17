@@ -1456,8 +1456,40 @@ JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) 
   return obj;
 }
 
+std::string FormatConsoleArgs(JSContext *ctx, int argc, JSValueConst *argv) {
+  std::string msg;
+  for (int i = 0; i < argc; ++i) {
+    if (i > 0) msg += ' ';
+    const char *str = JS_ToCString(ctx, argv[i]);
+    if (str) { msg += str; JS_FreeCString(ctx, str); }
+  }
+  return msg;
+}
+
+JSValue JsConsoleLog(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  std::fprintf(stderr, "[JS] %s\n", FormatConsoleArgs(ctx, argc, argv).c_str());
+  return JS_UNDEFINED;
+}
+
+JSValue JsConsoleWarn(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  std::fprintf(stderr, "[JS WARN] %s\n", FormatConsoleArgs(ctx, argc, argv).c_str());
+  return JS_UNDEFINED;
+}
+
+JSValue JsConsoleError(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  std::fprintf(stderr, "[JS ERROR] %s\n", FormatConsoleArgs(ctx, argc, argv).c_str());
+  return JS_UNDEFINED;
+}
+
 void RegisterBindingsInternal(JSContext *ctx) {
   JSValue global = JS_GetGlobalObject(ctx);
+
+  // console.log/warn/error
+  JSValue console = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, console, "log", JS_NewCFunction(ctx, JsConsoleLog, "log", 1));
+  JS_SetPropertyStr(ctx, console, "warn", JS_NewCFunction(ctx, JsConsoleWarn, "warn", 1));
+  JS_SetPropertyStr(ctx, console, "error", JS_NewCFunction(ctx, JsConsoleError, "error", 1));
+  JS_SetPropertyStr(ctx, global, "console", console);
   JS_SetPropertyStr(ctx, global, "cube", JS_NewCFunction(ctx, JsCube, "cube", 1));
   JS_SetPropertyStr(ctx, global, "sphere", JS_NewCFunction(ctx, JsSphere, "sphere", 1));
   JS_SetPropertyStr(ctx, global, "cylinder", JS_NewCFunction(ctx, JsCylinder, "cylinder", 1));
