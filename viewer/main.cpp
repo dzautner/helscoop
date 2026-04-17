@@ -320,6 +320,7 @@ int main(int argc, char *argv[]) {
 
   SceneData sceneData;
   std::string statusMessage;
+  std::string brandText = kBrandText;
   std::filesystem::path scriptPath;
   std::unordered_map<std::filesystem::path, WatchedFile> watchedFiles;
   std::optional<std::filesystem::path> defaultScript;
@@ -366,6 +367,12 @@ int main(int argc, char *argv[]) {
     if (!load.dependencies.empty()) {
       setWatchedFiles(load.dependencies);
     }
+    // Derive brand text from script path: use parent dir name if file is main.js
+    std::string stem = scriptPath.stem().string();
+    if (stem == "main" || stem == "scene" || stem == "index") {
+      stem = scriptPath.parent_path().filename().string();
+    }
+    brandText = toUpper(stem);
   }
 
   if (sceneData.objects.empty()) {
@@ -1831,10 +1838,10 @@ int main(int argc, char *argv[]) {
       // Draw toolbar at top (includes panel toggles and status)
       DrawToolbar(uiState, uiFont, screenWidth, statusMessage);
 
-      // Draw branding in toolbar area
+      // Draw branding in toolbar area (scene name or fallback)
       const float margin = 15.0f;
-      const Vector2 brandPos = {margin, 4.0f};  // Adjusted for toolbar
-      DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, WHITE);
+      const Vector2 brandPos = {margin, 4.0f};
+      DrawTextEx(brandingFont, brandText.c_str(), brandPos, kBrandFontSize, 0.0f, WHITE);
 
       // Draw UI panels (positioned below toolbar)
       if (uiState.showMaterialsPanel) {
