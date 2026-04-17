@@ -1055,7 +1055,9 @@ int main(int argc, char *argv[]) {
         if (dirErr && !std::filesystem::exists(downloads)) {
           reportStatus("Export failed: cannot access " + downloads.string());
         } else {
-          std::filesystem::path savePath = downloads / "ding.stl";
+          std::string stlName = scriptPath.stem().string();
+          if (stlName == "main") stlName = scriptPath.parent_path().filename().string();
+          std::filesystem::path savePath = downloads / (stlName + ".stl");
           std::string error;
           if (WriteMeshAsBinaryStl(combined.GetMeshGL(), savePath, error)) {
             reportStatus("Saved " + savePath.string());
@@ -1223,7 +1225,7 @@ int main(int argc, char *argv[]) {
     const float wheel = GetMouseWheelMove();
     if (!mouseOverPanel && !isDraggingPanel && wheel != 0.0f) {
       orbitDistance *= (1.0f - wheel * 0.1f);
-      orbitDistance = Clamp(orbitDistance, 1.0f, 50.0f);
+      orbitDistance = Clamp(orbitDistance, 0.05f, 500.0f);
     }
 
     const Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
@@ -1245,13 +1247,14 @@ int main(int argc, char *argv[]) {
         orbitPitch = initialPitch;
       }
 
+      bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
       const float moveSpeed = 0.05f * orbitDistance;
       if (IsKeyDown(KEY_W)) camera.target = Vector3Add(camera.target, Vector3Scale(forward, moveSpeed));
       if (IsKeyDown(KEY_S)) camera.target = Vector3Add(camera.target, Vector3Scale(forward, -moveSpeed));
       if (IsKeyDown(KEY_A)) camera.target = Vector3Add(camera.target, Vector3Scale(right, -moveSpeed));
       if (IsKeyDown(KEY_D)) camera.target = Vector3Add(camera.target, Vector3Scale(right, moveSpeed));
       if (IsKeyDown(KEY_Q)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, -moveSpeed));
-      if (IsKeyDown(KEY_E)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, moveSpeed));
+      if (!ctrl && IsKeyDown(KEY_E)) camera.target = Vector3Add(camera.target, Vector3Scale(worldUp, moveSpeed));
     }
 
     const Vector3 offsets = {
