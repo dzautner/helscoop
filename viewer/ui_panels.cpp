@@ -1535,7 +1535,8 @@ bool DrawAssemblyPanel(const AssemblyInstructions& assembly,
 bool DrawToolbar(UIState& uiState,
                  const Font& uiFont,
                  int screenWidth,
-                 const std::string& statusMessage) {
+                 const std::string& statusMessage,
+                 float brandWidth) {
   bool anyToggled = false;
 
   const float toolbarHeight = kToolbarHeight;
@@ -1547,7 +1548,7 @@ bool DrawToolbar(UIState& uiState,
   // Dark toolbar background
   DrawRectangle(0, 0, screenWidth, static_cast<int>(toolbarHeight), Color{20, 20, 25, 255});
 
-  float x = 160.0f;  // After HELSCOOP branding
+  float x = brandWidth + 20.0f;
   float y = (toolbarHeight - btnH) / 2.0f;
 
   // Simple toggle button

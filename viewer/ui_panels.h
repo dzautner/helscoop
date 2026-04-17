@@ -125,7 +125,8 @@ bool DrawAssemblyPanel(const AssemblyInstructions& assembly,
 bool DrawToolbar(UIState& uiState,
                  const Font& uiFont,
                  int screenWidth,
-                 const std::string& statusMessage);
+                 const std::string& statusMessage,
+                 float brandWidth = 145.0f);
 
 // Toolbar height constant for panel positioning
 inline constexpr float kToolbarHeight = 42.0f;

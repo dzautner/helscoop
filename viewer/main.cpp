@@ -1835,12 +1835,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (!renderMode || renderShowUI) {
-      // Draw toolbar at top (includes panel toggles and status)
-      DrawToolbar(uiState, uiFont, screenWidth, statusMessage);
-
       // Draw branding in toolbar area (scene name or fallback)
       const float margin = 15.0f;
       const Vector2 brandPos = {margin, 4.0f};
+      const Vector2 brandSize = MeasureTextEx(brandingFont, brandText.c_str(), kBrandFontSize, 0.0f);
+
+      // Draw toolbar at top (includes panel toggles and status)
+      DrawToolbar(uiState, uiFont, screenWidth, statusMessage, margin + brandSize.x);
       DrawTextEx(brandingFont, brandText.c_str(), brandPos, kBrandFontSize, 0.0f, WHITE);
 
       // Draw UI panels (positioned below toolbar)
