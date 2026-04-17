@@ -84,6 +84,10 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
   auto afterRead = std::chrono::high_resolution_clock::now();
 
   JSContext* ctx = JS_NewContext(runtime);
+  if (!ctx) {
+    result.message = "Failed to create JS context (out of memory)";
+    return result;
+  }
   RegisterBindings(ctx);
 
   auto afterBindings = std::chrono::high_resolution_clock::now();
