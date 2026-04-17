@@ -807,9 +807,9 @@ int main(int argc, char *argv[]) {
 
   int toonSteps = 4;
   SetShaderValue(toonShader, locToonSteps, &toonSteps, SHADER_UNIFORM_INT);
-  float ambient = 0.35f;
+  float ambient = 0.6f;
   SetShaderValue(toonShader, locAmbient, &ambient, SHADER_UNIFORM_FLOAT);
-  float diffuseWeight = 0.75f;
+  float diffuseWeight = 0.5f;
   SetShaderValue(toonShader, locDiffuseWeight, &diffuseWeight, SHADER_UNIFORM_FLOAT);
   float rimWeight = 0.25f;
   SetShaderValue(toonShader, locRimWeight, &rimWeight, SHADER_UNIFORM_FLOAT);
@@ -1502,35 +1502,37 @@ int main(int argc, char *argv[]) {
     BeginTextureMode(rtColor);
     ClearBackground(RAYWHITE);
 
-    // Render sky gradient background (only in PBR mode)
-    if (pbrModeEnabled) {
-      Color skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
-                       static_cast<unsigned char>(skyTopCol[1] * 255),
-                       static_cast<unsigned char>(skyTopCol[2] * 255), 255};
-      Color skyHorizC = {static_cast<unsigned char>(skyHorizonCol[0] * 255),
-                         static_cast<unsigned char>(skyHorizonCol[1] * 255),
-                         static_cast<unsigned char>(skyHorizonCol[2] * 255), 255};
-      Color skyGroundC = {static_cast<unsigned char>(skyGroundCol[0] * 255),
-                          static_cast<unsigned char>(skyGroundCol[1] * 255),
-                          static_cast<unsigned char>(skyGroundCol[2] * 255), 255};
-      // Use render texture dimensions (supersampled), not screen dimensions,
-      // so the gradient fills the entire render target
+    // Render sky gradient background
+    {
+      Color skyTopC, skyHorizC, skyGroundC;
+      if (pbrModeEnabled) {
+        skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
+                   static_cast<unsigned char>(skyTopCol[1] * 255),
+                   static_cast<unsigned char>(skyTopCol[2] * 255), 255};
+        skyHorizC = {static_cast<unsigned char>(skyHorizonCol[0] * 255),
+                     static_cast<unsigned char>(skyHorizonCol[1] * 255),
+                     static_cast<unsigned char>(skyHorizonCol[2] * 255), 255};
+        skyGroundC = {static_cast<unsigned char>(skyGroundCol[0] * 255),
+                      static_cast<unsigned char>(skyGroundCol[1] * 255),
+                      static_cast<unsigned char>(skyGroundCol[2] * 255), 255};
+      } else {
+        skyTopC = {210, 215, 220, 255};
+        skyHorizC = {230, 232, 235, 255};
+        skyGroundC = {195, 200, 195, 255};
+      }
+
       int h = rtColor.texture.height;
       int w = rtColor.texture.width;
 
-      // Calculate where the horizon actually projects to screen space
-      // based on camera pitch, so the gradient tracks the 3D view
       Vector3 camFwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
-      float pitch = asinf(camFwd.y);  // Positive = looking up
+      float pitch = asinf(camFwd.y);
       float fovY = camera.fovy * DEG2RAD;
       int horizonY = (int)(h * 0.5f + (h * 0.5f) * tanf(pitch) / tanf(fovY * 0.5f));
       horizonY = Clamp(horizonY, 0, h);
 
-      // Sky gradient above horizon
       if (horizonY > 0) {
         DrawRectangleGradientV(0, 0, w, horizonY, skyTopC, skyHorizC);
       }
-      // Ground gradient below horizon
       if (horizonY < h) {
         DrawRectangleGradientV(0, horizonY, w, h - horizonY, skyHorizC, skyGroundC);
       }
@@ -1834,7 +1836,7 @@ int main(int argc, char *argv[]) {
     SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
     // Bind SSAO texture and set strength for final composite
     SetShaderValueTexture(edgeShader, locEdgeSSAOTex, rtSSAOBlur.texture);
-    const float ssaoStrength = pbrModeEnabled ? 0.35f : 0.5f;
+    const float ssaoStrength = pbrModeEnabled ? 0.35f : 0.25f;
     SetShaderValue(edgeShader, locEdgeSSAOStrength, &ssaoStrength, SHADER_UNIFORM_FLOAT);
 
     // Final composite
