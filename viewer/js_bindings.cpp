@@ -1443,6 +1443,52 @@ JSValue JsMinGap(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return JS_NewFloat64(ctx, a->handle->MinGap(*b->handle, searchLength));
 }
 
+// linearPattern(geometry, count, [dx, dy, dz]) — union of count copies offset by [dx,dy,dz]
+JSValue JsLinearPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 3) {
+    return JS_ThrowTypeError(ctx, "linearPattern expects (manifold, count, [dx,dy,dz])");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  int32_t count = 1;
+  if (JS_ToInt32(ctx, &count, argv[1]) < 0) return JS_EXCEPTION;
+  if (count < 1) return JS_ThrowRangeError(ctx, "count must be >= 1");
+  std::array<double, 3> offset{};
+  if (!GetVec3(ctx, argv[2], offset)) return JS_EXCEPTION;
+
+  std::vector<manifold::Manifold> parts;
+  parts.reserve(count);
+  for (int32_t i = 0; i < count; ++i) {
+    parts.push_back(target->handle->Translate(
+      {offset[0] * i, offset[1] * i, offset[2] * i}));
+  }
+  auto result = std::make_shared<manifold::Manifold>(
+    manifold::Manifold::BatchBoolean(parts, manifold::OpType::Add));
+  return WrapManifold(ctx, std::move(result));
+}
+
+// circularPattern(geometry, count, [cx, cy, cz]) — count copies rotated around Y axis
+JSValue JsCircularPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "circularPattern expects (manifold, count)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  int32_t count = 1;
+  if (JS_ToInt32(ctx, &count, argv[1]) < 0) return JS_EXCEPTION;
+  if (count < 1) return JS_ThrowRangeError(ctx, "count must be >= 1");
+
+  std::vector<manifold::Manifold> parts;
+  parts.reserve(count);
+  double angleStep = 360.0 / count;
+  for (int32_t i = 0; i < count; ++i) {
+    parts.push_back(target->handle->Rotate(0.0, angleStep * i, 0.0));
+  }
+  auto result = std::make_shared<manifold::Manifold>(
+    manifold::Manifold::BatchBoolean(parts, manifold::OpType::Add));
+  return WrapManifold(ctx, std::move(result));
+}
+
 JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) {
     return JS_ThrowTypeError(ctx, "withColor expects (manifold, [r,g,b])");
@@ -1524,6 +1570,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
   JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));
   JS_SetPropertyStr(ctx, global, "withColor", JS_NewCFunction(ctx, JsWithColor, "withColor", 2));
   JS_SetPropertyStr(ctx, global, "withMaterial", JS_NewCFunction(ctx, JsWithMaterial, "withMaterial", 2));
+  JS_SetPropertyStr(ctx, global, "linearPattern", JS_NewCFunction(ctx, JsLinearPattern, "linearPattern", 3));
+  JS_SetPropertyStr(ctx, global, "circularPattern", JS_NewCFunction(ctx, JsCircularPattern, "circularPattern", 2));
   JS_SetPropertyStr(ctx, global, "union", JS_NewCFunction(ctx, JsUnion, "union", 1));
   JS_SetPropertyStr(ctx, global, "difference", JS_NewCFunction(ctx, JsDifference, "difference", 1));
   JS_SetPropertyStr(ctx, global, "intersection", JS_NewCFunction(ctx, JsIntersection, "intersection", 1));

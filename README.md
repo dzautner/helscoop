@@ -64,6 +64,10 @@ mirror(geometry, [nx, ny, nz])
 extrude(polygon, {height, twistDegrees, scaleTop, divisions})
 revolve(polygon, {segments, degrees})   // defaults: 360°, auto segments
 
+// Patterns
+linearPattern(geometry, count, [dx, dy, dz])   // count copies offset by [dx,dy,dz]
+circularPattern(geometry, count)                // count copies rotated around Y axis
+
 // Color & materials
 withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
 withMaterial(geometry, "material_id")   // references materials/materials.json
