@@ -449,7 +449,7 @@ JSValue JsCube(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 JSValue JsSphere(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double radius = 1.0;
   if (argc >= 1 && JS_IsNumber(argv[0])) {
-    JS_ToFloat64(ctx, &radius, argv[0]);
+    if (JS_ToFloat64(ctx, &radius, argv[0]) < 0) return JS_EXCEPTION;
   } else if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue radiusVal = JS_GetPropertyStr(ctx, argv[0], "radius");
     if (!JS_IsUndefined(radiusVal)) {
@@ -471,8 +471,8 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   bool center = false;
   // Accept cylinder(height, radius) shorthand
   if (argc >= 2 && JS_IsNumber(argv[0]) && JS_IsNumber(argv[1])) {
-    JS_ToFloat64(ctx, &height, argv[0]);
-    JS_ToFloat64(ctx, &radius, argv[1]);
+    if (JS_ToFloat64(ctx, &height, argv[0]) < 0) return JS_EXCEPTION;
+    if (JS_ToFloat64(ctx, &radius, argv[1]) < 0) return JS_EXCEPTION;
   } else if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
     if (!JS_IsUndefined(heightVal)) {
@@ -562,17 +562,21 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
     }
     JS_FreeValue(ctx, endVal);
 
-    // Get height
     JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
     if (!JS_IsUndefined(heightVal)) {
-      JS_ToFloat64(ctx, &params.height, heightVal);
+      if (JS_ToFloat64(ctx, &params.height, heightVal) < 0) {
+        JS_FreeValue(ctx, heightVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, heightVal);
 
-    // Get thickness (optional)
     JSValue thicknessVal = JS_GetPropertyStr(ctx, argv[0], "thickness");
     if (!JS_IsUndefined(thicknessVal)) {
-      JS_ToFloat64(ctx, &params.thickness, thicknessVal);
+      if (JS_ToFloat64(ctx, &params.thickness, thicknessVal) < 0) {
+        JS_FreeValue(ctx, thicknessVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, thicknessVal);
 
@@ -608,7 +612,10 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
     JSValue studSpacingVal = JS_GetPropertyStr(ctx, argv[0], "studSpacing");
     if (!JS_IsUndefined(studSpacingVal)) {
-      JS_ToFloat64(ctx, &params.studSpacing, studSpacingVal);
+      if (JS_ToFloat64(ctx, &params.studSpacing, studSpacingVal) < 0) {
+        JS_FreeValue(ctx, studSpacingVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, studSpacingVal);
 
@@ -623,7 +630,10 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
     JSValue sheathingThicknessVal = JS_GetPropertyStr(ctx, argv[0], "sheathingThickness");
     if (!JS_IsUndefined(sheathingThicknessVal)) {
-      JS_ToFloat64(ctx, &params.sheathingThickness, sheathingThicknessVal);
+      if (JS_ToFloat64(ctx, &params.sheathingThickness, sheathingThicknessVal) < 0) {
+        JS_FreeValue(ctx, sheathingThicknessVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, sheathingThicknessVal);
   }
@@ -1456,6 +1466,24 @@ JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) 
   return obj;
 }
 
+JSValue JsWithMaterial(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "withMaterial expects (manifold, materialId)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+
+  const char *matId = JS_ToCString(ctx, argv[1]);
+  if (!matId) return JS_EXCEPTION;
+
+  JSValue obj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, obj, "geometry", JS_DupValue(ctx, argv[0]));
+  JS_SetPropertyStr(ctx, obj, "material", JS_NewString(ctx, matId));
+  JS_FreeCString(ctx, matId);
+
+  return obj;
+}
+
 std::string FormatConsoleArgs(JSContext *ctx, int argc, JSValueConst *argv) {
   std::string msg;
   for (int i = 0; i < argc; ++i) {
@@ -1495,6 +1523,7 @@ void RegisterBindingsInternal(JSContext *ctx) {
   JS_SetPropertyStr(ctx, global, "cylinder", JS_NewCFunction(ctx, JsCylinder, "cylinder", 1));
   JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));
   JS_SetPropertyStr(ctx, global, "withColor", JS_NewCFunction(ctx, JsWithColor, "withColor", 2));
+  JS_SetPropertyStr(ctx, global, "withMaterial", JS_NewCFunction(ctx, JsWithMaterial, "withMaterial", 2));
   JS_SetPropertyStr(ctx, global, "union", JS_NewCFunction(ctx, JsUnion, "union", 1));
   JS_SetPropertyStr(ctx, global, "difference", JS_NewCFunction(ctx, JsDifference, "difference", 1));
   JS_SetPropertyStr(ctx, global, "intersection", JS_NewCFunction(ctx, JsIntersection, "intersection", 1));
