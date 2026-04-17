@@ -449,15 +449,17 @@ void main() {
 
     // === ENVIRONMENT REFLECTIONS ===
     vec3 ambientDiffuse = kD_env * diffuseEnv * shadowFactor * 0.5;
-    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);
+    float specBoost = 1.0 + metallic * 2.0 * (1.0 - roughness);
+    vec3 ambientSpecular = specularEnv * specBoost;
 
     vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
 
     // Direct lighting with shadow (both primary and secondary lights)
     vec3 directLighting = Lo * shadowFactor;
 
-    // Rim/fresnel lighting for depth (catches light at edges)
-    float rim = pow(1.0 - NdotV, 3.0) * 0.1;
+    // Rim/fresnel lighting for depth (stronger for metals)
+    float rimPower = mix(3.0, 2.0, metallic);
+    float rim = pow(1.0 - NdotV, rimPower) * mix(0.1, 0.25, metallic);
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     // === FINAL COMPOSITION ===
@@ -814,11 +816,13 @@ void main() {
     float finalAO = ao * normalAO;
 
     vec3 ambientDiffuse = kD_env * diffuseEnv * 0.5;
-    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);
+    float specBoost = 1.0 + metallic * 2.0 * (1.0 - roughness);
+    vec3 ambientSpecular = specularEnv * specBoost;
     vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
 
-    // Rim/fresnel lighting for depth
-    float rim = pow(1.0 - NdotV, 3.0) * 0.1;
+    // Rim/fresnel lighting for depth (stronger for metals)
+    float rimPower = mix(3.0, 2.0, metallic);
+    float rim = pow(1.0 - NdotV, rimPower) * mix(0.1, 0.25, metallic);
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     vec3 color = ambient + Lo + rimColor;
