@@ -533,8 +533,12 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
         JSValue x = JS_GetPropertyUint32(ctx, startVal, 0);
         JSValue y = JS_GetPropertyUint32(ctx, startVal, 1);
         if (!JS_IsUndefined(x) && !JS_IsUndefined(y)) {
-          JS_ToFloat64(ctx, &params.start[0], x);
-          JS_ToFloat64(ctx, &params.start[1], y);
+          if (JS_ToFloat64(ctx, &params.start[0], x) < 0 ||
+              JS_ToFloat64(ctx, &params.start[1], y) < 0) {
+            JS_FreeValue(ctx, x); JS_FreeValue(ctx, y);
+            JS_FreeValue(ctx, startVal);
+            return JS_EXCEPTION;
+          }
         }
         JS_FreeValue(ctx, x);
         JS_FreeValue(ctx, y);
@@ -553,8 +557,12 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
         JSValue x = JS_GetPropertyUint32(ctx, endVal, 0);
         JSValue y = JS_GetPropertyUint32(ctx, endVal, 1);
         if (!JS_IsUndefined(x) && !JS_IsUndefined(y)) {
-          JS_ToFloat64(ctx, &params.end[0], x);
-          JS_ToFloat64(ctx, &params.end[1], y);
+          if (JS_ToFloat64(ctx, &params.end[0], x) < 0 ||
+              JS_ToFloat64(ctx, &params.end[1], y) < 0) {
+            JS_FreeValue(ctx, x); JS_FreeValue(ctx, y);
+            JS_FreeValue(ctx, endVal);
+            return JS_EXCEPTION;
+          }
         }
         JS_FreeValue(ctx, x);
         JS_FreeValue(ctx, y);
@@ -602,8 +610,12 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
       JSValue w = JS_GetPropertyUint32(ctx, studSizeVal, 0);
       JSValue d = JS_GetPropertyUint32(ctx, studSizeVal, 1);
       if (!JS_IsUndefined(w) && !JS_IsUndefined(d)) {
-        JS_ToFloat64(ctx, &params.studSize[0], w);
-        JS_ToFloat64(ctx, &params.studSize[1], d);
+        if (JS_ToFloat64(ctx, &params.studSize[0], w) < 0 ||
+            JS_ToFloat64(ctx, &params.studSize[1], d) < 0) {
+          JS_FreeValue(ctx, w); JS_FreeValue(ctx, d);
+          JS_FreeValue(ctx, studSizeVal);
+          return JS_EXCEPTION;
+        }
       }
       JS_FreeValue(ctx, w);
       JS_FreeValue(ctx, d);
