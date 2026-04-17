@@ -260,7 +260,7 @@ std::vector<ModelWithColor> CreateModelsFromPrecomputed(std::vector<PrecomputedM
 
   for (auto& mesh : meshes) {
     Model model = CreateRaylibModelFrom(mesh.meshGL, mesh.color);
-    result.push_back({model, mesh.color, mesh.materialId, mesh.sceneObjectIndex});
+    result.push_back({model, mesh.color, mesh.materialId, mesh.sceneObjectIndex, mesh.roughness, mesh.metallic});
   }
 
   auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(

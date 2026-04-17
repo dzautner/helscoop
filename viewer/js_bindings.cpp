@@ -1604,6 +1604,38 @@ JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) 
   return obj;
 }
 
+JSValue JsWithPBR(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2 || !JS_IsObject(argv[1])) {
+    return JS_ThrowTypeError(ctx, "withPBR expects (manifold, {roughness?, metallic?, color?})");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+
+  JSValue obj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, obj, "geometry", JS_DupValue(ctx, argv[0]));
+
+  JSValue opts = argv[1];
+  JSValue roughnessVal = JS_GetPropertyStr(ctx, opts, "roughness");
+  if (!JS_IsUndefined(roughnessVal)) {
+    JS_SetPropertyStr(ctx, obj, "roughness", JS_DupValue(ctx, roughnessVal));
+  }
+  JS_FreeValue(ctx, roughnessVal);
+
+  JSValue metallicVal = JS_GetPropertyStr(ctx, opts, "metallic");
+  if (!JS_IsUndefined(metallicVal)) {
+    JS_SetPropertyStr(ctx, obj, "metallic", JS_DupValue(ctx, metallicVal));
+  }
+  JS_FreeValue(ctx, metallicVal);
+
+  JSValue colorVal = JS_GetPropertyStr(ctx, opts, "color");
+  if (!JS_IsUndefined(colorVal) && JS_IsArray(colorVal)) {
+    JS_SetPropertyStr(ctx, obj, "color", JS_DupValue(ctx, colorVal));
+  }
+  JS_FreeValue(ctx, colorVal);
+
+  return obj;
+}
+
 JSValue JsWithMaterial(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) {
     return JS_ThrowTypeError(ctx, "withMaterial expects (manifold, materialId)");
@@ -1661,6 +1693,7 @@ void RegisterBindingsInternal(JSContext *ctx) {
   JS_SetPropertyStr(ctx, global, "cylinder", JS_NewCFunction(ctx, JsCylinder, "cylinder", 1));
   JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));
   JS_SetPropertyStr(ctx, global, "withColor", JS_NewCFunction(ctx, JsWithColor, "withColor", 2));
+  JS_SetPropertyStr(ctx, global, "withPBR", JS_NewCFunction(ctx, JsWithPBR, "withPBR", 2));
   JS_SetPropertyStr(ctx, global, "withMaterial", JS_NewCFunction(ctx, JsWithMaterial, "withMaterial", 2));
   JS_SetPropertyStr(ctx, global, "linearPattern", JS_NewCFunction(ctx, JsLinearPattern, "linearPattern", 3));
   JS_SetPropertyStr(ctx, global, "circularPattern", JS_NewCFunction(ctx, JsCircularPattern, "circularPattern", 2));

@@ -58,5 +58,5 @@ if (threadCuts.length > 0) {
 }
 
 export const scene = [
-  withColor(scale(bolt, S), ZINC),
+  withPBR(scale(bolt, S), { color: ZINC, metallic: 0.85, roughness: 0.3 }),
 ];

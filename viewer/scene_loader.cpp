@@ -283,7 +283,23 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     }
     JS_FreeValue(ctx, assemblyOnlyVal);
 
-    return ColoredObject{geom, color, materialId, objectId, quantity, assemblyOnly};
+    // Check for PBR overrides (roughness, metallic)
+    float roughness = -1.0f;
+    float metallic = -1.0f;
+    JSValue roughnessVal = JS_GetPropertyStr(ctx, objVal, "roughness");
+    if (!JS_IsUndefined(roughnessVal)) {
+      double r = 0.0;
+      if (JS_ToFloat64(ctx, &r, roughnessVal) == 0) roughness = static_cast<float>(r);
+    }
+    JS_FreeValue(ctx, roughnessVal);
+    JSValue metallicVal = JS_GetPropertyStr(ctx, objVal, "metallic");
+    if (!JS_IsUndefined(metallicVal)) {
+      double m = 0.0;
+      if (JS_ToFloat64(ctx, &m, metallicVal) == 0) metallic = static_cast<float>(m);
+    }
+    JS_FreeValue(ctx, metallicVal);
+
+    return ColoredObject{geom, color, materialId, objectId, quantity, assemblyOnly, roughness, metallic};
   };
 
   if (JS_IsArray(sceneVal)) {
@@ -735,7 +751,9 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
     Color color;
     std::string materialId;
     std::string objectId;
-    size_t sceneObjectIndex;  // Track original index for assemblyOnly check
+    size_t sceneObjectIndex;
+    float roughness;
+    float metallic;
   };
   std::vector<TessTask> tasks;
   tasks.reserve(result.sceneData.objects.size());
@@ -750,14 +768,16 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
         obj.color,
         obj.materialId,
         obj.objectId,
-        i  // Store original scene object index
+        i,
+        obj.roughness,
+        obj.metallic
       });
     }
   }
 
   result.meshes.reserve(tasks.size());
   for (auto& task : tasks) {
-    result.meshes.push_back({task.future.get(), task.color, task.materialId, task.objectId, task.sceneObjectIndex});
+    result.meshes.push_back({task.future.get(), task.color, task.materialId, task.objectId, task.sceneObjectIndex, task.roughness, task.metallic});
   }
 
   auto end = std::chrono::high_resolution_clock::now();

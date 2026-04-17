@@ -1697,7 +1697,6 @@ int main(int argc, char *argv[]) {
       int useTex = (materialTex && materialTex->id != 0) ? 1 : 0;
 
       if (pbrModeEnabled) {
-        // Get material PBR properties (roughness, metallic)
         float matRoughness = 0.5f;
         float matMetallic = 0.0f;
         float matAo = 1.0f;
@@ -1709,6 +1708,8 @@ int main(int argc, char *argv[]) {
             matMetallic = mat->visual.metallic;
           }
         }
+        if (modelWithColor.roughness >= 0.0f) matRoughness = modelWithColor.roughness;
+        if (modelWithColor.metallic >= 0.0f) matMetallic = modelWithColor.metallic;
 
         if (shadowsEnabled) {
           // PBR with shadows rendering path

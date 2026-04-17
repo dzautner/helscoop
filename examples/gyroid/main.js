@@ -48,5 +48,5 @@ const base = translate(
 const piece = union(sculpture, base);
 
 export const scene = [
-  withColor(scale(piece, S), COPPER),
+  withPBR(scale(piece, S), { color: COPPER, metallic: 0.7, roughness: 0.35 }),
 ];

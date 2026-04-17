@@ -81,6 +81,7 @@ trimByPlane(geometry, [nx,ny,nz], offset)
 
 // Color & materials
 withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
+withPBR(geometry, {color, roughness, metallic})  // PBR material properties
 withMaterial(geometry, "material_id")   // references materials/materials.json
 
 // Queries

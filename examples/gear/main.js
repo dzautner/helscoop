@@ -73,4 +73,4 @@ if (num_spokes > 0 && spoke_radius > 0) {
   gear = difference(gear, allHoles);
 }
 
-export const scene = [withColor(scale(gear, S), STEEL)];
+export const scene = [withPBR(scale(gear, S), { color: STEEL, metallic: 0.9, roughness: 0.25 })];
