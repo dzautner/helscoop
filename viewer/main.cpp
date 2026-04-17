@@ -183,6 +183,8 @@ int main(int argc, char *argv[]) {
     } else if (arg == "--focus-category" && i + 1 < argc) {
       renderFocusCategories.insert(argv[i + 1]);
       i += 1;
+    } else if (arg == "--toon") {
+      // Set toon rendering for headless render (handled after shader init)
     } else if (arg == "--interior-cutaway") {
       renderHiddenCategories.insert("sheathing");
       renderHiddenCategories.insert("roofing");
@@ -191,6 +193,24 @@ int main(int argc, char *argv[]) {
       renderHiddenMaterials.insert("hardware_cloth");
       renderHiddenMaterials.insert("insulation_100mm");
       renderHiddenMaterials.insert("vapor_barrier");
+    }
+  }
+
+  // Resolve scene path: if relative and not found in CWD, try relative to
+  // the binary's parent directories (handles running from build/).
+  if (renderMode && !renderScenePath.empty()) {
+    std::filesystem::path scenePath(renderScenePath);
+    if (scenePath.is_relative() && !std::filesystem::exists(scenePath)) {
+      std::filesystem::path binDir = std::filesystem::canonical(
+          std::filesystem::path(argv[0]).parent_path());
+      for (auto dir = binDir; dir.has_parent_path() && dir != dir.parent_path();
+           dir = dir.parent_path()) {
+        auto candidate = dir / scenePath;
+        if (std::filesystem::exists(candidate)) {
+          renderScenePath = candidate.string();
+          break;
+        }
+      }
     }
   }
 
@@ -663,24 +683,27 @@ int main(int argc, char *argv[]) {
   pbrShader.locs[SHADER_LOC_MAP_DIFFUSE] = locPbrAlbedoTex;
 
   // PBR environment colors tuned for a Nordic daytime look (Sotunki-like, cool clear air).
-  const float pbrSkyTop[3] = {0.43f, 0.62f, 0.88f};
-  const float pbrSkyBottom[3] = {0.87f, 0.92f, 0.98f};
+  const float pbrSkyTop[3] = {0.30f, 0.45f, 0.65f};
+  const float pbrSkyBottom[3] = {0.55f, 0.60f, 0.65f};
   const float pbrGround[3] = {0.36f, 0.43f, 0.33f};
   SetShaderValue(pbrShader, locPbrSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrGround, pbrGround, SHADER_UNIFORM_VEC3);
-  float pbrExposure = 0.7f;
+  float pbrExposure = 0.85f;
   SetShaderValue(pbrShader, locPbrExposure, &pbrExposure, SHADER_UNIFORM_FLOAT);
 
   // PBR light (sun-like directional), slightly cooler than the previous warm bias.
-  const float pbrLightColor[3] = {2.5f, 2.6f, 2.4f};
+  const float pbrLightColor[3] = {2.2f, 2.3f, 2.1f};
   SetShaderValue(pbrShader, locPbrLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
   // Secondary cool fill from opposite side for shadow readability.
   const float pbrLightColor2[3] = {0.95f, 1.05f, 1.22f};
 
-  // Rendering mode toggle
-  bool pbrModeEnabled = true;  // Start with PBR enabled for realistic look
+  // Rendering mode: PBR by default, --toon CLI flag switches to toon
+  bool pbrModeEnabled = true;
+  for (int i = 1; i < argc; i++) {
+    if (std::string(argv[i]) == "--toon") { pbrModeEnabled = false; break; }
+  }
   int debugViewMode = 0;  // 0=off, 1=depth, 2=normals, 3=combined (cycle with D)
 
   // Sky shader setup
@@ -1562,9 +1585,9 @@ int main(int argc, char *argv[]) {
         rlActiveTextureSlot(0);
       }
       rlSetBlendMode(RL_BLEND_ALPHA);
-    } else {
+    } else if (!renderMode) {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
-      DrawAxes(2.0f);  // Only draw axes in toon mode
+      DrawAxes(2.0f);
     }
 
     // Determine which material ID to highlight (hover takes precedence)

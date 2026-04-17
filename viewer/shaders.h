@@ -359,8 +359,8 @@ vec2 approximateBRDF(float NdotV, float roughness) {
 }
 
 void main() {
-    // Get albedo
-    vec3 albedo = albedoColor.rgb;
+    // Get albedo — convert sRGB input to linear for PBR math
+    vec3 albedo = pow(albedoColor.rgb, vec3(2.2));
     if (useAlbedoTex > 0) {
         albedo *= texture(albedoTex, fragTexCoord).rgb;
     }
@@ -447,10 +447,9 @@ void main() {
     // Final AO - keep it subtle
     float finalAO = ao * normalAO * heightAO;
 
-    // === IMPROVED ENVIRONMENT REFLECTIONS ===
-    // Increase specular environment contribution for shinier look
-    vec3 ambientDiffuse = kD_env * diffuseEnv * shadowFactor;
-    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);  // Boost metallic reflections
+    // === ENVIRONMENT REFLECTIONS ===
+    vec3 ambientDiffuse = kD_env * diffuseEnv * shadowFactor * 0.5;
+    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);
 
     vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
 
@@ -458,7 +457,7 @@ void main() {
     vec3 directLighting = Lo * shadowFactor;
 
     // Rim/fresnel lighting for depth (catches light at edges)
-    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
+    float rim = pow(1.0 - NdotV, 3.0) * 0.1;
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     // === FINAL COMPOSITION ===
@@ -753,7 +752,8 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
 }
 
 void main() {
-    vec3 albedo = albedoColor.rgb;
+    // Convert sRGB albedo to linear for PBR math
+    vec3 albedo = pow(albedoColor.rgb, vec3(2.2));
     if (useAlbedoTex > 0) {
         albedo *= texture(albedoTex, fragTexCoord).rgb;
     }
@@ -813,12 +813,12 @@ void main() {
     float normalAO = 0.7 + 0.3 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
     float finalAO = ao * normalAO;
 
-    vec3 ambientDiffuse = kD_env * diffuseEnv;
+    vec3 ambientDiffuse = kD_env * diffuseEnv * 0.5;
     vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);
     vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
 
     // Rim/fresnel lighting for depth
-    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
+    float rim = pow(1.0 - NdotV, 3.0) * 0.1;
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     vec3 color = ambient + Lo + rimColor;
