@@ -1056,10 +1056,11 @@ int main(int argc, char *argv[]) {
       if (dirErr && !std::filesystem::exists(downloads)) {
         reportStatus("IFC export failed: cannot access " + downloads.string());
       } else {
-        std::filesystem::path ifcPath = downloads / "helscoop.ifc";
+        std::string ifcName = scriptPath.stem().string() + ".ifc";
+        std::filesystem::path ifcPath = downloads / ifcName;
         std::string error;
         if (ExportToIFC(sceneData, sceneMaterials, g_materialLibrary, ifcPath, error)) {
-          reportStatus("Saved ~/Downloads/helscoop.ifc");
+          reportStatus("Saved ~/Downloads/" + ifcName);
         } else {
           reportStatus("IFC export failed: " + error);
         }
@@ -1082,11 +1083,12 @@ int main(int argc, char *argv[]) {
         if (dirErr && !std::filesystem::exists(downloads)) {
           reportStatus("SVG export failed: cannot access Downloads");
         } else {
-          std::filesystem::path svgPath = downloads / "helscoop_blueprint.svg";
+          std::string svgName = scriptPath.stem().string() + "_blueprint.svg";
+          std::filesystem::path svgPath = downloads / svgName;
           BlueprintOptions options;
           std::string error;
           if (ExportToSVG(sceneData, sceneMaterials, g_materialLibrary, svgPath, options, error)) {
-            reportStatus("Saved ~/Downloads/helscoop_blueprint.svg");
+            reportStatus("Saved ~/Downloads/" + svgName);
           } else {
             reportStatus("SVG export failed: " + error);
           }
@@ -1110,10 +1112,11 @@ int main(int argc, char *argv[]) {
         if (dirErr && !std::filesystem::exists(downloads)) {
           reportStatus("BOM export failed: cannot access Downloads");
         } else {
-          std::filesystem::path csvPath = downloads / "helscoop_parts.csv";
+          std::string csvName = scriptPath.stem().string() + "_parts.csv";
+          std::filesystem::path csvPath = downloads / csvName;
           std::string error;
           if (ExportPartsList(sceneMaterials, g_materialLibrary, csvPath, error)) {
-            reportStatus("Saved ~/Downloads/helscoop_parts.csv");
+            reportStatus("Saved ~/Downloads/" + csvName);
           } else {
             reportStatus("BOM export failed: " + error);
           }
@@ -1137,11 +1140,12 @@ int main(int argc, char *argv[]) {
           downloads = std::filesystem::current_path();
         }
 
-        std::filesystem::path instructionsDir = downloads / "helscoop_instructions";
+        std::string instrName = scriptPath.stem().string() + "_instructions";
+        std::filesystem::path instructionsDir = downloads / instrName;
         std::string error;
         if (ExportAssemblyInstructions(sceneData, sceneMaterials, g_materialLibrary,
                                        assemblyInstructions, instructionsDir, error)) {
-          reportStatus("Saved ~/Downloads/helscoop_instructions/");
+          reportStatus("Saved ~/Downloads/" + instrName + "/");
         } else {
           reportStatus("Instructions export failed: " + error);
         }
