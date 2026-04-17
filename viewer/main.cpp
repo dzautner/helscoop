@@ -1915,9 +1915,14 @@ int main(int argc, char *argv[]) {
 
     // Screenshot for render mode
     if (renderMode && !screenshotTaken && frameCount >= std::max(renderCaptureFrame, 1)) {
-      TakeScreenshot(renderOutputPath.c_str());
-      TraceLog(LOG_INFO, "Rendered to: %s", renderOutputPath.c_str());
-      std::cout << "Rendered to: " << renderOutputPath << std::endl;
+      // Use ExportImage instead of TakeScreenshot to support absolute paths
+      // (TakeScreenshot strips directory components)
+      Image screenImage = LoadImageFromScreen();
+      auto absOutputPath = std::filesystem::absolute(renderOutputPath);
+      ExportImage(screenImage, absOutputPath.string().c_str());
+      UnloadImage(screenImage);
+      TraceLog(LOG_INFO, "Rendered to: %s", absOutputPath.string().c_str());
+      std::cout << "Rendered to: " << absOutputPath.string() << std::endl;
       screenshotTaken = true;
       break;
     }
