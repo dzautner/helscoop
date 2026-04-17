@@ -1043,6 +1043,10 @@ JSValue JsExtrude(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   }
   JS_FreeValue(ctx, scaleVal);
 
+  if (height <= 0.0)
+    return JS_ThrowRangeError(ctx, "extrude height must be > 0");
+  if (divisions < 0)
+    return JS_ThrowRangeError(ctx, "extrude divisions must be >= 0");
   auto manifold = std::make_shared<manifold::Manifold>(
       manifold::Manifold::Extrude(polys, height, divisions, twist, scaleTop));
   return WrapManifold(ctx, std::move(manifold));
@@ -1075,6 +1079,10 @@ JSValue JsRevolve(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
     }
     JS_FreeValue(ctx, degVal);
   }
+  if (segments < 0)
+    return JS_ThrowRangeError(ctx, "revolve segments must be >= 0");
+  if (degrees == 0.0)
+    return JS_ThrowRangeError(ctx, "revolve degrees must be non-zero");
   auto manifold = std::make_shared<manifold::Manifold>(
       manifold::Manifold::Revolve(polys, segments, degrees));
   return WrapManifold(ctx, std::move(manifold));

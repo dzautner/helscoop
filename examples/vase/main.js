@@ -45,7 +45,7 @@ const inner = translate(
     scaleTop: top_scale,
     divisions: 32,
   }),
-  [0, -0.5, 0]
+  [0, 0, -0.5]
 );
 
 // Hollow vase = outer minus inner
