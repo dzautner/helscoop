@@ -832,14 +832,17 @@ in vec2 vertexTexCoord;
 
 uniform mat4 mvp;
 uniform mat4 matModel;
+uniform mat4 lightSpaceMatrix;
 
 out vec3 fragWorldPos;
 out vec2 fragTexCoord;
+out vec4 fragPosLightSpace;
 
 void main() {
     vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
     fragWorldPos = worldPos.xyz;
     fragTexCoord = vertexTexCoord;
+    fragPosLightSpace = lightSpaceMatrix * worldPos;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )glsl";
@@ -849,6 +852,7 @@ inline const char* kGroundPlane_FS = R"glsl(
 
 in vec3 fragWorldPos;
 in vec2 fragTexCoord;
+in vec4 fragPosLightSpace;
 
 out vec4 finalColor;
 
@@ -856,9 +860,11 @@ uniform vec3 groundColor;
 uniform vec3 horizonColor;
 uniform float fadeRadius;
 uniform vec3 sceneCenter;
-uniform vec3 lightDir;      // Main directional light (world space)
-uniform vec3 lightColor;    // Main light color/intensity
-uniform vec3 cameraPos;     // Camera position for specular
+uniform vec3 lightDir;
+uniform vec3 lightColor;
+uniform vec3 cameraPos;
+uniform sampler2D shadowMap;
+uniform int shadowsActive;
 
 float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -896,10 +902,35 @@ void main() {
 
     vec3 N = vec3(0.0, 1.0, 0.0);  // Ground normal (up)
 
-    // Diffuse lighting
+    // Shadow calculation
+    float shadow = 0.0;
+    if (shadowsActive > 0) {
+        vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+        projCoords = projCoords * 0.5 + 0.5;
+        projCoords.y = 1.0 - projCoords.y;
+
+        if (projCoords.z <= 1.0 &&
+            projCoords.x >= 0.0 && projCoords.x <= 1.0 &&
+            projCoords.y >= 0.0 && projCoords.y <= 1.0) {
+
+            float currentDepth = projCoords.z;
+            float bias = 0.003;
+
+            vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+            for (int x = -1; x <= 1; ++x) {
+                for (int y = -1; y <= 1; ++y) {
+                    float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+                    shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                }
+            }
+            shadow /= 9.0;
+        }
+    }
+
+    // Diffuse lighting with shadow
     float NdotL = max(dot(N, lightDir), 0.0);
     vec3 ambient = vec3(0.42);
-    vec3 diffuse = lightColor * NdotL * 0.58;
+    vec3 diffuse = lightColor * NdotL * 0.58 * (1.0 - shadow * 0.7);
     vec3 lighting = ambient + diffuse;
 
     // Procedural terrain tinting for a natural ground read (grass + compacted soil).

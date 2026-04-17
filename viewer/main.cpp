@@ -570,6 +570,9 @@ int main(int argc, char *argv[]) {
   const int locGPLightDir = GetShaderLocation(groundPlaneShader, "lightDir");
   const int locGPLightColor = GetShaderLocation(groundPlaneShader, "lightColor");
   const int locGPCameraPos = GetShaderLocation(groundPlaneShader, "cameraPos");
+  const int locGPShadowMap = GetShaderLocation(groundPlaneShader, "shadowMap");
+  const int locGPShadowsActive = GetShaderLocation(groundPlaneShader, "shadowsActive");
+  const int locGPLightSpaceMatrix = GetShaderLocation(groundPlaneShader, "lightSpaceMatrix");
 
   Material groundPlaneMat = LoadMaterialDefault();
   groundPlaneMat.shader = groundPlaneShader;
@@ -1518,12 +1521,33 @@ int main(int argc, char *argv[]) {
       SetShaderValue(groundPlaneShader, locGPLightColor, gpLightCol, SHADER_UNIFORM_VEC3);
       SetShaderValue(groundPlaneShader, locGPCameraPos, gpCamPos, SHADER_UNIFORM_VEC3);
 
+      // Pass shadow map to ground plane
+      if (shadowsEnabled) {
+        int gpShadowTexUnit = 3;
+        SetShaderValue(groundPlaneShader, locGPShadowMap, &gpShadowTexUnit, SHADER_UNIFORM_INT);
+        int gpShadowActive = 1;
+        SetShaderValue(groundPlaneShader, locGPShadowsActive, &gpShadowActive, SHADER_UNIFORM_INT);
+        SetShaderValueMatrix(groundPlaneShader, locGPLightSpaceMatrix, lightSpaceMatrix);
+      } else {
+        int gpShadowActive = 0;
+        SetShaderValue(groundPlaneShader, locGPShadowsActive, &gpShadowActive, SHADER_UNIFORM_INT);
+      }
+
       // Draw ground plane with alpha blending so edges fade into sky
       rlEnableColorBlend();
       rlSetBlendMode(RL_BLEND_ALPHA);
+      if (shadowsEnabled) {
+        rlActiveTextureSlot(3);
+        rlEnableTexture(shadowMap.texture.id);
+      }
       Matrix groundTransform = MatrixTranslate(centerX, minY - 0.002f, centerZ);
       DrawMesh(groundPlaneMesh, groundPlaneMat, groundTransform);
-      rlSetBlendMode(RL_BLEND_ALPHA);  // Reset blend mode
+      if (shadowsEnabled) {
+        rlActiveTextureSlot(3);
+        rlDisableTexture();
+        rlActiveTextureSlot(0);
+      }
+      rlSetBlendMode(RL_BLEND_ALPHA);
     } else {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
       DrawAxes(2.0f);  // Only draw axes in toon mode
