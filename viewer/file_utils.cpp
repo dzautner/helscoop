@@ -176,6 +176,8 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
     {"heater_power", "Heater Watts", "Energy", 100, 2000},
     {"chicken_body_heat", "Heat/Chicken W", "Energy", 5, 15},
     {"num_chickens_for_heat", "Num Chickens", "Energy", 0, 20},
+    // Exterior Colors (0=Yellow, 1=Falu Red, 2=Gray, 3=Blue, 4=Green, 5=White)
+    {"cladding_color", "Cladding Color", "Exterior", 0, 5},
   };
 
   std::istringstream stream(*source);
@@ -265,7 +267,12 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
         size_t valueEnd = line.find(';', valueStart);
         if (valueEnd != std::string::npos) {
           std::ostringstream newValue;
-          newValue << static_cast<int>(param.value);
+          float intpart;
+          if (std::modff(param.value, &intpart) == 0.0f) {
+            newValue << static_cast<int>(param.value);
+          } else {
+            newValue << param.value;
+          }
           result << line.substr(0, valueStart) << newValue.str() << line.substr(valueEnd) << "\n";
           continue;
         }

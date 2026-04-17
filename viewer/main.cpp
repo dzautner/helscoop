@@ -4,18 +4,22 @@
 
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
+#include <ApplicationServices/ApplicationServices.h>
 #endif
 
 #include <atomic>
+#include <algorithm>
 #include <cfloat>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <future>
 #include <iostream>
 #include <mutex>
 #include <set>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 extern "C" {
 #include "quickjs.h"
@@ -49,8 +53,23 @@ int main(int argc, char *argv[]) {
   float camYaw = 0.7f;      // Default camera yaw (radians)
   float camPitch = 0.4f;    // Default camera pitch (radians)
   float camDist = 0.0f;     // 0 = auto-calculate based on scene
+  float camDistScale = 1.0f; // Multiplier applied to auto distance
   float camTargetX = 0.0f, camTargetY = 0.0f, camTargetZ = 0.0f;
   bool camTargetSet = false;
+  float camPosX = 0.0f, camPosY = 0.0f, camPosZ = 0.0f;
+  bool camPosSet = false;
+  float camTargetOffsetX = 0.0f, camTargetOffsetY = 0.0f, camTargetOffsetZ = 0.0f;
+  bool camTargetOffsetSet = false;
+  float renderFov = 45.0f;
+  bool renderShowUI = false;
+  int renderCaptureFrame = 3;
+  std::set<std::string> renderHiddenMaterials;
+  std::set<std::string> renderHiddenCategories;
+  std::set<std::string> renderHiddenObjects;
+  std::set<std::string> renderShowObjects;
+  std::set<std::string> renderFocusMaterials;
+  std::set<std::string> renderFocusObjects;
+  std::set<std::string> renderFocusCategories;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -72,21 +91,109 @@ int main(int argc, char *argv[]) {
     } else if (arg == "--dist" && i + 1 < argc) {
       camDist = std::atof(argv[i + 1]);
       i += 1;
+    } else if (arg == "--dist-scale" && i + 1 < argc) {
+      camDistScale = std::atof(argv[i + 1]);
+      i += 1;
     } else if (arg == "--target" && i + 3 < argc) {
       camTargetX = std::atof(argv[i + 1]);
       camTargetY = std::atof(argv[i + 2]);
       camTargetZ = std::atof(argv[i + 3]);
       camTargetSet = true;
       i += 3;
+    } else if ((arg == "--camera-pos" || arg == "--cam-pos") && i + 3 < argc) {
+      camPosX = std::atof(argv[i + 1]);
+      camPosY = std::atof(argv[i + 2]);
+      camPosZ = std::atof(argv[i + 3]);
+      camPosSet = true;
+      i += 3;
+    } else if ((arg == "--look-at" || arg == "--cam-look") && i + 3 < argc) {
+      camTargetX = std::atof(argv[i + 1]);
+      camTargetY = std::atof(argv[i + 2]);
+      camTargetZ = std::atof(argv[i + 3]);
+      camTargetSet = true;
+      i += 3;
+    } else if (arg == "--target-offset" && i + 3 < argc) {
+      camTargetOffsetX = std::atof(argv[i + 1]);
+      camTargetOffsetY = std::atof(argv[i + 2]);
+      camTargetOffsetZ = std::atof(argv[i + 3]);
+      camTargetOffsetSet = true;
+      i += 3;
+    } else if (arg == "--fov" && i + 1 < argc) {
+      renderFov = std::atof(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--show-ui") {
+      renderShowUI = true;
+    } else if (arg == "--hide-ui") {
+      renderShowUI = false;
+    } else if (arg == "--frames" && i + 1 < argc) {
+      renderCaptureFrame = std::atoi(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--hide-material" && i + 1 < argc) {
+      renderHiddenMaterials.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--hide-category" && i + 1 < argc) {
+      renderHiddenCategories.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--hide-object" && i + 1 < argc) {
+      renderHiddenObjects.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--show-object" && i + 1 < argc) {
+      renderShowObjects.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--focus-material" && i + 1 < argc) {
+      renderFocusMaterials.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--focus-object" && i + 1 < argc) {
+      renderFocusObjects.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--focus-category" && i + 1 < argc) {
+      renderFocusCategories.insert(argv[i + 1]);
+      i += 1;
+    } else if (arg == "--interior-cutaway") {
+      renderHiddenCategories.insert("sheathing");
+      renderHiddenCategories.insert("roofing");
+      renderHiddenCategories.insert("finish");
+      renderHiddenCategories.insert("cladding");
+      renderHiddenMaterials.insert("hardware_cloth");
+      renderHiddenMaterials.insert("insulation_100mm");
+      renderHiddenMaterials.insert("vapor_barrier");
     }
   }
 
-  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
+#ifdef __APPLE__
+  {
+    uint32_t displayCount = 0;
+    CGError displayErr = CGGetOnlineDisplayList(0, nullptr, &displayCount);
+    if (displayErr != kCGErrorSuccess || displayCount == 0) {
+      std::cerr << "No active macOS display session detected." << std::endl;
+      std::cerr << "Run from a logged-in desktop session (GUI terminal, not SSH)." << std::endl;
+      return 2;
+    }
+    CGDirectDisplayID mainDisplay = CGMainDisplayID();
+    if (mainDisplay == kCGNullDirectDisplay) {
+      std::cerr << "No main display available (headless session?)." << std::endl;
+      return 2;
+    }
+  }
+#endif
+
+  const bool headlessRender = renderMode && !renderShowUI;
+  unsigned int windowFlags = FLAG_MSAA_4X_HINT;
+  if (!headlessRender) {
+    windowFlags |= FLAG_WINDOW_RESIZABLE;
+  }
+  if (headlessRender) {
+    windowFlags |= FLAG_WINDOW_HIDDEN;
+  }
+
+  SetConfigFlags(windowFlags);
+  TraceLog(LOG_INFO, "Window init start: renderMode=%d headlessRender=%d", renderMode ? 1 : 0, headlessRender ? 1 : 0);
   if (renderMode) {
     InitWindow(renderWidth, renderHeight, "dingcad");
   } else {
     InitWindow(1280, 720, "dingcad");
   }
+  TraceLog(LOG_INFO, "Window init complete");
   SetTargetFPS(60);
 
   Font brandingFont = GetFontDefault();
@@ -94,27 +201,36 @@ int main(int argc, char *argv[]) {
   bool brandingFontCustom = false;
   bool uiFontCustom = false;
 
-  const std::filesystem::path berkeleyPath("BerkeleyMonoTrial-Regular.otf");
-  const std::filesystem::path consolasPath("/System/Library/Fonts/Supplemental/Consolas.ttf");
-  if (std::filesystem::exists(berkeleyPath)) {
-    brandingFont = LoadFontEx(berkeleyPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
-    uiFont = LoadFontEx(berkeleyPath.string().c_str(), kUIFontSize, nullptr, 0);
-    brandingFontCustom = true;
-    uiFontCustom = true;
-    TraceLog(LOG_INFO, "Loaded Berkeley Mono font");
-  } else if (std::filesystem::exists(consolasPath)) {
-    brandingFont = LoadFontEx(consolasPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
-    uiFont = LoadFontEx(consolasPath.string().c_str(), kUIFontSize, nullptr, 0);
-    brandingFontCustom = true;
-    uiFontCustom = true;
-    TraceLog(LOG_INFO, "Loaded Consolas font (Berkeley Mono not found)");
+  bool skipCustomFonts = headlessRender;
+  if (const char *skipFontsEnv = std::getenv("DINGCAD_SKIP_CUSTOM_FONTS")) {
+    skipCustomFonts = (std::string(skipFontsEnv) == "1");
+  }
+
+  if (!skipCustomFonts) {
+    const std::filesystem::path berkeleyPath("BerkeleyMonoTrial-Regular.otf");
+    const std::filesystem::path consolasPath("/System/Library/Fonts/Supplemental/Consolas.ttf");
+    if (std::filesystem::exists(berkeleyPath)) {
+      brandingFont = LoadFontEx(berkeleyPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
+      uiFont = LoadFontEx(berkeleyPath.string().c_str(), kUIFontSize, nullptr, 0);
+      brandingFontCustom = true;
+      uiFontCustom = true;
+      TraceLog(LOG_INFO, "Loaded Berkeley Mono font");
+    } else if (std::filesystem::exists(consolasPath)) {
+      brandingFont = LoadFontEx(consolasPath.string().c_str(), static_cast<int>(kBrandFontSize), nullptr, 0);
+      uiFont = LoadFontEx(consolasPath.string().c_str(), kUIFontSize, nullptr, 0);
+      brandingFontCustom = true;
+      uiFontCustom = true;
+      TraceLog(LOG_INFO, "Loaded Consolas font (Berkeley Mono not found)");
+    }
+  } else {
+    TraceLog(LOG_INFO, "Skipping custom fonts for render pipeline stability");
   }
 
   Camera3D camera = {0};
   camera.position = {4.0f, 4.0f, 4.0f};
   camera.target = {0.0f, 0.5f, 0.0f};
   camera.up = {0.0f, 1.0f, 0.0f};
-  camera.fovy = 45.0f;
+  camera.fovy = renderFov;
   camera.projection = CAMERA_PERSPECTIVE;
 
   float orbitDistance = Vector3Distance(camera.position, camera.target);
@@ -130,8 +246,39 @@ int main(int argc, char *argv[]) {
   EnsureManifoldClass(runtime);
   JS_SetModuleLoaderFunc(runtime, nullptr, FilesystemModuleLoader, &g_moduleLoaderData);
 
-  // Load material library
-  InitMaterialLibrary(std::filesystem::current_path());
+  // Load material library relative to scene location in render mode.
+  // Fall back to repository root/current cwd when scene-local materials are absent.
+  bool materialLibraryLoaded = false;
+  std::vector<std::filesystem::path> materialBaseCandidates;
+  if (renderMode && !renderScenePath.empty()) {
+    const std::filesystem::path sceneDir =
+      std::filesystem::absolute(std::filesystem::path(renderScenePath)).parent_path();
+    materialBaseCandidates.push_back(sceneDir);
+    if (sceneDir.has_parent_path()) {
+      materialBaseCandidates.push_back(sceneDir.parent_path());
+      if (sceneDir.parent_path().has_parent_path()) {
+        materialBaseCandidates.push_back(sceneDir.parent_path().parent_path());
+      }
+    }
+  }
+  materialBaseCandidates.push_back(std::filesystem::current_path());
+
+  std::set<std::filesystem::path> triedBases;
+  for (const auto& base : materialBaseCandidates) {
+    const auto canonicalBase = std::filesystem::weakly_canonical(base);
+    if (triedBases.find(canonicalBase) != triedBases.end()) {
+      continue;
+    }
+    triedBases.insert(canonicalBase);
+    if (InitMaterialLibrary(canonicalBase)) {
+      materialLibraryLoaded = true;
+      TraceLog(LOG_INFO, "Material library loaded from base: %s", canonicalBase.string().c_str());
+      break;
+    }
+  }
+  if (!materialLibraryLoaded) {
+    TraceLog(LOG_WARNING, "Proceeding without material library; fallback colors only.");
+  }
 
   SceneData sceneData;
   std::string statusMessage;
@@ -200,23 +347,85 @@ int main(int argc, char *argv[]) {
 
   // In render mode, set up camera based on command line args and scene bounds
   if (renderMode && !models.empty()) {
-    // Calculate scene bounding box
-    BoundingBox sceneBounds = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
+    auto expandBounds = [](BoundingBox& dst, const BoundingBox& src, bool& hasAny) {
+      if (!hasAny) {
+        dst = src;
+        hasAny = true;
+        return;
+      }
+      dst.min.x = std::min(dst.min.x, src.min.x);
+      dst.min.y = std::min(dst.min.y, src.min.y);
+      dst.min.z = std::min(dst.min.z, src.min.z);
+      dst.max.x = std::max(dst.max.x, src.max.x);
+      dst.max.y = std::max(dst.max.y, src.max.y);
+      dst.max.z = std::max(dst.max.z, src.max.z);
+    };
+
+    BoundingBox sceneBounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
+    bool hasSceneBounds = false;
     for (const auto& m : models) {
       BoundingBox bbox = GetModelBoundingBox(m.model);
-      sceneBounds.min.x = std::min(sceneBounds.min.x, bbox.min.x);
-      sceneBounds.min.y = std::min(sceneBounds.min.y, bbox.min.y);
-      sceneBounds.min.z = std::min(sceneBounds.min.z, bbox.min.z);
-      sceneBounds.max.x = std::max(sceneBounds.max.x, bbox.max.x);
-      sceneBounds.max.y = std::max(sceneBounds.max.y, bbox.max.y);
-      sceneBounds.max.z = std::max(sceneBounds.max.z, bbox.max.z);
+      expandBounds(sceneBounds, bbox, hasSceneBounds);
     }
+
+    if (!hasSceneBounds) {
+      sceneBounds = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
+    }
+
+    const bool hasFocusQuery = !renderFocusMaterials.empty() ||
+                               !renderFocusObjects.empty() ||
+                               !renderFocusCategories.empty();
+    BoundingBox focusBounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
+    bool hasFocusBounds = false;
+    if (hasFocusQuery) {
+      for (const auto& m : models) {
+        bool matchesFocus = false;
+        if (!m.materialId.empty() &&
+            renderFocusMaterials.find(m.materialId) != renderFocusMaterials.end()) {
+          matchesFocus = true;
+        }
+        if (!matchesFocus && m.sceneObjectIndex < sceneData.objects.size()) {
+          const auto& obj = sceneData.objects[m.sceneObjectIndex];
+          if (!obj.objectId.empty() &&
+              renderFocusObjects.find(obj.objectId) != renderFocusObjects.end()) {
+            matchesFocus = true;
+          }
+        }
+        if (!matchesFocus && !m.materialId.empty()) {
+          const PBRMaterial* mat = g_materialLibrary.get(m.materialId);
+          if (mat && renderFocusCategories.find(mat->category) != renderFocusCategories.end()) {
+            matchesFocus = true;
+          }
+        }
+        if (matchesFocus) {
+          BoundingBox bbox = GetModelBoundingBox(m.model);
+          expandBounds(focusBounds, bbox, hasFocusBounds);
+        }
+      }
+      if (!hasFocusBounds) {
+        TraceLog(LOG_WARNING, "Render focus selectors matched no geometry; falling back to full-scene framing.");
+      }
+    }
+
+    const BoundingBox framingBounds = (hasFocusBounds ? focusBounds : sceneBounds);
+    const float fullSceneSizeRaw = Vector3Distance(sceneBounds.min, sceneBounds.max);
+    float fullSceneSize = fullSceneSizeRaw;
+    if (fullSceneSize < 0.01f) fullSceneSize = 0.01f;
+
     Vector3 sceneCenter = {
-      (sceneBounds.min.x + sceneBounds.max.x) * 0.5f,
-      (sceneBounds.min.y + sceneBounds.max.y) * 0.5f,
-      (sceneBounds.min.z + sceneBounds.max.z) * 0.5f
+      (framingBounds.min.x + framingBounds.max.x) * 0.5f,
+      (framingBounds.min.y + framingBounds.max.y) * 0.5f,
+      (framingBounds.min.z + framingBounds.max.z) * 0.5f
     };
-    float sceneSize = Vector3Distance(sceneBounds.min, sceneBounds.max);
+    float framingSize = Vector3Distance(framingBounds.min, framingBounds.max);
+    if (framingSize < 0.01f) framingSize = 0.01f;
+    float cameraFitSize = framingSize;
+    if (hasFocusBounds) {
+      // Keep focus shots readable: tiny focus objects should not force an extreme macro zoom.
+      cameraFitSize = std::max(cameraFitSize, fullSceneSize * 0.22f);
+    }
+    // Use global scene scale for target offsets so shot presets remain stable with focus framing.
+    const float targetOffsetScale = hasFocusBounds ? fullSceneSize : framingSize;
 
     // Set camera target
     if (camTargetSet) {
@@ -224,31 +433,60 @@ int main(int argc, char *argv[]) {
     } else {
       camera.target = sceneCenter;
     }
+    if (camTargetOffsetSet) {
+      camera.target.x += camTargetOffsetX * targetOffsetScale;
+      camera.target.y += camTargetOffsetY * targetOffsetScale;
+      camera.target.z += camTargetOffsetZ * targetOffsetScale;
+    }
 
     // Set orbit distance (auto or manual)
     if (camDist > 0.0f) {
       orbitDistance = camDist;
     } else {
-      orbitDistance = sceneSize * 0.8f;  // Auto-fit to scene
+      orbitDistance = std::max(cameraFitSize * 0.8f * camDistScale, 0.22f);  // Auto-fit scaled by CLI
     }
 
-    // Apply yaw and pitch from command line
+    // Apply yaw and pitch from command line by default.
     orbitYaw = camYaw;
     orbitPitch = camPitch;
 
-    // Update camera position
-    camera.position = Vector3Add(camera.target, {
-      orbitDistance * cosf(orbitPitch) * sinf(orbitYaw),
-      orbitDistance * sinf(orbitPitch),
-      orbitDistance * cosf(orbitPitch) * cosf(orbitYaw)
-    });
+    // Optional absolute camera placement for precise interior/detail shots.
+    if (camPosSet) {
+      camera.position = {camPosX, camPosY, camPosZ};
+      Vector3 toCam = Vector3Subtract(camera.position, camera.target);
+      float d = Vector3Length(toCam);
+      if (d > 0.0001f) {
+        orbitDistance = d;
+        orbitYaw = atan2f(toCam.x, toCam.z);
+        orbitPitch = asinf(toCam.y / d);
+      }
+    } else {
+      // Orbit camera position from target.
+      camera.position = Vector3Add(camera.target, {
+        orbitDistance * cosf(orbitPitch) * sinf(orbitYaw),
+        orbitDistance * sinf(orbitPitch),
+        orbitDistance * cosf(orbitPitch) * cosf(orbitYaw)
+      });
+    }
 
-    TraceLog(LOG_INFO, "Render mode camera: yaw=%.2f pitch=%.2f dist=%.2f target=(%.2f,%.2f,%.2f)",
-             orbitYaw, orbitPitch, orbitDistance, camera.target.x, camera.target.y, camera.target.z);
+    TraceLog(LOG_INFO,
+             "Render mode camera: yaw=%.2f pitch=%.2f dist=%.2f fov=%.1f target=(%.2f,%.2f,%.2f) pos=(%.2f,%.2f,%.2f) absPos=%s focus=%s fit=%.2f full=%.2f",
+             orbitYaw, orbitPitch, orbitDistance, camera.fovy, camera.target.x, camera.target.y, camera.target.z,
+             camera.position.x, camera.position.y, camera.position.z, camPosSet ? "yes" : "no",
+             hasFocusBounds ? "yes" : "no", cameraFitSize, fullSceneSize);
   }
 
   // UI State
   UIState uiState;
+  if (renderMode && !renderShowUI) {
+    uiState.showToolbar = false;
+    uiState.showParametersPanel = false;
+    uiState.showMaterialsPanel = false;
+    uiState.showThermalPanel = false;
+    uiState.showStructuralPanel = false;
+    uiState.showAssemblyPanel = false;
+    uiState.thermalViewEnabled = false;
+  }
   std::vector<SceneParameter> sceneParameters;
   std::vector<MaterialItem> sceneMaterials = std::move(initialMaterials);
   ThermalAnalysisResult thermalResult;
@@ -394,20 +632,20 @@ int main(int argc, char *argv[]) {
   pbrMat.shader = pbrShader;
   pbrShader.locs[SHADER_LOC_MAP_DIFFUSE] = locPbrAlbedoTex;
 
-  // PBR environment colors (soft outdoor lighting)
-  const float pbrSkyTop[3] = {0.5f, 0.7f, 1.0f};     // Light blue sky
-  const float pbrSkyBottom[3] = {0.9f, 0.9f, 0.95f}; // Pale horizon
-  const float pbrGround[3] = {0.3f, 0.35f, 0.25f};   // Grass/ground reflection
+  // PBR environment colors tuned for a Nordic daytime look (Sotunki-like, cool clear air).
+  const float pbrSkyTop[3] = {0.43f, 0.62f, 0.88f};
+  const float pbrSkyBottom[3] = {0.87f, 0.92f, 0.98f};
+  const float pbrGround[3] = {0.36f, 0.43f, 0.33f};
   SetShaderValue(pbrShader, locPbrSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrGround, pbrGround, SHADER_UNIFORM_VEC3);
 
-  // PBR light (sun-like directional) - bright for good contrast
-  const float pbrLightColor[3] = {4.5f, 4.3f, 3.8f}; // Bright warm sunlight (HDR intensity)
+  // PBR light (sun-like directional), slightly cooler than the previous warm bias.
+  const float pbrLightColor[3] = {4.0f, 4.1f, 3.9f};
   SetShaderValue(pbrShader, locPbrLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
-  // Secondary light (cool fill from opposite side) - fills in shadows
-  const float pbrLightColor2[3] = {0.8f, 0.9f, 1.2f}; // Cool blue-ish fill light
+  // Secondary cool fill from opposite side for shadow readability.
+  const float pbrLightColor2[3] = {0.95f, 1.05f, 1.22f};
 
   // Rendering mode toggle
   bool pbrModeEnabled = true;  // Start with PBR enabled for realistic look
@@ -418,10 +656,10 @@ int main(int argc, char *argv[]) {
   const int locSkyHorizon = GetShaderLocation(skyShader, "skyHorizon");
   const int locSkyGround = GetShaderLocation(skyShader, "groundColor");
 
-  // Sky colors - vibrant outdoor lighting
-  const float skyTopCol[3] = {0.4f, 0.6f, 0.95f};       // Bright blue sky
-  const float skyHorizonCol[3] = {0.85f, 0.9f, 1.0f};   // Light blue/white horizon
-  const float skyGroundCol[3] = {0.4f, 0.45f, 0.35f};   // Muted ground color
+  // Sky gradient tuned for clear Nordic daylight.
+  const float skyTopCol[3] = {0.40f, 0.60f, 0.88f};
+  const float skyHorizonCol[3] = {0.84f, 0.91f, 0.98f};
+  const float skyGroundCol[3] = {0.36f, 0.42f, 0.34f};
   SetShaderValue(skyShader, locSkyTop, skyTopCol, SHADER_UNIFORM_VEC3);
   SetShaderValue(skyShader, locSkyHorizon, skyHorizonCol, SHADER_UNIFORM_VEC3);
   SetShaderValue(skyShader, locSkyGround, skyGroundCol, SHADER_UNIFORM_VEC3);
@@ -501,10 +739,10 @@ int main(int argc, char *argv[]) {
     shadowDepthMat.maps[i].texture.id = 0;
   }
 
-  // Static toon lighting configuration
-  const Vector3 lightDirWS = Vector3Normalize({0.45f, 0.85f, 0.35f});
+  // Static lighting configuration (sun + cool fill).
+  const Vector3 lightDirWS = Vector3Normalize({0.38f, 0.70f, 0.42f});
   // Secondary fill light - comes from opposite side, lower angle (simulates sky bounce)
-  const Vector3 lightDir2WS = Vector3Normalize({-0.6f, 0.4f, -0.5f});
+  const Vector3 lightDir2WS = Vector3Normalize({-0.58f, 0.42f, -0.55f});
   const float baseCol[4] = {kBaseColor.r / 255.0f, kBaseColor.g / 255.0f, kBaseColor.b / 255.0f, 1.0f};
   SetShaderValue(toonShader, locBaseColor, baseCol, SHADER_UNIFORM_VEC4);
 
@@ -1097,15 +1335,93 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    auto renderObjectFiltered = [&](const ModelWithColor& modelWithColor) {
+      if (!renderMode) return false;
+      size_t objIdx = modelWithColor.sceneObjectIndex;
+      if (objIdx >= sceneData.objects.size()) {
+        return !renderShowObjects.empty();
+      }
+      const auto& obj = sceneData.objects[objIdx];
+      if (!renderShowObjects.empty()) {
+        if (obj.objectId.empty() ||
+            renderShowObjects.find(obj.objectId) == renderShowObjects.end()) {
+          return true;
+        }
+      }
+      if (!obj.objectId.empty() &&
+          renderHiddenObjects.find(obj.objectId) != renderHiddenObjects.end()) {
+        return true;
+      }
+      return false;
+    };
+
+    // Build assembly visibility set if in assembly mode
+    std::set<size_t> assemblyVisibleSet;
+    std::set<size_t> assemblyNewSet;
+    if (uiState.showAssemblyPanel && !assemblyInstructions.steps.empty()) {
+      int stepIdx = std::clamp(uiState.currentAssemblyStep, 0,
+                               static_cast<int>(assemblyInstructions.steps.size()) - 1);
+      const auto& step = assemblyInstructions.steps[stepIdx];
+      assemblyVisibleSet.insert(step.objectIndices.begin(), step.objectIndices.end());
+      assemblyNewSet.insert(step.newObjectIndices.begin(), step.newObjectIndices.end());
+    }
+
+    auto shouldSkipObject = [&](const ModelWithColor& mc) -> bool {
+      if (renderObjectFiltered(mc)) return true;
+      if (renderMode && !mc.materialId.empty()) {
+        if (renderHiddenMaterials.find(mc.materialId) != renderHiddenMaterials.end())
+          return true;
+        const PBRMaterial* mat = g_materialLibrary.get(mc.materialId);
+        if (mat && renderHiddenCategories.find(mat->category) != renderHiddenCategories.end())
+          return true;
+      }
+      size_t objIdx = mc.sceneObjectIndex;
+      if (!uiState.showAssemblyPanel && objIdx < sceneData.objects.size() &&
+          sceneData.objects[objIdx].assemblyOnly)
+        return true;
+      if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty() &&
+          assemblyVisibleSet.find(objIdx) == assemblyVisibleSet.end())
+        return true;
+      if (uiState.thermalViewEnabled && !mc.materialId.empty()) {
+        const PBRMaterial* mat = g_materialLibrary.get(mc.materialId);
+        if (mat) {
+          const std::string& cat = mat->category;
+          if (cat == "sheathing" || cat == "roofing" || cat == "finish")
+            return true;
+        }
+      }
+      return false;
+    };
+
     // ========================================================================
     // SHADOW MAP PASS - Render depth from light's perspective
     // ========================================================================
     Matrix lightSpaceMatrix = MatrixIdentity();
     if (shadowsEnabled && pbrModeEnabled) {
-      // Calculate light space matrix for shadow mapping
+      // Calculate light space matrix from actual scene bounds
       Vector3 lightDir = lightDirWS;
-      Vector3 sceneCenter = {0.0f, 1.5f, 0.0f};  // Approximate scene center
-      float sceneRadius = 12.0f;  // Approximate scene radius
+      BoundingBox shadowBounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
+      bool hasShadowBounds = false;
+      for (const auto& m : models) {
+        BoundingBox bbox = GetModelBoundingBox(m.model);
+        if (!hasShadowBounds) {
+          shadowBounds = bbox;
+          hasShadowBounds = true;
+        } else {
+          shadowBounds.min.x = std::min(shadowBounds.min.x, bbox.min.x);
+          shadowBounds.min.y = std::min(shadowBounds.min.y, bbox.min.y);
+          shadowBounds.min.z = std::min(shadowBounds.min.z, bbox.min.z);
+          shadowBounds.max.x = std::max(shadowBounds.max.x, bbox.max.x);
+          shadowBounds.max.y = std::max(shadowBounds.max.y, bbox.max.y);
+          shadowBounds.max.z = std::max(shadowBounds.max.z, bbox.max.z);
+        }
+      }
+      Vector3 sceneCenter = {
+        (shadowBounds.min.x + shadowBounds.max.x) * 0.5f,
+        (shadowBounds.min.y + shadowBounds.max.y) * 0.5f,
+        (shadowBounds.min.z + shadowBounds.max.z) * 0.5f
+      };
+      float sceneRadius = std::max(Vector3Distance(shadowBounds.min, shadowBounds.max) * 0.5f, 0.1f);
 
       // Light view matrix - looking at scene from light direction
       Vector3 lightPos = Vector3Add(sceneCenter, Vector3Scale(lightDir, sceneRadius * 2.0f));
@@ -1137,6 +1453,7 @@ int main(int argc, char *argv[]) {
       lightSpaceMatrix = MatrixMultiply(lightViewMat, lightProjMat);
 
       for (const auto &modelWithColor : models) {
+        if (shouldSkipObject(modelWithColor)) continue;
         for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
           DrawMesh(modelWithColor.model.meshes[i], shadowDepthMat, modelWithColor.model.transform);
         }
@@ -1221,7 +1538,7 @@ int main(int argc, char *argv[]) {
       centerZ = (minZ + maxZ) * 0.5f;
 
       // Set ground plane shader uniforms
-      float gpGroundCol[3] = {0.42f, 0.43f, 0.38f};   // Warm grey-green
+      float gpGroundCol[3] = {0.52f, 0.54f, 0.47f};   // Light moss/soil blend anchor
       float gpHorizonCol[3] = {skyGroundCol[0], skyGroundCol[1], skyGroundCol[2]};
       float gpFadeRadius = groundPlaneSize * 0.5f;
       float gpCenter[3] = {centerX, 0.0f, centerZ};
@@ -1251,37 +1568,17 @@ int main(int argc, char *argv[]) {
         ? uiState.hoveredMaterialId
         : uiState.selectedMaterialId;
 
-    // Build assembly visibility set if in assembly mode
-    std::set<size_t> assemblyVisibleSet;
-    std::set<size_t> assemblyNewSet;
-    if (uiState.showAssemblyPanel && !assemblyInstructions.steps.empty()) {
-      int stepIdx = std::clamp(uiState.currentAssemblyStep, 0,
-                               static_cast<int>(assemblyInstructions.steps.size()) - 1);
-      const auto& step = assemblyInstructions.steps[stepIdx];
-      assemblyVisibleSet.insert(step.objectIndices.begin(), step.objectIndices.end());
-      assemblyNewSet.insert(step.newObjectIndices.begin(), step.newObjectIndices.end());
-    }
-
     // Outline pass - use bright highlight for hovered/selected material
     // Skip outlines in PBR mode for cleaner look (outlines are toon-style)
     if (!pbrModeEnabled) {
     rlDisableBackfaceCulling();
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
-
-      // Skip assemblyOnly objects when NOT in assembly mode
-      size_t objIdx = modelWithColor.sceneObjectIndex;
-      if (!uiState.showAssemblyPanel && objIdx < sceneData.objects.size() &&
-          sceneData.objects[objIdx].assemblyOnly) {
+      if (shouldSkipObject(modelWithColor)) {
         continue;
       }
 
-      // Skip objects not visible in current assembly step
-      if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
-        if (assemblyVisibleSet.find(objIdx) == assemblyVisibleSet.end()) {
-          continue;
-        }
-      }
+      size_t objIdx = modelWithColor.sceneObjectIndex;
 
       // Check if this object should be highlighted
       bool shouldHighlight = !highlightMatId.empty() &&
@@ -1322,35 +1619,11 @@ int main(int argc, char *argv[]) {
     // Toon shading pass
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
-
-      // Skip assemblyOnly objects when NOT in assembly mode
-      size_t objIdx = modelWithColor.sceneObjectIndex;
-      if (!uiState.showAssemblyPanel && objIdx < sceneData.objects.size() &&
-          sceneData.objects[objIdx].assemblyOnly) {
+      if (shouldSkipObject(modelWithColor)) {
         continue;
       }
 
-      // Skip objects not visible in current assembly step
-      if (uiState.showAssemblyPanel && !assemblyVisibleSet.empty()) {
-        if (assemblyVisibleSet.find(objIdx) == assemblyVisibleSet.end()) {
-          continue;
-        }
-      }
-
-      // In thermal view, hide exterior layers that cover insulation
-      // This makes the thermal visualization visible
-      if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
-        const PBRMaterial* mat = g_materialLibrary.get(modelWithColor.materialId);
-        if (mat) {
-          const std::string& cat = mat->category;
-          // Hide sheathing, roofing, and finish - they cover the insulation
-          if (cat == "sheathing" || cat == "roofing" || cat == "finish") {
-            continue;  // Skip this object in thermal view
-          }
-        }
-      }
-
-      // Check if this is a new part in assembly mode (for color modification)
+      size_t objIdx = modelWithColor.sceneObjectIndex;
       bool isNewPart = uiState.showAssemblyPanel && assemblyNewSet.find(objIdx) != assemblyNewSet.end();
 
       // Use thermal color if thermal view is enabled and material has thermal data
@@ -1474,16 +1747,7 @@ int main(int argc, char *argv[]) {
     rlDisableColorBlend();  // Disable blending so alpha (depth) is written correctly
     BeginMode3D(camera);
     for (const auto &modelWithColor : models) {
-      // Skip exterior layers in thermal view (same filter as toon shading pass)
-      if (uiState.thermalViewEnabled && !modelWithColor.materialId.empty()) {
-        const PBRMaterial* mat = g_materialLibrary.get(modelWithColor.materialId);
-        if (mat) {
-          const std::string& cat = mat->category;
-          if (cat == "sheathing" || cat == "roofing" || cat == "finish") {
-            continue;
-          }
-        }
-      }
+      if (shouldSkipObject(modelWithColor)) continue;
       for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
         DrawMesh(modelWithColor.model.meshes[i], normalDepthMat, modelWithColor.model.transform);
       }
@@ -1556,23 +1820,26 @@ int main(int argc, char *argv[]) {
 
     const Rectangle srcRect = {0.0f, 0.0f, static_cast<float>(rtColor.texture.width),
                                -static_cast<float>(rtColor.texture.height)};
+    const Rectangle screenDstRect = {0.0f, 0.0f,
+                                     static_cast<float>(screenWidth),
+                                     static_cast<float>(screenHeight)};
 
     if (debugViewMode == 1) {
       // Raw mode - show pure 3D render without any post-processing
-      DrawTextureRec(rtColor.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      DrawTexturePro(rtColor.texture, srcRect, screenDstRect, {0.0f, 0.0f}, 0.0f, WHITE);
     } else if (debugViewMode >= 2 && debugViewMode <= 4) {
       // Debug visualization mode - texture0 is auto-bound by DrawTextureRec
       int shaderDebugMode = debugViewMode - 2;  // 0=depth, 1=normals, 2=combined
       SetShaderValue(debugShader, locDebugMode, &shaderDebugMode, SHADER_UNIFORM_INT);
       BeginShaderMode(debugShader);
-      DrawTextureRec(rtNormalDepth.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      DrawTexturePro(rtNormalDepth.texture, srcRect, screenDstRect, {0.0f, 0.0f}, 0.0f, WHITE);
       EndShaderMode();
     } else if (debugViewMode == 5) {
       // SSAO debug view - show raw SSAO buffer
-      DrawTextureRec(rtSSAORaw.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      DrawTexturePro(rtSSAORaw.texture, srcRect, screenDstRect, {0.0f, 0.0f}, 0.0f, WHITE);
     } else if (debugViewMode == 6) {
       // SSAO blurred debug view
-      DrawTextureRec(rtSSAOBlur.texture, srcRect, {0.0f, 0.0f}, WHITE);
+      DrawTexturePro(rtSSAOBlur.texture, srcRect, screenDstRect, {0.0f, 0.0f}, 0.0f, WHITE);
     } else {
       // Normal rendering (mode 0) with edge detection, SSAO, and FXAA
       // Step 1: Apply edge shader and downsample to rtFXAA (screen resolution)
@@ -1597,88 +1864,90 @@ int main(int argc, char *argv[]) {
       BeginShaderMode(fxaaShader);
       const Rectangle fxaaSrcRect = {0.0f, 0.0f, static_cast<float>(rtFXAA.texture.width),
                                      -static_cast<float>(rtFXAA.texture.height)};
-      DrawTextureRec(rtFXAA.texture, fxaaSrcRect, {0.0f, 0.0f}, WHITE);
+      DrawTexturePro(rtFXAA.texture, fxaaSrcRect, screenDstRect, {0.0f, 0.0f}, 0.0f, WHITE);
       EndShaderMode();
     }
 
-    // Draw toolbar at top (includes panel toggles and status)
-    DrawToolbar(uiState, uiFont, screenWidth, statusMessage);
+    if (!renderMode || renderShowUI) {
+      // Draw toolbar at top (includes panel toggles and status)
+      DrawToolbar(uiState, uiFont, screenWidth, statusMessage);
 
-    // Draw branding in toolbar area
-    const float margin = 15.0f;
-    const Vector2 brandPos = {margin, 4.0f};  // Adjusted for toolbar
-    DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, WHITE);
+      // Draw branding in toolbar area
+      const float margin = 15.0f;
+      const Vector2 brandPos = {margin, 4.0f};  // Adjusted for toolbar
+      DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, WHITE);
 
-    // Draw UI panels (positioned below toolbar)
-    if (uiState.showMaterialsPanel) {
-      // When assembly panel is active, filter materials to show only materials visible in current step
-      std::vector<std::string> assemblyMaterialFilter;
-      if (uiState.showAssemblyPanel && !assemblyInstructions.steps.empty()) {
-        int stepIdx = std::clamp(uiState.currentAssemblyStep, 0,
-                                 static_cast<int>(assemblyInstructions.steps.size()) - 1);
-        const auto& currentStep = assemblyInstructions.steps[stepIdx];
+      // Draw UI panels (positioned below toolbar)
+      if (uiState.showMaterialsPanel) {
+        // When assembly panel is active, filter materials to show only materials visible in current step
+        std::vector<std::string> assemblyMaterialFilter;
+        if (uiState.showAssemblyPanel && !assemblyInstructions.steps.empty()) {
+          int stepIdx = std::clamp(uiState.currentAssemblyStep, 0,
+                                   static_cast<int>(assemblyInstructions.steps.size()) - 1);
+          const auto& currentStep = assemblyInstructions.steps[stepIdx];
 
-        // Collect materials from visible objects in this step
-        std::set<std::string> visibleMaterials;
+          // Collect materials from visible objects in this step
+          std::set<std::string> visibleMaterials;
 
-        // If step uses showObjects, get materials from those object indices
-        if (!currentStep.objectIndices.empty()) {
-          for (size_t objIdx : currentStep.objectIndices) {
-            if (objIdx < sceneData.objects.size()) {
-              const auto& obj = sceneData.objects[objIdx];
-              if (!obj.materialId.empty()) {
-                visibleMaterials.insert(obj.materialId);
+          // If step uses showObjects, get materials from those object indices
+          if (!currentStep.objectIndices.empty()) {
+            for (size_t objIdx : currentStep.objectIndices) {
+              if (objIdx < sceneData.objects.size()) {
+                const auto& obj = sceneData.objects[objIdx];
+                if (!obj.materialId.empty()) {
+                  visibleMaterials.insert(obj.materialId);
+                }
               }
             }
           }
-        }
 
-        // Also include explicitly listed showMaterials (for steps that use material-based filtering)
-        for (const auto& mat : currentStep.showMaterials) {
-          visibleMaterials.insert(mat);
-        }
+          // Also include explicitly listed showMaterials (for steps that use material-based filtering)
+          for (const auto& mat : currentStep.showMaterials) {
+            visibleMaterials.insert(mat);
+          }
 
-        // Convert set to vector for the filter
-        for (const auto& mat : visibleMaterials) {
-          assemblyMaterialFilter.push_back(mat);
+          // Convert set to vector for the filter
+          for (const auto& mat : visibleMaterials) {
+            assemblyMaterialFilter.push_back(mat);
+          }
         }
+        DrawMaterialsPanel(sceneMaterials, uiState, uiFont, screenWidth, screenHeight, assemblyMaterialFilter);
       }
-      DrawMaterialsPanel(sceneMaterials, uiState, uiFont, screenWidth, screenHeight, assemblyMaterialFilter);
-    }
 
-    if (uiState.showParametersPanel) {
-      bool paramWritten = DrawParametersPanel(sceneParameters, uiState, uiFont,
-                                              screenWidth, screenHeight,
-                                              loadingInBackground, scriptPath);
-      (void)paramWritten;  // File watcher handles reload
-    }
-
-    // Thermal view UI
-    if (uiState.thermalViewEnabled) {
-      if (uiState.showThermalPanel) {
-        if (DrawThermalPanel(thermalResult, uiState, uiFont, screenWidth, screenHeight)) {
-          // Thermal settings changed - trigger recalculation
-          thermalResultDirty = true;
-        }
+      if (uiState.showParametersPanel) {
+        bool paramWritten = DrawParametersPanel(sceneParameters, uiState, uiFont,
+                                                screenWidth, screenHeight,
+                                                loadingInBackground, scriptPath);
+        (void)paramWritten;  // File watcher handles reload
       }
-      DrawThermalLegend(thermalResult.minHeatFlux, thermalResult.maxHeatFlux,
-                        uiFont, screenWidth, screenHeight);
-    }
 
-    // Draw structural panel
-    if (uiState.showStructuralPanel) {
-      DrawStructuralPanel(structuralResult, uiState, uiFont, screenWidth, screenHeight);
-    }
+      // Thermal view UI
+      if (uiState.thermalViewEnabled) {
+        if (uiState.showThermalPanel) {
+          if (DrawThermalPanel(thermalResult, uiState, uiFont, screenWidth, screenHeight)) {
+            // Thermal settings changed - trigger recalculation
+            thermalResultDirty = true;
+          }
+        }
+        DrawThermalLegend(thermalResult.minHeatFlux, thermalResult.maxHeatFlux,
+                          uiFont, screenWidth, screenHeight);
+      }
 
-    // Draw assembly preview panel
-    if (uiState.showAssemblyPanel) {
-      DrawAssemblyPanel(assemblyInstructions, uiState, uiFont, screenWidth, screenHeight);
+      // Draw structural panel
+      if (uiState.showStructuralPanel) {
+        DrawStructuralPanel(structuralResult, uiState, uiFont, screenWidth, screenHeight);
+      }
+
+      // Draw assembly preview panel
+      if (uiState.showAssemblyPanel) {
+        DrawAssemblyPanel(assemblyInstructions, uiState, uiFont, screenWidth, screenHeight);
+      }
     }
 
     EndDrawing();
 
     // Screenshot for render mode
-    if (renderMode && !screenshotTaken && frameCount >= 3) {
+    if (renderMode && !screenshotTaken && frameCount >= std::max(renderCaptureFrame, 1)) {
       TakeScreenshot(renderOutputPath.c_str());
       TraceLog(LOG_INFO, "Rendered to: %s", renderOutputPath.c_str());
       std::cout << "Rendered to: " << renderOutputPath << std::endl;
@@ -1687,10 +1956,25 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  // In one-shot render mode we can exit after screenshot without full manual teardown.
+  // Some explicit shader/material unload combinations currently trip driver/raylib shutdown.
+  if (renderMode) {
+    DestroyModels(models);
+    if (brandingFontCustom) UnloadFont(brandingFont);
+    if (uiFontCustom) UnloadFont(uiFont);
+    JS_FreeRuntime(runtime);
+    CloseWindow();
+    return 0;
+  }
+
   // Cleanup
   UnloadMaterialTextures();
+  UnloadTexture(fallbackTexture);
   UnloadRenderTexture(rtColor);
   UnloadRenderTexture(rtNormalDepth);
+  UnloadRenderTexture(rtSSAORaw);
+  UnloadRenderTexture(rtSSAOBlur);
+  UnloadRenderTexture(rtFXAA);
   if (shadowsEnabled) {
     UnloadRenderTexture(shadowMap);
     UnloadMaterial(pbrShadowMat);
@@ -1699,12 +1983,24 @@ int main(int argc, char *argv[]) {
     UnloadShader(shadowDepthShader);
   }
   UnloadMaterial(toonMat);
+  UnloadMaterial(pbrMat);
   UnloadMaterial(normalDepthMat);
   UnloadMaterial(outlineMat);
   UnloadMaterial(groundPlaneMat);
+  UnloadMaterial(skyMat);
+  UnloadShader(toonShader);
+  UnloadShader(pbrShader);
+  UnloadShader(normalDepthShader);
+  UnloadShader(outlineShader);
   UnloadShader(groundPlaneShader);
-  UnloadMesh(groundPlaneMesh);
+  UnloadShader(skyShader);
   UnloadShader(edgeShader);
+  UnloadShader(ssaoShader);
+  UnloadShader(ssaoBlurShader);
+  UnloadShader(fxaaShader);
+  UnloadShader(debugShader);
+  UnloadMesh(groundPlaneMesh);
+  UnloadMesh(skyQuad);
   DestroyModels(models);
   if (brandingFontCustom) UnloadFont(brandingFont);
   if (uiFontCustom) UnloadFont(uiFont);
