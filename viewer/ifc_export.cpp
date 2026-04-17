@@ -79,9 +79,10 @@ bool ExportToIFC(
   // Get current timestamp
   auto now = std::chrono::system_clock::now();
   auto time = std::chrono::system_clock::to_time_t(now);
-  std::tm* tm = std::localtime(&time);
+  std::tm tmBuf;
+  localtime_r(&time, &tmBuf);
   char timestamp[64];
-  strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", tm);
+  strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &tmBuf);
 
   // IFC HEADER - Use IFC2X3 for better compatibility
   file << "ISO-10303-21;\n";
