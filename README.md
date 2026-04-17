@@ -45,8 +45,8 @@ Scene files are ES modules exporting `scene` (geometry array) and optionally `di
 ```javascript
 // Primitives
 cube([width, height, depth])            // or cube({size: [w,h,d], center: true})
-sphere({radius: 10})
-cylinder({height: 50, radius: 10})      // radiusTop for cones
+sphere(radius)                          // or sphere({radius: 10})
+cylinder(height, radius)                // or cylinder({height, radius, radiusTop, center})
 Wall({start: [x,z], end: [x,z], height: h, thickness: t})
 
 // Boolean operations (variadic or array)
@@ -59,6 +59,10 @@ translate(geometry, [x, y, z])
 rotate(geometry, [degX, degY, degZ])
 scale(geometry, factor)                 // or scale(geometry, [sx, sy, sz])
 mirror(geometry, [nx, ny, nz])
+
+// Extrusion & revolution
+extrude(polygon, {height, twistDegrees, scaleTop, divisions})
+revolve(polygon, {segments, degrees})   // defaults: 360°, auto segments
 
 // Color & materials
 withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
