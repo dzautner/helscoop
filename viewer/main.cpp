@@ -729,6 +729,8 @@ int main(int argc, char *argv[]) {
   const int locPbrShadowShadowMap = GetShaderLocation(pbrShadowShader, "shadowMap");
   const int locPbrShadowLightDir = GetShaderLocation(pbrShadowShader, "lightDir");
   const int locPbrShadowLightColor = GetShaderLocation(pbrShadowShader, "lightColor");
+  const int locPbrShadowLightDir2 = GetShaderLocation(pbrShadowShader, "lightDir2");
+  const int locPbrShadowLightColor2 = GetShaderLocation(pbrShadowShader, "lightColor2");
   const int locPbrShadowSkyTop = GetShaderLocation(pbrShadowShader, "skyColorTop");
   const int locPbrShadowSkyBottom = GetShaderLocation(pbrShadowShader, "skyColorBottom");
   const int locPbrShadowGround = GetShaderLocation(pbrShadowShader, "groundColor");
@@ -1446,6 +1448,8 @@ int main(int argc, char *argv[]) {
       // Update PBR shadow shader with light space matrix
       SetShaderValueMatrix(pbrShadowShader, locPbrShadowLightSpaceMatrix, lightSpaceMatrix);
       SetShaderValue(pbrShadowShader, locPbrShadowLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+      SetShaderValue(pbrShadowShader, locPbrShadowLightDir2, &lightDir2WS.x, SHADER_UNIFORM_VEC3);
+      SetShaderValue(pbrShadowShader, locPbrShadowLightColor2, pbrLightColor2, SHADER_UNIFORM_VEC3);
 
       // Shadow map is manually bound to texture unit 3 in the draw loop below
     }

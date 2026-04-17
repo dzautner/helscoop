@@ -632,6 +632,10 @@ uniform sampler2D shadowMap;
 uniform vec3 lightDir;
 uniform vec3 lightColor;
 
+// Secondary light (fill/rim)
+uniform vec3 lightDir2;
+uniform vec3 lightColor2;
+
 // Environment
 uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
@@ -673,30 +677,49 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
 }
 
 vec3 getEnvironmentLight(vec3 N, float rough) {
-    float skyFactor = N.y * 0.5 + 0.5;
-    vec3 skyColor = mix(groundColor, mix(skyColorBottom, skyColorTop, skyFactor), max(0.0, N.y));
-    return mix(skyColor, (skyColorTop + skyColorBottom + groundColor) / 3.0, rough * 0.5);
+    float upFactor = N.y * 0.5 + 0.5;
+    upFactor = clamp(upFactor, 0.0, 1.0);
+
+    vec3 skyColor;
+    if (N.y > 0.0) {
+        float t = pow(upFactor, 0.6);
+        skyColor = mix(skyColorBottom, skyColorTop, t);
+    } else {
+        float t = pow(1.0 - upFactor, 0.8);
+        skyColor = mix(skyColorBottom, groundColor, t);
+    }
+
+    float horizonDist = abs(N.y);
+    float horizonGlow = exp(-horizonDist * 3.0) * 0.15;
+    skyColor += vec3(1.0, 0.95, 0.9) * horizonGlow;
+
+    vec3 avgEnv = (skyColorTop + skyColorBottom * 2.0 + groundColor) * 0.25;
+    skyColor = mix(skyColor, avgEnv, rough * rough * 0.6);
+
+    return skyColor;
+}
+
+vec2 approximateBRDF(float NdotV, float roughness) {
+    vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+    vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+    vec4 r = roughness * c0 + c1;
+    float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
+    return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
 float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
-    // Perspective divide
     vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
     projCoords = projCoords * 0.5 + 0.5;
-
-    // Flip Y for render texture coordinate system
     projCoords.y = 1.0 - projCoords.y;
 
-    // Outside shadow map - no shadow
     if (projCoords.z > 1.0) return 0.0;
     if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
     float currentDepth = projCoords.z;
 
-    // Slope-scaled bias to reduce shadow acne on angled surfaces
     float cosTheta = max(dot(normal, lightDir), 0.0);
     float bias = max(0.01 * (1.0 - cosTheta), 0.003);
 
-    // PCF soft shadows (3x3 kernel)
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     for (int x = -1; x <= 1; ++x) {
@@ -723,38 +746,63 @@ void main() {
 
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
-    // Cook-Torrance BRDF
+    // Cook-Torrance BRDF for primary light
     float NDF = DistributionGGX(N, H, roughness);
     float G = GeometrySmith(N, V, L, roughness);
     vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-    vec3 specular = numerator / denominator;
+    vec3 specular = (NDF * G * F) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001);
 
     vec3 kS = F;
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // Shadow calculation
+    // Shadow map
     float shadow = calculateShadow(fragPosLightSpace, N, L);
 
-    // Direct lighting with shadows
+    // Primary direct lighting with shadow
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
 
+    // Secondary fill light (unshadowed)
+    vec3 L2 = normalize(lightDir2);
+    vec3 H2 = normalize(V + L2);
+    float NDF2 = DistributionGGX(N, H2, roughness);
+    float G2 = GeometrySmith(N, V, L2, roughness);
+    vec3 F2 = fresnelSchlick(max(dot(H2, V), 0.0), F0);
+    vec3 spec2 = (NDF2 * G2 * F2) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L2), 0.0) + 0.0001);
+    vec3 kD2 = (vec3(1.0) - F2) * (1.0 - metallic);
+    float NdotL2 = max(dot(N, L2), 0.0);
+    Lo += (kD2 * albedo / PI + spec2) * lightColor2 * NdotL2;
+
     // Ambient/Environment lighting (not shadowed)
-    vec3 F_env = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-    vec3 kD_env = (1.0 - F_env) * (1.0 - metallic);
+    float NdotV = max(dot(N, V), 0.0);
+    vec3 F_env = fresnelSchlickRoughness(NdotV, F0, roughness);
+    vec3 kS_env = F_env;
+    vec3 kD_env = (1.0 - kS_env) * (1.0 - metallic);
+
     vec3 irradiance = getEnvironmentLight(N, 1.0);
     vec3 diffuseEnv = irradiance * albedo;
+
     vec3 R = reflect(-V, N);
     vec3 prefilteredColor = getEnvironmentLight(R, roughness);
-    vec2 envBRDF = vec2(1.0 - roughness * 0.5, roughness * 0.1);
-    vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
-    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao;
 
-    vec3 color = ambient + Lo;
+    vec2 envBRDF = approximateBRDF(NdotV, roughness);
+    vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
+
+    // Normal-based AO (bottom-facing slightly darker)
+    float normalAO = 0.7 + 0.3 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
+    float finalAO = ao * normalAO;
+
+    vec3 ambientDiffuse = kD_env * diffuseEnv;
+    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);
+    vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
+
+    // Rim/fresnel lighting for depth
+    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
+    vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
+
+    vec3 color = ambient + Lo + rimColor;
 
     // ACES Filmic tone mapping
     float a = 2.51;
@@ -812,6 +860,35 @@ uniform vec3 lightDir;      // Main directional light (world space)
 uniform vec3 lightColor;    // Main light color/intensity
 uniform vec3 cameraPos;     // Camera position for specular
 
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    float a = hash12(i + vec2(0.0, 0.0));
+    float b = hash12(i + vec2(1.0, 0.0));
+    float c = hash12(i + vec2(0.0, 1.0));
+    float d = hash12(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+    for (int i = 0; i < 4; i++) {
+      v += a * valueNoise(p);
+      p = m * p;
+      a *= 0.5;
+    }
+    return v;
+}
+
 void main() {
     // Distance from scene center for fade
     float dist = length(fragWorldPos.xz - sceneCenter.xz);
@@ -821,31 +898,31 @@ void main() {
 
     // Diffuse lighting
     float NdotL = max(dot(N, lightDir), 0.0);
-    vec3 ambient = vec3(0.35);
-    vec3 diffuse = lightColor * NdotL * 0.65;
+    vec3 ambient = vec3(0.42);
+    vec3 diffuse = lightColor * NdotL * 0.58;
     vec3 lighting = ambient + diffuse;
 
-    // Grid pattern - two scales for depth perception
-    // Fine grid (1-unit spacing)
-    vec2 gridFine = abs(fract(fragWorldPos.xz) - 0.5);
-    float fineGridLine = 1.0 - smoothstep(0.47, 0.50, max(gridFine.x, gridFine.y));
-    // Fade fine grid with distance
-    float fineFade = 1.0 - smoothstep(5.0, 20.0, dist);
-    float fineGrid = fineGridLine * 0.12 * fineFade;
+    // Procedural terrain tinting for a natural ground read (grass + compacted soil).
+    vec2 p = fragWorldPos.xz;
+    float macroN = fbm(p * 0.09);
+    float microN = fbm(p * 0.55 + vec2(19.7, -13.1));
+    vec3 mossTint = vec3(0.42, 0.50, 0.38);
+    vec3 soilTint = vec3(0.38, 0.34, 0.28);
+    vec3 localGround = mix(soilTint, mossTint, smoothstep(0.25, 0.78, macroN));
+    localGround *= mix(0.92, 1.16, microN);
 
-    // Coarse grid (5-unit spacing)
-    vec2 gridCoarse = abs(fract(fragWorldPos.xz * 0.2) - 0.5);
-    float coarseGridLine = 1.0 - smoothstep(0.47, 0.50, max(gridCoarse.x, gridCoarse.y));
-    float coarseGrid = coarseGridLine * 0.10;
+    // Gentle worn patch around activity center near coop/run connection.
+    vec2 d = p - sceneCenter.xz;
+    float worn = exp(-(d.x * d.x * 0.11 + d.y * d.y * 0.06));
+    localGround = mix(localGround, soilTint * 1.10, worn * 0.28);
 
-    float gridDarken = max(fineGrid, coarseGrid);
+    // Blend toward horizon tint with distance.
+    vec3 baseColor = mix(localGround, horizonColor * 0.88, smoothstep(fadeRadius * 0.12, fadeRadius, dist) * 0.45);
 
-    // Base color with gradient toward horizon color at edges
-    vec3 baseColor = mix(groundColor, horizonColor, smoothstep(0.0, fadeRadius, dist) * 0.5);
-
-    // Apply lighting and grid
-    vec3 color = baseColor * lighting;
-    color = mix(color, color * 0.75, gridDarken);
+    // Apply lighting and a subtle grazing highlight to avoid flatness.
+    vec3 V = normalize(cameraPos - fragWorldPos);
+    float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+    vec3 color = baseColor * lighting + rim * vec3(0.045, 0.05, 0.04);
 
     // Output with fade to transparent at edges
     finalColor = vec4(color, fade);
