@@ -9,10 +9,10 @@ const module_val = 8;
 const gear_width = 15;
 // @param bore_radius "Gear" Bore Radius (3-30)
 const bore_radius = 12;
-// @param hub_radius "Gear" Hub Radius (0-50)
-const hub_radius = 0;
-// @param hub_width "Gear" Hub Width (0-30)
-const hub_width = 10;
+// @param num_spokes "Gear" Spoke Holes (0-8)
+const num_spokes = 6;
+// @param spoke_radius "Gear" Spoke Hole Radius (5-25)
+const spoke_radius = 15;
 
 const S = 0.003;
 export const displayScale = S;
@@ -61,17 +61,16 @@ const boreCentered = translate(bore, [0, 0, -1]);
 
 let gear = difference(gearBody, boreCentered);
 
-// Optional raised hub
-const parts = [withColor(scale(gear, S), STEEL)];
-
-if (hub_radius > bore_radius && hub_width > 0) {
-  const hubBody = cylinder({ height: gear_width + hub_width, radius: hub_radius });
-  const hubBore = translate(
-    cylinder({ height: gear_width + hub_width + 2, radius: bore_radius }),
-    [0, 0, -1]
+// Lightening holes using circularPattern (rotates around Z axis)
+const pitch_r = module_val * num_teeth / 2;
+if (num_spokes > 0 && spoke_radius > 0) {
+  const spokeR = (pitch_r - module_val * 1.25 + bore_radius) / 2;
+  const spokeHole = translate(
+    cylinder({ height: gear_width + 2, radius: spoke_radius }),
+    [spokeR, 0, -1]
   );
-  const hub = difference(hubBody, hubBore);
-  parts.push(withColor(scale(hub, S), STEEL_DARK));
+  const allHoles = circularPattern(spokeHole, num_spokes);
+  gear = difference(gear, allHoles);
 }
 
-export const scene = parts;
+export const scene = [withColor(scale(gear, S), STEEL)];

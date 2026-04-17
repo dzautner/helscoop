@@ -68,7 +68,7 @@ revolve(polygon, {segments, degrees})   // defaults: 360°, auto segments
 
 // Patterns
 linearPattern(geometry, count, [dx, dy, dz])   // count copies offset by [dx,dy,dz]
-circularPattern(geometry, count)                // count copies rotated around Y axis
+circularPattern(geometry, count)                // count copies rotated around Z axis
 
 // Smoothing & refinement
 smooth(geometry, tolerance?)            // subdivide smooth (default tolerance=0.5)

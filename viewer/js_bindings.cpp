@@ -1505,7 +1505,7 @@ JSValue JsLinearPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *ar
   return WrapManifold(ctx, std::move(result));
 }
 
-// circularPattern(geometry, count, [cx, cy, cz]) — count copies rotated around Y axis
+// circularPattern(geometry, count) — count copies rotated around Z axis (height)
 JSValue JsCircularPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) {
     return JS_ThrowTypeError(ctx, "circularPattern expects (manifold, count)");
@@ -1520,7 +1520,7 @@ JSValue JsCircularPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *
   parts.reserve(count);
   double angleStep = 360.0 / count;
   for (int32_t i = 0; i < count; ++i) {
-    parts.push_back(target->handle->Rotate(0.0, angleStep * i, 0.0));
+    parts.push_back(target->handle->Rotate(0.0, 0.0, angleStep * i));
   }
   auto result = std::make_shared<manifold::Manifold>(
     manifold::Manifold::BatchBoolean(parts, manifold::OpType::Add));
