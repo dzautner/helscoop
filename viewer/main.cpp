@@ -43,6 +43,33 @@ extern "C" {
 
 using namespace dingcad;
 
+static void ExpandBounds(BoundingBox& dst, const BoundingBox& src, bool& hasAny) {
+  if (!hasAny) {
+    dst = src;
+    hasAny = true;
+    return;
+  }
+  dst.min.x = std::min(dst.min.x, src.min.x);
+  dst.min.y = std::min(dst.min.y, src.min.y);
+  dst.min.z = std::min(dst.min.z, src.min.z);
+  dst.max.x = std::max(dst.max.x, src.max.x);
+  dst.max.y = std::max(dst.max.y, src.max.y);
+  dst.max.z = std::max(dst.max.z, src.max.z);
+}
+
+static BoundingBox ComputeSceneBounds(const std::vector<ModelWithColor>& models) {
+  BoundingBox bounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
+  bool hasAny = false;
+  for (const auto& m : models) {
+    BoundingBox bbox = GetModelBoundingBox(m.model);
+    ExpandBounds(bounds, bbox, hasAny);
+  }
+  if (!hasAny) {
+    bounds = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
+  }
+  return bounds;
+}
+
 int main(int argc, char *argv[]) {
   // Parse command-line arguments
   bool renderMode = false;
@@ -348,33 +375,11 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<ModelWithColor> models = CreateModelsFromScene(sceneData);
+  BoundingBox cachedSceneBounds = ComputeSceneBounds(models);
 
   // In render mode, set up camera based on command line args and scene bounds
   if (renderMode && !models.empty()) {
-    auto expandBounds = [](BoundingBox& dst, const BoundingBox& src, bool& hasAny) {
-      if (!hasAny) {
-        dst = src;
-        hasAny = true;
-        return;
-      }
-      dst.min.x = std::min(dst.min.x, src.min.x);
-      dst.min.y = std::min(dst.min.y, src.min.y);
-      dst.min.z = std::min(dst.min.z, src.min.z);
-      dst.max.x = std::max(dst.max.x, src.max.x);
-      dst.max.y = std::max(dst.max.y, src.max.y);
-      dst.max.z = std::max(dst.max.z, src.max.z);
-    };
-
-    BoundingBox sceneBounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
-    bool hasSceneBounds = false;
-    for (const auto& m : models) {
-      BoundingBox bbox = GetModelBoundingBox(m.model);
-      expandBounds(sceneBounds, bbox, hasSceneBounds);
-    }
-
-    if (!hasSceneBounds) {
-      sceneBounds = {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}};
-    }
+    const BoundingBox& sceneBounds = cachedSceneBounds;
 
     const bool hasFocusQuery = !renderFocusMaterials.empty() ||
                                !renderFocusObjects.empty() ||
@@ -403,7 +408,7 @@ int main(int argc, char *argv[]) {
         }
         if (matchesFocus) {
           BoundingBox bbox = GetModelBoundingBox(m.model);
-          expandBounds(focusBounds, bbox, hasFocusBounds);
+          ExpandBounds(focusBounds, bbox, hasFocusBounds);
         }
       }
       if (!hasFocusBounds) {
@@ -837,6 +842,10 @@ int main(int argc, char *argv[]) {
   int frameCount = 0;
   bool screenshotTaken = false;
 
+  // File-watch debounce state
+  bool fileChangePending = false;
+  auto fileChangeDetectedTime = std::chrono::steady_clock::now();
+
   // Background loading state
   std::future<BackgroundLoadResult> backgroundLoadFuture;
   bool loadingInBackground = false;
@@ -891,6 +900,7 @@ int main(int argc, char *argv[]) {
       uiState.currentAssemblyStep = 0;  // Reset to first step
       TraceLog(LOG_INFO, "Updated %zu parameters and %zu materials from reload",
                sceneParameters.size(), sceneMaterials.size());
+      cachedSceneBounds = ComputeSceneBounds(models);
       TraceLog(LOG_INFO, "PROFILE: Background load completed, total wall time: %lld ms", totalMs);
     } else {
       reportStatus(result.message);
@@ -909,7 +919,7 @@ int main(int argc, char *argv[]) {
 
     checkBackgroundLoad();
 
-    // File watching
+    // File watching with debounce to avoid rapid reloads during auto-save
     if (!scriptPath.empty() && !loadingInBackground) {
       bool changed = false;
       for (const auto &entry : watchedFiles) {
@@ -926,7 +936,15 @@ int main(int argc, char *argv[]) {
         }
       }
       if (changed) {
-        startBackgroundLoad();
+        fileChangeDetectedTime = std::chrono::steady_clock::now();
+        fileChangePending = true;
+      }
+      if (fileChangePending) {
+        auto elapsed = std::chrono::steady_clock::now() - fileChangeDetectedTime;
+        if (elapsed >= std::chrono::milliseconds(150)) {
+          fileChangePending = false;
+          startBackgroundLoad();
+        }
       }
     }
 
@@ -1394,30 +1412,13 @@ int main(int argc, char *argv[]) {
     // ========================================================================
     Matrix lightSpaceMatrix = MatrixIdentity();
     if (shadowsEnabled && pbrModeEnabled) {
-      // Calculate light space matrix from actual scene bounds
       Vector3 lightDir = lightDirWS;
-      BoundingBox shadowBounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
-      bool hasShadowBounds = false;
-      for (const auto& m : models) {
-        BoundingBox bbox = GetModelBoundingBox(m.model);
-        if (!hasShadowBounds) {
-          shadowBounds = bbox;
-          hasShadowBounds = true;
-        } else {
-          shadowBounds.min.x = std::min(shadowBounds.min.x, bbox.min.x);
-          shadowBounds.min.y = std::min(shadowBounds.min.y, bbox.min.y);
-          shadowBounds.min.z = std::min(shadowBounds.min.z, bbox.min.z);
-          shadowBounds.max.x = std::max(shadowBounds.max.x, bbox.max.x);
-          shadowBounds.max.y = std::max(shadowBounds.max.y, bbox.max.y);
-          shadowBounds.max.z = std::max(shadowBounds.max.z, bbox.max.z);
-        }
-      }
       Vector3 sceneCenter = {
-        (shadowBounds.min.x + shadowBounds.max.x) * 0.5f,
-        (shadowBounds.min.y + shadowBounds.max.y) * 0.5f,
-        (shadowBounds.min.z + shadowBounds.max.z) * 0.5f
+        (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f,
+        (cachedSceneBounds.min.y + cachedSceneBounds.max.y) * 0.5f,
+        (cachedSceneBounds.min.z + cachedSceneBounds.max.z) * 0.5f
       };
-      float sceneRadius = std::max(Vector3Distance(shadowBounds.min, shadowBounds.max) * 0.5f, 0.1f);
+      float sceneRadius = std::max(Vector3Distance(cachedSceneBounds.min, cachedSceneBounds.max) * 0.5f, 0.1f);
 
       // Light view matrix - looking at scene from light direction
       Vector3 lightPos = Vector3Add(sceneCenter, Vector3Scale(lightDir, sceneRadius * 2.0f));
@@ -1509,29 +1510,10 @@ int main(int argc, char *argv[]) {
 
     BeginMode3D(camera);
     if (pbrModeEnabled) {
-      // Draw a simple ground plane using the PBR shader
-      // Calculate scene bounds to position and center ground correctly
-      float minY = 0.0f, centerX = 0.0f, centerZ = 0.0f;
-      float minX = FLT_MAX, maxX = -FLT_MAX, minZ = FLT_MAX, maxZ = -FLT_MAX;
-      for (const auto& m : models) {
-        BoundingBox bbox = GetModelBoundingBox(m.model);
-        Vector3 corners[8] = {
-          {bbox.min.x, bbox.min.y, bbox.min.z}, {bbox.max.x, bbox.min.y, bbox.min.z},
-          {bbox.min.x, bbox.min.y, bbox.max.z}, {bbox.max.x, bbox.min.y, bbox.max.z},
-          {bbox.min.x, bbox.max.y, bbox.min.z}, {bbox.max.x, bbox.max.y, bbox.min.z},
-          {bbox.min.x, bbox.max.y, bbox.max.z}, {bbox.max.x, bbox.max.y, bbox.max.z},
-        };
-        for (int i = 0; i < 8; i++) {
-          Vector3 p = Vector3Transform(corners[i], m.model.transform);
-          if (p.y < minY) minY = p.y;
-          if (p.x < minX) minX = p.x;
-          if (p.x > maxX) maxX = p.x;
-          if (p.z < minZ) minZ = p.z;
-          if (p.z > maxZ) maxZ = p.z;
-        }
-      }
-      centerX = (minX + maxX) * 0.5f;
-      centerZ = (minZ + maxZ) * 0.5f;
+      // Draw ground plane positioned at cached scene bounds
+      float minY = cachedSceneBounds.min.y;
+      float centerX = (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f;
+      float centerZ = (cachedSceneBounds.min.z + cachedSceneBounds.max.z) * 0.5f;
 
       // Set ground plane shader uniforms
       float gpGroundCol[3] = {0.52f, 0.54f, 0.47f};   // Light moss/soil blend anchor
@@ -1612,7 +1594,14 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    // Toon shading pass
+    // Bind shadow map to texture unit 3 once before the object loop
+    if (pbrModeEnabled && shadowsEnabled) {
+      rlActiveTextureSlot(3);
+      rlEnableTexture(shadowMap.texture.id);
+      rlActiveTextureSlot(0);
+    }
+
+    // Main shading pass
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
       if (shouldSkipObject(modelWithColor)) {
@@ -1684,19 +1673,9 @@ int main(int argc, char *argv[]) {
           pbrShadowMat.maps[MATERIAL_MAP_DIFFUSE].texture =
             (materialTex && materialTex->id != 0) ? *materialTex : fallbackTexture;
 
-          // Bind shadow map to texture unit 3 once for all meshes
-          rlActiveTextureSlot(3);
-          rlEnableTexture(shadowMap.texture.id);
-          rlActiveTextureSlot(0);  // Reset to slot 0 so DrawMesh binds diffuse correctly
-
           for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
             DrawMesh(modelWithColor.model.meshes[i], pbrShadowMat, modelWithColor.model.transform);
           }
-
-          // Unbind shadow map from unit 3 to avoid interfering with post-processing
-          rlActiveTextureSlot(3);
-          rlDisableTexture();
-          rlActiveTextureSlot(0);
         } else {
           // PBR without shadows (fallback)
           SetShaderValue(pbrShader, locPbrAlbedoColor, modelColor, SHADER_UNIFORM_VEC4);
@@ -1724,6 +1703,13 @@ int main(int argc, char *argv[]) {
           DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
         }
       }
+    }
+
+    // Unbind shadow map from unit 3 after the object loop
+    if (pbrModeEnabled && shadowsEnabled) {
+      rlActiveTextureSlot(3);
+      rlDisableTexture();
+      rlActiveTextureSlot(0);
     }
 
     // Disable polygon offset after rendering

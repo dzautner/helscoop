@@ -174,6 +174,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
   if (JS_IsUndefined(sceneVal)) {
     JS_FreeValue(ctx, sceneVal);
     JS_FreeValue(ctx, materialsVal);
+    JS_FreeValue(ctx, assemblyVal);
     JS_FreeContext(ctx);
     result.message = "Scene module must export 'scene'";
     assignDependencies();
@@ -287,6 +288,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
       JS_FreeValue(ctx, lengthVal);
       JS_FreeValue(ctx, sceneVal);
       JS_FreeValue(ctx, materialsVal);
+      JS_FreeValue(ctx, assemblyVal);
       JS_FreeContext(ctx);
       result.message = "Failed to get scene array length";
       assignDependencies();
@@ -304,6 +306,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
       } else {
         JS_FreeValue(ctx, sceneVal);
         JS_FreeValue(ctx, materialsVal);
+        JS_FreeValue(ctx, assemblyVal);
         JS_FreeContext(ctx);
         result.message = "Scene array element " + std::to_string(i) + " is not a manifold or colored object";
         assignDependencies();
@@ -317,6 +320,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     } else {
       JS_FreeValue(ctx, sceneVal);
       JS_FreeValue(ctx, materialsVal);
+      JS_FreeValue(ctx, assemblyVal);
       JS_FreeContext(ctx);
       result.message = "Exported 'scene' is not a manifold or colored object";
       assignDependencies();
@@ -327,6 +331,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
   if (result.sceneData.objects.empty()) {
     JS_FreeValue(ctx, sceneVal);
     JS_FreeValue(ctx, materialsVal);
+    JS_FreeValue(ctx, assemblyVal);
     JS_FreeContext(ctx);
     result.message = "Scene is empty";
     assignDependencies();
