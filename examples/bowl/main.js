@@ -56,10 +56,10 @@ const innerProfile = [
 
 const outerSolid = revolve([outerProfile], { segments: 64 });
 const innerCavity = revolve([innerProfile], { segments: 64 });
-const bowlShape = difference(outerSolid, innerCavity);
+const bowlRaw = difference(outerSolid, innerCavity);
 
-// Rotate so the bowl stands upright (revolve axis Y → Z-up)
-const bowl = rotate(bowlShape, [90, 0, 0]);
+// Smooth the surface subdivision and rotate upright (revolve Y → Z-up)
+const bowl = rotate(smooth(bowlRaw, 0.5), [90, 0, 0]);
 
 export const scene = [
   withColor(scale(bowl, S), CHERRY),

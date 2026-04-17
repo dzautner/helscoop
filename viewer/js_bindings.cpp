@@ -1450,6 +1450,24 @@ JSValue JsSmoothOut(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) 
   return WrapManifold(ctx, std::move(manifold));
 }
 
+// smooth(manifold, tolerance?) — SmoothOut + RefineToTolerance in one call
+JSValue JsSmooth(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "smooth expects (manifold, tolerance?)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  double tolerance = 0.5;
+  if (argc >= 2 && !JS_IsUndefined(argv[1])) {
+    if (JS_ToFloat64(ctx, &tolerance, argv[1]) < 0) return JS_EXCEPTION;
+  }
+  if (tolerance <= 0.0)
+    return JS_ThrowRangeError(ctx, "smooth tolerance must be > 0");
+  auto smoothed = target->handle->SmoothOut();
+  auto refined = std::make_shared<manifold::Manifold>(smoothed.RefineToTolerance(tolerance));
+  return WrapManifold(ctx, std::move(refined));
+}
+
 JSValue JsMinGap(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 3) {
     return JS_ThrowTypeError(ctx, "minGap expects (manifoldA, manifoldB, searchLength)");
@@ -1682,6 +1700,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
                                      "smoothByNormals", 2));
   JS_SetPropertyStr(ctx, global, "smoothOut",
                     JS_NewCFunction(ctx, JsSmoothOut, "smoothOut", 3));
+  JS_SetPropertyStr(ctx, global, "smooth",
+                    JS_NewCFunction(ctx, JsSmooth, "smooth", 2));
   JS_SetPropertyStr(ctx, global, "minGap",
                     JS_NewCFunction(ctx, JsMinGap, "minGap", 3));
   JS_FreeValue(ctx, global);

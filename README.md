@@ -70,6 +70,10 @@ revolve(polygon, {segments, degrees})   // defaults: 360°, auto segments
 linearPattern(geometry, count, [dx, dy, dz])   // count copies offset by [dx,dy,dz]
 circularPattern(geometry, count)                // count copies rotated around Y axis
 
+// Smoothing & refinement
+smooth(geometry, tolerance?)            // subdivide smooth (default tolerance=0.5)
+hull(a, b, c)                          // convex hull of geometries
+
 // Color & materials
 withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
 withMaterial(geometry, "material_id")   // references materials/materials.json
@@ -80,7 +84,7 @@ surfaceArea(geometry)
 boundingBox(geometry)                   // returns {min, max}
 ```
 
-See `examples/table/main.js` for a minimal parametric example.
+See `examples/` for parametric examples (table, bookshelf, vase, bowl).
 
 ### Render Mode
 
