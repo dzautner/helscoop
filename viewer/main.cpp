@@ -836,7 +836,7 @@ int main(int argc, char *argv[]) {
 
   float normalThreshold = 0.25f;
   float depthThreshold = 0.002f;
-  float edgeIntensity = 1.0f;
+  float edgeIntensity = pbrModeEnabled ? 0.3f : 1.0f;
   SetShaderValue(edgeShader, locNormalThreshold, &normalThreshold, SHADER_UNIFORM_FLOAT);
   SetShaderValue(edgeShader, locDepthThreshold, &depthThreshold, SHADER_UNIFORM_FLOAT);
   SetShaderValue(edgeShader, locEdgeIntensity, &edgeIntensity, SHADER_UNIFORM_FLOAT);
@@ -1034,6 +1034,8 @@ int main(int argc, char *argv[]) {
       }
       if (IsKeyPressed(KEY_P)) {
         pbrModeEnabled = !pbrModeEnabled;
+        edgeIntensity = pbrModeEnabled ? 0.3f : 1.0f;
+        SetShaderValue(edgeShader, locEdgeIntensity, &edgeIntensity, SHADER_UNIFORM_FLOAT);
         TraceLog(LOG_INFO, "Rendering mode: %s", pbrModeEnabled ? "PBR (Realistic)" : "Toon (Stylized)");
       }
       if (IsKeyPressed(KEY_F9)) {
