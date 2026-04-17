@@ -353,6 +353,7 @@ int main(int argc, char *argv[]) {
 
   std::vector<MaterialItem> initialMaterials;
   AssemblyInstructions initialAssembly;
+  double currentDisplayScale = 1.0;
   if (defaultScript) {
     scriptPath = std::filesystem::absolute(*defaultScript);
     auto load = LoadSceneFromFile(runtime, scriptPath);
@@ -360,6 +361,7 @@ int main(int argc, char *argv[]) {
       sceneData = load.sceneData;
       initialMaterials = std::move(load.materials);
       initialAssembly = std::move(load.assembly);
+      currentDisplayScale = load.displayScale;
       reportStatus(load.message);
     } else {
       reportStatus(load.message);
@@ -573,6 +575,7 @@ int main(int argc, char *argv[]) {
   const int locGPShadowMap = GetShaderLocation(groundPlaneShader, "shadowMap");
   const int locGPShadowsActive = GetShaderLocation(groundPlaneShader, "shadowsActive");
   const int locGPLightSpaceMatrix = GetShaderLocation(groundPlaneShader, "lightSpaceMatrix");
+  const int locGPGridSpacing = GetShaderLocation(groundPlaneShader, "gridSpacing");
 
   Material groundPlaneMat = LoadMaterialDefault();
   groundPlaneMat.shader = groundPlaneShader;
@@ -900,6 +903,7 @@ int main(int argc, char *argv[]) {
 
     if (result.success) {
       sceneData = std::move(result.sceneData);
+      currentDisplayScale = result.displayScale;
       DestroyModels(models);
       models = CreateModelsFromPrecomputed(result.meshes);
       reportStatus(result.message);
@@ -1520,6 +1524,8 @@ int main(int argc, char *argv[]) {
       SetShaderValue(groundPlaneShader, locGPLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
       SetShaderValue(groundPlaneShader, locGPLightColor, gpLightCol, SHADER_UNIFORM_VEC3);
       SetShaderValue(groundPlaneShader, locGPCameraPos, gpCamPos, SHADER_UNIFORM_VEC3);
+      float gpGridSpacing = static_cast<float>(currentDisplayScale * 1000.0);
+      SetShaderValue(groundPlaneShader, locGPGridSpacing, &gpGridSpacing, SHADER_UNIFORM_FLOAT);
 
       // Pass shadow map to ground plane
       if (shadowsEnabled) {

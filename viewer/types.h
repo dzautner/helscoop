@@ -193,6 +193,7 @@ struct LoadResult {
   std::vector<std::filesystem::path> dependencies;
   std::vector<MaterialItem> materials;
   AssemblyInstructions assembly;  // Scene-defined assembly (empty if not defined)
+  double displayScale = 1.0;
 };
 
 // Pre-computed mesh for GPU upload
@@ -213,6 +214,7 @@ struct BackgroundLoadResult {
   std::vector<std::filesystem::path> dependencies;
   std::vector<MaterialItem> materials;
   AssemblyInstructions assembly;  // Scene-defined assembly (empty if not defined)
+  double displayScale = 1.0;
 };
 
 }  // namespace dingcad

@@ -881,6 +881,12 @@ uniform vec3 lightColor;
 uniform vec3 cameraPos;
 uniform sampler2D shadowMap;
 uniform int shadowsActive;
+uniform float gridSpacing;
+
+float gridLine(vec2 worldPos, float spacing, float lineWidth) {
+    vec2 grid = abs(fract(worldPos / spacing - 0.5) - 0.5) / fwidth(worldPos / spacing);
+    return 1.0 - min(min(grid.x, grid.y), 1.0);
+}
 
 float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -970,6 +976,15 @@ void main() {
     vec3 V = normalize(cameraPos - fragWorldPos);
     float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
     vec3 color = baseColor * lighting + rim * vec3(0.045, 0.05, 0.04);
+
+    // Grid overlay
+    if (gridSpacing > 0.0) {
+        float minorGrid = gridLine(fragWorldPos.xz, gridSpacing, 1.0);
+        float majorGrid = gridLine(fragWorldPos.xz, gridSpacing * 5.0, 1.0);
+        float gridFade = 1.0 - smoothstep(fadeRadius * 0.15, fadeRadius * 0.6, dist);
+        float gridAlpha = max(minorGrid * 0.18, majorGrid * 0.4) * gridFade;
+        color = mix(color, vec3(0.2), gridAlpha);
+    }
 
     // Output with fade to transparent at edges
     finalColor = vec4(color, fade);

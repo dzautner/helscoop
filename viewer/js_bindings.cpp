@@ -448,7 +448,9 @@ JSValue JsCube(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
 JSValue JsSphere(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double radius = 1.0;
-  if (argc >= 1 && JS_IsObject(argv[0])) {
+  if (argc >= 1 && JS_IsNumber(argv[0])) {
+    JS_ToFloat64(ctx, &radius, argv[0]);
+  } else if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue radiusVal = JS_GetPropertyStr(ctx, argv[0], "radius");
     if (!JS_IsUndefined(radiusVal)) {
       if (JS_ToFloat64(ctx, &radius, radiusVal) < 0) {
@@ -467,7 +469,11 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double radius = 0.5;
   double radiusTop = -1.0;
   bool center = false;
-  if (argc >= 1 && JS_IsObject(argv[0])) {
+  // Accept cylinder(height, radius) shorthand
+  if (argc >= 2 && JS_IsNumber(argv[0]) && JS_IsNumber(argv[1])) {
+    JS_ToFloat64(ctx, &height, argv[0]);
+    JS_ToFloat64(ctx, &radius, argv[1]);
+  } else if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
     if (!JS_IsUndefined(heightVal)) {
       if (JS_ToFloat64(ctx, &height, heightVal) < 0) {

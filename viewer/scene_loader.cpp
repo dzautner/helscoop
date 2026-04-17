@@ -168,6 +168,7 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
     double val;
     if (JS_ToFloat64(ctx, &val, displayScaleVal) == 0 && val > 0) {
       displayScale = val;
+      result.displayScale = val;
       TraceLog(LOG_INFO, "SCALE: Read displayScale from scene: %f", displayScale);
     }
   } else {
@@ -720,6 +721,7 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
   result.dependencies = std::move(loadResult.dependencies);
   result.materials = std::move(loadResult.materials);
   result.assembly = std::move(loadResult.assembly);
+  result.displayScale = loadResult.displayScale;
 
   if (!result.success) {
     JS_FreeRuntime(runtime);
