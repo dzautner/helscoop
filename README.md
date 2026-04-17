@@ -42,9 +42,11 @@ Format: `// @param <name> "<section>" <label> (<min>-<max>)`
 
 Scene files are ES modules exporting `scene` (geometry array) and optionally `displayScale`.
 
+**Coordinate system:** X = width (left-right), Y = depth (front-back), Z = height (up).
+
 ```javascript
 // Primitives
-cube([width, height, depth])            // or cube({size: [w,h,d], center: true})
+cube([width, depth, height])            // or cube({size: [w,d,h], center: true})
 sphere(radius)                          // or sphere({radius: 10})
 cylinder(height, radius)                // or cylinder({height, radius, radiusTop, center})
 Wall({start: [x,z], end: [x,z], height: h, thickness: t})
