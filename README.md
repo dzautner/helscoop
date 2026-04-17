@@ -75,6 +75,10 @@ circularPattern(geometry, count)                // count copies rotated around Z
 smooth(geometry, tolerance?)            // subdivide smooth (default tolerance=0.5)
 hull(a, b, c)                          // convex hull of geometries
 
+// SDF / implicit surfaces
+levelSet({sdf, bounds, edgeLength})     // sdf: ([x,y,z]) => number, bounds: {min, max}
+trimByPlane(geometry, [nx,ny,nz], offset)
+
 // Color & materials
 withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
 withMaterial(geometry, "material_id")   // references materials/materials.json
@@ -85,7 +89,7 @@ surfaceArea(geometry)
 boundingBox(geometry)                   // returns {min, max}
 ```
 
-See `examples/` for parametric examples (table, bookshelf, vase, bowl).
+See `examples/` for parametric examples (table, bookshelf, vase, bowl, gear, bolt, gyroid).
 
 ### Render Mode
 
