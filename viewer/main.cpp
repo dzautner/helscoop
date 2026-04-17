@@ -656,6 +656,7 @@ int main(int argc, char *argv[]) {
   const int locPbrSkyTop = GetShaderLocation(pbrShader, "skyColorTop");
   const int locPbrSkyBottom = GetShaderLocation(pbrShader, "skyColorBottom");
   const int locPbrGround = GetShaderLocation(pbrShader, "groundColor");
+  const int locPbrExposure = GetShaderLocation(pbrShader, "exposure");
 
   Material pbrMat = LoadMaterialDefault();
   pbrMat.shader = pbrShader;
@@ -668,9 +669,11 @@ int main(int argc, char *argv[]) {
   SetShaderValue(pbrShader, locPbrSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShader, locPbrGround, pbrGround, SHADER_UNIFORM_VEC3);
+  float pbrExposure = 0.7f;
+  SetShaderValue(pbrShader, locPbrExposure, &pbrExposure, SHADER_UNIFORM_FLOAT);
 
   // PBR light (sun-like directional), slightly cooler than the previous warm bias.
-  const float pbrLightColor[3] = {4.0f, 4.1f, 3.9f};
+  const float pbrLightColor[3] = {2.5f, 2.6f, 2.4f};
   SetShaderValue(pbrShader, locPbrLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
   // Secondary cool fill from opposite side for shadow readability.
@@ -740,12 +743,14 @@ int main(int argc, char *argv[]) {
   const int locPbrShadowSkyTop = GetShaderLocation(pbrShadowShader, "skyColorTop");
   const int locPbrShadowSkyBottom = GetShaderLocation(pbrShadowShader, "skyColorBottom");
   const int locPbrShadowGround = GetShaderLocation(pbrShadowShader, "groundColor");
+  const int locPbrShadowExposure = GetShaderLocation(pbrShadowShader, "exposure");
   const int locPbrShadowLightSpaceMatrix = GetShaderLocation(pbrShadowShader, "lightSpaceMatrix");
 
   // Set PBR shadow shader environment colors (same as regular PBR)
   SetShaderValue(pbrShadowShader, locPbrShadowSkyTop, pbrSkyTop, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShadowShader, locPbrShadowSkyBottom, pbrSkyBottom, SHADER_UNIFORM_VEC3);
   SetShaderValue(pbrShadowShader, locPbrShadowGround, pbrGround, SHADER_UNIFORM_VEC3);
+  SetShaderValue(pbrShadowShader, locPbrShadowExposure, &pbrExposure, SHADER_UNIFORM_FLOAT);
   SetShaderValue(pbrShadowShader, locPbrShadowLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
   // Set shadow map sampler to use texture unit 3 (units 0-2 used by post-processing)
@@ -1604,13 +1609,10 @@ int main(int argc, char *argv[]) {
     setOutlineUniforms(outlineThickness, outlineColor);
     } // end of !pbrModeEnabled outline pass
 
-    // Enable polygon offset to fix z-fighting on coplanar surfaces (door panels, cladding)
-#ifdef __APPLE__
     if (pbrModeEnabled) {
       glEnable(GL_POLYGON_OFFSET_FILL);
       glPolygonOffset(1.0f, 1.0f);
     }
-#endif
 
     // Bind shadow map to texture unit 3 once before the object loop
     if (pbrModeEnabled && shadowsEnabled) {
@@ -1730,12 +1732,9 @@ int main(int argc, char *argv[]) {
       rlActiveTextureSlot(0);
     }
 
-    // Disable polygon offset after rendering
-#ifdef __APPLE__
     if (pbrModeEnabled) {
       glDisable(GL_POLYGON_OFFSET_FILL);
     }
-#endif
 
     EndMode3D();
     EndTextureMode();

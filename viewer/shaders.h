@@ -269,6 +269,7 @@ uniform vec3 lightColor2;   // Secondary light color (usually dimmer, cooler)
 uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
 uniform vec3 groundColor;
+uniform float exposure;
 
 const float PI = 3.14159265359;
 
@@ -463,8 +464,9 @@ void main() {
     // === FINAL COMPOSITION ===
     vec3 color = ambient + directLighting + rimColor;
 
-    // ACES Filmic tone mapping (better contrast and color preservation than Reinhard)
-    // From: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+    color *= exposure;
+
+    // ACES Filmic tone mapping
     float a = 2.51;
     float b = 0.03;
     float c = 2.43;
@@ -640,6 +642,7 @@ uniform vec3 lightColor2;
 uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
 uniform vec3 groundColor;
+uniform float exposure;
 
 const float PI = 3.14159265359;
 
@@ -819,6 +822,8 @@ void main() {
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     vec3 color = ambient + Lo + rimColor;
+
+    color *= exposure;
 
     // ACES Filmic tone mapping
     float a = 2.51;
