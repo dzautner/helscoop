@@ -275,12 +275,29 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
   std::cerr << "WriteParameterToFile: Writing param '" << param.name << "' = " << param.value
             << " at line " << param.lineNumber << " to " << actualPath << std::endl;
 
-  std::ofstream out(actualPath);
-  if (!out) {
-    std::cerr << "WriteParameterToFile: Failed to open file for writing" << std::endl;
+  auto tmpPath = actualPath;
+  tmpPath += ".tmp";
+  {
+    std::ofstream out(tmpPath);
+    if (!out) {
+      std::cerr << "WriteParameterToFile: Failed to open temp file for writing" << std::endl;
+      return false;
+    }
+    out << result.str();
+    out.flush();
+    if (!out.good()) {
+      std::cerr << "WriteParameterToFile: Write failed" << std::endl;
+      std::filesystem::remove(tmpPath);
+      return false;
+    }
+  }
+  std::error_code ec;
+  std::filesystem::rename(tmpPath, actualPath, ec);
+  if (ec) {
+    std::cerr << "WriteParameterToFile: Rename failed: " << ec.message() << std::endl;
+    std::filesystem::remove(tmpPath);
     return false;
   }
-  out << result.str();
   std::cerr << "WriteParameterToFile: Success" << std::endl;
   return true;
 }
