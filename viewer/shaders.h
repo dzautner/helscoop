@@ -960,26 +960,21 @@ void main() {
 
     // Diffuse lighting with shadow
     float NdotL = max(dot(N, lightDir), 0.0);
-    vec3 ambient = vec3(0.42);
-    vec3 diffuse = lightColor * NdotL * 0.58 * (1.0 - shadow * 0.7);
+    vec3 ambient = vec3(0.52);
+    vec3 diffuse = lightColor * NdotL * 0.48 * (1.0 - shadow * 0.6);
     vec3 lighting = ambient + diffuse;
 
-    // Procedural terrain tinting for a natural ground read (grass + compacted soil).
+    // Subtle procedural variation for natural ground texture
     vec2 p = fragWorldPos.xz;
     float macroN = fbm(p * 0.09);
     float microN = fbm(p * 0.55 + vec2(19.7, -13.1));
-    vec3 mossTint = vec3(0.42, 0.50, 0.38);
-    vec3 soilTint = vec3(0.38, 0.34, 0.28);
-    vec3 localGround = mix(soilTint, mossTint, smoothstep(0.25, 0.78, macroN));
-    localGround *= mix(0.92, 1.16, microN);
+    vec3 warmTint = vec3(0.62, 0.60, 0.56);
+    vec3 coolTint = vec3(0.56, 0.57, 0.55);
+    vec3 localGround = mix(coolTint, warmTint, smoothstep(0.3, 0.7, macroN));
+    localGround *= mix(0.95, 1.05, microN);
 
-    // Gentle worn patch around activity center near coop/run connection.
-    vec2 d = p - sceneCenter.xz;
-    float worn = exp(-(d.x * d.x * 0.11 + d.y * d.y * 0.06));
-    localGround = mix(localGround, soilTint * 1.10, worn * 0.28);
-
-    // Blend toward horizon tint with distance.
-    vec3 baseColor = mix(localGround, horizonColor * 0.88, smoothstep(fadeRadius * 0.12, fadeRadius, dist) * 0.45);
+    // Blend toward horizon tint with distance
+    vec3 baseColor = mix(localGround, horizonColor * 0.92, smoothstep(fadeRadius * 0.12, fadeRadius, dist) * 0.4);
 
     // Apply lighting and a subtle grazing highlight to avoid flatness.
     vec3 V = normalize(cameraPos - fragWorldPos);

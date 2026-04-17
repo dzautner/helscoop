@@ -1546,7 +1546,7 @@ int main(int argc, char *argv[]) {
       float centerZ = (cachedSceneBounds.min.z + cachedSceneBounds.max.z) * 0.5f;
 
       // Set ground plane shader uniforms
-      float gpGroundCol[3] = {0.52f, 0.54f, 0.47f};   // Light moss/soil blend anchor
+      float gpGroundCol[3] = {0.60f, 0.58f, 0.55f};   // Neutral warm stone
       float gpHorizonCol[3] = {skyGroundCol[0], skyGroundCol[1], skyGroundCol[2]};
       float gpFadeRadius = groundPlaneSize * 0.5f;
       float gpCenter[3] = {centerX, 0.0f, centerZ};
