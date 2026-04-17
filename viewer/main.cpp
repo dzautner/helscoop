@@ -163,17 +163,21 @@ int main(int argc, char *argv[]) {
 #ifdef __APPLE__
   {
     uint32_t displayCount = 0;
-    CGError displayErr = CGGetOnlineDisplayList(0, nullptr, &displayCount);
-    if (displayErr != kCGErrorSuccess || displayCount == 0) {
+    CGGetOnlineDisplayList(0, nullptr, &displayCount);
+    if (displayCount == 0) {
       std::cerr << "No active macOS display session detected." << std::endl;
       std::cerr << "Run from a logged-in desktop session (GUI terminal, not SSH)." << std::endl;
       return 2;
     }
-    CGDirectDisplayID mainDisplay = CGMainDisplayID();
-    if (mainDisplay == kCGNullDirectDisplay) {
-      std::cerr << "No main display available (headless session?)." << std::endl;
+    // Check for WindowServer access by attempting to create a session dictionary.
+    // CGGetOnlineDisplayList succeeds even in some sessions where GLFW can't
+    // create windows (e.g., CLI tools without proper WindowServer access).
+    CFDictionaryRef sessionDict = CGSessionCopyCurrentDictionary();
+    if (sessionDict == nullptr) {
+      std::cerr << "No window server session available. Run from a GUI terminal." << std::endl;
       return 2;
     }
+    CFRelease(sessionDict);
   }
 #endif
 
