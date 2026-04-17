@@ -5,7 +5,7 @@ const radius = 50;
 // @param height "Vase" Height (50-300)
 const height = 150;
 // @param sides "Vase" Sides (3-12)
-const sides = 8;
+const sides = 12;
 // @param wall_thickness "Vase" Wall Thickness (2-8)
 const wall_thickness = 3;
 // @param twist "Vase" Twist Degrees (0-180)
@@ -17,7 +17,6 @@ const S = 0.005;
 export const displayScale = S;
 
 const CERAMIC = [0.85, 0.78, 0.72];
-const CERAMIC_INNER = [0.75, 0.68, 0.62];
 
 // Generate polygon points for a regular polygon
 function polygon(r, n) {
@@ -52,5 +51,5 @@ const inner = translate(
 const vase = difference(outer, inner);
 
 export const scene = [
-  withColor(scale(vase, S), CERAMIC),
+  withPBR(scale(vase, S), { color: CERAMIC, roughness: 0.15, metallic: 0.05 }),
 ];

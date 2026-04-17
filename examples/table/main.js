@@ -54,7 +54,7 @@ const allAprons = union([
 ]);
 
 export const scene = [
-  withColor(scale(topPlaced, S), OAK),
-  withColor(scale(allLegs, S), OAK_DARK),
-  withColor(scale(allAprons, S), OAK_DARK),
+  withPBR(scale(topPlaced, S), { color: OAK, roughness: 0.45, metallic: 0.0 }),
+  withPBR(scale(allLegs, S), { color: OAK_DARK, roughness: 0.5, metallic: 0.0 }),
+  withPBR(scale(allAprons, S), { color: OAK_DARK, roughness: 0.5, metallic: 0.0 }),
 ];

@@ -53,7 +53,7 @@ const backPanel = translate(
 
 // Assemble
 export const scene = [
-  withColor(scale(union(sides, caps), S), WALNUT),
-  withColor(scale(allShelves, S), WALNUT_LIGHT),
-  withColor(scale(backPanel, S), PLYWOOD),
+  withPBR(scale(union(sides, caps), S), { color: WALNUT, roughness: 0.4, metallic: 0.0 }),
+  withPBR(scale(allShelves, S), { color: WALNUT_LIGHT, roughness: 0.45, metallic: 0.0 }),
+  withPBR(scale(backPanel, S), { color: PLYWOOD, roughness: 0.6, metallic: 0.0 }),
 ];

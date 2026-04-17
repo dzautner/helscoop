@@ -62,5 +62,5 @@ const bowlRaw = difference(outerSolid, innerCavity);
 const bowl = rotate(smooth(bowlRaw, 0.5), [90, 0, 0]);
 
 export const scene = [
-  withColor(scale(bowl, S), CHERRY),
+  withPBR(scale(bowl, S), { color: CHERRY, roughness: 0.35, metallic: 0.0 }),
 ];
