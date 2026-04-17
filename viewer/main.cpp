@@ -271,10 +271,10 @@ int main(int argc, char *argv[]) {
   camera.fovy = renderFov;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  float orbitDistance = Vector3Distance(camera.position, camera.target);
+  float orbitDistance = std::max(Vector3Distance(camera.position, camera.target), 0.001f);
   float orbitYaw = atan2f(camera.position.x - camera.target.x,
                           camera.position.z - camera.target.z);
-  float orbitPitch = asinf((camera.position.y - camera.target.y) / orbitDistance);
+  float orbitPitch = asinf(Clamp((camera.position.y - camera.target.y) / orbitDistance, -1.0f, 1.0f));
   const Vector3 initialTarget = camera.target;
   const float initialDistance = orbitDistance;
   const float initialYaw = orbitYaw;

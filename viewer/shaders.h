@@ -954,7 +954,6 @@ void main() {
     vec4 nd = texture(texture0, uv);
     float depth = nd.a;
 
-    // Skip background
     if (depth > 0.99) {
         finalColor = vec4(1.0);
         return;
@@ -963,11 +962,10 @@ void main() {
     vec3 normal = normalize(nd.rgb * 2.0 - 1.0);
     float linearDepth = depth * (zFar - zNear) + zNear;
 
-    // Sample radius scales with depth - larger radius when zoomed out
     float sampleRadius = ssaoRadius * 50.0 * (linearDepth / 10.0);
     sampleRadius = clamp(sampleRadius, 10.0, 100.0);
 
-    const int SAMPLES = 12;
+    const int SAMPLES = 16;
     float occlusion = 0.0;
     float validSamples = 0.0;
 
@@ -982,32 +980,33 @@ void main() {
         vec4 neighborND = texture(texture0, uv + offset);
         float neighborDepth = neighborND.a;
 
-        // Skip background
         if (neighborDepth > 0.99) continue;
 
-        // Normal-based: only trigger at real corners (normals must differ significantly)
         vec3 neighborNormal = normalize(neighborND.rgb * 2.0 - 1.0);
-        float normalDot = max(0.0, dot(normal, neighborNormal));
-        float normalDiff = 1.0 - normalDot;
+        float normalDiff = 1.0 - max(0.0, dot(normal, neighborNormal));
 
-        // Only count as occlusion at real corners (threshold 0.3 = ~70 degree difference)
-        float occlusionContrib = 0.0;
-        if (normalDiff > 0.3) {
-            // Strong corners get full occlusion, weaker get less
-            occlusionContrib = smoothstep(0.3, 0.7, normalDiff);
+        // Depth-based occlusion: neighbor closer to camera = occluding
+        float depthDelta = depth - neighborDepth;
+        float depthOcclusion = 0.0;
+        if (depthDelta > 0.0005 && depthDelta < 0.05) {
+            depthOcclusion = smoothstep(0.0005, 0.005, depthDelta);
         }
+
+        // Normal-based occlusion at corners
+        float normalOcclusion = smoothstep(0.2, 0.6, normalDiff);
+
+        // Combine: either mechanism can trigger occlusion
+        float occlusionContrib = max(depthOcclusion, normalOcclusion * 0.8);
 
         occlusion += occlusionContrib;
         validSamples += 1.0;
     }
 
-    // Normalize
     if (validSamples > 0.0) {
         occlusion = occlusion / validSamples;
     }
 
-    // Apply intensity - output: 1=bright/no occlusion, 0=dark/full occlusion
-    float ao = 1.0 - occlusion * ssaoIntensity * 0.5;
+    float ao = 1.0 - occlusion * ssaoIntensity * 0.6;
     ao = clamp(ao, 0.0, 1.0);
 
     finalColor = vec4(ao, ao, ao, 1.0);
