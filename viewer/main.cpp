@@ -57,6 +57,13 @@ static void ExpandBounds(BoundingBox& dst, const BoundingBox& src, bool& hasAny)
   dst.max.z = std::max(dst.max.z, src.max.z);
 }
 
+static std::filesystem::path GetDownloadsDir() {
+  if (const char* home = std::getenv("HOME")) {
+    return std::filesystem::path(home) / "Downloads";
+  }
+  return std::filesystem::current_path();
+}
+
 static BoundingBox ComputeSceneBounds(const std::vector<ModelWithColor>& models) {
   BoundingBox bounds = {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
   bool hasAny = false;
@@ -1021,13 +1028,7 @@ int main(int argc, char *argv[]) {
       if (!allGeometry.empty()) {
         manifold::Manifold combined = manifold::Manifold::Compose(allGeometry);
 
-        std::filesystem::path downloads;
-        if (const char *home = std::getenv("HOME")) {
-          downloads = std::filesystem::path(home) / "Downloads";
-        } else {
-          downloads = std::filesystem::current_path();
-        }
-
+        auto downloads = GetDownloadsDir();
         std::error_code dirErr;
         std::filesystem::create_directories(downloads, dirErr);
         if (dirErr && !std::filesystem::exists(downloads)) {
@@ -1054,13 +1055,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (ifcExportRequested && !sceneData.objects.empty()) {
-      std::filesystem::path downloads;
-      if (const char *home = std::getenv("HOME")) {
-        downloads = std::filesystem::path(home) / "Downloads";
-      } else {
-        downloads = std::filesystem::current_path();
-      }
-
+      auto downloads = GetDownloadsDir();
       std::error_code dirErr;
       std::filesystem::create_directories(downloads, dirErr);
       if (dirErr && !std::filesystem::exists(downloads)) {
@@ -1081,13 +1076,7 @@ int main(int argc, char *argv[]) {
     if (uiState.svgExportClicked) {
       uiState.svgExportClicked = false;
       if (!sceneData.objects.empty()) {
-        std::filesystem::path downloads;
-        if (const char *home = std::getenv("HOME")) {
-          downloads = std::filesystem::path(home) / "Downloads";
-        } else {
-          downloads = std::filesystem::current_path();
-        }
-
+        auto downloads = GetDownloadsDir();
         std::error_code dirErr;
         std::filesystem::create_directories(downloads, dirErr);
         if (dirErr && !std::filesystem::exists(downloads)) {
@@ -1110,13 +1099,7 @@ int main(int argc, char *argv[]) {
     if (uiState.bomExportClicked) {
       uiState.bomExportClicked = false;
       if (!sceneMaterials.empty()) {
-        std::filesystem::path downloads;
-        if (const char *home = std::getenv("HOME")) {
-          downloads = std::filesystem::path(home) / "Downloads";
-        } else {
-          downloads = std::filesystem::current_path();
-        }
-
+        auto downloads = GetDownloadsDir();
         std::error_code dirErr;
         std::filesystem::create_directories(downloads, dirErr);
         if (dirErr && !std::filesystem::exists(downloads)) {
@@ -1143,13 +1126,7 @@ int main(int argc, char *argv[]) {
           assemblyInstructions = GenerateDefaultAssembly(sceneData, sceneMaterials);
         }
 
-        std::filesystem::path downloads;
-        if (const char *home = std::getenv("HOME")) {
-          downloads = std::filesystem::path(home) / "Downloads";
-        } else {
-          downloads = std::filesystem::current_path();
-        }
-
+        auto downloads = GetDownloadsDir();
         std::string instrName = scriptPath.stem().string() + "_instructions";
         std::filesystem::path instructionsDir = downloads / instrName;
         std::string error;
