@@ -1833,7 +1833,7 @@ int main(int argc, char *argv[]) {
     SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
     // Bind SSAO texture and set strength for final composite
     SetShaderValueTexture(edgeShader, locEdgeSSAOTex, rtSSAOBlur.texture);
-    const float ssaoStrength = 0.15f;  // Subtle SSAO effect
+    const float ssaoStrength = pbrModeEnabled ? 0.35f : 0.5f;
     SetShaderValue(edgeShader, locEdgeSSAOStrength, &ssaoStrength, SHADER_UNIFORM_FLOAT);
 
     // Final composite
