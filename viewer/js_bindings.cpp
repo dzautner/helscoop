@@ -635,36 +635,10 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 JSValue JsBoolean(JSContext *ctx, int argc, JSValueConst *argv,
                   manifold::OpType op) {
   std::vector<manifold::Manifold> parts;
-
-  // Accept both union(a, b, c) and union([a, b, c]) syntax
-  if (argc == 1 && JS_IsArray(argv[0])) {
-    JSValue lengthVal = JS_GetPropertyStr(ctx, argv[0], "length");
-    uint32_t len = 0;
-    JS_ToUint32(ctx, &len, lengthVal);
-    JS_FreeValue(ctx, lengthVal);
-    if (len < 2) {
-      return JS_ThrowTypeError(ctx, "boolean operation requires at least two manifolds");
-    }
-    parts.reserve(len);
-    for (uint32_t i = 0; i < len; ++i) {
-      JSValue elem = JS_GetPropertyUint32(ctx, argv[0], i);
-      JsManifold *m = GetJsManifold(ctx, elem);
-      JS_FreeValue(ctx, elem);
-      if (!m) return JS_EXCEPTION;
-      parts.push_back(*m->handle);
-    }
-  } else {
-    if (argc < 2) {
-      return JS_ThrowTypeError(ctx, "boolean operation requires at least two manifolds");
-    }
-    parts.reserve(argc);
-    for (int i = 0; i < argc; ++i) {
-      JsManifold *m = GetJsManifold(ctx, argv[i]);
-      if (!m) return JS_EXCEPTION;
-      parts.push_back(*m->handle);
-    }
+  if (!CollectManifoldArgs(ctx, argc, argv, parts)) return JS_EXCEPTION;
+  if (parts.size() < 2) {
+    return JS_ThrowTypeError(ctx, "boolean operation requires at least two manifolds");
   }
-
   auto result = std::make_shared<manifold::Manifold>(
     manifold::Manifold::BatchBoolean(parts, op)
   );
