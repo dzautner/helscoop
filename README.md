@@ -49,6 +49,7 @@ Scene files are ES modules exporting `scene` (geometry array) and optionally `di
 cube([width, depth, height])            // or cube({size: [w,d,h], center: true})
 sphere(radius)                          // or sphere({radius: 10})
 cylinder(height, radius)                // or cylinder({height, radius, radiusTop, segments, center})
+torus(majorRadius, minorRadius)         // or torus({majorRadius, minorRadius, segments, minorSegments})
 Wall({start: [x,z], end: [x,z], height: h, thickness: t})
 
 // Boolean operations (variadic or array)

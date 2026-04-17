@@ -1110,6 +1110,50 @@ JSValue JsRevolve(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return WrapManifold(ctx, std::move(manifold));
 }
 
+// torus(majorRadius, minorRadius) or torus({majorRadius, minorRadius, segments?, minorSegments?})
+JSValue JsTorus(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  double majorR = 10.0;
+  double minorR = 3.0;
+  int32_t segments = 48;
+  int32_t minorSegments = 24;
+  if (argc >= 2 && JS_IsNumber(argv[0]) && JS_IsNumber(argv[1])) {
+    if (JS_ToFloat64(ctx, &majorR, argv[0]) < 0) return JS_EXCEPTION;
+    if (JS_ToFloat64(ctx, &minorR, argv[1]) < 0) return JS_EXCEPTION;
+  } else if (argc >= 1 && JS_IsObject(argv[0])) {
+    JSValue v;
+    v = JS_GetPropertyStr(ctx, argv[0], "majorRadius");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &majorR, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[0], "minorRadius");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &minorR, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[0], "segments");
+    if (!JS_IsUndefined(v)) { if (JS_ToInt32(ctx, &segments, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[0], "minorSegments");
+    if (!JS_IsUndefined(v)) { if (JS_ToInt32(ctx, &minorSegments, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+  }
+  if (majorR <= 0.0 || minorR <= 0.0)
+    return JS_ThrowRangeError(ctx, "torus radii must be > 0");
+  if (minorR >= majorR)
+    return JS_ThrowRangeError(ctx, "minorRadius must be < majorRadius");
+
+  manifold::Polygons polys(1);
+  auto& ring = polys[0];
+  ring.reserve(minorSegments);
+  for (int i = 0; i < minorSegments; ++i) {
+    double angle = 2.0 * M_PI * i / minorSegments;
+    double x = majorR + minorR * std::cos(angle);
+    double y = minorR * std::sin(angle);
+    ring.push_back({x, y});
+  }
+
+  auto result = std::make_shared<manifold::Manifold>(
+      manifold::Manifold::Revolve(polys, segments));
+  return WrapManifold(ctx, std::move(result));
+}
+
 JSValue JsBatchBoolean(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) {
     return JS_ThrowTypeError(ctx, "batchBoolean expects (op, manifolds)");
@@ -1680,6 +1724,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsExtrude, "extrude", 2));
   JS_SetPropertyStr(ctx, global, "revolve",
                     JS_NewCFunction(ctx, JsRevolve, "revolve", 2));
+  JS_SetPropertyStr(ctx, global, "torus",
+                    JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",
                     JS_NewCFunction(ctx, JsBooleanOp, "boolean", 3));
   JS_SetPropertyStr(ctx, global, "batchBoolean",
