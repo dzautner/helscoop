@@ -79,6 +79,11 @@ hull(a, b, c)                          // convex hull of geometries
 levelSet({sdf, bounds, edgeLength})     // sdf: ([x,y,z]) => number, bounds: {min, max}
 trimByPlane(geometry, [nx,ny,nz], offset)
 
+// Deformation & splitting
+warp(geometry, ([x,y,z]) => [x',y',z'])  // per-vertex coordinate transform
+splitByPlane(geometry, [nx,ny,nz], offset)  // returns [inside, outside]
+split(geometry, cutter)                    // returns [inside, outside]
+
 // Color & materials
 withColor(geometry, [r, g, b])          // r,g,b in 0-1 range
 withPBR(geometry, {color, roughness, metallic})  // PBR material properties
@@ -103,6 +108,7 @@ See `examples/` for parametric examples:
 | bolt | Hex head + threads, zinc metallic PBR |
 | gyroid | levelSet SDF, lattice structures |
 | lamp | Multi-material: brass metal + cream matte shade |
+| tower | warp() twist deformation, refineToLength |
 | helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode
