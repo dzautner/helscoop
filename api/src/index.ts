@@ -6,6 +6,7 @@ import projectsRouter from "./routes/projects";
 import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
 import chatRouter from "./routes/chat";
+import buildingRouter from "./routes/building";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
@@ -46,6 +47,7 @@ app.use("/projects", projectsRouter);
 app.use("/suppliers", suppliersRouter);
 app.use("/pricing", pricingRouter);
 app.use("/chat", chatRouter);
+app.use("/building", buildingRouter);
 
 app.get("/materials/export/viewer", async (_req, res) => {
   const { query: dbQuery } = await import("./db");

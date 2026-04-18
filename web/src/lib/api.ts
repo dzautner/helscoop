@@ -116,4 +116,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ messages, currentScene }),
     }),
+
+  getBuilding: (address: string) =>
+    apiFetch(`/building?address=${encodeURIComponent(address)}`),
 };
