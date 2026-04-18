@@ -920,9 +920,27 @@ export default function BomPanel({
 
       <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
         {bom.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "32px 16px" }}>
-            <div style={{ color: "var(--text-muted)", fontSize: 13 }}>
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              margin: "0 auto 16px",
+              borderRadius: "var(--radius-md)",
+              background: "var(--amber-glow)",
+              border: "1px solid var(--amber-border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </div>
+            <div style={{ color: "var(--text-secondary)", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
               {t('editor.noMaterials')}
+            </div>
+            <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+              {t('editor.noMaterialsHint')}
             </div>
           </div>
         ) : (
