@@ -84,8 +84,8 @@ int main(int argc, char *argv[]) {
   std::string renderOutputPath;
   int renderWidth = 1024;
   int renderHeight = 768;
-  float camYaw = 0.7f;      // Default camera yaw (radians)
-  float camPitch = 0.4f;    // Default camera pitch (radians)
+  float camYaw = 40.0f * DEG2RAD;
+  float camPitch = 23.0f * DEG2RAD;
   float camDist = 0.0f;     // 0 = auto-calculate based on scene
   float camDistScale = 1.0f; // Multiplier applied to auto distance
   float camTargetX = 0.0f, camTargetY = 0.0f, camTargetZ = 0.0f;
@@ -117,10 +117,10 @@ int main(int argc, char *argv[]) {
       renderHeight = std::atoi(argv[i + 2]);
       i += 2;
     } else if (arg == "--yaw" && i + 1 < argc) {
-      camYaw = std::atof(argv[i + 1]);
+      camYaw = std::atof(argv[i + 1]) * DEG2RAD;
       i += 1;
     } else if (arg == "--pitch" && i + 1 < argc) {
-      camPitch = std::atof(argv[i + 1]);
+      camPitch = std::atof(argv[i + 1]) * DEG2RAD;
       i += 1;
     } else if (arg == "--dist" && i + 1 < argc) {
       camDist = std::atof(argv[i + 1]);
@@ -515,8 +515,8 @@ int main(int argc, char *argv[]) {
     }
 
     TraceLog(LOG_INFO,
-             "Render mode camera: yaw=%.2f pitch=%.2f dist=%.2f fov=%.1f target=(%.2f,%.2f,%.2f) pos=(%.2f,%.2f,%.2f) absPos=%s focus=%s fit=%.2f full=%.2f",
-             orbitYaw, orbitPitch, orbitDistance, camera.fovy, camera.target.x, camera.target.y, camera.target.z,
+             "Render mode camera: yaw=%.1f° pitch=%.1f° dist=%.2f fov=%.1f target=(%.2f,%.2f,%.2f) pos=(%.2f,%.2f,%.2f) absPos=%s focus=%s fit=%.2f full=%.2f",
+             orbitYaw * RAD2DEG, orbitPitch * RAD2DEG, orbitDistance, camera.fovy, camera.target.x, camera.target.y, camera.target.z,
              camera.position.x, camera.position.y, camera.position.z, camPosSet ? "yes" : "no",
              hasFocusBounds ? "yes" : "no", cameraFitSize, fullSceneSize);
   }
