@@ -2569,33 +2569,38 @@ function ground_patch(radius, position) {
 const coop_center_x = coop_len / 2;
 const coop_center_y = coop_w / 2;
 
-// Background pines (behind and to sides)
-const pine1 = pine_tree(3500, 80, [-2500, coop_center_y + 1500, 0]);
-const pine2 = pine_tree(4200, 90, [-3200, coop_center_y - 800, 0]);
-const pine3 = pine_tree(3800, 85, [-1800, -2000, 0]);
-const pine4 = pine_tree(4500, 95, [coop_len + 6000, coop_center_y + 2500, 0]);
-const pine5 = pine_tree(3200, 75, [coop_len + 5000, -1500, 0]);
+// Background pines (well away from coop to avoid roof shadows)
+const pine1 = pine_tree(3500, 80, [-4000, coop_center_y + 2500, 0]);
+const pine2 = pine_tree(4200, 90, [-4500, coop_center_y - 1500, 0]);
+const pine3 = pine_tree(3800, 85, [-3000, -3500, 0]);
+const pine4 = pine_tree(4500, 95, [coop_len + 8000, coop_center_y + 3500, 0]);
+const pine5 = pine_tree(3200, 75, [coop_len + 7500, -2500, 0]);
+const pine6 = pine_tree(3900, 85, [-5000, coop_center_y, 0]);
+const pine7 = pine_tree(3600, 80, [coop_len + 9000, coop_center_y, 0]);
 
-// Birch trees (lighter, scattered)
-const birch1 = birch_tree(3800, [-2000, -1200, 0]);
-const birch2 = birch_tree(3200, [coop_len + 6500, coop_center_y - 500, 0]);
-const birch3 = birch_tree(4000, [-3500, coop_center_y + 3000, 0]);
+// Birch trees (lighter, scattered — iconic Finnish landscape)
+const birch1 = birch_tree(3800, [-3500, -2500, 0]);
+const birch2 = birch_tree(3200, [coop_len + 8500, coop_center_y - 1000, 0]);
+const birch3 = birch_tree(4000, [-5500, coop_center_y + 3500, 0]);
+const birch4 = birch_tree(3500, [coop_len + 7000, -3000, 0]);
+const birch5 = birch_tree(3000, [-3800, coop_center_y + 4000, 0]);
 
-// Small spruces near the coop
-const spruce1 = spruce(2200, [-800, coop_center_y + 2800, 0]);
-const spruce2 = spruce(1800, [coop_len + 7000, coop_center_y + 1800, 0]);
+// Small spruces (forest understory, still clear of coop)
+const spruce1 = spruce(2200, [-2500, coop_center_y + 4000, 0]);
+const spruce2 = spruce(1800, [coop_len + 9500, coop_center_y + 2500, 0]);
+const spruce3 = spruce(2000, [-4500, -2000, 0]);
 
 // Collect all tree parts
 const all_pine_trunks = union(
-  pine1.trunk, pine2.trunk, pine3.trunk, pine4.trunk, pine5.trunk
+  pine1.trunk, pine2.trunk, pine3.trunk, pine4.trunk, pine5.trunk, pine6.trunk, pine7.trunk
 );
 const all_pine_canopies = union(
-  pine1.canopy, pine2.canopy, pine3.canopy, pine4.canopy, pine5.canopy
+  pine1.canopy, pine2.canopy, pine3.canopy, pine4.canopy, pine5.canopy, pine6.canopy, pine7.canopy
 );
-const all_birch_trunks = union(birch1.trunk, birch2.trunk, birch3.trunk);
-const all_birch_canopies = union(birch1.canopy, birch2.canopy, birch3.canopy);
-const all_spruce_trunks = union(spruce1.trunk, spruce2.trunk);
-const all_spruce_canopies = union(spruce1.canopy, spruce2.canopy);
+const all_birch_trunks = union(birch1.trunk, birch2.trunk, birch3.trunk, birch4.trunk, birch5.trunk);
+const all_birch_canopies = union(birch1.canopy, birch2.canopy, birch3.canopy, birch4.canopy, birch5.canopy);
+const all_spruce_trunks = union(spruce1.trunk, spruce2.trunk, spruce3.trunk);
+const all_spruce_canopies = union(spruce1.canopy, spruce2.canopy, spruce3.canopy);
 
 // Ground cover patches (moss, grass, blueberry)
 const ground_patches_list = [
@@ -2608,20 +2613,50 @@ const ground_patches_list = [
 ];
 const all_ground_patches = union(...ground_patches_list);
 
-// Stone/boulder accents
+// Stone/boulder accents (Finnish granite)
 const boulder1 = translate(
-  scale(sphere({ radius: 180 }), [1.3, 1.0, 0.6]),
-  [-1200, coop_center_y + 2200, 80]
+  scale(sphere({ radius: 250 }), [1.3, 1.0, 0.6]),
+  [-2500, coop_center_y + 3000, 80]
 );
 const boulder2 = translate(
-  scale(sphere({ radius: 140 }), [1.0, 1.2, 0.5]),
-  [coop_len + 5800, -600, 60]
+  scale(sphere({ radius: 200 }), [1.0, 1.2, 0.5]),
+  [coop_len + 7000, -1500, 60]
 );
 const boulder3 = translate(
-  scale(sphere({ radius: 200 }), [1.1, 0.9, 0.55]),
-  [-2600, -800, 90]
+  scale(sphere({ radius: 280 }), [1.1, 0.9, 0.55]),
+  [-3500, -1800, 90]
 );
-const all_boulders = union(boulder1, boulder2, boulder3);
+const boulder4 = translate(
+  scale(sphere({ radius: 160 }), [1.2, 1.1, 0.5]),
+  [coop_len + 8000, coop_center_y + 2000, 50]
+);
+const all_boulders = union(boulder1, boulder2, boulder3, boulder4);
+
+// Gravel path leading to the door
+const path_width = 600;
+const path1 = translate(
+  cube({ size: [path_width, 3000, 15], center: false }),
+  [-2500, coop_center_y - path_width / 2, 0]
+);
+const all_paths = path1;
+
+// Log pile (firewood stack — very Finnish)
+function log_row(count, log_r, log_len, base_pos) {
+  const logs = [];
+  for (let i = 0; i < count; i++) {
+    logs.push(translate(
+      rotate(
+        cylinder({ height: log_len, radius: log_r, segments: 8, center: false }),
+        [0, 90, 0]
+      ),
+      [base_pos[0], base_pos[1] + i * log_r * 2.1, base_pos[2] + log_r]
+    ));
+  }
+  return union(...logs);
+}
+const log_stack_row1 = log_row(5, 60, 500, [-1800, coop_center_y - 400, 0]);
+const log_stack_row2 = log_row(4, 60, 500, [-1800, coop_center_y - 400 + 63, 130]);
+const log_stack = union(log_stack_row1, log_stack_row2);
 
 // ============================================================================
 // TUNNEL SKIRTING - Covers tunnel foundation
@@ -3459,6 +3494,11 @@ const scaledSpruceCanopies = withColor(scale(all_spruce_canopies, DISPLAY_SCALE)
 const scaledGroundPatches = withColor(scale(all_ground_patches, DISPLAY_SCALE), MOSS_GREEN);
 const scaledBoulders = withColor(scale(all_boulders, DISPLAY_SCALE), BOULDER_GRAY);
 
+const GRAVEL_BEIGE = [0.72, 0.68, 0.60];
+const LOG_BROWN = [0.45, 0.30, 0.18];
+const scaledPaths = withColor(scale(all_paths, DISPLAY_SCALE), GRAVEL_BEIGE);
+const scaledLogStack = withColor(scale(log_stack, DISPLAY_SCALE), LOG_BROWN);
+
 // Tunnel skirting
 const scaledTunnelSkirting = withColorId(scale(tunnel_skirting, DISPLAY_SCALE), SKIRTING_DARK, 'tunnel_skirting');
 
@@ -3587,7 +3627,7 @@ export const scene = [
   scaledPineTrunks, scaledPineCanopies,
   scaledBirchTrunks, scaledBirchCanopies,
   scaledSpruceTrunks, scaledSpruceCanopies,
-  scaledGroundPatches, scaledBoulders,
+  scaledGroundPatches, scaledBoulders, scaledPaths, scaledLogStack,
   // Chickens (conditional)
   ...(show_chickens ? [scaledChickens] : []),
   // Lounge area (always shown)
