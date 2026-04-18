@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { BuildingResult } from "@/types";
 
 export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingBuilding: BuildingResult | null }) {
@@ -106,7 +107,8 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
       {/* Right: Login form */}
       <div className="login-form-panel">
         <div style={{ position: "absolute", top: 16, right: 16 }}>
-          <LanguageSwitcher />
+          <ThemeToggle />
+            <LanguageSwitcher />
         </div>
         <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ marginBottom: 36 }}>

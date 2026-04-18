@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -74,20 +75,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fi">
+    <html lang="fi" data-theme="dark" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <style
-          dangerouslySetInnerHTML={{ __html: "html{background:#12110f}" }}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("helscoop-theme");var d=t==="light"?"light":t==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light":"dark";document.documentElement.setAttribute("data-theme",d);document.documentElement.style.background=d==="light"?"#faf8f5":"#12110f"}catch(e){}})()`
+          }}
         />
       </head>
       <body className="grain">
-        <LocaleProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </LocaleProvider>
+        <ThemeProvider>
+          <LocaleProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import { useToast } from "@/components/ToastProvider";
 import { SkeletonTableRow } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Tab = "materials" | "suppliers" | "pricing";
 
@@ -415,7 +416,8 @@ export default function AdminPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <LanguageSwitcher />
+          <ThemeToggle />
+            <LanguageSwitcher />
           <button
             className="btn btn-ghost"
             onClick={() => (window.location.href = "/")}
