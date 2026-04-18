@@ -76,6 +76,7 @@ render_test "mode/camera-top" "examples/table/main.js" "--camera top"
 render_test "mode/camera-iso" "examples/showroom/main.js" "--camera iso"
 render_test "mode/wireframe" "examples/gear/main.js" "--wireframe"
 render_test "mode/transparent" "examples/gear/main.js" "--background transparent"
+render_test "mode/param-override" "examples/gear/main.js" "--param num_teeth=30"
 
 echo ""
 echo "=== Results ==="
