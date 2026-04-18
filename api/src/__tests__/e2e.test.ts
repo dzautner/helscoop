@@ -172,6 +172,35 @@ describe.skipIf(!process.env.E2E)("E2E Integration Tests", () => {
     expect(body.role).toBe("assistant");
   });
 
+  it("exports project as PDF", async () => {
+    const res = await fetch(`${API}/projects/${projectId}/pdf?lang=fi`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+    const buf = await res.arrayBuffer();
+    expect(buf.byteLength).toBeGreaterThan(1000);
+  });
+
+  it("looks up demo building with verified confidence", async () => {
+    const { status, body } = await apiFetch("/building?address=Ribbingintie+109-11,+00890,+Helsinki");
+    expect(status).toBe(200);
+    expect(body.confidence).toBe("verified");
+    expect(body.scene_js).toContain("box(");
+    expect(body.scene_js).toContain("scene.add(");
+    expect(body.scene_js).not.toContain("cube(");
+    expect(body.bom_suggestion.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("generates generic building with estimated confidence", async () => {
+    const { status, body } = await apiFetch("/building?address=Mannerheimintie+42,+Helsinki");
+    expect(status).toBe(200);
+    expect(body.confidence).toBe("estimated");
+    expect(body.scene_js).toContain("box(");
+    expect(body.scene_js).not.toContain("cube(");
+    expect(body.scene_js).toContain("0.52");
+  });
+
   it("deletes a project", async () => {
     const { status, body } = await apiFetch(`/projects/${projectId}`, {
       method: "DELETE",
