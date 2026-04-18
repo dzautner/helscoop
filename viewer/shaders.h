@@ -569,9 +569,11 @@ in float fragDepth;
 out vec4 fragColor;
 
 void main() {
-    // Convert from NDC (-1 to 1) to 0-1 range
     float depth = fragDepth * 0.5 + 0.5;
-    fragColor = vec4(depth, depth, depth, 1.0);
+    // Pack depth into RG channels for 16-bit precision (vs 8-bit single channel)
+    float r = floor(depth * 255.0) / 255.0;
+    float g = fract(depth * 255.0);
+    fragColor = vec4(r, g, 0.0, 1.0);
 }
 )glsl";
 
@@ -711,6 +713,10 @@ vec2 approximateBRDF(float NdotV, float roughness) {
     return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
+float unpackDepth(vec4 rgba) {
+    return rgba.r + rgba.g / 255.0;
+}
+
 float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
     projCoords = projCoords * 0.5 + 0.5;
@@ -722,9 +728,8 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     float currentDepth = projCoords.z;
 
     float cosTheta = max(dot(normal, lightDir), 0.0);
-    float bias = max(0.08 * (1.0 - cosTheta), 0.008);
+    float bias = max(0.03 * (1.0 - cosTheta), 0.003);
 
-    // Poisson disk samples for soft shadow edges
     const vec2 poissonDisk[12] = vec2[](
         vec2(-0.94201624, -0.39906216),
         vec2( 0.94558609, -0.76890725),
@@ -745,7 +750,7 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     float spread = 1.5;
 
     for (int i = 0; i < 12; i++) {
-        float pcfDepth = texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread).r;
+        float pcfDepth = unpackDepth(texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread));
         shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
     }
     shadow /= 12.0;
@@ -897,6 +902,10 @@ float gridLine(vec2 worldPos, float spacing, float lineWidth) {
     return 1.0 - min(min(grid.x, grid.y), 1.0);
 }
 
+float unpackDepthGround(vec4 rgba) {
+    return rgba.r + rgba.g / 255.0;
+}
+
 float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
@@ -945,7 +954,7 @@ void main() {
             projCoords.y >= 0.0 && projCoords.y <= 1.0) {
 
             float currentDepth = projCoords.z;
-            float bias = 0.005;
+            float bias = 0.002;
 
             const vec2 poissonDisk[16] = vec2[](
                 vec2(-0.94201624, -0.39906216),
@@ -969,7 +978,7 @@ void main() {
             vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
             float spread = 2.5;
             for (int i = 0; i < 16; i++) {
-                float pcfDepth = texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread).r;
+                float pcfDepth = unpackDepthGround(texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread));
                 shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
             }
             shadow /= 16.0;

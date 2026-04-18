@@ -738,12 +738,12 @@ int main(int argc, char *argv[]) {
   // ============================================================================
   // Shadow mapping setup - Use standard render texture and encode depth in color
   // ============================================================================
-  const int SHADOW_MAP_SIZE = 2048;
+  const int SHADOW_MAP_SIZE = 4096;
   RenderTexture2D shadowMap = {0};
   if (shadowsEnabled) {
     shadowMap = LoadRenderTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     // Set texture filtering for shadow map
-    SetTextureFilter(shadowMap.texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureFilter(shadowMap.texture, TEXTURE_FILTER_POINT);
     SetTextureWrap(shadowMap.texture, TEXTURE_WRAP_CLAMP);
     TraceLog(LOG_INFO, "Shadow map render texture created successfully (%dx%d)", SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   }
