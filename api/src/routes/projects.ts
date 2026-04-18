@@ -1,4 +1,5 @@
 import { Router } from "express";
+import PDFDocument from "pdfkit";
 import { query } from "../db";
 import { requireAuth } from "../auth";
 
@@ -129,6 +130,287 @@ router.post("/:id/duplicate", async (req, res) => {
     [req.user!.id, p.name + " (copy)", p.description, p.scene_js, p.display_scale]
   );
   res.status(201).json(dup.rows[0]);
+});
+
+// ---------------------------------------------------------------------------
+// PDF cost-estimate export
+// ---------------------------------------------------------------------------
+
+const pdfStrings = {
+  fi: {
+    header: "Helscoop \u2014 Kustannusarvio",
+    projectName: "Projekti",
+    description: "Kuvaus",
+    date: "P\u00e4iv\u00e4m\u00e4\u00e4r\u00e4",
+    bomTitle: "Materiaalilista",
+    colMaterial: "Materiaali",
+    colQty: "M\u00e4\u00e4r\u00e4",
+    colUnit: "Yksikk\u00f6",
+    colUnitPrice: "Yks.hinta",
+    colTotal: "Yhteens\u00e4",
+    colSupplier: "Toimittaja",
+    total: "YHTEENS\u00c4",
+    inclVat: "sis. ALV 25,5 %",
+    footer: "Luotu Helscoop.fi -palvelulla",
+    noDescription: "Ei kuvausta",
+    page: "Sivu",
+  },
+  en: {
+    header: "Helscoop \u2014 Cost Estimate",
+    projectName: "Project",
+    description: "Description",
+    date: "Date",
+    bomTitle: "Bill of Materials",
+    colMaterial: "Material",
+    colQty: "Qty",
+    colUnit: "Unit",
+    colUnitPrice: "Unit price",
+    colTotal: "Total",
+    colSupplier: "Supplier",
+    total: "TOTAL",
+    inclVat: "incl. VAT 25.5%",
+    footer: "Generated with Helscoop.fi",
+    noDescription: "No description",
+    page: "Page",
+  },
+};
+
+router.get("/:id/pdf", async (req, res) => {
+  const lang = (req.query.lang === "en" ? "en" : "fi") as keyof typeof pdfStrings;
+  const s = pdfStrings[lang];
+
+  // Fetch project
+  const projResult = await query(
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    [req.params.id, req.user!.id]
+  );
+  if (projResult.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+  const project = projResult.rows[0];
+
+  // Fetch BOM with pricing
+  const bomResult = await query(
+    `SELECT pb.*, m.name AS material_name, m.waste_factor,
+      p.unit_price, p.unit,
+      (pb.quantity * p.unit_price * m.waste_factor) AS line_cost,
+      s.name AS supplier_name
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     LEFT JOIN pricing p ON m.id = p.material_id AND p.is_primary = true
+     LEFT JOIN suppliers s ON p.supplier_id = s.id
+     WHERE pb.project_id = $1
+     ORDER BY m.name`,
+    [req.params.id]
+  );
+
+  const bomRows = bomResult.rows;
+  const grandTotal = bomRows.reduce(
+    (sum: number, r: { line_cost: string | null }) => sum + Number(r.line_cost || 0),
+    0
+  );
+
+  // Build PDF
+  const doc = new PDFDocument({ size: "A4", margin: 50, bufferPages: true });
+
+  // Stream to response
+  res.setHeader("Content-Type", "application/pdf");
+  const safeName = (project.name || "project").replace(/[^a-zA-Z0-9_\-]/g, "_");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="helscoop_${safeName}.pdf"`
+  );
+  doc.pipe(res);
+
+  // --- Header ---
+  doc
+    .fontSize(22)
+    .font("Helvetica-Bold")
+    .text(s.header, { align: "center" });
+  doc.moveDown(0.3);
+  doc
+    .moveTo(50, doc.y)
+    .lineTo(doc.page.width - 50, doc.y)
+    .strokeColor("#c4915c")
+    .lineWidth(2)
+    .stroke();
+  doc.moveDown(1);
+
+  // --- Project info ---
+  const infoLabelX = 50;
+  const infoValueX = 170;
+
+  doc.fontSize(11).font("Helvetica-Bold").text(`${s.projectName}:`, infoLabelX, doc.y);
+  doc.font("Helvetica").text(project.name || "", infoValueX, doc.y - doc.currentLineHeight());
+  doc.moveDown(0.3);
+
+  doc.font("Helvetica-Bold").text(`${s.description}:`, infoLabelX, doc.y);
+  doc.font("Helvetica").text(project.description || s.noDescription, infoValueX, doc.y - doc.currentLineHeight());
+  doc.moveDown(0.3);
+
+  const dateStr = new Date().toLocaleDateString(lang === "fi" ? "fi-FI" : "en-GB", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  doc.font("Helvetica-Bold").text(`${s.date}:`, infoLabelX, doc.y);
+  doc.font("Helvetica").text(dateStr, infoValueX, doc.y - doc.currentLineHeight());
+  doc.moveDown(1.5);
+
+  // --- BOM table ---
+  doc
+    .fontSize(14)
+    .font("Helvetica-Bold")
+    .text(s.bomTitle)
+    .moveDown(0.5);
+
+  // Table layout
+  const tableLeft = 50;
+  const colWidths = [180, 45, 40, 70, 70, 90];
+  const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+  const headers = [s.colMaterial, s.colQty, s.colUnit, s.colUnitPrice, s.colTotal, s.colSupplier];
+  const rowHeight = 22;
+
+  function drawTableHeader(yPos: number) {
+    doc
+      .rect(tableLeft, yPos, tableWidth, rowHeight)
+      .fill("#3d3831");
+
+    let x = tableLeft;
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#e0dcd4");
+    for (let i = 0; i < headers.length; i++) {
+      doc.text(headers[i], x + 4, yPos + 6, { width: colWidths[i] - 8, align: i >= 1 && i <= 4 ? "right" : "left" });
+      x += colWidths[i];
+    }
+    doc.fillColor("#1a1816");
+    return yPos + rowHeight;
+  }
+
+  let y = drawTableHeader(doc.y);
+
+  // Data rows
+  for (let rowIdx = 0; rowIdx < bomRows.length; rowIdx++) {
+    if (y + rowHeight > doc.page.height - 80) {
+      doc.addPage();
+      y = drawTableHeader(50);
+    }
+
+    const row = bomRows[rowIdx];
+    const isAlt = rowIdx % 2 === 1;
+
+    if (isAlt) {
+      doc.rect(tableLeft, y, tableWidth, rowHeight).fill("#f5f2ed");
+    }
+
+    const unitPrice = Number(row.unit_price || 0);
+    const lineCost = Number(row.line_cost || 0);
+
+    let x = tableLeft;
+    doc.fontSize(9).font("Helvetica").fillColor("#1a1816");
+
+    doc.text(row.material_name || "", x + 4, y + 6, { width: colWidths[0] - 8, align: "left" });
+    x += colWidths[0];
+
+    doc.text(String(row.quantity), x + 4, y + 6, { width: colWidths[1] - 8, align: "right" });
+    x += colWidths[1];
+
+    doc.text(row.unit || "kpl", x + 4, y + 6, { width: colWidths[2] - 8, align: "right" });
+    x += colWidths[2];
+
+    doc.text(unitPrice.toFixed(2), x + 4, y + 6, { width: colWidths[3] - 8, align: "right" });
+    x += colWidths[3];
+
+    doc.font("Helvetica-Bold").text(lineCost.toFixed(2), x + 4, y + 6, { width: colWidths[4] - 8, align: "right" });
+    x += colWidths[4];
+
+    doc.font("Helvetica").text(row.supplier_name || "", x + 4, y + 6, { width: colWidths[5] - 8, align: "left" });
+
+    doc
+      .moveTo(tableLeft, y + rowHeight)
+      .lineTo(tableLeft + tableWidth, y + rowHeight)
+      .strokeColor("#d4d0c8")
+      .lineWidth(0.5)
+      .stroke();
+
+    y += rowHeight;
+  }
+
+  // Grand total row
+  if (y + rowHeight + 8 > doc.page.height - 80) {
+    doc.addPage();
+    y = 50;
+  }
+  y += 4;
+  doc
+    .rect(tableLeft, y, tableWidth, rowHeight + 4)
+    .fill("#c4915c");
+
+  const totalColX = tableLeft + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3];
+  doc
+    .fontSize(11)
+    .font("Helvetica-Bold")
+    .fillColor("#ffffff");
+  doc.text(s.total, tableLeft + 4, y + 7);
+  doc.text(
+    grandTotal.toLocaleString(lang === "fi" ? "fi-FI" : "en-GB", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) + " EUR",
+    totalColX + 4,
+    y + 7,
+    { width: colWidths[4] - 8, align: "right" }
+  );
+
+  doc
+    .fontSize(8)
+    .font("Helvetica")
+    .fillColor("#1a1816")
+    .text(s.inclVat, tableLeft, y + rowHeight + 10);
+
+  // --- Supplier attributions ---
+  const suppliers = [...new Set(
+    bomRows
+      .map((r: { supplier_name?: string }) => r.supplier_name)
+      .filter((name): name is string => Boolean(name))
+  )];
+  if (suppliers.length > 0) {
+    const suppY = Math.max(doc.y, y + rowHeight + 28);
+    doc
+      .fontSize(8)
+      .font("Helvetica")
+      .fillColor("#8a857d")
+      .text(
+        (lang === "fi" ? "Hintatiedot: " : "Pricing from: ") + suppliers.join(", "),
+        tableLeft,
+        suppY
+      );
+  }
+
+  // --- Footer on each page ---
+  const range = doc.bufferedPageRange();
+  const pageCount = range.count;
+  const timestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
+  for (let i = 0; i < pageCount; i++) {
+    doc.switchToPage(i);
+    doc
+      .fontSize(8)
+      .font("Helvetica")
+      .fillColor("#8a857d");
+    doc.text(
+      `${s.footer} \u2014 ${timestamp}`,
+      50,
+      doc.page.height - 40,
+      { width: doc.page.width - 100, align: "left" }
+    );
+    doc.text(
+      `${s.page} ${i + 1} / ${pageCount}`,
+      50,
+      doc.page.height - 40,
+      { width: doc.page.width - 100, align: "right" }
+    );
+  }
+
+  doc.end();
 });
 
 export default router;
