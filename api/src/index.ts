@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { login, register, signToken, requireAuth } from "./auth";
+import { login, register, signToken, requireAuth, forgotPassword, resetPassword } from "./auth";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
 import suppliersRouter from "./routes/suppliers";
@@ -112,6 +112,48 @@ app.post("/auth/register", authLimiter, async (req, res) => {
 
 app.get("/auth/me", requireAuth, (req, res) => {
   res.json(req.user);
+});
+
+app.post("/auth/forgot-password", authLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+  try {
+    const token = await forgotPassword(email);
+    if (token) {
+      // MVP: log the reset link instead of sending email
+      console.log("Password reset link: /reset-password?token=" + token);
+    }
+  } catch (e) {
+    // Log but don't reveal errors to the client
+    console.error("Forgot password error:", e);
+  }
+  // Always return success to avoid revealing whether email exists
+  res.json({ message: "If the email is registered, a reset link has been sent." });
+});
+
+app.post("/auth/reset-password", authLimiter, async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res.status(400).json({ error: "Token and password are required" });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  }
+  try {
+    const success = await resetPassword(token, password);
+    if (!success) {
+      return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
+    res.json({ message: "Password has been reset successfully" });
+  } catch (e) {
+    console.error("Reset password error:", e);
+    res.status(500).json({ error: "Failed to reset password" });
+  }
 });
 
 app.use("/materials", materialsRouter);

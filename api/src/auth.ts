@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -67,4 +68,39 @@ export async function register(
     [email, name, hash]
   );
   return result.rows[0];
+}
+
+// Generate a reset token for the given email. Returns the token if user exists, null otherwise.
+export async function forgotPassword(email: string): Promise<string | null> {
+  const result = await query("SELECT id FROM users WHERE email = $1", [email]);
+  if (result.rows.length === 0) return null;
+
+  const token = crypto.randomUUID();
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+  await query(
+    "UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3",
+    [token, expires.toISOString(), email]
+  );
+
+  return token;
+}
+
+// Validate a reset token and update the user's password. Returns true on success.
+export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
+  const result = await query(
+    "SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()",
+    [token]
+  );
+  if (result.rows.length === 0) return false;
+
+  const userId = result.rows[0].id;
+  const hash = await bcrypt.hash(newPassword, 10);
+
+  await query(
+    "UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2",
+    [hash, userId]
+  );
+
+  return true;
 }

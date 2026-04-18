@@ -356,6 +356,21 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {!isRegister && (
+                <div style={{ marginTop: 8, textAlign: "right" }}>
+                  <a
+                    href="/forgot-password"
+                    style={{
+                      color: "var(--amber)",
+                      fontSize: 13,
+                      textDecoration: "none",
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Unohditko salasanan?
+                  </a>
+                </div>
+              )}
             </div>
 
             {error && (
