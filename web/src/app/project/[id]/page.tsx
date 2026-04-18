@@ -88,6 +88,7 @@ export default function ProjectPage() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bomChangedRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
+  const captureThumbRef = useRef<(() => string | null) | null>(null);
 
   const pushHistory = useCallback((code: string) => {
     const history = historyRef.current;
@@ -174,6 +175,11 @@ export default function ProjectPage() {
           )
         );
         bomChangedRef.current = false;
+      }
+      // Capture and save thumbnail in the background (non-blocking)
+      const thumbDataUrl = captureThumbRef.current?.();
+      if (thumbDataUrl) {
+        savePromises.push(api.saveThumbnail(projectId, thumbDataUrl));
       }
       await Promise.all(savePromises);
       setLastSaved(new Date().toLocaleTimeString());
@@ -672,6 +678,7 @@ export default function ProjectPage() {
                 wireframe={wireframe}
                 onObjectCount={setObjectCount}
                 onError={setSceneError}
+                captureRef={captureThumbRef}
               />
             </ErrorBoundary>
           </div>

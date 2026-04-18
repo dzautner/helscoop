@@ -7,6 +7,7 @@ export interface Project {
   updated_at: string;
   scene_js?: string | null;
   display_scale?: number;
+  thumbnail_url?: string | null;
   bom?: BomItem[];
 }
 

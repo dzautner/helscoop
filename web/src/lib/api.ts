@@ -109,6 +109,11 @@ export const api = {
     apiFetch(`/projects/${id}`, { method: "DELETE" }),
   duplicateProject: (id: string) =>
     apiFetch(`/projects/${id}/duplicate`, { method: "POST" }),
+  saveThumbnail: (id: string, thumbnail: string) =>
+    apiFetch(`/projects/${id}/thumbnail`, {
+      method: "PUT",
+      body: JSON.stringify({ thumbnail }),
+    }),
 
   getMaterials: () => apiFetch("/materials"),
   getMaterial: (id: string) => apiFetch(`/materials/${id}`),
