@@ -418,7 +418,7 @@ app.get("/bom/export/:projectId", requireAuth, async (req, res) => {
       "Content-Disposition",
       `attachment; filename="bom_${req.params.projectId}.csv"`
     );
-    return res.send(header + rows);
+    return res.send('\uFEFF' + header + rows);
   }
 
   res.json(result.rows);

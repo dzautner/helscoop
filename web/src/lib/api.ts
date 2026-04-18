@@ -115,6 +115,26 @@ export const api = {
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),
   exportBOM: (projectId: string) => apiFetch(`/bom/export/${projectId}`),
+  exportBOMCsv: async (projectId: string, projectName: string) => {
+    const t = getToken();
+    const res = await fetch(`${API_URL}/bom/export/${projectId}?format=csv`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        ERROR_MESSAGES[res.status] || `Virhe ${res.status} / Error ${res.status}`,
+        res.status,
+        res.statusText
+      );
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `helscoop_${projectName.replace(/\s+/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   saveBOM: (projectId: string, items: { material_id: string; quantity: number; unit: string }[]) =>
     apiFetch(`/projects/${projectId}/bom`, {
       method: "PUT",
