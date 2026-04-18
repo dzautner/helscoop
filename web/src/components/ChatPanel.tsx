@@ -136,7 +136,9 @@ export default function ChatPanel({
                   </svg>
                 </div>
                 <div className="chat-msg-content">
-                  <span style={{ animation: "breathe 1.5s infinite" }}>{t('editor.thinking')}</span>
+                  <div className="typing-dots">
+                    <span /><span /><span />
+                  </div>
                 </div>
               </div>
             )}
@@ -154,7 +156,7 @@ export default function ChatPanel({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="18 15 12 9 6 15" />
           </svg>
-          <span>{messages.length} {messages.length === 1 ? "message" : "messages"}</span>
+          <span>{messages.length} {messages.length === 1 ? t('editor.message') || "message" : t('editor.messages') || "messages"}</span>
         </button>
       )}
 
