@@ -39,6 +39,9 @@ jobs:
         working-directory: api
         run: npm ci
 
+      - name: Link node_modules for migration script
+        run: ln -s ${{ github.workspace }}/api/node_modules ${{ github.workspace }}/db/node_modules
+
       - name: Run migrations
         working-directory: api
         run: npm run db:migrate

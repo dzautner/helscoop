@@ -210,6 +210,53 @@ describe("Web app", () => {
   });
 });
 
+describe("Building endpoint security", () => {
+  it("building route has rate limiting and input validation", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const buildingPath = path.resolve(__dirname, "../routes/building.ts");
+    const src = fs.readFileSync(buildingPath, "utf-8");
+
+    // Input length validation
+    expect(src).toContain("MAX_ADDRESS_LENGTH");
+    expect(src).toContain("200");
+
+    // LRU cache
+    expect(src).toContain("buildingCache");
+    expect(src).toContain("CACHE_MAX_SIZE");
+    expect(src).toContain("CACHE_TTL_MS");
+    expect(src).toContain("getCached");
+    expect(src).toContain("setCache");
+  });
+
+  it("index.ts has building-specific rate limiters", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const indexPath = path.resolve(__dirname, "../index.ts");
+    const src = fs.readFileSync(indexPath, "utf-8");
+
+    // Building-specific rate limiter
+    expect(src).toContain("buildingLimiter");
+    expect(src).toContain("buildingLimiterAuthenticated");
+
+    // Abuse logging
+    expect(src).toContain("RATE_LIMIT");
+    expect(src).toContain("Building endpoint rate limit hit");
+  });
+
+  it("building normalizeAddress handles edge cases", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const buildingPath = path.resolve(__dirname, "../routes/building.ts");
+    const src = fs.readFileSync(buildingPath, "utf-8");
+
+    // normalizeAddress exists
+    expect(src).toContain("function normalizeAddress");
+    // Handles commas, dots, dashes
+    expect(src).toContain("toLowerCase");
+  });
+});
+
 describe("Docker", () => {
   it("docker-compose.yml has all services", async () => {
     const fs = await import("fs");

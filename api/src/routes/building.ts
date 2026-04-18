@@ -4,6 +4,47 @@ import { join } from "path";
 
 const router = Router();
 
+// ---------------------------------------------------------------------------
+// In-memory LRU cache for building lookup results
+// Max 1000 entries, 5-minute TTL per entry
+// ---------------------------------------------------------------------------
+const CACHE_MAX_SIZE = 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry {
+  data: unknown;
+  timestamp: number;
+}
+
+const buildingCache = new Map<string, CacheEntry>();
+
+function getCached(key: string): unknown | null {
+  const entry = buildingCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    buildingCache.delete(key);
+    return null;
+  }
+  // Move to end for LRU ordering (Map preserves insertion order)
+  buildingCache.delete(key);
+  buildingCache.set(key, entry);
+  return entry.data;
+}
+
+function setCache(key: string, data: unknown): void {
+  // Evict oldest entries if at capacity
+  if (buildingCache.size >= CACHE_MAX_SIZE) {
+    const oldest = buildingCache.keys().next().value;
+    if (oldest !== undefined) {
+      buildingCache.delete(oldest);
+    }
+  }
+  buildingCache.set(key, { data, timestamp: Date.now() });
+}
+
+// Maximum allowed address length to prevent abuse
+const MAX_ADDRESS_LENGTH = 200;
+
 // Load demo building data at startup
 interface BuildingInfo {
   type: string;
@@ -230,28 +271,46 @@ function generateGenericScene(
 // GET /building?address=<address>
 router.get("/", (req: Request, res: Response) => {
   const address = (req.query.address as string) || "";
+
+  // Input validation: minimum length
   if (!address || address.length < 3) {
     return res.status(400).json({ error: "Address query parameter required (min 3 characters)" });
+  }
+
+  // Input validation: maximum length to prevent abuse
+  if (address.length > MAX_ADDRESS_LENGTH) {
+    return res.status(400).json({ error: `Address must be ${MAX_ADDRESS_LENGTH} characters or fewer` });
+  }
+
+  // Check cache first
+  const cacheKey = normalizeAddress(address);
+  const cached = getCached(cacheKey);
+  if (cached) {
+    return res.json(cached);
   }
 
   // Try to match against demo buildings
   for (const building of demoBuildings) {
     if (matchesDemoAddress(address, building.address)) {
-      return res.json({
+      const result = {
         ...building,
         confidence: "verified" as const,
         data_sources: ["Helsinki CityGML", "K-Rauta hinnat 04/2026"],
-      });
+      };
+      setCache(cacheKey, result);
+      return res.json(result);
     }
   }
 
   // Fallback: generate generic building
   const generic = generateGenericBuilding(address);
-  return res.json({
+  const result = {
     ...generic,
     confidence: "estimated" as const,
     data_sources: ["Yleinen kerrostalomalli"],
-  });
+  };
+  setCache(cacheKey, result);
+  return res.json(result);
 });
 
 export default router;
