@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
@@ -12,7 +12,10 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
+import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import type { Material, BomItem, Project } from "@/types";
 
 function Viewport3DLoading() {
@@ -70,6 +73,8 @@ export default function ProjectPage() {
   const [projectDesc, setProjectDesc] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [showCode, setShowCode] = useState(false);
+  const [showBom, setShowBom] = useState(true);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
@@ -207,21 +212,6 @@ export default function ProjectPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [saveStatus]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const isMod = e.metaKey || e.ctrlKey;
-      if (isMod && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if (isMod && e.key === "z" && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo]);
-
   const handleSceneChange = useCallback(
     (code: string) => {
       setSceneJs(code);
@@ -237,6 +227,70 @@ export default function ProjectPage() {
     },
     [pushHistory]
   );
+
+  /* ── Keyboard shortcuts ──────────────────────────────────────── */
+  const closeAllPanels = useCallback(() => {
+    setShowChat(false);
+    setShowCode(false);
+    setShowShortcutsHelp(false);
+  }, []);
+
+  const shortcuts = useMemo<KeyboardShortcut[]>(() => [
+    {
+      key: "Cmd+S",
+      mod: true,
+      code: "s",
+      action: save,
+      descriptionKey: "shortcuts.save",
+    },
+    {
+      key: "Cmd+B",
+      mod: true,
+      code: "b",
+      action: () => setShowBom((v) => !v),
+      descriptionKey: "shortcuts.toggleBom",
+    },
+    {
+      key: "Cmd+Enter",
+      mod: true,
+      code: "Enter",
+      action: () => {
+        handleApplyCode(sceneJs);
+      },
+      descriptionKey: "shortcuts.applyCode",
+    },
+    {
+      key: "Escape",
+      mod: false,
+      code: "Escape",
+      action: closeAllPanels,
+      descriptionKey: "shortcuts.closePanel",
+    },
+    {
+      key: "Cmd+/",
+      mod: true,
+      code: "/",
+      action: () => setShowShortcutsHelp((v) => !v),
+      descriptionKey: "shortcuts.showShortcuts",
+    },
+    {
+      key: "Cmd+Z",
+      mod: true,
+      code: "z",
+      action: undo,
+      descriptionKey: "shortcuts.undo",
+    },
+    {
+      key: "Cmd+Shift+Z",
+      mod: true,
+      shift: true,
+      code: "z",
+      action: redo,
+      descriptionKey: "shortcuts.redo",
+    },
+  ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo]);
+
+  useKeyboardShortcuts(shortcuts);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -431,6 +485,23 @@ export default function ProjectPage() {
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
             {t('editor.assistant')}
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowShortcutsHelp((v) => !v)}
+            title={t('shortcuts.showShortcuts')}
+            style={{ padding: "6px 8px" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
+              <line x1="6" y1="8" x2="6" y2="8" />
+              <line x1="10" y1="8" x2="10" y2="8" />
+              <line x1="14" y1="8" x2="14" y2="8" />
+              <line x1="18" y1="8" x2="18" y2="8" />
+              <line x1="6" y1="12" x2="6" y2="12" />
+              <line x1="18" y1="12" x2="18" y2="12" />
+              <line x1="8" y1="16" x2="16" y2="16" />
+            </svg>
           </button>
           <ThemeToggle />
             <LanguageSwitcher />
@@ -666,14 +737,23 @@ export default function ProjectPage() {
         )}
 
         {/* BOM panel */}
-        <BomPanel
-          bom={bom}
-          materials={materials}
-          onAdd={addBomItem}
-          onRemove={removeBomItem}
-          onUpdateQty={updateBomQty}
-        />
+        {showBom && (
+          <BomPanel
+            bom={bom}
+            materials={materials}
+            onAdd={addBomItem}
+            onRemove={removeBomItem}
+            onUpdateQty={updateBomQty}
+          />
+        )}
       </div>
+
+      {/* Keyboard shortcuts help overlay */}
+      <KeyboardShortcutsHelp
+        open={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
+        shortcuts={shortcuts}
+      />
     </div>
   );
 }
