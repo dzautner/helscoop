@@ -1,11 +1,21 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { api, setToken, getToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard, SkeletonBlock } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+
+const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ width: "100%", height: "100%", background: "#1a1816", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+      Ladataan 3D...
+    </div>
+  ),
+});
 
 interface Project {
   id: string;
@@ -75,20 +85,25 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
   return (
     <div style={{
       width: "100%",
-      padding: "48px 24px 40px",
-      background: "linear-gradient(180deg, rgba(196,145,92,0.06) 0%, transparent 100%)",
+      padding: result ? "48px 24px 24px" : "80px 24px 64px",
+      background: "linear-gradient(180deg, rgba(196,145,92,0.08) 0%, rgba(196,145,92,0.02) 50%, transparent 100%)",
       borderBottom: "1px solid var(--border)",
+      transition: "padding 0.3s ease",
     }}>
-      <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
-        <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 12, letterSpacing: "0.12em" }}>
-          {t('search.demoLabel')}
-        </div>
-        <h2 className="heading-display" style={{ fontSize: 28, marginBottom: 8 }}>
-          {t('search.title')}
-        </h2>
-        <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 24 }}>
-          {t('search.subtitle')}
-        </p>
+      <div style={{ maxWidth: result ? 960 : 640, margin: "0 auto", textAlign: "center", transition: "max-width 0.3s ease" }}>
+        {!result && (
+          <>
+            <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.15em", fontSize: 11 }}>
+              {t('search.demoLabel')}
+            </div>
+            <h2 className="heading-display" style={{ fontSize: 36, marginBottom: 10, lineHeight: 1.1 }}>
+              {t('search.title')}
+            </h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: 16, marginBottom: 32, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>
+              {t('search.subtitle')}
+            </p>
+          </>
+        )}
 
         <div style={{ display: "flex", gap: 8, maxWidth: 520, margin: "0 auto" }}>
           <input
@@ -113,66 +128,85 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
         </div>
 
         {result && (
-          <div className="card anim-up" style={{
-            marginTop: 24,
-            padding: "24px 28px",
+          <div className="anim-up" style={{
+            marginTop: 28,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 24,
             textAlign: "left",
-            maxWidth: 520,
-            marginLeft: "auto",
-            marginRight: "auto",
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-              <div>
-                <h3 className="heading-display" style={{ fontSize: 18, marginBottom: 4 }}>
-                  {result.address}
-                </h3>
-                <span className="badge badge-amber">
-                  {buildingTypeLabels[result.building_info.type] || result.building_info.type}
-                </span>
-              </div>
-              <div style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--text-muted)",
-                textAlign: "right",
-              }}>
-                {result.coordinates.lat.toFixed(4)}, {result.coordinates.lon.toFixed(4)}
-              </div>
-            </div>
-
+            {/* Left: 3D Preview */}
             <div style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 12,
-              marginBottom: 20,
+              borderRadius: "var(--radius-lg)",
+              overflow: "hidden",
+              border: "1px solid var(--border)",
+              background: "#1a1816",
+              minHeight: 320,
             }}>
-              {[
-                { label: t('search.yearBuilt'), value: String(result.building_info.year_built) },
-                { label: t('search.area'), value: `${result.building_info.area_m2} m\u00B2` },
-                { label: t('search.floors'), value: String(result.building_info.floors) },
-                { label: t('search.material'), value: materialLabels[result.building_info.material] || result.building_info.material },
-                { label: t('search.heating'), value: heatingLabels[result.building_info.heating] || result.building_info.heating },
-                { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
-              ].map((item, i) => (
-                <div key={i} style={{
-                  padding: "10px 12px",
-                  background: "var(--bg-tertiary)",
-                  borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--border)",
-                }}>
-                  <div className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{item.value}</div>
-                </div>
-              ))}
+              <Viewport3D
+                sceneJs={result.scene_js}
+                wireframe={false}
+                onObjectCount={() => {}}
+                onError={() => {}}
+              />
             </div>
 
-            <button
-              className="btn btn-primary"
-              onClick={() => onCreateProject(result)}
-              style={{ width: "100%", padding: "13px 16px", fontSize: 14 }}
-            >
-              {t('search.createFromBuilding')}
-            </button>
+            {/* Right: Building info + CTA */}
+            <div className="card" style={{ padding: "24px 28px", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <h3 className="heading-display" style={{ fontSize: 20, marginBottom: 6 }}>
+                    {result.address}
+                  </h3>
+                  <span className="badge badge-amber">
+                    {buildingTypeLabels[result.building_info.type] || result.building_info.type}
+                  </span>
+                </div>
+                <div style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: "var(--text-muted)",
+                  textAlign: "right",
+                }}>
+                  {result.coordinates.lat.toFixed(4)}<br/>{result.coordinates.lon.toFixed(4)}
+                </div>
+              </div>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 10,
+                marginBottom: 16,
+                flex: 1,
+              }}>
+                {[
+                  { label: t('search.yearBuilt'), value: String(result.building_info.year_built) },
+                  { label: t('search.area'), value: `${result.building_info.area_m2} m\u00B2` },
+                  { label: t('search.floors'), value: String(result.building_info.floors) },
+                  { label: t('search.material'), value: materialLabels[result.building_info.material] || result.building_info.material },
+                  { label: t('search.heating'), value: heatingLabels[result.building_info.heating] || result.building_info.heating },
+                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
+                ].map((item, i) => (
+                  <div key={i} style={{
+                    padding: "10px 12px",
+                    background: "var(--bg-tertiary)",
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border)",
+                  }}>
+                    <div className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={() => onCreateProject(result)}
+                style={{ width: "100%", padding: "14px 16px", fontSize: 15, fontWeight: 600 }}
+              >
+                {t('search.createFromBuilding')}
+              </button>
+            </div>
           </div>
         )}
 
@@ -186,6 +220,56 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
             {t('search.notFound')}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FeatureHighlights() {
+  const { t, locale } = useTranslation();
+  const features = locale === 'fi' ? [
+    { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D-malli osoitteesta", desc: "Syota kotiosoitteesi ja nae talosi kolmiulotteisena mallina hetkessa" },
+    { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Muuta puhumalla", desc: "Kuvaile muutos suomeksi — \"lisaa terassi taakse\" — AI toteuttaa" },
+    { icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6", title: "Automaattinen materiaaliluettelo", desc: "Reaaliaikaiset hinnat K-Raudasta ja Sarokkaasta, suoraan projektiisi" },
+  ] : [
+    { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D model from address", desc: "Enter your home address and see your house as a 3D model instantly" },
+    { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Modify by chatting", desc: "Describe changes in plain language — \"add a terrace in the back\" — AI executes" },
+    { icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6", title: "Automatic bill of materials", desc: "Real-time prices from K-Rauta and Stark, directly in your project" },
+  ];
+
+  return (
+    <div style={{
+      padding: "56px 24px",
+      borderBottom: "1px solid var(--border)",
+    }}>
+      <div style={{
+        maxWidth: 960,
+        margin: "0 auto",
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 32,
+      }}>
+        {features.map((f, i) => (
+          <div key={i} className="anim-up" style={{ animationDelay: `${i * 0.1}s`, textAlign: "center" }}>
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 14,
+              background: "var(--amber-glow)",
+              border: "1px solid var(--amber-border)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 18,
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d={f.icon} />
+              </svg>
+            </div>
+            <h3 className="heading-display" style={{ fontSize: 17, marginBottom: 8 }}>{f.title}</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: 14, lineHeight: 1.6 }}>{f.desc}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -978,6 +1062,7 @@ export default function Home() {
     return (
       <div>
         <AddressSearch onCreateProject={handleCreateFromBuilding} />
+        <FeatureHighlights />
         <LoginForm onLogin={handleLogin} pendingBuilding={pendingBuilding} />
       </div>
     );
