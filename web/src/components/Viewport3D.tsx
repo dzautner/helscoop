@@ -292,17 +292,20 @@ export default function Viewport3D({
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Sky gradient background
+    // Sky gradient background — Nordic twilight atmosphere
     const canvas = document.createElement("canvas");
     canvas.width = 2;
-    canvas.height = 256;
+    canvas.height = 512;
     const ctx = canvas.getContext("2d")!;
-    const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-    gradient.addColorStop(0, "#1a1d2e");
-    gradient.addColorStop(0.6, "#1e1f28");
-    gradient.addColorStop(1, "#2a2420");
+    const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+    gradient.addColorStop(0, "#0d1117");
+    gradient.addColorStop(0.25, "#151b2b");
+    gradient.addColorStop(0.5, "#1c2333");
+    gradient.addColorStop(0.75, "#252a35");
+    gradient.addColorStop(0.9, "#2d2f38");
+    gradient.addColorStop(1, "#1e1d1b");
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 2, 256);
+    ctx.fillRect(0, 0, 2, 512);
     const bgTexture = new THREE.CanvasTexture(canvas);
     bgTexture.magFilter = THREE.LinearFilter;
     scene.background = bgTexture;
@@ -340,14 +343,15 @@ export default function Viewport3D({
     controls.update();
     controlsRef.current = controls;
 
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffeedd, 0.4);
+    // Lights — three-point setup for architectural visualization
+    const ambientLight = new THREE.AmbientLight(0xe8e4df, 0.35);
     scene.add(ambientLight);
 
-    const hemisphereLight = new THREE.HemisphereLight(0x8899bb, 0x443322, 0.3);
+    const hemisphereLight = new THREE.HemisphereLight(0x7799cc, 0x3d3528, 0.45);
     scene.add(hemisphereLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+    // Key light — warm sun from upper right
+    const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.3);
     dirLight.position.set(5, 8, 4);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
@@ -361,17 +365,25 @@ export default function Viewport3D({
     dirLight.shadow.bias = -0.001;
     scene.add(dirLight);
 
+    // Fill light — cool bounce from left
+    const fillLight = new THREE.DirectionalLight(0xc4d4e8, 0.3);
+    fillLight.position.set(-4, 3, -2);
+    scene.add(fillLight);
+
     // Grid floor
     const gridHelper = new THREE.GridHelper(20, 20, 0x333333, 0x222222);
     (gridHelper.material as THREE.Material).opacity = 0.15;
     (gridHelper.material as THREE.Material).transparent = true;
     scene.add(gridHelper);
 
-    // Ground plane (receives shadows, subtle)
+    // Depth fog
+    scene.fog = new THREE.Fog(0x1a1d22, 15, 45);
+
+    // Ground plane (receives shadows)
     const groundGeom = new THREE.PlaneGeometry(40, 40);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1816,
-      roughness: 0.95,
+      color: 0x1f1e1c,
+      roughness: 0.92,
       metalness: 0.0,
     });
     const ground = new THREE.Mesh(groundGeom, groundMat);
