@@ -8,11 +8,11 @@
 
 // Coop dimensions
 // @param coop_len "Coop Dimensions" Coop Length (1500-6000)
-const coop_len = 2474;           // Coop length (X direction)
+const coop_len = 1526;           // Coop length (X direction)
 // @param coop_w "Coop Dimensions" Coop Width (1500-6000)
-const coop_w = 3867;             // Coop width (Y direction)
+const coop_w = 4841;             // Coop width (Y direction)
 // @param wall_h "Coop Dimensions" Wall Height (1500-3000)
-const wall_h = 2404;             // Wall height (Z direction)
+const wall_h = 2630;             // Wall height (Z direction)
 
 // Structural members
 const joist_sec = [48, 98];      // Joist cross-section [thickness, height]
@@ -59,7 +59,7 @@ const front_vent_clearance_over_door = 20;
 // @param nest_boxes "Nesting Boxes" Number of Boxes (1-6)
 const nest_boxes = 6;
 // @param nest_box_w "Nesting Boxes" Box Width (200-500)
-const nest_box_w = 200;
+const nest_box_w = 305;
 // @param nest_box_d "Nesting Boxes" Box Depth (300-600)
 const nest_box_d = 400;
 // @param nest_box_h "Nesting Boxes" Box Height (250-500)
@@ -2502,6 +2502,128 @@ const bushes = bush_positions.map(pos => bush(400, pos));
 const all_bushes = union(...bushes);
 
 // ============================================================================
+// FINNISH NATURE - Sipoonkorpi-inspired landscape
+// ============================================================================
+
+// Pine tree: trunk + layered cone canopy
+function pine_tree(height, trunk_r, position) {
+  const trunk = translate(
+    cylinder({ height: height * 0.6, radius: trunk_r, center: false }),
+    [position[0], position[1], position[2]]
+  );
+  const layers = [];
+  const canopy_base = height * 0.3;
+  const canopy_top = height;
+  const layer_count = 4;
+  for (let i = 0; i < layer_count; i++) {
+    const t = i / layer_count;
+    const layer_z = canopy_base + (canopy_top - canopy_base) * t;
+    const layer_r = height * 0.28 * (1 - t * 0.6);
+    const layer_h = (canopy_top - canopy_base) / layer_count * 1.3;
+    layers.push(translate(
+      cylinder({ height: layer_h, radius: layer_r, radiusTop: layer_r * 0.15, segments: 8, center: false }),
+      [position[0], position[1], position[2] + layer_z]
+    ));
+  }
+  return { trunk, canopy: union(...layers) };
+}
+
+// Birch tree: white trunk + oval canopy
+function birch_tree(height, position) {
+  const trunk_r = height * 0.025;
+  const trunk = translate(
+    cylinder({ height: height * 0.65, radius: trunk_r, center: false }),
+    [position[0], position[1], position[2]]
+  );
+  const canopy_r = height * 0.22;
+  const canopy_h = height * 0.55;
+  const canopy = translate(
+    scale(sphere({ radius: canopy_r }), [1.0, 1.0, canopy_h / canopy_r]),
+    [position[0], position[1], position[2] + height * 0.65]
+  );
+  return { trunk, canopy };
+}
+
+// Small spruce: dense conical shape
+function spruce(height, position) {
+  const trunk = translate(
+    cylinder({ height: height * 0.9, radius: height * 0.03, center: false }),
+    [position[0], position[1], position[2]]
+  );
+  const canopy = translate(
+    cylinder({ height: height * 0.85, radius: height * 0.3, radiusTop: 0, segments: 8, center: false }),
+    [position[0], position[1], position[2] + height * 0.15]
+  );
+  return { trunk, canopy };
+}
+
+// Ground cover: flat rounded moss/grass patches
+function ground_patch(radius, position) {
+  return translate(
+    cylinder({ height: 30, radius: radius, segments: 12, center: false }),
+    [position[0], position[1], position[2]]
+  );
+}
+
+// Place trees around the scene - scattered like a Finnish forest clearing
+const coop_center_x = coop_len / 2;
+const coop_center_y = coop_w / 2;
+
+// Background pines (behind and to sides)
+const pine1 = pine_tree(3500, 80, [-2500, coop_center_y + 1500, 0]);
+const pine2 = pine_tree(4200, 90, [-3200, coop_center_y - 800, 0]);
+const pine3 = pine_tree(3800, 85, [-1800, -2000, 0]);
+const pine4 = pine_tree(4500, 95, [coop_len + 6000, coop_center_y + 2500, 0]);
+const pine5 = pine_tree(3200, 75, [coop_len + 5000, -1500, 0]);
+
+// Birch trees (lighter, scattered)
+const birch1 = birch_tree(3800, [-2000, -1200, 0]);
+const birch2 = birch_tree(3200, [coop_len + 6500, coop_center_y - 500, 0]);
+const birch3 = birch_tree(4000, [-3500, coop_center_y + 3000, 0]);
+
+// Small spruces near the coop
+const spruce1 = spruce(2200, [-800, coop_center_y + 2800, 0]);
+const spruce2 = spruce(1800, [coop_len + 7000, coop_center_y + 1800, 0]);
+
+// Collect all tree parts
+const all_pine_trunks = union(
+  pine1.trunk, pine2.trunk, pine3.trunk, pine4.trunk, pine5.trunk
+);
+const all_pine_canopies = union(
+  pine1.canopy, pine2.canopy, pine3.canopy, pine4.canopy, pine5.canopy
+);
+const all_birch_trunks = union(birch1.trunk, birch2.trunk, birch3.trunk);
+const all_birch_canopies = union(birch1.canopy, birch2.canopy, birch3.canopy);
+const all_spruce_trunks = union(spruce1.trunk, spruce2.trunk);
+const all_spruce_canopies = union(spruce1.canopy, spruce2.canopy);
+
+// Ground cover patches (moss, grass, blueberry)
+const ground_patches_list = [
+  ground_patch(600, [-1500, coop_center_y, 0]),
+  ground_patch(800, [coop_len + 4500, coop_center_y + 1000, 0]),
+  ground_patch(500, [-2800, coop_center_y + 2000, 0]),
+  ground_patch(700, [coop_len + 5500, -800, 0]),
+  ground_patch(900, [-1000, -1500, 0]),
+  ground_patch(650, [coop_len + 6500, coop_center_y + 2800, 0]),
+];
+const all_ground_patches = union(...ground_patches_list);
+
+// Stone/boulder accents
+const boulder1 = translate(
+  scale(sphere({ radius: 180 }), [1.3, 1.0, 0.6]),
+  [-1200, coop_center_y + 2200, 80]
+);
+const boulder2 = translate(
+  scale(sphere({ radius: 140 }), [1.0, 1.2, 0.5]),
+  [coop_len + 5800, -600, 60]
+);
+const boulder3 = translate(
+  scale(sphere({ radius: 200 }), [1.1, 0.9, 0.55]),
+  [-2600, -800, 90]
+);
+const all_boulders = union(boulder1, boulder2, boulder3);
+
+// ============================================================================
 // TUNNEL SKIRTING - Covers tunnel foundation
 // ============================================================================
 
@@ -3319,6 +3441,24 @@ const scaledChickenGym = withMaterial(scale(chicken_gym, DISPLAY_SCALE), 'cedar_
 const BUSH_GREEN = [0.33, 0.42, 0.18];  // DarkOliveGreen
 const scaledBushes = withColor(scale(all_bushes, DISPLAY_SCALE), BUSH_GREEN);
 
+// Finnish nature colors
+const PINE_TRUNK = [0.40, 0.28, 0.18];
+const PINE_GREEN = [0.18, 0.32, 0.15];
+const BIRCH_WHITE = [0.88, 0.86, 0.82];
+const BIRCH_LEAF = [0.38, 0.52, 0.22];
+const SPRUCE_GREEN = [0.12, 0.25, 0.12];
+const MOSS_GREEN = [0.28, 0.38, 0.15];
+const BOULDER_GRAY = [0.52, 0.50, 0.48];
+
+const scaledPineTrunks = withColor(scale(all_pine_trunks, DISPLAY_SCALE), PINE_TRUNK);
+const scaledPineCanopies = withColor(scale(all_pine_canopies, DISPLAY_SCALE), PINE_GREEN);
+const scaledBirchTrunks = withColor(scale(all_birch_trunks, DISPLAY_SCALE), BIRCH_WHITE);
+const scaledBirchCanopies = withColor(scale(all_birch_canopies, DISPLAY_SCALE), BIRCH_LEAF);
+const scaledSpruceTrunks = withColor(scale(all_spruce_trunks, DISPLAY_SCALE), SPRUCE_GREEN);
+const scaledSpruceCanopies = withColor(scale(all_spruce_canopies, DISPLAY_SCALE), SPRUCE_GREEN);
+const scaledGroundPatches = withColor(scale(all_ground_patches, DISPLAY_SCALE), MOSS_GREEN);
+const scaledBoulders = withColor(scale(all_boulders, DISPLAY_SCALE), BOULDER_GRAY);
+
 // Tunnel skirting
 const scaledTunnelSkirting = withColorId(scale(tunnel_skirting, DISPLAY_SCALE), SKIRTING_DARK, 'tunnel_skirting');
 
@@ -3443,6 +3583,11 @@ export const scene = [
   ] : []),
   // Landscaping (always shown)
   scaledBushes,
+  // Finnish nature - trees and ground cover
+  scaledPineTrunks, scaledPineCanopies,
+  scaledBirchTrunks, scaledBirchCanopies,
+  scaledSpruceTrunks, scaledSpruceCanopies,
+  scaledGroundPatches, scaledBoulders,
   // Chickens (conditional)
   ...(show_chickens ? [scaledChickens] : []),
   // Lounge area (always shown)
