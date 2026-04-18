@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard } from "@/components/Skeleton";
@@ -10,6 +10,8 @@ import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
 import type { Project, Template } from "@/types";
 
+type SortKey = "modified" | "created" | "name" | "cost";
+
 export default function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -17,6 +19,8 @@ export default function ProjectList() {
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("modified");
   const { toast } = useToast();
   const { t, locale } = useTranslation();
 
@@ -99,6 +103,40 @@ export default function ProjectList() {
     }
     return `${count} project${count !== 1 ? "s" : ""}`;
   }
+
+  const filteredProjects = useMemo(() => {
+    let result = projects;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description && p.description.toLowerCase().includes(q))
+      );
+    }
+
+    // Sort
+    const sorted = [...result];
+    switch (sortKey) {
+      case "name":
+        sorted.sort((a, b) => a.name.localeCompare(b.name, locale === "fi" ? "fi" : "en"));
+        break;
+      case "created":
+        sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case "cost":
+        sorted.sort((a, b) => Number(b.estimated_cost) - Number(a.estimated_cost));
+        break;
+      case "modified":
+      default:
+        sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        break;
+    }
+
+    return sorted;
+  }, [projects, searchQuery, sortKey, locale]);
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -226,17 +264,101 @@ export default function ProjectList() {
             </p>
           </div>
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {projects.map((p, i) => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                index={i}
-                onDuplicate={duplicateProject}
-                onDelete={deleteProject}
-              />
-            ))}
-          </div>
+          <>
+            {/* Search and sort bar */}
+            <div className="anim-up delay-1" style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}>
+              <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--text-muted)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    position: "absolute",
+                    left: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  className="input"
+                  placeholder={t('project.searchPlaceholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ paddingLeft: 36 }}
+                />
+              </div>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                style={{
+                  padding: "11px 14px",
+                  background: "var(--bg-tertiary)",
+                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--radius-sm)",
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-body)",
+                  fontSize: 13,
+                  outline: "none",
+                  cursor: "pointer",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  paddingRight: 32,
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236f6860' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 12px center",
+                }}
+              >
+                <option value="modified">{t('project.sortByModified')}</option>
+                <option value="name">{t('project.sortByName')}</option>
+                <option value="created">{t('project.sortByCreated')}</option>
+                <option value="cost">{t('project.sortByCost')}</option>
+              </select>
+            </div>
+
+            {filteredProjects.length === 0 ? (
+              <div style={{
+                padding: "48px 40px",
+                textAlign: "center",
+                borderRadius: "var(--radius-xl)",
+                border: "1px dashed var(--border-strong)",
+                background: "var(--bg-secondary)",
+              }}>
+                <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: 4 }}>
+                  {t('project.noSearchResults')}
+                </p>
+                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                  {t('project.noSearchResultsDesc')}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {filteredProjects.map((p, i) => (
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    index={i}
+                    onDuplicate={duplicateProject}
+                    onDelete={deleteProject}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

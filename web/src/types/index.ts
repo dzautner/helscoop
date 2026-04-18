@@ -3,6 +3,7 @@ export interface Project {
   name: string;
   description: string;
   estimated_cost: number;
+  created_at: string;
   updated_at: string;
   scene_js?: string | null;
   display_scale?: number;
