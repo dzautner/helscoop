@@ -4,7 +4,7 @@ import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
-import { login, register, signToken, requireAuth, forgotPassword, resetPassword, AuthUser } from "./auth";
+import { login, register, signToken, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, AuthUser } from "./auth";
 import { query } from "./db";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
@@ -157,7 +157,7 @@ app.post("/auth/register", authLimiter, async (req, res) => {
 
 app.get("/auth/me", authenticatedLimiter, requireAuth, async (req, res) => {
   const result = await query(
-    "SELECT id, email, name, role FROM users WHERE id = $1",
+    "SELECT id, email, name, role, email_verified FROM users WHERE id = $1",
     [req.user!.id]
   );
   if (result.rows.length === 0) {
@@ -265,11 +265,8 @@ app.post("/auth/forgot-password", authLimiter, async (req, res) => {
     return res.status(400).json({ error: "Invalid email format" });
   }
   try {
-    const token = await forgotPassword(email);
-    if (token) {
-      // MVP: log the reset link instead of sending email
-      console.log("Password reset link: /reset-password?token=" + token);
-    }
+    // forgotPassword now sends the reset email directly
+    await forgotPassword(email);
   } catch (e) {
     // Log but don't reveal errors to the client
     console.error("Forgot password error:", e);
@@ -295,6 +292,38 @@ app.post("/auth/reset-password", authLimiter, async (req, res) => {
   } catch (e) {
     console.error("Reset password error:", e);
     res.status(500).json({ error: "Failed to reset password" });
+  }
+});
+
+// Email verification endpoint
+app.get("/auth/verify-email", authLimiter, async (req, res) => {
+  const token = req.query.token as string;
+  if (!token) {
+    return res.status(400).json({ error: "Verification token is required" });
+  }
+  try {
+    const success = await verifyEmail(token);
+    if (!success) {
+      return res.status(400).json({ error: "Invalid or expired verification token" });
+    }
+    res.json({ message: "Email verified successfully" });
+  } catch (e) {
+    console.error("Email verification error:", e);
+    res.status(500).json({ error: "Failed to verify email" });
+  }
+});
+
+// Resend verification email
+app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (req, res) => {
+  try {
+    const sent = await resendVerification(req.user!.id);
+    if (!sent) {
+      return res.status(400).json({ error: "Email already verified or user not found" });
+    }
+    res.json({ message: "Verification email sent" });
+  } catch (e) {
+    console.error("Resend verification error:", e);
+    res.status(500).json({ error: "Failed to resend verification email" });
   }
 });
 
