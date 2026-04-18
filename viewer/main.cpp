@@ -109,6 +109,7 @@ int main(int argc, char *argv[]) {
   int renderSupersample = 1;
   int turntableFrames = 0;
   bool renderWireframe = false;
+  std::vector<std::pair<std::string, float>> cliParamOverrides;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -144,6 +145,8 @@ int main(int argc, char *argv[]) {
                 << "  --focus-object NAME     Highlight object\n"
                 << "  --focus-category NAME   Highlight category\n"
                 << "  --interior-cutaway      Hide sheathing/roofing/cladding\n\n"
+                << "Parameters:\n"
+                << "  --param name=value      Override scene parameter value\n\n"
                 << "Interactive:\n"
                 << "  R         Reload scene\n"
                 << "  T         Toggle parameters panel\n"
@@ -277,6 +280,17 @@ int main(int argc, char *argv[]) {
       renderHiddenMaterials.insert("hardware_cloth");
       renderHiddenMaterials.insert("insulation_100mm");
       renderHiddenMaterials.insert("vapor_barrier");
+    } else if (arg == "--param" && i + 1 < argc) {
+      std::string paramSpec = argv[i + 1];
+      auto eqPos = paramSpec.find('=');
+      if (eqPos != std::string::npos) {
+        std::string name = paramSpec.substr(0, eqPos);
+        float value = std::atof(paramSpec.substr(eqPos + 1).c_str());
+        cliParamOverrides.push_back({name, value});
+      } else {
+        std::cerr << "Invalid --param format: " << paramSpec << " (use --param name=value)" << std::endl;
+      }
+      i += 1;
     }
   }
 
@@ -641,6 +655,45 @@ int main(int argc, char *argv[]) {
   };
 
   refreshParameters();
+
+  std::vector<std::pair<std::string, float>> originalParamValues;
+  if (!cliParamOverrides.empty()) {
+    bool anyWritten = false;
+    for (const auto& [name, value] : cliParamOverrides) {
+      bool found = false;
+      for (auto& param : sceneParameters) {
+        if (param.name == name) {
+          originalParamValues.push_back({param.name, param.value});
+          param.value = value;
+          if (WriteParameterToFile(scriptPath, param)) {
+            TraceLog(LOG_INFO, "CLI override: %s = %g", name.c_str(), value);
+            anyWritten = true;
+          }
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        std::cerr << "Warning: parameter '" << name << "' not found in scene" << std::endl;
+      }
+    }
+    if (anyWritten) {
+      DestroyModels(models);
+      auto reloadResult = LoadAndTessellate(scriptPath);
+      if (reloadResult.success) {
+        sceneData = std::move(reloadResult.sceneData);
+        currentDisplayScale = reloadResult.displayScale;
+        models = CreateModelsFromPrecomputed(reloadResult.meshes);
+        sceneMaterials = std::move(reloadResult.materials);
+        if (!reloadResult.assembly.steps.empty()) {
+          assemblyInstructions = std::move(reloadResult.assembly);
+          ResolveAssemblyMaterials(assemblyInstructions, sceneData);
+        }
+      }
+      refreshParameters();
+    }
+  }
+
   TraceLog(LOG_INFO, "Initial load: %zu parameters, %zu materials",
            sceneParameters.size(), sceneMaterials.size());
 
@@ -2271,6 +2324,20 @@ int main(int argc, char *argv[]) {
         std::cout << "Rendered to: " << absOutputPath.string() << std::endl;
         screenshotTaken = true;
         break;
+      }
+    }
+  }
+
+  // Restore CLI param overrides so scene file is unchanged
+  if (!originalParamValues.empty()) {
+    refreshParameters();
+    for (const auto& [name, origValue] : originalParamValues) {
+      for (auto& param : sceneParameters) {
+        if (param.name == name) {
+          param.value = origValue;
+          WriteParameterToFile(scriptPath, param);
+          break;
+        }
       }
     }
   }
