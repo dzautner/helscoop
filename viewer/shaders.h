@@ -1340,11 +1340,20 @@ void main() {
     float lumaB = luma(rgbB);
 
     // Use rgbB if within range, otherwise rgbA (avoid artifacts)
+    vec3 fxaaResult;
     if (lumaB < lumaMin || lumaB > lumaMax) {
-        finalColor = vec4(rgbA, 1.0);
+        fxaaResult = rgbA;
     } else {
-        finalColor = vec4(rgbB, 1.0);
+        fxaaResult = rgbB;
     }
+
+    // Subtle vignette: darken edges for a polished look
+    vec2 vignetteUV = uv * 2.0 - 1.0;
+    float vignette = 1.0 - dot(vignetteUV, vignetteUV) * 0.15;
+    vignette = clamp(vignette, 0.0, 1.0);
+    vignette = mix(0.85, 1.0, vignette);
+
+    finalColor = vec4(fxaaResult * vignette, 1.0);
 }
 )glsl";
 
