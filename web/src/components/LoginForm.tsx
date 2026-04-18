@@ -1,0 +1,240 @@
+"use client";
+
+import { useState } from "react";
+import { api, setToken } from "@/lib/api";
+import { useTranslation } from "@/components/LocaleProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import type { BuildingResult } from "@/types";
+
+export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingBuilding: BuildingResult | null }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [isRegister, setIsRegister] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const result = isRegister
+        ? await api.register(email, password, name)
+        : await api.login(email, password);
+      setToken(result.token);
+      onLogin();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('auth.loginFailed'));
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      position: "relative",
+    }}>
+      {/* Left: Brand panel */}
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: "60px 80px",
+        position: "relative",
+        overflow: "hidden",
+        background: "linear-gradient(160deg, #1a1510 0%, #12110f 100%)",
+      }}>
+        {/* Decorative diagonal lines */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0.03,
+          backgroundImage: `repeating-linear-gradient(
+            -45deg,
+            transparent,
+            transparent 40px,
+            var(--amber) 40px,
+            var(--amber) 41px
+          )`,
+        }} />
+
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div className="anim-up" style={{ marginBottom: 48 }}>
+            <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.12em" }}>
+              {t('brand.tagline')}
+            </div>
+            <h1 className="heading-display" style={{ fontSize: 56, lineHeight: 1.05, marginBottom: 20 }}>
+              <span style={{ color: "var(--text-primary)" }}>Hel</span>
+              <span style={{ color: "var(--amber)" }}>scoop</span>
+            </h1>
+            <p style={{ fontSize: 18, lineHeight: 1.7, color: "var(--text-secondary)", maxWidth: 420 }}>
+              {t('brand.description')}
+            </p>
+          </div>
+
+          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {[
+              { num: "28", label: t('brand.featureMaterials'), desc: t('brand.featureMaterialsDesc') },
+              { num: "6", label: t('brand.featureSuppliers'), desc: t('brand.featureSuppliersDesc') },
+              { num: "AI", label: t('brand.featureAI'), desc: t('brand.featureAIDesc') },
+            ].map((item, i) => (
+              <div key={i} style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: "14px 0",
+                borderBottom: "1px solid var(--border)",
+              }}>
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--amber-glow)",
+                  border: "1px solid var(--amber-border)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: item.num === "AI" ? 14 : 18,
+                  color: "var(--amber)",
+                  flexShrink: 0,
+                }}>
+                  {item.num}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{item.label}</div>
+                  <div style={{ color: "var(--text-muted)", fontSize: 13 }}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right: Login form */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "60px 40px",
+        background: "var(--bg-secondary)",
+        borderLeft: "1px solid var(--border)",
+        position: "relative",
+      }}>
+        <div style={{ position: "absolute", top: 16, right: 16 }}>
+          <LanguageSwitcher />
+        </div>
+        <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
+          <div style={{ marginBottom: 36 }}>
+            <h2 className="heading-display" style={{ fontSize: 28, marginBottom: 8 }}>
+              {isRegister ? t('auth.registerTitle') : t('auth.loginTitle')}
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+              {pendingBuilding
+                ? t('auth.loginSubtitleBuilding') + pendingBuilding.address
+                : isRegister
+                  ? t('auth.registerSubtitle')
+                  : t('auth.loginSubtitle')}
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {isRegister && (
+              <div>
+                <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.name')}</label>
+                <input
+                  className="input"
+                  placeholder={t('auth.namePlaceholder')}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            )}
+            <div>
+              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.email')}</label>
+              <input
+                className="input"
+                type="email"
+                placeholder={t('auth.emailPlaceholder')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.password')}</label>
+              <input
+                className="input"
+                type="password"
+                placeholder={t('auth.passwordPlaceholder')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              {!isRegister && (
+                <div style={{ marginTop: 8, textAlign: "right" }}>
+                  <a
+                    href="/forgot-password"
+                    style={{
+                      color: "var(--amber)",
+                      fontSize: 13,
+                      textDecoration: "none",
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Unohditko salasanan?
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div style={{
+                padding: "10px 14px",
+                borderRadius: "var(--radius-sm)",
+                background: "var(--danger-dim)",
+                color: "var(--danger)",
+                fontSize: 13,
+                border: "1px solid rgba(199,95,95,0.12)",
+              }}>
+                {error}
+              </div>
+            )}
+
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={loading}
+              style={{ width: "100%", padding: "13px 16px", fontSize: 14, marginTop: 4 }}
+            >
+              {loading ? t('auth.loading') : isRegister ? t('auth.register') : t('auth.login')}
+            </button>
+          </form>
+
+          <div className="divider-amber" style={{ marginTop: 28, marginBottom: 20 }} />
+
+          <div style={{ textAlign: "center" }}>
+            <button
+              onClick={() => { setIsRegister(!isRegister); setError(""); }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--amber)",
+                cursor: "pointer",
+                fontSize: 13,
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
