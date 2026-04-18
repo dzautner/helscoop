@@ -1258,6 +1258,88 @@ JSValue JsOffset2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return result;
 }
 
+// hull2D(polygon) or hull2D(polygon1, polygon2, ...) or hull2D([pt1, pt2, ...])
+// Returns the convex hull as a polygon array
+JSValue JsHull2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "hull2D expects at least one argument");
+  }
+
+  // Check if first arg looks like a flat list of points [[x,y], [x,y], ...]
+  // vs polygon format [[[x,y], ...]]
+  manifold::Polygons polys;
+  bool isPointList = false;
+  if (argc == 1 && JS_IsArray(argv[0])) {
+    JSValue first = JS_GetPropertyUint32(ctx, argv[0], 0);
+    if (JS_IsArray(first)) {
+      JSValue inner = JS_GetPropertyUint32(ctx, first, 0);
+      if (JS_IsNumber(inner)) {
+        isPointList = true;
+      }
+      JS_FreeValue(ctx, inner);
+    }
+    JS_FreeValue(ctx, first);
+  }
+
+  if (isPointList) {
+    manifold::SimplePolygon pts;
+    int32_t len = 0;
+    JSValue lenVal = JS_GetPropertyStr(ctx, argv[0], "length");
+    JS_ToInt32(ctx, &len, lenVal);
+    JS_FreeValue(ctx, lenVal);
+    for (int32_t i = 0; i < len; i++) {
+      JSValue pt = JS_GetPropertyUint32(ctx, argv[0], i);
+      double x = 0, y = 0;
+      JSValue xv = JS_GetPropertyUint32(ctx, pt, 0);
+      JSValue yv = JS_GetPropertyUint32(ctx, pt, 1);
+      JS_ToFloat64(ctx, &x, xv);
+      JS_ToFloat64(ctx, &y, yv);
+      JS_FreeValue(ctx, xv);
+      JS_FreeValue(ctx, yv);
+      JS_FreeValue(ctx, pt);
+      pts.push_back({x, y});
+    }
+    auto hull = manifold::CrossSection::Hull(pts);
+    auto paths = hull.ToPolygons();
+    JSValue result = JS_NewArray(ctx);
+    for (size_t i = 0; i < paths.size(); i++) {
+      JSValue poly = JS_NewArray(ctx);
+      for (size_t j = 0; j < paths[i].size(); j++) {
+        JSValue pt = JS_NewArray(ctx);
+        JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, paths[i][j].x));
+        JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, paths[i][j].y));
+        JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(j), pt);
+      }
+      JS_SetPropertyUint32(ctx, result, static_cast<uint32_t>(i), poly);
+    }
+    return result;
+  }
+
+  // Multiple polygon arguments or single polygon — collect all and hull
+  std::vector<manifold::CrossSection> sections;
+  for (int i = 0; i < argc; i++) {
+    manifold::Polygons p;
+    if (JsValueToPolygons(ctx, argv[i], p)) {
+      sections.push_back(manifold::CrossSection(p, manifold::CrossSection::FillRule::Positive));
+    }
+  }
+
+  auto hull = manifold::CrossSection::Hull(sections);
+  auto paths = hull.ToPolygons();
+  JSValue result = JS_NewArray(ctx);
+  for (size_t i = 0; i < paths.size(); i++) {
+    JSValue poly = JS_NewArray(ctx);
+    for (size_t j = 0; j < paths[i].size(); j++) {
+      JSValue pt = JS_NewArray(ctx);
+      JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, paths[i][j].x));
+      JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, paths[i][j].y));
+      JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(j), pt);
+    }
+    JS_SetPropertyUint32(ctx, result, static_cast<uint32_t>(i), poly);
+  }
+  return result;
+}
+
 // torus(majorRadius, minorRadius) or torus({majorRadius, minorRadius, segments?, minorSegments?})
 JSValue JsTorus(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double majorR = 10.0;
@@ -2012,6 +2094,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsCircle2D, "circle2D", 2));
   JS_SetPropertyStr(ctx, global, "rect2D",
                     JS_NewCFunction(ctx, JsRect2D, "rect2D", 3));
+  JS_SetPropertyStr(ctx, global, "hull2D",
+                    JS_NewCFunction(ctx, JsHull2D, "hull2D", 1));
   JS_SetPropertyStr(ctx, global, "torus",
                     JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",

@@ -85,6 +85,8 @@ circle2D(radius, segments?)                // polygon array for a circle (defaul
 rect2D(width, height, center?)             // polygon array for a rectangle
 offset2D(polygon, delta)                   // offset polygon outward (+) or inward (-)
 offset2D(polygon, {delta, join, segments}) // join: "round"|"square"|"miter"|"bevel"
+hull2D(points)                             // convex hull of [[x,y], ...] points
+hull2D(polygon1, polygon2, ...)            // convex hull wrapping multiple polygons
 
 // Deformation & splitting
 warp(geometry, ([x,y,z]) => [x',y',z'])  // per-vertex coordinate transform
@@ -127,6 +129,8 @@ See `examples/` for parametric examples:
 ```
 
 Yaw and pitch are in degrees. Default camera: 40° yaw, 23° pitch. `--supersample 2` renders at 2x resolution and downscales for smoother edges. `--background white` gives a clean studio look with bright environment reflections.
+
+Camera presets with `--camera <name>`: `front`, `back`, `left`, `right`, `top`, `bottom`, `iso` (45°/35°), `iso-back`, `three-quarter` (default angles).
 
 Architecture visual doc pipeline:
 

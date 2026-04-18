@@ -194,6 +194,31 @@ int main(int argc, char *argv[]) {
     } else if (arg == "--supersample" && i + 1 < argc) {
       renderSupersample = std::clamp(std::atoi(argv[i + 1]), 1, 4);
       i += 1;
+    } else if (arg == "--camera" && i + 1 < argc) {
+      std::string preset = argv[i + 1];
+      if (preset == "front") {
+        camYaw = 0.0f; camPitch = 0.0f;
+      } else if (preset == "back") {
+        camYaw = 180.0f * DEG2RAD; camPitch = 0.0f;
+      } else if (preset == "left") {
+        camYaw = -90.0f * DEG2RAD; camPitch = 0.0f;
+      } else if (preset == "right") {
+        camYaw = 90.0f * DEG2RAD; camPitch = 0.0f;
+      } else if (preset == "top") {
+        camYaw = 0.0f; camPitch = 89.0f * DEG2RAD;
+      } else if (preset == "bottom") {
+        camYaw = 0.0f; camPitch = -89.0f * DEG2RAD;
+      } else if (preset == "iso") {
+        camYaw = 45.0f * DEG2RAD; camPitch = 35.26f * DEG2RAD;
+      } else if (preset == "iso-back") {
+        camYaw = 135.0f * DEG2RAD; camPitch = 35.26f * DEG2RAD;
+      } else if (preset == "three-quarter") {
+        camYaw = 40.0f * DEG2RAD; camPitch = 23.0f * DEG2RAD;
+      } else {
+        std::cerr << "Unknown camera preset: " << preset
+                  << " (use front/back/left/right/top/bottom/iso/iso-back/three-quarter)" << std::endl;
+      }
+      i += 1;
     } else if (arg == "--interior-cutaway") {
       renderHiddenCategories.insert("sheathing");
       renderHiddenCategories.insert("roofing");
