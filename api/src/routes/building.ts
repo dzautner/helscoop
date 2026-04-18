@@ -218,10 +218,10 @@ function generateGenericScene(
   const roofPanelLength = (l + 0.6).toFixed(1);
 
   lines += `// Pitched roof\n`;
-  lines += `const roof_left = translate(rotate(box(${roofPanelLength}, 0.08, ${roofPanelDepth}), 30, 0, 0), 0, ${roofCenterY}, ${(-w / 4).toFixed(2)});\n`;
+  lines += `const roof_left = translate(rotate(box(${roofPanelLength}, 0.08, ${roofPanelDepth}), 0.52, 0, 0), 0, ${roofCenterY}, ${(-w / 4).toFixed(2)});\n`;
   lines += `scene.add(roof_left, {material: "metal", color: ${roofColor}});\n`;
 
-  lines += `const roof_right = translate(rotate(box(${roofPanelLength}, 0.08, ${roofPanelDepth}), -30, 0, 0), 0, ${roofCenterY}, ${(w / 4).toFixed(2)});\n`;
+  lines += `const roof_right = translate(rotate(box(${roofPanelLength}, 0.08, ${roofPanelDepth}), -0.52, 0, 0), 0, ${roofCenterY}, ${(w / 4).toFixed(2)});\n`;
   lines += `scene.add(roof_right, {material: "metal", color: ${roofColor}});\n`;
 
   return lines;
