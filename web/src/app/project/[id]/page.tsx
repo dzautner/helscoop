@@ -47,7 +47,7 @@ function SceneEditor({
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          Scene Script
+          Kohtaus
         </span>
       </div>
       <textarea
@@ -116,7 +116,7 @@ function BomPanel({
     >
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Bill of Materials</h3>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Materiaalilista</h3>
           <span className="badge badge-success" style={{ fontSize: 12, padding: "3px 10px" }}>
             {total.toFixed(2)} EUR
           </span>
@@ -127,7 +127,7 @@ function BomPanel({
         {bom.length === 0 ? (
           <div style={{ textAlign: "center", padding: "32px 16px" }}>
             <div style={{ color: "var(--text-muted)", fontSize: 13 }}>
-              No materials added yet
+              Ei materiaaleja
             </div>
           </div>
         ) : (
@@ -234,7 +234,7 @@ function BomPanel({
             outline: "none",
           }}
         >
-          <option value="">Add material...</option>
+          <option value="">Lisaa materiaali...</option>
           {materials
             .filter((m) => !bom.some((b) => b.material_id === m.id))
             .map((m) => (
@@ -276,7 +276,7 @@ function BomPanel({
             opacity: selectedMat ? 1 : 0.4,
           }}
         >
-          Add
+          Lisaa
         </button>
       </div>
     </div>
@@ -348,7 +348,7 @@ function ChatPanel({
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-        AI Assistant
+        AI-avustaja
       </div>
       <div
         style={{
@@ -362,14 +362,14 @@ function ChatPanel({
       >
         {messages.length === 0 && (
           <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "24px 12px", textAlign: "center", lineHeight: 2 }}>
-            Describe what you want to build or change.
+            Kuvaile mita haluat rakentaa tai muuttaa.
             <br />
-            <span style={{ color: "var(--accent)", opacity: 0.7 }}>
-              &ldquo;Add a roof to the building&rdquo;
+            <span style={{ color: "#c4915c", opacity: 0.7 }}>
+              &ldquo;Lisaa katto rakennukseen&rdquo;
             </span>
             <br />
-            <span style={{ color: "var(--accent)", opacity: 0.7 }}>
-              &ldquo;Add a window to the back wall&rdquo;
+            <span style={{ color: "#c4915c", opacity: 0.7 }}>
+              &ldquo;Lisaa ikkuna takaseinaan&rdquo;
             </span>
           </div>
         )}
@@ -414,7 +414,7 @@ function ChatPanel({
                     fontWeight: 600,
                   }}
                 >
-                  Apply to Scene
+                  Aseta kohtaukseen
                 </button>
               )}
             </div>
@@ -422,7 +422,7 @@ function ChatPanel({
         })}
         {loading && (
           <div style={{ color: "var(--accent)", fontSize: 13, padding: 8 }}>
-            <span style={{ animation: "pulse 1.5s infinite" }}>Thinking...</span>
+            <span style={{ animation: "pulse 1.5s infinite" }}>Mietitaan...</span>
           </div>
         )}
       </div>
@@ -439,7 +439,7 @@ function ChatPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-          placeholder="Describe a change..."
+          placeholder="Kuvaile muutos..."
           style={{ flex: 1, padding: "8px 12px", fontSize: 13 }}
         />
         <button
@@ -647,8 +647,8 @@ export default function ProjectPage() {
         <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
           {saving ? "saving..." : lastSaved ? `saved ${lastSaved}` : ""}
         </span>
-        <button className="btn btn-primary" onClick={save} style={{ padding: "6px 16px" }}>
-          Save
+        <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
+          Tallenna
         </button>
         <button className="btn btn-ghost" onClick={async () => {
           const res = await api.exportBOM(projectId);
@@ -660,21 +660,21 @@ export default function ProjectPage() {
           a.click();
           URL.revokeObjectURL(url);
         }}>
-          Export
+          Vie BOM
         </button>
         <button
           className="btn"
           onClick={() => setShowChat(!showChat)}
           style={{
             padding: "6px 12px",
-            background: showChat ? "var(--accent)" : "var(--accent-muted)",
-            color: showChat ? "#fff" : "var(--accent)",
+            background: showChat ? "#c4915c" : "rgba(196,145,92,0.12)",
+            color: showChat ? "#fff" : "#c4915c",
           }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          AI
+          Avustaja
         </button>
       </div>
 

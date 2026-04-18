@@ -78,7 +78,7 @@ function MaterialsTab() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         <input
           className="input"
-          placeholder="Filter materials..."
+          placeholder="Hae materiaaleja..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
@@ -92,12 +92,12 @@ function MaterialsTab() {
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 48 }}></th>
-              <th style={thStyle}>Name</th>
-              <th style={thStyle}>Category</th>
-              <th style={thStyle}>Waste</th>
-              <th style={thStyle}>Primary Price</th>
-              <th style={thStyle}>Supplier</th>
-              <th style={thStyle}>Alt</th>
+              <th style={thStyle}>Nimi</th>
+              <th style={thStyle}>Kategoria</th>
+              <th style={thStyle}>Hukka</th>
+              <th style={thStyle}>Hinta</th>
+              <th style={thStyle}>Toimittaja</th>
+              <th style={thStyle}>Muut</th>
             </tr>
           </thead>
           <tbody>
@@ -156,7 +156,7 @@ function MaterialsTab() {
                         {primary.unit_price.toFixed(2)} {primary.currency}/{primary.unit}
                       </span>
                     ) : (
-                      <span className="badge badge-danger">No price</span>
+                      <span className="badge badge-danger">Ei hintaa</span>
                     )}
                   </td>
                   <td style={{ ...tdStyle, color: "var(--text-muted)" }}>
@@ -191,10 +191,10 @@ function SuppliersTab() {
       <table style={tableStyle}>
         <thead>
           <tr>
-            <th style={thStyle}>Supplier</th>
-            <th style={thStyle}>Website</th>
-            <th style={thStyle}>Products</th>
-            <th style={thStyle}>Oldest Price</th>
+            <th style={thStyle}>Toimittaja</th>
+            <th style={thStyle}>Verkkosivu</th>
+            <th style={thStyle}>Tuotteet</th>
+            <th style={thStyle}>Vanhin hinta</th>
           </tr>
         </thead>
         <tbody>
@@ -244,24 +244,24 @@ function PricingTab() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Stale Prices</h3>
-        <span className="badge badge-warning">&gt;30 days old</span>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Vanhentuneet hinnat</h3>
+        <span className="badge badge-warning">&gt;30 paivaa</span>
       </div>
       {stale.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px" }}>
           <span className="badge badge-success" style={{ padding: "6px 16px", fontSize: 13 }}>
-            All prices up to date
+            Kaikki hinnat ajan tasalla
           </span>
         </div>
       ) : (
         <table style={tableStyle}>
           <thead>
             <tr>
-              <th style={thStyle}>Material</th>
-              <th style={thStyle}>Supplier</th>
-              <th style={thStyle}>Price</th>
-              <th style={thStyle}>Last Scraped</th>
-              <th style={thStyle}>Stale</th>
+              <th style={thStyle}>Materiaali</th>
+              <th style={thStyle}>Toimittaja</th>
+              <th style={thStyle}>Hinta</th>
+              <th style={thStyle}>Viimeksi paivitetty</th>
+              <th style={thStyle}>Ika</th>
             </tr>
           </thead>
           <tbody>
@@ -326,9 +326,9 @@ export default function AdminPage() {
   }
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "materials", label: "Materials", icon: "M4 6h16M4 12h16M4 18h16" },
-    { key: "suppliers", label: "Suppliers", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
-    { key: "pricing", label: "Pricing", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+    { key: "materials", label: "Materiaalit", icon: "M4 6h16M4 12h16M4 18h16" },
+    { key: "suppliers", label: "Toimittajat", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
+    { key: "pricing", label: "Hinnoittelu", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
   ];
 
   return (
@@ -342,9 +342,9 @@ export default function AdminPage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px" }}>Admin</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px" }}>Hallintapaneeli</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
-            Manage materials, suppliers, and pricing data
+            Materiaalit, toimittajat ja hinnoittelu
           </p>
         </div>
         <button
@@ -354,7 +354,7 @@ export default function AdminPage() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-          Back
+          Takaisin
         </button>
       </div>
 

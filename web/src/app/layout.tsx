@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DingCAD",
-  description: "Parametric CAD for construction",
+  title: "DingCAD - Rakennusprojektien suunnittelu",
+  description: "Suunnittele ja laske rakennusprojektisi reaaliaikaisilla hinnoilla",
 };
 
 export default function RootLayout({
