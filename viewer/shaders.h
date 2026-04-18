@@ -317,30 +317,53 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
     return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// Improved environment lighting with horizon band and proper hemisphere sampling
+// Procedural studio HDRI — adds bright rectangular highlights that metals reflect
 vec3 getEnvironmentLight(vec3 N, float rough) {
-    // Smoother hemisphere interpolation
-    float upFactor = N.y * 0.5 + 0.5;  // 0 at bottom, 1 at top
+    float upFactor = N.y * 0.5 + 0.5;
     upFactor = clamp(upFactor, 0.0, 1.0);
 
-    // Three-way blend: ground -> horizon -> sky
     vec3 skyColor;
     if (N.y > 0.0) {
-        // Above horizon: blend horizon to sky top
-        float t = pow(upFactor, 0.6);  // Non-linear for softer gradient
+        float t = pow(upFactor, 0.6);
         skyColor = mix(skyColorBottom, skyColorTop, t);
     } else {
-        // Below horizon: blend ground to horizon
         float t = pow(1.0 - upFactor, 0.8);
         skyColor = mix(skyColorBottom, groundColor, t);
     }
 
-    // Add subtle horizon glow (brighter at horizon)
     float horizonDist = abs(N.y);
     float horizonGlow = exp(-horizonDist * 3.0) * 0.15;
     skyColor += vec3(1.0, 0.95, 0.9) * horizonGlow;
 
-    // Roughness-based blur simulation (rough surfaces see averaged environment)
+    // Studio soft-box highlights (two rectangular area lights in upper hemisphere)
+    // Convert direction to spherical for highlight placement
+    float phi = atan(N.z, N.x);       // azimuth
+    float theta = acos(clamp(N.y, -1.0, 1.0));  // polar angle from up
+
+    // Key light soft-box: upper-left area
+    float h1_phi = 2.3;   // azimuth position
+    float h1_theta = 0.6;  // elevation
+    float h1_w = 0.5;      // width
+    float h1_h = 0.35;     // height
+    float d1_phi = smoothstep(h1_w, 0.0, abs(phi - h1_phi));
+    float d1_theta = smoothstep(h1_h, 0.0, abs(theta - h1_theta));
+    float highlight1 = d1_phi * d1_theta * 0.6;
+
+    // Fill light soft-box: upper-right, dimmer and wider
+    float h2_phi = -0.8;
+    float h2_theta = 0.8;
+    float h2_w = 0.7;
+    float h2_h = 0.4;
+    float d2_phi = smoothstep(h2_w, 0.0, abs(phi - h2_phi));
+    float d2_theta = smoothstep(h2_h, 0.0, abs(theta - h2_theta));
+    float highlight2 = d2_phi * d2_theta * 0.35;
+
+    // Highlights fade with roughness (rough surfaces blur them out)
+    float highlightFade = 1.0 - rough * rough;
+    vec3 warmWhite = vec3(1.0, 0.97, 0.92);
+    skyColor += warmWhite * (highlight1 + highlight2) * highlightFade;
+
+    // Roughness-based blur simulation
     vec3 avgEnv = (skyColorTop + skyColorBottom * 2.0 + groundColor) * 0.25;
     skyColor = mix(skyColor, avgEnv, rough * rough * 0.6);
 
@@ -697,6 +720,17 @@ vec3 getEnvironmentLight(vec3 N, float rough) {
     float horizonDist = abs(N.y);
     float horizonGlow = exp(-horizonDist * 3.0) * 0.15;
     skyColor += vec3(1.0, 0.95, 0.9) * horizonGlow;
+
+    float phi = atan(N.z, N.x);
+    float theta = acos(clamp(N.y, -1.0, 1.0));
+    float d1_phi = smoothstep(0.5, 0.0, abs(phi - 2.3));
+    float d1_theta = smoothstep(0.35, 0.0, abs(theta - 0.6));
+    float highlight1 = d1_phi * d1_theta * 0.6;
+    float d2_phi = smoothstep(0.7, 0.0, abs(phi - (-0.8)));
+    float d2_theta = smoothstep(0.4, 0.0, abs(theta - 0.8));
+    float highlight2 = d2_phi * d2_theta * 0.35;
+    float highlightFade = 1.0 - rough * rough;
+    skyColor += vec3(1.0, 0.97, 0.92) * (highlight1 + highlight2) * highlightFade;
 
     vec3 avgEnv = (skyColorTop + skyColorBottom * 2.0 + groundColor) * 0.25;
     skyColor = mix(skyColor, avgEnv, rough * rough * 0.6);
