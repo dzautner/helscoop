@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { api, getToken, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonTableRow } from "@/components/Skeleton";
+import { useTranslation } from "@/components/LocaleProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 type Tab = "materials" | "suppliers" | "pricing";
 
@@ -66,6 +68,7 @@ function MaterialsTab() {
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     api.getMaterials()
@@ -74,10 +77,10 @@ function MaterialsTab() {
         setLoading(false);
       })
       .catch((err) => {
-        toast(err instanceof Error ? err.message : "Materiaalien lataus epaonnistui / Failed to load materials", "error");
+        toast(err instanceof Error ? err.message : t('toast.loadMaterialsFailed'), "error");
         setLoading(false);
       });
-  }, [toast]);
+  }, [toast, t]);
 
   const filtered = materials.filter(
     (m) =>
@@ -90,7 +93,7 @@ function MaterialsTab() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         <input
           className="input"
-          placeholder="Hae materiaaleja..."
+          placeholder={t('admin.search')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
@@ -104,12 +107,12 @@ function MaterialsTab() {
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 48 }}></th>
-              <th style={thStyle}>Nimi</th>
-              <th style={thStyle}>Kategoria</th>
-              <th style={thStyle}>Hukka</th>
-              <th style={thStyle}>Hinta</th>
-              <th style={thStyle}>Toimittaja</th>
-              <th style={thStyle}>Muut</th>
+              <th style={thStyle}>{t('admin.name')}</th>
+              <th style={thStyle}>{t('admin.category')}</th>
+              <th style={thStyle}>{t('admin.wasteFactor')}</th>
+              <th style={thStyle}>{t('admin.price')}</th>
+              <th style={thStyle}>{t('admin.supplier')}</th>
+              <th style={thStyle}>{t('admin.others')}</th>
             </tr>
           </thead>
           <tbody>
@@ -173,7 +176,7 @@ function MaterialsTab() {
                           {primary.unit_price.toFixed(2)} {primary.currency}/{primary.unit}
                         </span>
                       ) : (
-                        <span className="badge badge-danger">Ei hintaa</span>
+                        <span className="badge badge-danger">{t('admin.noPrice')}</span>
                       )}
                     </td>
                     <td style={{ ...tdStyle, color: "var(--text-muted)" }}>
@@ -201,6 +204,7 @@ function SuppliersTab() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     api.getSuppliers()
@@ -209,20 +213,20 @@ function SuppliersTab() {
         setLoading(false);
       })
       .catch((err) => {
-        toast(err instanceof Error ? err.message : "Toimittajien lataus epaonnistui / Failed to load suppliers", "error");
+        toast(err instanceof Error ? err.message : t('toast.loadSuppliersFailed'), "error");
         setLoading(false);
       });
-  }, [toast]);
+  }, [toast, t]);
 
   return (
     <div>
       <table style={tableStyle}>
         <thead>
           <tr>
-            <th style={thStyle}>Toimittaja</th>
-            <th style={thStyle}>Verkkosivu</th>
-            <th style={thStyle}>Tuotteet</th>
-            <th style={thStyle}>Vanhin hinta</th>
+            <th style={thStyle}>{t('admin.supplier')}</th>
+            <th style={thStyle}>{t('admin.website')}</th>
+            <th style={thStyle}>{t('admin.products')}</th>
+            <th style={thStyle}>{t('admin.oldestPrice')}</th>
           </tr>
         </thead>
         <tbody>
@@ -272,6 +276,7 @@ function PricingTab() {
   const [stale, setStale] = useState<StalePrice[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     api.getStalePrices()
@@ -280,26 +285,26 @@ function PricingTab() {
         setLoading(false);
       })
       .catch((err) => {
-        toast(err instanceof Error ? err.message : "Hintatietojen lataus epaonnistui / Failed to load pricing", "error");
+        toast(err instanceof Error ? err.message : t('toast.loadPricingFailed'), "error");
         setLoading(false);
       });
-  }, [toast]);
+  }, [toast, t]);
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Vanhentuneet hinnat</h3>
-        <span className="badge badge-amber">&gt;30 paivaa</span>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{t('admin.stalePrices')}</h3>
+        <span className="badge badge-amber">{t('admin.staleThreshold')}</span>
       </div>
       {loading ? (
         <table style={tableStyle}>
           <thead>
             <tr>
-              <th style={thStyle}>Materiaali</th>
-              <th style={thStyle}>Toimittaja</th>
-              <th style={thStyle}>Hinta</th>
-              <th style={thStyle}>Viimeksi paivitetty</th>
-              <th style={thStyle}>Ika</th>
+              <th style={thStyle}>{t('admin.material')}</th>
+              <th style={thStyle}>{t('admin.supplier')}</th>
+              <th style={thStyle}>{t('admin.price')}</th>
+              <th style={thStyle}>{t('admin.lastUpdated')}</th>
+              <th style={thStyle}>{t('admin.age')}</th>
             </tr>
           </thead>
           <tbody>
@@ -311,18 +316,18 @@ function PricingTab() {
       ) : stale.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px" }}>
           <span className="badge badge-forest" style={{ padding: "6px 16px", fontSize: 13 }}>
-            Kaikki hinnat ajan tasalla
+            {t('admin.allUpToDate')}
           </span>
         </div>
       ) : (
         <table style={tableStyle}>
           <thead>
             <tr>
-              <th style={thStyle}>Materiaali</th>
-              <th style={thStyle}>Toimittaja</th>
-              <th style={thStyle}>Hinta</th>
-              <th style={thStyle}>Viimeksi paivitetty</th>
-              <th style={thStyle}>Ika</th>
+              <th style={thStyle}>{t('admin.material')}</th>
+              <th style={thStyle}>{t('admin.supplier')}</th>
+              <th style={thStyle}>{t('admin.price')}</th>
+              <th style={thStyle}>{t('admin.lastUpdated')}</th>
+              <th style={thStyle}>{t('admin.age')}</th>
             </tr>
           </thead>
           <tbody>
@@ -356,6 +361,7 @@ function PricingTab() {
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("materials");
   const [authorized, setAuthorized] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!getToken()) {
@@ -381,15 +387,15 @@ export default function AdminPage() {
   if (!authorized) {
     return (
       <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
-        Checking access...
+        {t('admin.checkingAccess')}
       </div>
     );
   }
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "materials", label: "Materiaalit", icon: "M4 6h16M4 12h16M4 18h16" },
-    { key: "suppliers", label: "Toimittajat", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
-    { key: "pricing", label: "Hinnoittelu", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+    { key: "materials", label: t('admin.materials'), icon: "M4 6h16M4 12h16M4 18h16" },
+    { key: "suppliers", label: t('admin.suppliers'), icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
+    { key: "pricing", label: t('admin.pricing'), icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
   ];
 
   return (
@@ -403,38 +409,41 @@ export default function AdminPage() {
         }}
       >
         <div>
-          <h1 className="heading-display" style={{ fontSize: 24, margin: "0 0 4px" }}>Hallintapaneeli</h1>
+          <h1 className="heading-display" style={{ fontSize: 24, margin: "0 0 4px" }}>{t('admin.adminPanel')}</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
-            Materiaalit, toimittajat ja hinnoittelu
+            {t('admin.adminDesc')}
           </p>
         </div>
-        <button
-          className="btn btn-ghost"
-          onClick={() => (window.location.href = "/")}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Takaisin
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <LanguageSwitcher />
+          <button
+            className="btn btn-ghost"
+            onClick={() => (window.location.href = "/")}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            {t('nav.back')}
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
-        {tabs.map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
+            key={tabItem.key}
             className="btn"
-            onClick={() => setTab(t.key)}
+            onClick={() => setTab(tabItem.key)}
             style={{
               padding: "10px 20px",
-              background: tab === t.key ? "var(--amber-glow)" : "transparent",
-              color: tab === t.key ? "var(--amber)" : "var(--text-muted)",
-              fontWeight: tab === t.key ? 600 : 400,
+              background: tab === tabItem.key ? "var(--amber-glow)" : "transparent",
+              color: tab === tabItem.key ? "var(--amber)" : "var(--text-muted)",
+              fontWeight: tab === tabItem.key ? 600 : 400,
               borderRadius: "var(--radius-sm)",
-              border: tab === t.key ? "1px solid var(--amber-border)" : "1px solid transparent",
+              border: tab === tabItem.key ? "1px solid var(--amber-border)" : "1px solid transparent",
             }}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
