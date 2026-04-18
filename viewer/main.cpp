@@ -1098,6 +1098,36 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    // OBJ Export handling - Ctrl+O
+    if (!uiState.materialFilterActive &&
+        IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_O) &&
+        !sceneData.objects.empty()) {
+      std::vector<manifold::Manifold> allGeometry;
+      allGeometry.reserve(sceneData.objects.size());
+      for (const auto &obj : sceneData.objects) {
+        if (obj.geometry) allGeometry.push_back(*obj.geometry);
+      }
+      if (!allGeometry.empty()) {
+        manifold::Manifold combined = manifold::Manifold::Compose(allGeometry);
+        auto downloads = GetDownloadsDir();
+        std::error_code dirErr;
+        std::filesystem::create_directories(downloads, dirErr);
+        if (dirErr && !std::filesystem::exists(downloads)) {
+          reportStatus("Export failed: cannot access " + downloads.string());
+        } else {
+          std::string objName = scriptPath.stem().string();
+          if (objName == "main") objName = scriptPath.parent_path().filename().string();
+          std::filesystem::path savePath = downloads / (objName + ".obj");
+          std::string error;
+          if (WriteMeshAsObj(combined.GetMeshGL(), savePath, error)) {
+            reportStatus("Saved " + savePath.string());
+          } else {
+            reportStatus(error);
+          }
+        }
+      }
+    }
+
     // IFC Export handling - Ctrl+I or toolbar button
     bool ifcExportRequested = uiState.ifcExportClicked;
     uiState.ifcExportClicked = false;

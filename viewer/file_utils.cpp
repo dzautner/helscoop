@@ -109,6 +109,66 @@ bool WriteMeshAsBinaryStl(const manifold::MeshGL& mesh,
   return true;
 }
 
+bool WriteMeshAsObj(const manifold::MeshGL& mesh,
+                    const std::filesystem::path& path,
+                    std::string& error) {
+  const uint32_t triCount = static_cast<uint32_t>(mesh.NumTri());
+  if (triCount == 0) {
+    error = "Export failed: mesh is empty";
+    return false;
+  }
+
+  std::ofstream out(path);
+  if (!out) {
+    error = "Export failed: cannot open " + path.string();
+    return false;
+  }
+
+  out << "# dingcad OBJ export\n";
+  out << "# Vertices: " << mesh.NumVert() << " Triangles: " << triCount << "\n\n";
+
+  const uint32_t numVerts = static_cast<uint32_t>(mesh.NumVert());
+  for (uint32_t i = 0; i < numVerts; ++i) {
+    const Vec3f v = FetchVertex(mesh, i);
+    out << "v " << v.x << " " << v.y << " " << v.z << "\n";
+  }
+  out << "\n";
+
+  // Compute per-face normals and accumulate into per-vertex normals for smooth shading
+  std::vector<Vec3f> vertNormals(numVerts, {0.0f, 0.0f, 0.0f});
+  for (uint32_t tri = 0; tri < triCount; ++tri) {
+    const uint32_t i0 = mesh.triVerts[tri * 3 + 0];
+    const uint32_t i1 = mesh.triVerts[tri * 3 + 1];
+    const uint32_t i2 = mesh.triVerts[tri * 3 + 2];
+    const Vec3f v0 = FetchVertex(mesh, i0);
+    const Vec3f v1 = FetchVertex(mesh, i1);
+    const Vec3f v2 = FetchVertex(mesh, i2);
+    const Vec3f fn = Cross(Subtract(v1, v0), Subtract(v2, v0));
+    vertNormals[i0] = {vertNormals[i0].x + fn.x, vertNormals[i0].y + fn.y, vertNormals[i0].z + fn.z};
+    vertNormals[i1] = {vertNormals[i1].x + fn.x, vertNormals[i1].y + fn.y, vertNormals[i1].z + fn.z};
+    vertNormals[i2] = {vertNormals[i2].x + fn.x, vertNormals[i2].y + fn.y, vertNormals[i2].z + fn.z};
+  }
+  for (uint32_t i = 0; i < numVerts; ++i) {
+    vertNormals[i] = Normalize(vertNormals[i]);
+    out << "vn " << vertNormals[i].x << " " << vertNormals[i].y << " " << vertNormals[i].z << "\n";
+  }
+  out << "\n";
+
+  for (uint32_t tri = 0; tri < triCount; ++tri) {
+    const uint32_t i0 = mesh.triVerts[tri * 3 + 0] + 1;
+    const uint32_t i1 = mesh.triVerts[tri * 3 + 1] + 1;
+    const uint32_t i2 = mesh.triVerts[tri * 3 + 2] + 1;
+    out << "f " << i0 << "//" << i0 << " " << i1 << "//" << i1 << " " << i2 << "//" << i2 << "\n";
+  }
+
+  if (!out) {
+    error = "Export failed: write error";
+    return false;
+  }
+
+  return true;
+}
+
 std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& path) {
   std::vector<SceneParameter> params;
 

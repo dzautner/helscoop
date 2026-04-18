@@ -25,6 +25,7 @@ This repository is mostly autonomously written by an LLM that I've lazily prompt
 | Space | Reset camera |
 | WASD/QE | Move camera |
 | Ctrl+E | Export STL |
+| Ctrl+O | Export OBJ |
 | Ctrl+I | Export IFC |
 
 ### Parametric Controls

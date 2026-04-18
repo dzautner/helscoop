@@ -21,6 +21,11 @@ bool WriteMeshAsBinaryStl(const manifold::MeshGL& mesh,
                           const std::filesystem::path& path,
                           std::string& error);
 
+// Write mesh to Wavefront OBJ file (with normals)
+bool WriteMeshAsObj(const manifold::MeshGL& mesh,
+                    const std::filesystem::path& path,
+                    std::string& error);
+
 // Parse scene parameters from JS file
 std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& path);
 
