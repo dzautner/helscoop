@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectEditor } from "@/components/Skeleton";
+import { useTranslation } from "@/components/LocaleProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
   ssr: false,
@@ -54,12 +56,14 @@ function SceneEditor({
   sceneJs: string;
   onChange: (code: string) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          Kohtaus
+          {t('editor.scene')}
         </span>
       </div>
       <textarea
@@ -113,6 +117,7 @@ function BomPanel({
 }) {
   const [selectedMat, setSelectedMat] = useState("");
   const [qty, setQty] = useState(1);
+  const { t } = useTranslation();
 
   const total = bom.reduce((sum, item) => sum + (item.total || 0), 0);
 
@@ -128,7 +133,7 @@ function BomPanel({
     >
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Materiaalilista</h3>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
           <span className="badge badge-success" style={{ fontSize: 12, padding: "3px 10px" }}>
             {total.toFixed(2)} EUR
           </span>
@@ -139,7 +144,7 @@ function BomPanel({
         {bom.length === 0 ? (
           <div style={{ textAlign: "center", padding: "32px 16px" }}>
             <div style={{ color: "var(--text-muted)", fontSize: 13 }}>
-              Ei materiaaleja
+              {t('editor.noMaterials')}
             </div>
           </div>
         ) : (
@@ -246,7 +251,7 @@ function BomPanel({
             outline: "none",
           }}
         >
-          <option value="">Lisaa materiaali...</option>
+          <option value="">{t('editor.addMaterial')}</option>
           {materials
             .filter((m) => !bom.some((b) => b.material_id === m.id))
             .map((m) => (
@@ -288,7 +293,7 @@ function BomPanel({
             opacity: selectedMat ? 1 : 0.4,
           }}
         >
-          Lisaa
+          {t('editor.add')}
         </button>
       </div>
     </div>
@@ -311,6 +316,7 @@ function ChatPanel({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   async function send() {
     if (!input.trim() || loading) return;
@@ -324,10 +330,10 @@ function ChatPanel({
       const reply = await api.chat(newMessages, sceneJs);
       setMessages([...newMessages, reply]);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "AI-avustajan virhe / AI assistant error", "error");
+      toast(err instanceof Error ? err.message : t('toast.aiError'), "error");
       setMessages([
         ...newMessages,
-        { role: "assistant", content: "Jokin meni pieleen. Yrita uudelleen." },
+        { role: "assistant", content: t('editor.chatError') },
       ]);
     }
     setLoading(false);
@@ -362,7 +368,7 @@ function ChatPanel({
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-        AI-avustaja
+        {t('editor.aiAssistant')}
       </div>
       <div
         style={{
@@ -376,14 +382,14 @@ function ChatPanel({
       >
         {messages.length === 0 && (
           <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "24px 12px", textAlign: "center", lineHeight: 2 }}>
-            Kuvaile mita haluat rakentaa tai muuttaa.
+            {t('editor.describePrompt')}
             <br />
             <span style={{ color: "#c4915c", opacity: 0.7 }}>
-              &ldquo;Lisaa katto rakennukseen&rdquo;
+              &ldquo;{t('editor.exampleRoof')}&rdquo;
             </span>
             <br />
             <span style={{ color: "#c4915c", opacity: 0.7 }}>
-              &ldquo;Lisaa ikkuna takaseinaan&rdquo;
+              &ldquo;{t('editor.exampleWindow')}&rdquo;
             </span>
           </div>
         )}
@@ -428,7 +434,7 @@ function ChatPanel({
                     fontWeight: 600,
                   }}
                 >
-                  Aseta kohtaukseen
+                  {t('editor.applyToScene')}
                 </button>
               )}
             </div>
@@ -436,7 +442,7 @@ function ChatPanel({
         })}
         {loading && (
           <div style={{ color: "var(--accent)", fontSize: 13, padding: 8 }}>
-            <span style={{ animation: "pulse 1.5s infinite" }}>Mietitaan...</span>
+            <span style={{ animation: "pulse 1.5s infinite" }}>{t('editor.thinking')}</span>
           </div>
         )}
       </div>
@@ -453,7 +459,7 @@ function ChatPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-          placeholder="Kuvaile muutos..."
+          placeholder={t('editor.describeChange')}
           style={{ flex: 1, padding: "8px 12px", fontSize: 13 }}
         />
         <button
@@ -504,6 +510,7 @@ export default function ProjectPage() {
   const router = useRouter();
   const projectId = params.id as string;
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -591,11 +598,11 @@ export default function ProjectPage() {
           setToken(null);
           router.push("/");
         } else {
-          toast(err instanceof Error ? err.message : "Projektin lataus epaonnistui / Failed to load project", "error");
+          toast(err instanceof Error ? err.message : t('toast.loadProjectFailed'), "error");
           setLoadError(true);
         }
       });
-  }, [projectId, router, toast]);
+  }, [projectId, router, toast, t]);
 
   // Save function (used by both auto-save and manual save)
   const save = useCallback(async () => {
@@ -624,12 +631,12 @@ export default function ProjectPage() {
       await Promise.all(savePromises);
       setLastSaved(new Date().toLocaleTimeString());
       setSaveStatus("saved");
-      toast("Tallennettu / Saved", "success");
+      toast(t('toast.saved'), "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Tallennus epaonnistui / Save failed", "error");
+      toast(err instanceof Error ? err.message : t('toast.saveFailed'), "error");
       setSaveStatus("unsaved");
     }
-  }, [projectId, projectName, projectDesc, sceneJs, bom, toast]);
+  }, [projectId, projectName, projectDesc, sceneJs, bom, toast, t]);
 
   // Schedule auto-save (debounced 2 seconds)
   const scheduleAutoSave = useCallback(() => {
@@ -670,8 +677,6 @@ export default function ProjectPage() {
     const handler = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
       if (isMod && e.key === "z" && !e.shiftKey) {
-        // Only intercept if the active element is not the scene textarea
-        // Actually, we want undo/redo for scene regardless
         e.preventDefault();
         undo();
       } else if (isMod && e.key === "z" && e.shiftKey) {
@@ -743,10 +748,10 @@ export default function ProjectPage() {
   if (loadError) {
     return (
       <div className="anim-up" style={{ padding: 60, textAlign: "center" }}>
-        <h2 className="heading-display" style={{ marginBottom: 8 }}>Virhe</h2>
-        <p style={{ color: "var(--danger)", marginBottom: 16 }}>Projektia ei voitu ladata / Could not load project</p>
+        <h2 className="heading-display" style={{ marginBottom: 8 }}>{t('editor.error')}</h2>
+        <p style={{ color: "var(--danger)", marginBottom: 16 }}>{t('editor.errorLoadProject')}</p>
         <button className="btn btn-primary" onClick={() => router.push("/")}>
-          Takaisin projekteihin
+          {t('editor.backToProjects')}
         </button>
       </div>
     );
@@ -799,7 +804,7 @@ export default function ProjectPage() {
         <input
           value={projectDesc}
           onChange={(e) => setProjectDesc(e.target.value)}
-          placeholder="Kuvaus..."
+          placeholder={t('project.descriptionPlaceholder')}
           style={{
             fontSize: 13,
             color: "var(--text-muted)",
@@ -815,7 +820,7 @@ export default function ProjectPage() {
             className="btn btn-ghost"
             onClick={undo}
             disabled={!canUndo}
-            title="Kumoa (Ctrl+Z)"
+            title={t('editor.undoShortcut')}
             style={{ padding: "6px 8px", opacity: canUndo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -827,7 +832,7 @@ export default function ProjectPage() {
             className="btn btn-ghost"
             onClick={redo}
             disabled={!canRedo}
-            title="Tee uudelleen (Ctrl+Shift+Z)"
+            title={t('editor.redoShortcut')}
             style={{ padding: "6px 8px", opacity: canRedo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -855,13 +860,13 @@ export default function ProjectPage() {
             <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--warning, #e5c07b)" }} />
           )}
           {saveStatus === "saving"
-            ? "Tallentaa..."
+            ? t('editor.saving')
             : saveStatus === "saved"
-              ? `Tallennettu${lastSaved ? ` ${lastSaved}` : ""}`
-              : "Ei tallennettu"}
+              ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
+              : t('editor.unsaved')}
         </span>
         <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
-          Tallenna
+          {t('editor.save')}
         </button>
         <button className="btn btn-ghost" onClick={async () => {
           try {
@@ -873,12 +878,12 @@ export default function ProjectPage() {
             a.download = `bom_${projectId}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            toast("BOM viety / BOM exported", "success");
+            toast(t('toast.bomExported'), "success");
           } catch (err) {
-            toast(err instanceof Error ? err.message : "BOM-vienti epaonnistui / BOM export failed", "error");
+            toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
           }
         }}>
-          Vie BOM
+          {t('editor.export')}
         </button>
         <button
           className="btn"
@@ -892,8 +897,9 @@ export default function ProjectPage() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          Avustaja
+          {t('editor.assistant')}
         </button>
+        <LanguageSwitcher />
       </div>
 
       {/* Main content */}

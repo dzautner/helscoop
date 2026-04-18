@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { api, setToken, getToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard, SkeletonBlock } from "@/components/Skeleton";
+import { useTranslation } from "@/components/LocaleProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface Project {
   id: string;
@@ -31,25 +33,19 @@ interface BuildingResult {
   bom_suggestion: { material_id: string; quantity: number; unit: string }[];
 }
 
-const BUILDING_TYPE_LABELS: Record<string, string> = {
-  omakotitalo: "Omakotitalo",
-  rivitalo: "Rivitalo",
-  kerrostalo: "Kerrostalo",
-  paritalo: "Paritalo",
+const BUILDING_TYPE_LABELS: Record<string, Record<string, string>> = {
+  fi: { omakotitalo: "Omakotitalo", rivitalo: "Rivitalo", kerrostalo: "Kerrostalo", paritalo: "Paritalo" },
+  en: { omakotitalo: "Detached house", rivitalo: "Terraced house", kerrostalo: "Apartment block", paritalo: "Semi-detached" },
 };
 
-const MATERIAL_LABELS: Record<string, string> = {
-  puu: "Puu",
-  tiili: "Tiili",
-  betoni: "Betoni",
-  hirsi: "Hirsi",
+const MATERIAL_LABELS: Record<string, Record<string, string>> = {
+  fi: { puu: "Puu", tiili: "Tiili", betoni: "Betoni", hirsi: "Hirsi" },
+  en: { puu: "Wood", tiili: "Brick", betoni: "Concrete", hirsi: "Log" },
 };
 
-const HEATING_LABELS: Record<string, string> = {
-  kaukolampo: "Kaukolampo",
-  sahko: "Sahko",
-  maalampopumppu: "Maalampopumppu",
-  oljy: "Oljy",
+const HEATING_LABELS: Record<string, Record<string, string>> = {
+  fi: { kaukolampo: "Kaukolampo", sahko: "Sahko", maalampopumppu: "Maalampopumppu", oljy: "Oljy" },
+  en: { kaukolampo: "District heating", sahko: "Electric", maalampopumppu: "Ground source heat pump", oljy: "Oil" },
 };
 
 function AddressSearch({ onCreateProject }: { onCreateProject: (building: BuildingResult) => void }) {
@@ -57,6 +53,7 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BuildingResult | null>(null);
   const [searched, setSearched] = useState(false);
+  const { t, locale } = useTranslation();
 
   const search = useCallback(async () => {
     if (!query.trim() || query.trim().length < 3) return;
@@ -71,6 +68,10 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
     setLoading(false);
   }, [query]);
 
+  const buildingTypeLabels = BUILDING_TYPE_LABELS[locale] || BUILDING_TYPE_LABELS.fi;
+  const materialLabels = MATERIAL_LABELS[locale] || MATERIAL_LABELS.fi;
+  const heatingLabels = HEATING_LABELS[locale] || HEATING_LABELS.fi;
+
   return (
     <div style={{
       width: "100%",
@@ -80,19 +81,19 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
     }}>
       <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
         <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 12, letterSpacing: "0.12em" }}>
-          TALOHAUN DEMO
+          {t('search.demoLabel')}
         </div>
         <h2 className="heading-display" style={{ fontSize: 28, marginBottom: 8 }}>
-          Miltae talosi nayttaa 3D:ssa?
+          {t('search.title')}
         </h2>
         <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 24 }}>
-          Syota osoitteesi ja nae talosi kolmiulotteisena mallina.
+          {t('search.subtitle')}
         </p>
 
         <div style={{ display: "flex", gap: 8, maxWidth: 520, margin: "0 auto" }}>
           <input
             className="input"
-            placeholder="Syota osoitteesi, esim. Ribbingintie 109..."
+            placeholder={t('search.placeholder')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -107,7 +108,7 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
             disabled={loading || query.trim().length < 3}
             style={{ padding: "14px 28px", fontSize: 14 }}
           >
-            {loading ? "Haetaan..." : "Hae"}
+            {loading ? t('search.searching') : t('search.searchButton')}
           </button>
         </div>
 
@@ -126,7 +127,7 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
                   {result.address}
                 </h3>
                 <span className="badge badge-amber">
-                  {BUILDING_TYPE_LABELS[result.building_info.type] || result.building_info.type}
+                  {buildingTypeLabels[result.building_info.type] || result.building_info.type}
                 </span>
               </div>
               <div style={{
@@ -146,12 +147,12 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
               marginBottom: 20,
             }}>
               {[
-                { label: "Rakennettu", value: String(result.building_info.year_built) },
-                { label: "Pinta-ala", value: `${result.building_info.area_m2} m\u00B2` },
-                { label: "Kerroksia", value: String(result.building_info.floors) },
-                { label: "Materiaali", value: MATERIAL_LABELS[result.building_info.material] || result.building_info.material },
-                { label: "Lammitys", value: HEATING_LABELS[result.building_info.heating] || result.building_info.heating },
-                { label: "BOM-rivit", value: `${result.bom_suggestion.length} kpl` },
+                { label: t('search.yearBuilt'), value: String(result.building_info.year_built) },
+                { label: t('search.area'), value: `${result.building_info.area_m2} m\u00B2` },
+                { label: t('search.floors'), value: String(result.building_info.floors) },
+                { label: t('search.material'), value: materialLabels[result.building_info.material] || result.building_info.material },
+                { label: t('search.heating'), value: heatingLabels[result.building_info.heating] || result.building_info.heating },
+                { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
               ].map((item, i) => (
                 <div key={i} style={{
                   padding: "10px 12px",
@@ -170,7 +171,7 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
               onClick={() => onCreateProject(result)}
               style={{ width: "100%", padding: "13px 16px", fontSize: 14 }}
             >
-              Luo projekti tasta talosta
+              {t('search.createFromBuilding')}
             </button>
           </div>
         )}
@@ -182,7 +183,7 @@ function AddressSearch({ onCreateProject }: { onCreateProject: (building: Buildi
             color: "var(--text-muted)",
             fontSize: 13,
           }}>
-            Osoitetta ei loytynyt. Kokeile esim. &quot;Ribbingintie 109&quot; tai &quot;Uunimaentie 1&quot;.
+            {t('search.notFound')}
           </div>
         )}
       </div>
@@ -197,6 +198,7 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -209,7 +211,7 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
       setToken(result.token);
       onLogin();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kirjautuminen ei onnistunut");
+      setError(err instanceof Error ? err.message : t('auth.loginFailed'));
     }
     setLoading(false);
   }
@@ -248,23 +250,22 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
         <div style={{ position: "relative", zIndex: 1 }}>
           <div className="anim-up" style={{ marginBottom: 48 }}>
             <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.12em" }}>
-              N&Auml;E TALOSI &middot; MUUTA &middot; RAKENNA
+              {t('brand.tagline')}
             </div>
             <h1 className="heading-display" style={{ fontSize: 56, lineHeight: 1.05, marginBottom: 20 }}>
               <span style={{ color: "var(--text-primary)" }}>Hel</span>
               <span style={{ color: "var(--amber)" }}>scoop</span>
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.7, color: "var(--text-secondary)", maxWidth: 420 }}>
-              Parametrinen suunnittelutyokalu rakennusprojekteille.
-              Reaaliaikaiset hinnat suoraan K-Raudasta ja Sarokkaasta.
+              {t('brand.description')}
             </p>
           </div>
 
           <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {[
-              { num: "28", label: "Materiaalia", desc: "puu, eriste, katto, betoni" },
-              { num: "6", label: "Toimittajaa", desc: "K-Rauta, Sarokas, Ruukki..." },
-              { num: "AI", label: "Avustaja", desc: "kuvaile muutos, se toteutuu" },
+              { num: "28", label: t('brand.featureMaterials'), desc: t('brand.featureMaterialsDesc') },
+              { num: "6", label: t('brand.featureSuppliers'), desc: t('brand.featureSuppliersDesc') },
+              { num: "AI", label: t('brand.featureAI'), desc: t('brand.featureAIDesc') },
             ].map((item, i) => (
               <div key={i} style={{
                 display: "flex",
@@ -308,50 +309,54 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
         padding: "60px 40px",
         background: "var(--bg-secondary)",
         borderLeft: "1px solid var(--border)",
+        position: "relative",
       }}>
+        <div style={{ position: "absolute", top: 16, right: 16 }}>
+          <LanguageSwitcher />
+        </div>
         <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ marginBottom: 36 }}>
             <h2 className="heading-display" style={{ fontSize: 28, marginBottom: 8 }}>
-              {isRegister ? "Luo tili" : "Kirjaudu sisaan"}
+              {isRegister ? t('auth.registerTitle') : t('auth.loginTitle')}
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
               {pendingBuilding
-                ? "Kirjaudu luodaksesi projekti osoitteesta: " + pendingBuilding.address
+                ? t('auth.loginSubtitleBuilding') + pendingBuilding.address
                 : isRegister
-                  ? "Aloita rakennusprojektien suunnittelu"
-                  : "Jatka siita mihin jait"}
+                  ? t('auth.registerSubtitle')
+                  : t('auth.loginSubtitle')}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {isRegister && (
               <div>
-                <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>Nimi</label>
+                <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.name')}</label>
                 <input
                   className="input"
-                  placeholder="Matti Meikalainen"
+                  placeholder={t('auth.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
             )}
             <div>
-              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>Sahkoposti</label>
+              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.email')}</label>
               <input
                 className="input"
                 type="email"
-                placeholder="matti@esimerkki.fi"
+                placeholder={t('auth.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
             <div>
-              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>Salasana</label>
+              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.password')}</label>
               <input
                 className="input"
                 type="password"
-                placeholder="Salasana"
+                placeholder={t('auth.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -377,7 +382,7 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
               disabled={loading}
               style={{ width: "100%", padding: "13px 16px", fontSize: 14, marginTop: 4 }}
             >
-              {loading ? "Ladataan..." : isRegister ? "Luo tili" : "Kirjaudu"}
+              {loading ? t('auth.loading') : isRegister ? t('auth.register') : t('auth.login')}
             </button>
           </form>
 
@@ -395,7 +400,7 @@ function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingB
                 fontFamily: "var(--font-body)",
               }}
             >
-              {isRegister ? "Onko jo tili? Kirjaudu" : "Ei tilia? Luo uusi"}
+              {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}
             </button>
           </div>
         </div>
@@ -429,6 +434,7 @@ function ProjectList() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { t, locale } = useTranslation();
 
   useEffect(() => {
     let mounted = true;
@@ -442,12 +448,12 @@ function ProjectList() {
       })
       .catch((err) => {
         if (mounted) {
-          toast(err instanceof Error ? err.message : "Projektien lataus epaonnistui / Failed to load projects", "error");
+          toast(err instanceof Error ? err.message : t('toast.loadProjectsFailed'), "error");
           setLoading(false);
         }
       });
     return () => { mounted = false; };
-  }, [toast]);
+  }, [toast, t]);
 
   async function createProject() {
     if (!newName.trim()) return;
@@ -456,41 +462,41 @@ function ProjectList() {
       const p = await api.createProject({ name: newName });
       setProjects([p, ...projects]);
       setNewName("");
-      toast("Projekti luotu / Project created", "success");
+      toast(t('toast.projectCreated'), "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Projektin luonti epaonnistui / Failed to create project", "error");
+      toast(err instanceof Error ? err.message : t('toast.createProjectFailed'), "error");
     }
     setCreating(false);
   }
 
-  async function createFromTemplate(t: Template) {
+  async function createFromTemplate(tmpl: Template) {
     setCreating(true);
     try {
       const p = await api.createProject({
-        name: t.name,
-        description: t.description,
-        scene_js: t.scene_js,
+        name: tmpl.name,
+        description: tmpl.description,
+        scene_js: tmpl.scene_js,
       });
-      if (t.bom.length > 0) {
-        await api.saveBOM(p.id, t.bom);
+      if (tmpl.bom.length > 0) {
+        await api.saveBOM(p.id, tmpl.bom);
       }
-      setProjects([{ ...p, estimated_cost: t.estimated_cost }, ...projects]);
+      setProjects([{ ...p, estimated_cost: tmpl.estimated_cost }, ...projects]);
       setShowTemplates(false);
-      toast(`Projekti "${t.name}" luotu mallista / Created from template`, "success");
+      toast(t('toast.templateCreated'), "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Mallin luonti epaonnistui / Template creation failed", "error");
+      toast(err instanceof Error ? err.message : t('toast.templateFailed'), "error");
     }
     setCreating(false);
   }
 
   async function deleteProject(id: string) {
-    if (!confirm("Haluatko varmasti poistaa taman projektin?")) return;
+    if (!confirm(t('project.deleteConfirm'))) return;
     try {
       await api.deleteProject(id);
       setProjects(projects.filter((p) => p.id !== id));
-      toast("Projekti poistettu / Project deleted", "success");
+      toast(t('toast.projectDeleted'), "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Poistaminen epaonnistui / Delete failed", "error");
+      toast(err instanceof Error ? err.message : t('toast.deleteFailed'), "error");
     }
   }
 
@@ -498,10 +504,17 @@ function ProjectList() {
     try {
       const p = await api.duplicateProject(id);
       setProjects([p, ...projects]);
-      toast("Projekti kopioitu / Project duplicated", "success");
+      toast(t('toast.projectDuplicated'), "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Kopiointi epaonnistui / Duplicate failed", "error");
+      toast(err instanceof Error ? err.message : t('toast.duplicateFailed'), "error");
     }
+  }
+
+  function projectCountText(count: number): string {
+    if (locale === 'fi') {
+      return `${count} projekti${count !== 1 ? "a" : ""}`;
+    }
+    return `${count} project${count !== 1 ? "s" : ""}`;
   }
 
   return (
@@ -529,14 +542,15 @@ function ProjectList() {
               <span style={{ color: "var(--amber)" }}>scoop</span>
             </span>
             <div style={{ width: 1, height: 20, background: "var(--border-strong)", margin: "0 4px" }} />
-            <span className="label-mono">Projektit</span>
+            <span className="label-mono">{t('nav.projects')}</span>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <LanguageSwitcher />
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => (window.location.href = "/admin")}>
-              Hallinta
+              {t('nav.admin')}
             </button>
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => { setToken(null); window.location.reload(); }}>
-              Ulos
+              {t('nav.logout')}
             </button>
           </div>
         </div>
@@ -546,20 +560,20 @@ function ProjectList() {
         {/* Hero create section */}
         <div className="anim-up" style={{ marginBottom: 48 }}>
           <h1 className="heading-display" style={{ fontSize: 36, marginBottom: 6 }}>
-            Omat projektit
+            {t('project.myProjects')}
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: 15, marginBottom: 24 }}>
             {loading
-              ? "Ladataan projekteja..."
+              ? t('project.loadingProjects')
               : projects.length > 0
-                ? `${projects.length} projekti${projects.length !== 1 ? "a" : ""}`
-                : "Aloita ensimmainen projektisi"}
+                ? projectCountText(projects.length)
+                : t('project.startFirst')}
           </p>
 
           <div style={{ display: "flex", gap: 8, maxWidth: 560 }}>
             <input
               className="input"
-              placeholder="Uusi projekti, esim. 'Autotalli 6x4m'..."
+              placeholder={t('project.newProjectPlaceholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && createProject()}
@@ -571,14 +585,14 @@ function ProjectList() {
               disabled={creating || !newName.trim()}
               style={{ padding: "11px 24px" }}
             >
-              {creating ? "..." : "Luo"}
+              {creating ? "..." : t('project.create')}
             </button>
           </div>
 
           {/* Template picker */}
           <div style={{ marginTop: 28 }}>
             <div className="label-mono" style={{ marginBottom: 14, letterSpacing: "0.1em" }}>
-              Tai aloita mallista
+              {t('project.orStartFromTemplate')}
             </div>
             {loading ? (
               <div style={{
@@ -715,11 +729,10 @@ function ProjectList() {
               </svg>
             </div>
             <h3 className="heading-display" style={{ fontSize: 22, marginBottom: 8 }}>
-              Aloita ensimmainen projektisi
+              {t('project.noProjects')}
             </h3>
             <p style={{ color: "var(--text-muted)", fontSize: 14, maxWidth: 360, margin: "0 auto" }}>
-              Kirjoita projektin nimi yllaolevaan kenttaan.
-              Materiaalihinnat paivitetaan automaattisesti.
+              {t('project.noProjectsDesc')}
             </p>
           </div>
         ) : (
@@ -757,22 +770,22 @@ function ProjectList() {
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)", fontSize: 13 }}>
-                    <span>{p.description || "Ei kuvausta"}</span>
+                    <span>{p.description || t('project.emptyDescription')}</span>
                     <span style={{ opacity: 0.5 }}>&middot;</span>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                      {new Date(p.updated_at).toLocaleDateString("fi-FI")}
+                      {new Date(p.updated_at).toLocaleDateString(locale === 'fi' ? 'fi-FI' : 'en-GB')}
                     </span>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
                   <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => (window.location.href = `/project/${p.id}`)}>
-                    Avaa
+                    {t('project.open')}
                   </button>
                   <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => duplicateProject(p.id)}>
-                    Kopioi
+                    {t('project.copy')}
                   </button>
                   <button className="btn btn-danger" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => deleteProject(p.id)}>
-                    Poista
+                    {t('project.delete')}
                   </button>
                 </div>
               </div>
@@ -805,9 +818,10 @@ export default function Home() {
 
   async function createProjectFromBuilding(building: BuildingResult) {
     try {
+      const buildingTypeLabels = BUILDING_TYPE_LABELS.fi;
       const project = await api.createProject({
         name: building.address,
-        description: `${BUILDING_TYPE_LABELS[building.building_info.type] || building.building_info.type}, ${building.building_info.year_built}, ${building.building_info.area_m2} m\u00B2`,
+        description: `${buildingTypeLabels[building.building_info.type] || building.building_info.type}, ${building.building_info.year_built}, ${building.building_info.area_m2} m\u00B2`,
         scene_js: building.scene_js,
       });
       if (building.bom_suggestion.length > 0) {
