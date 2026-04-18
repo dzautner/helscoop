@@ -41,9 +41,11 @@ in vec2 vertexTexCoord;
 uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matView;
+uniform mat4 lightSpaceMatrix;
 out vec3 vNvs;
 out vec3 vVdir;
 out vec2 vTexCoord;
+out vec4 vLightSpacePos;
 void main() {
     vec4 wpos = matModel * vec4(vertexPosition, 1.0);
     vec3 nvs  = mat3(matView) * mat3(matModel) * vertexNormal;
@@ -51,6 +53,7 @@ void main() {
     vec3 vpos = (matView * wpos).xyz;
     vVdir     = normalize(-vpos);
     vTexCoord = vertexTexCoord;
+    vLightSpacePos = lightSpaceMatrix * wpos;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )glsl";
@@ -60,6 +63,7 @@ inline const char* kToonFS = R"glsl(
 in vec3 vNvs;
 in vec3 vVdir;
 in vec2 vTexCoord;
+in vec4 vLightSpacePos;
 out vec4 finalColor;
 
 uniform vec3 lightDirVS;
@@ -71,11 +75,36 @@ uniform float rimWeight;
 uniform float specWeight;
 uniform float specShininess;
 uniform sampler2D albedoTex;
-uniform int useTexture;  // 0 = solid color, 1 = sample texture
+uniform int useTexture;
+uniform sampler2D shadowMap;
+uniform int useShadows;
 
 float quantize(float x, int steps){
     float s = max(1, steps-1);
     return floor(clamp(x,0.0,1.0)*s + 1e-4)/s;
+}
+
+float calcShadow() {
+    if (useShadows == 0) return 1.0;
+    vec3 projCoords = vLightSpacePos.xyz / vLightSpacePos.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0) return 1.0;
+
+    float currentDepth = projCoords.z;
+    float bias = 0.003;
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            vec2 sampleCoord = projCoords.xy + vec2(x, y) * texelSize * 2.0;
+            vec2 packed = texture(shadowMap, sampleCoord).rg;
+            float closestDepth = packed.r + packed.g / 255.0;
+            shadow += currentDepth - bias > closestDepth ? 0.0 : 1.0;
+        }
+    }
+    shadow /= 9.0;
+    return smoothstep(0.0, 1.0, shadow);
 }
 
 void main() {
@@ -83,19 +112,19 @@ void main() {
     vec3 l   = normalize(lightDirVS);
     vec3 v   = normalize(vVdir);
 
-    // Get albedo color - either from texture or solid baseColor
     vec3 albedo = baseColor.rgb;
     if (useTexture > 0) {
         albedo = texture(albedoTex, vTexCoord).rgb * baseColor.rgb;
     }
 
+    float shadow = calcShadow();
     float ndl = max(0.0, dot(n,l));
-    float cel = quantize(ndl, toonSteps);
+    float cel = quantize(ndl * shadow, toonSteps);
 
     float rim = pow(1.0 - max(0.0, dot(n, v)), 1.5);
 
     float spec = pow(max(0.0, dot(reflect(-l, n), v)), specShininess);
-    spec = step(0.5, spec) * specWeight;
+    spec = step(0.5, spec) * specWeight * shadow;
 
     float shade = clamp(ambient + diffuseWeight*cel + rimWeight*rim + spec, 0.0, 1.0);
     finalColor  = vec4(albedo * shade, 1.0);

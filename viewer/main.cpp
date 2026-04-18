@@ -667,6 +667,9 @@ int main(int argc, char *argv[]) {
   const int locSpecShininess = GetShaderLocation(toonShader, "specShininess");
   const int locAlbedoTex = GetShaderLocation(toonShader, "albedoTex");
   const int locUseTexture = GetShaderLocation(toonShader, "useTexture");
+  const int locToonShadowMap = GetShaderLocation(toonShader, "shadowMap");
+  const int locToonUseShadows = GetShaderLocation(toonShader, "useShadows");
+  const int locToonLightSpaceMatrix = GetShaderLocation(toonShader, "lightSpaceMatrix");
   Material toonMat = LoadMaterialDefault();
   toonMat.shader = toonShader;
   // Tell raylib that our albedoTex sampler is at SHADER_LOC_MAP_DIFFUSE location
@@ -1530,7 +1533,7 @@ int main(int argc, char *argv[]) {
     // SHADOW MAP PASS - Render depth from light's perspective
     // ========================================================================
     Matrix lightSpaceMatrix = MatrixIdentity();
-    if (shadowsEnabled && pbrModeEnabled) {
+    if (shadowsEnabled) {
       Vector3 lightDir = lightDirWS;
       Vector3 sceneCenter = {
         (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f,
@@ -1600,6 +1603,9 @@ int main(int argc, char *argv[]) {
       SetShaderValue(pbrShadowShader, locPbrShadowLightColor2, pbrLightColor2, SHADER_UNIFORM_VEC3);
 
       // Shadow map is manually bound to texture unit 3 in the draw loop below
+
+      // Also set for toon shader if shadows are available
+      SetShaderValueMatrix(toonShader, locToonLightSpaceMatrix, lightSpaceMatrix);
     }
 
     // ========================================================================
@@ -1762,10 +1768,19 @@ int main(int argc, char *argv[]) {
     }
 
     // Bind shadow map to texture unit 3 once before the object loop
-    if (pbrModeEnabled && shadowsEnabled) {
+    if (shadowsEnabled) {
       rlActiveTextureSlot(3);
       rlEnableTexture(shadowMap.texture.id);
       rlActiveTextureSlot(0);
+      if (!pbrModeEnabled) {
+        const int toonShadowUnit = 3;
+        SetShaderValue(toonShader, locToonShadowMap, &toonShadowUnit, SHADER_UNIFORM_INT);
+        const int useShadowsVal = 1;
+        SetShaderValue(toonShader, locToonUseShadows, &useShadowsVal, SHADER_UNIFORM_INT);
+      }
+    } else if (!pbrModeEnabled) {
+      const int useShadowsVal = 0;
+      SetShaderValue(toonShader, locToonUseShadows, &useShadowsVal, SHADER_UNIFORM_INT);
     }
 
     // Main shading pass
@@ -1874,7 +1889,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Unbind shadow map from unit 3 after the object loop
-    if (pbrModeEnabled && shadowsEnabled) {
+    if (shadowsEnabled) {
       rlActiveTextureSlot(3);
       rlDisableTexture();
       rlActiveTextureSlot(0);
