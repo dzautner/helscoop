@@ -265,6 +265,180 @@ function BomPanel({
   );
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+function ChatPanel({
+  sceneJs,
+  onApplyCode,
+}: {
+  sceneJs: string;
+  onApplyCode: (code: string) => void;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function send() {
+    if (!input.trim() || loading) return;
+    const userMsg: ChatMessage = { role: "user", content: input };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const reply = await api.chat(newMessages, sceneJs);
+      setMessages([...newMessages, reply]);
+    } catch {
+      setMessages([
+        ...newMessages,
+        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
+      ]);
+    }
+    setLoading(false);
+  }
+
+  function extractCode(content: string): string | null {
+    const match = content.match(/```(?:javascript|js)?\n([\s\S]*?)```/);
+    return match ? match[1].trim() : null;
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "#fff",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid #e5e7eb",
+          fontSize: 14,
+          fontWeight: 600,
+        }}
+      >
+        AI Scene Assistant
+      </div>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        {messages.length === 0 && (
+          <div style={{ color: "#999", fontSize: 13, padding: 12, textAlign: "center" }}>
+            Describe what you want to build or change. For example:
+            <br />
+            <em>&quot;Add a roof to the building&quot;</em>
+            <br />
+            <em>&quot;Make the walls taller&quot;</em>
+            <br />
+            <em>&quot;Add a window to the back wall&quot;</em>
+          </div>
+        )}
+        {messages.map((msg, i) => {
+          const code = msg.role === "assistant" ? extractCode(msg.content) : null;
+          const textContent = msg.content
+            .replace(/```(?:javascript|js)?\n[\s\S]*?```/g, "[code block]")
+            .trim();
+
+          return (
+            <div
+              key={i}
+              style={{
+                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                maxWidth: "85%",
+              }}
+            >
+              <div
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 12,
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  background: msg.role === "user" ? "#2563eb" : "#f3f4f6",
+                  color: msg.role === "user" ? "#fff" : "#1f2937",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {textContent}
+              </div>
+              {code && (
+                <button
+                  onClick={() => onApplyCode(code)}
+                  style={{
+                    marginTop: 4,
+                    padding: "4px 10px",
+                    background: "#059669",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  Apply to Scene
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {loading && (
+          <div style={{ color: "#999", fontSize: 13, padding: 8 }}>Thinking...</div>
+        )}
+      </div>
+      <div
+        style={{
+          padding: 12,
+          borderTop: "1px solid #e5e7eb",
+          display: "flex",
+          gap: 6,
+        }}
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+          placeholder="Describe a change..."
+          style={{
+            flex: 1,
+            padding: "8px 12px",
+            border: "1px solid #ddd",
+            borderRadius: 8,
+            fontSize: 13,
+            outline: "none",
+          }}
+        />
+        <button
+          onClick={send}
+          disabled={loading || !input.trim()}
+          style={{
+            padding: "8px 14px",
+            background: loading || !input.trim() ? "#e5e7eb" : "#2563eb",
+            color: loading || !input.trim() ? "#999" : "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: loading || !input.trim() ? "default" : "pointer",
+            fontSize: 13,
+          }}
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const DEFAULT_SCENE = `// DingCAD Scene Script
 // Available: box(w,h,d), cylinder(r,h), sphere(r)
 // Transforms: translate(mesh, x,y,z), rotate(mesh, rx,ry,rz)
@@ -298,6 +472,7 @@ export default function ProjectPage() {
   const [error, setError] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -507,6 +682,20 @@ export default function ProjectPage() {
         >
           Export BOM
         </button>
+        <button
+          onClick={() => setShowChat(!showChat)}
+          style={{
+            padding: "6px 12px",
+            background: showChat ? "#2563eb" : "#f3f4f6",
+            color: showChat ? "#fff" : "#333",
+            border: showChat ? "none" : "1px solid #ddd",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          AI Chat
+        </button>
       </div>
 
       {/* Main content */}
@@ -522,6 +711,17 @@ export default function ProjectPage() {
         >
           <SceneEditor sceneJs={sceneJs} onChange={setSceneJs} />
         </div>
+        {showChat && (
+          <div
+            style={{
+              width: 340,
+              borderLeft: "1px solid #e5e7eb",
+              flexShrink: 0,
+            }}
+          >
+            <ChatPanel sceneJs={sceneJs} onApplyCode={setSceneJs} />
+          </div>
+        )}
         <BomPanel
           bom={bom}
           materials={materials}

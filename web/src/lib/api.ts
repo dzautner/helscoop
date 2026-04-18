@@ -70,4 +70,10 @@ export const api = {
 
   getCategories: () => apiFetch("/categories"),
   exportBOM: (projectId: string) => apiFetch(`/bom/export/${projectId}`),
+
+  chat: (messages: { role: string; content: string }[], currentScene: string) =>
+    apiFetch("/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages, currentScene }),
+    }),
 };
