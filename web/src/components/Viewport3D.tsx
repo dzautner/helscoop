@@ -26,20 +26,6 @@ const CAMERA_PRESETS: CameraPreset[] = [
   { position: [5, 4, 5], target: [0, 1.5, 0], key: "editor.cameraIso" },
 ];
 
-const TOOLBAR_BTN: React.CSSProperties = {
-  padding: "4px 7px",
-  fontSize: 11,
-  fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace',
-  background: "rgba(0,0,0,0.55)",
-  color: "rgba(255,255,255,0.78)",
-  border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 4,
-  cursor: "pointer",
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
-  lineHeight: 1,
-  transition: "background 0.15s, color 0.15s",
-};
 
 /** Recursively dispose all geometries and materials in an Object3D tree */
 function disposeObject(obj: THREE.Object3D) {
@@ -146,15 +132,6 @@ function animateCamera(
   requestAnimationFrame(step);
 }
 
-function hoverIn(e: React.MouseEvent<HTMLButtonElement>) {
-  e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-  e.currentTarget.style.color = "rgba(255,255,255,0.95)";
-}
-function hoverOut(e: React.MouseEvent<HTMLButtonElement>) {
-  e.currentTarget.style.background = "rgba(0,0,0,0.55)";
-  e.currentTarget.style.color = "rgba(255,255,255,0.78)";
-}
-
 function CameraToolbar({
   cameraRef,
   controlsRef,
@@ -215,51 +192,23 @@ function CameraToolbar({
   }, [rendererRef, sceneRef, cameraRef]);
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 10,
-        left: 10,
-        display: "flex",
-        gap: 4,
-        zIndex: 10,
-        pointerEvents: "auto",
-      }}
-    >
+    <div className="viewport-cam-bar">
       {CAMERA_PRESETS.map((preset, i) => (
         <button
           key={i}
+          className="viewport-cam-btn"
           onClick={() => handlePreset(preset)}
           title={t(preset.key)}
-          style={TOOLBAR_BTN}
-          onMouseEnter={hoverIn}
-          onMouseLeave={hoverOut}
         >
           {t(preset.key)}
         </button>
       ))}
       <button
+        className="viewport-cam-btn"
         onClick={handleScreenshot}
         title={t("editor.screenshot")}
-        style={{
-          ...TOOLBAR_BTN,
-          display: "flex",
-          alignItems: "center",
-          gap: 3,
-        }}
-        onMouseEnter={hoverIn}
-        onMouseLeave={hoverOut}
       >
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
           <circle cx="12" cy="13" r="4" />
         </svg>
