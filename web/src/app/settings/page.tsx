@@ -7,6 +7,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { resetOnboarding } from "@/components/OnboardingTour";
 
 interface UserProfile {
   id: string;
@@ -335,9 +336,56 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* Account section */}
+        {/* Onboarding tour section */}
         <div
           className="card anim-up delay-2 settings-card"
+          style={{ marginBottom: 20 }}
+        >
+          <h2
+            className="heading-display"
+            style={{ fontSize: 20, marginBottom: 4 }}
+          >
+            {t("onboarding.restartTour")}
+          </h2>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 14,
+              marginBottom: 24,
+            }}
+          >
+            {t("onboarding.restartTourDesc")}
+          </p>
+
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              resetOnboarding();
+              toast(t("onboarding.tourRestarted"), "success");
+            }}
+            style={{ padding: "11px 24px" }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ marginRight: 4 }}
+            >
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            {t("onboarding.restartTour")}
+          </button>
+        </div>
+
+        {/* Account section */}
+        <div
+          className="card anim-up delay-3 settings-card"
         >
           <h2
             className="heading-display"

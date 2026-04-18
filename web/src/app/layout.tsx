@@ -3,6 +3,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import OnboardingTour from "@/components/OnboardingTour";
 
 export const metadata: Metadata = {
   title: {
@@ -90,7 +91,10 @@ export default function RootLayout({
       <body className="grain">
         <ThemeProvider>
           <LocaleProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              {children}
+              <OnboardingTour />
+            </ToastProvider>
           </LocaleProvider>
         </ThemeProvider>
       </body>

@@ -385,7 +385,7 @@ export default function ProjectPage() {
           <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
             {t('editor.save')}
           </button>
-          <button className="btn btn-ghost" onClick={async () => {
+          <button className="btn btn-ghost" data-tour="export-btn" onClick={async () => {
             try {
               const res = await api.exportBOM(projectId);
               const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
@@ -419,6 +419,7 @@ export default function ProjectPage() {
           </button>
           <button
             className="btn"
+            data-tour="chat-toggle"
             onClick={() => setShowChat(!showChat)}
             style={{
               padding: "6px 12px",
@@ -529,6 +530,7 @@ export default function ProjectPage() {
           {/* 3D Viewport */}
           <div
             ref={viewportRef}
+            data-tour="viewport"
             style={{
               flex: 1,
               minHeight: 0,
