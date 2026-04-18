@@ -96,6 +96,16 @@ export interface Category {
   hidden: boolean;
 }
 
+export interface PriceHistoryRow {
+  id: string;
+  pricing_id: string;
+  unit_price: string;
+  scraped_at: string;
+  source: string;
+  supplier_name: string;
+  supplier_id: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
