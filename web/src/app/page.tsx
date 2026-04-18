@@ -17,10 +17,12 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   const [name, setName] = useState("");
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       const result = isRegister
         ? await api.register(email, password, name)
@@ -30,31 +32,98 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     }
+    setLoading(false);
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "80px auto", padding: 32, background: "#fff", borderRadius: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.1)" }}>
-      <h1 style={{ margin: "0 0 8px", fontSize: 28 }}>DingCAD</h1>
-      <p style={{ color: "#666", marginBottom: 24 }}>Parametric CAD for construction</p>
-      <form onSubmit={handleSubmit}>
-        {isRegister && (
-          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)}
-            style={{ width: "100%", padding: 12, marginBottom: 12, borderRadius: 8, border: "1px solid #ddd", boxSizing: "border-box" }} />
-        )}
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required
-          style={{ width: "100%", padding: 12, marginBottom: 12, borderRadius: 8, border: "1px solid #ddd", boxSizing: "border-box" }} />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required
-          style={{ width: "100%", padding: 12, marginBottom: 16, borderRadius: 8, border: "1px solid #ddd", boxSizing: "border-box" }} />
-        {error && <p style={{ color: "red", fontSize: 14 }}>{error}</p>}
-        <button type="submit" style={{ width: "100%", padding: 12, background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 16 }}>
-          {isRegister ? "Sign Up" : "Log In"}
-        </button>
-      </form>
-      <p style={{ textAlign: "center", marginTop: 16, fontSize: 14 }}>
-        <button onClick={() => setIsRegister(!isRegister)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer" }}>
-          {isRegister ? "Already have an account? Log in" : "Need an account? Sign up"}
-        </button>
-      </p>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%)",
+      }}
+    >
+      <div className="animate-in" style={{ width: 380, padding: 40 }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: "var(--accent-muted)",
+              marginBottom: 16,
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 20h20M5 20V8l7-5 7 5v12M9 20v-6h6v6" />
+            </svg>
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>DingCAD</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+            Parametric CAD for construction
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {isRegister && (
+            <input
+              className="input"
+              placeholder="Full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          )}
+          <input
+            className="input"
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            className="input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error && (
+            <div className="badge-danger" style={{ padding: "8px 12px", borderRadius: 8, fontSize: 13, background: "var(--danger-muted)" }}>
+              {error}
+            </div>
+          )}
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={loading}
+            style={{ width: "100%", padding: "12px 16px", fontSize: 14, marginTop: 4 }}
+          >
+            {loading ? "..." : isRegister ? "Create Account" : "Sign In"}
+          </button>
+        </form>
+
+        <div style={{ textAlign: "center", marginTop: 20 }}>
+          <button
+            onClick={() => { setIsRegister(!isRegister); setError(""); }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--accent)",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            {isRegister ? "Already have an account? Sign in" : "Need an account? Create one"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -62,6 +131,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
 function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     api.getProjects().then(setProjects).catch(console.error);
@@ -69,9 +139,11 @@ function ProjectList() {
 
   async function createProject() {
     if (!newName.trim()) return;
+    setCreating(true);
     const p = await api.createProject({ name: newName });
     setProjects([p, ...projects]);
     setNewName("");
+    setCreating(false);
   }
 
   async function deleteProject(id: string) {
@@ -86,52 +158,126 @@ function ProjectList() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto", padding: "0 20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
-        <h1 style={{ margin: 0 }}>My Projects</h1>
-        <button onClick={() => { setToken(null); window.location.reload(); }}
-          style={{ background: "none", border: "1px solid #ddd", padding: "8px 16px", borderRadius: 8, cursor: "pointer" }}>
-          Log Out
-        </button>
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: "40px 20px" }}>
+      <div className="animate-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 36 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Projects</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+            {projects.length} project{projects.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => (window.location.href = "/admin")}
+            className="btn btn-ghost"
+          >
+            Admin
+          </button>
+          <button
+            onClick={() => { setToken(null); window.location.reload(); }}
+            className="btn btn-ghost"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        <input placeholder="New project name..." value={newName} onChange={(e) => setNewName(e.target.value)}
+      <div className="animate-in" style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        <input
+          className="input"
+          placeholder="New project name..."
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && createProject()}
-          style={{ flex: 1, padding: 12, borderRadius: 8, border: "1px solid #ddd" }} />
-        <button onClick={createProject}
-          style={{ padding: "12px 24px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}>
-          Create
+          style={{ flex: 1 }}
+        />
+        <button
+          className="btn btn-primary"
+          onClick={createProject}
+          disabled={creating || !newName.trim()}
+          style={{ padding: "10px 24px" }}
+        >
+          {creating ? "..." : "Create"}
         </button>
       </div>
 
       {projects.length === 0 ? (
-        <p style={{ color: "#666", textAlign: "center", padding: 40 }}>No projects yet. Create your first one above.</p>
+        <div
+          className="card animate-in"
+          style={{
+            padding: "60px 40px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              background: "var(--accent-muted)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 16,
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+            No projects yet. Create your first one above.
+          </p>
+        </div>
       ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {projects.map((p) => (
-            <div key={p.id} style={{ background: "#fff", padding: 20, borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h3 style={{ margin: "0 0 4px" }}>{p.name}</h3>
-                <p style={{ margin: 0, color: "#666", fontSize: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {projects.map((p, i) => (
+            <div
+              key={p.id}
+              className="card"
+              style={{
+                padding: "18px 24px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                animation: `fadeIn 0.3s ease-out ${i * 0.05}s both`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--text-muted)";
+                e.currentTarget.style.background = "var(--bg-tertiary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.background = "var(--bg-secondary)";
+              }}
+              onClick={() => (window.location.href = `/project/${p.id}`)}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{p.name}</h3>
+                  {p.estimated_cost > 0 && (
+                    <span className="badge badge-success">
+                      {Number(p.estimated_cost).toFixed(0)} EUR
+                    </span>
+                  )}
+                </div>
+                <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
                   {p.description || "No description"}
-                  {p.estimated_cost > 0 && ` — Est. ${Number(p.estimated_cost).toFixed(2)} EUR`}
-                </p>
-                <p style={{ margin: "4px 0 0", color: "#999", fontSize: 12 }}>
-                  Updated {new Date(p.updated_at).toLocaleDateString()}
+                  <span style={{ marginLeft: 8, opacity: 0.6 }}>
+                    {new Date(p.updated_at).toLocaleDateString()}
+                  </span>
                 </p>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => window.location.href = `/project/${p.id}`}
-                  style={{ padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
-                  Open
-                </button>
-                <button onClick={() => duplicateProject(p.id)}
-                  style={{ padding: "8px 12px", background: "#f3f4f6", border: "none", borderRadius: 6, cursor: "pointer" }}>
+              <div
+                style={{ display: "flex", gap: 6 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button className="btn btn-ghost" style={{ padding: "6px 12px" }} onClick={() => duplicateProject(p.id)}>
                   Duplicate
                 </button>
-                <button onClick={() => deleteProject(p.id)}
-                  style={{ padding: "8px 12px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, cursor: "pointer" }}>
+                <button className="btn btn-danger" style={{ padding: "6px 12px" }} onClick={() => deleteProject(p.id)}>
                   Delete
                 </button>
               </div>

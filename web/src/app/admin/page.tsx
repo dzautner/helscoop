@@ -36,6 +36,28 @@ interface StalePrice {
   days_stale: number;
 }
 
+const tableStyle = {
+  width: "100%",
+  borderCollapse: "collapse" as const,
+  fontSize: 13,
+};
+
+const thStyle = {
+  padding: "10px 16px",
+  textAlign: "left" as const,
+  fontSize: 11,
+  fontWeight: 600 as const,
+  color: "var(--text-muted)",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.05em",
+  borderBottom: "1px solid var(--border)",
+};
+
+const tdStyle = {
+  padding: "12px 16px",
+  borderBottom: "1px solid var(--border)",
+};
+
 function MaterialsTab() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filter, setFilter] = useState("");
@@ -52,92 +74,74 @@ function MaterialsTab() {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         <input
+          className="input"
           placeholder="Filter materials..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            fontSize: 13,
-          }}
+          style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
         />
-        <span style={{ padding: "8px 0", color: "#666", fontSize: 13 }}>
-          {filtered.length} of {materials.length}
+        <span className="badge badge-accent">
+          {filtered.length}/{materials.length}
         </span>
       </div>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: 13,
-        }}
-      >
-        <thead>
-          <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
-            <th style={{ padding: "8px 12px" }}>Name</th>
-            <th style={{ padding: "8px 12px" }}>Category</th>
-            <th style={{ padding: "8px 12px" }}>Waste</th>
-            <th style={{ padding: "8px 12px" }}>Primary Price</th>
-            <th style={{ padding: "8px 12px" }}>Supplier</th>
-            <th style={{ padding: "8px 12px" }}>Alt Prices</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((m) => {
-            const primary = m.pricing?.find((p) => p.is_primary);
-            const altCount = (m.pricing?.length || 0) - (primary ? 1 : 0);
-            return (
-              <tr
-                key={m.id}
-                style={{ borderBottom: "1px solid #f3f4f6" }}
-              >
-                <td style={{ padding: "8px 12px", fontWeight: 500 }}>
-                  {m.name}
-                </td>
-                <td style={{ padding: "8px 12px", color: "#666" }}>
-                  {m.category_name}
-                </td>
-                <td style={{ padding: "8px 12px" }}>
-                  {((m.waste_factor - 1) * 100).toFixed(0)}%
-                </td>
-                <td style={{ padding: "8px 12px" }}>
-                  {primary ? (
-                    <span style={{ color: "#059669", fontWeight: 500 }}>
-                      {primary.unit_price.toFixed(2)} {primary.currency}/{primary.unit}
-                    </span>
-                  ) : (
-                    <span style={{ color: "#dc2626" }}>No price</span>
-                  )}
-                </td>
-                <td style={{ padding: "8px 12px", color: "#666" }}>
-                  {primary?.supplier_name || "-"}
-                </td>
-                <td style={{ padding: "8px 12px" }}>
-                  {altCount > 0 ? (
-                    <span
-                      style={{
-                        background: "#dbeafe",
-                        color: "#2563eb",
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        fontSize: 11,
-                      }}
-                    >
-                      +{altCount}
-                    </span>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div style={{ overflowX: "auto" }}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Name</th>
+              <th style={thStyle}>Category</th>
+              <th style={thStyle}>Waste</th>
+              <th style={thStyle}>Primary Price</th>
+              <th style={thStyle}>Supplier</th>
+              <th style={thStyle}>Alt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((m, i) => {
+              const primary = m.pricing?.find((p) => p.is_primary);
+              const altCount = (m.pricing?.length || 0) - (primary ? 1 : 0);
+              return (
+                <tr
+                  key={m.id}
+                  style={{
+                    animation: `fadeIn 0.2s ease-out ${i * 0.02}s both`,
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>{m.name}</td>
+                  <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{m.category_name}</td>
+                  <td style={{ ...tdStyle, fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                    {((m.waste_factor - 1) * 100).toFixed(0)}%
+                  </td>
+                  <td style={tdStyle}>
+                    {primary ? (
+                      <span style={{ color: "var(--success)", fontFamily: "var(--font-mono)", fontWeight: 500, fontSize: 12 }}>
+                        {primary.unit_price.toFixed(2)} {primary.currency}/{primary.unit}
+                      </span>
+                    ) : (
+                      <span className="badge badge-danger">No price</span>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, color: "var(--text-muted)" }}>
+                    {primary?.supplier_name || "-"}
+                  </td>
+                  <td style={tdStyle}>
+                    {altCount > 0 ? (
+                      <span className="badge badge-accent">+{altCount}</span>
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>-</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -151,46 +155,43 @@ function SuppliersTab() {
 
   return (
     <div>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: 13,
-        }}
-      >
+      <table style={tableStyle}>
         <thead>
-          <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
-            <th style={{ padding: "8px 12px" }}>Supplier</th>
-            <th style={{ padding: "8px 12px" }}>Website</th>
-            <th style={{ padding: "8px 12px" }}>Products</th>
-            <th style={{ padding: "8px 12px" }}>Oldest Price</th>
+          <tr>
+            <th style={thStyle}>Supplier</th>
+            <th style={thStyle}>Website</th>
+            <th style={thStyle}>Products</th>
+            <th style={thStyle}>Oldest Price</th>
           </tr>
         </thead>
         <tbody>
-          {suppliers.map((s) => (
-            <tr key={s.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-              <td style={{ padding: "8px 12px", fontWeight: 500 }}>
-                {s.name}
-              </td>
-              <td style={{ padding: "8px 12px" }}>
+          {suppliers.map((s, i) => (
+            <tr
+              key={s.id}
+              style={{ animation: `fadeIn 0.2s ease-out ${i * 0.04}s both`, transition: "background 0.1s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <td style={{ ...tdStyle, fontWeight: 500 }}>{s.name}</td>
+              <td style={tdStyle}>
                 {s.website ? (
                   <a
                     href={s.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "#2563eb", textDecoration: "none" }}
+                    style={{ color: "var(--accent)", textDecoration: "none" }}
                   >
                     {new URL(s.website).hostname}
                   </a>
                 ) : (
-                  "-"
+                  <span style={{ color: "var(--text-muted)" }}>-</span>
                 )}
               </td>
-              <td style={{ padding: "8px 12px" }}>{s.product_count}</td>
-              <td style={{ padding: "8px 12px", color: "#666" }}>
-                {s.oldest_price
-                  ? new Date(s.oldest_price).toLocaleDateString()
-                  : "-"}
+              <td style={tdStyle}>
+                <span className="badge badge-accent">{s.product_count}</span>
+              </td>
+              <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                {s.oldest_price ? new Date(s.oldest_price).toLocaleDateString() : "-"}
               </td>
             </tr>
           ))}
@@ -209,57 +210,43 @@ function PricingTab() {
 
   return (
     <div>
-      <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>
-        Stale Prices (&gt;30 days old)
-      </h3>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Stale Prices</h3>
+        <span className="badge badge-warning">&gt;30 days old</span>
+      </div>
       {stale.length === 0 ? (
-        <p style={{ color: "#059669", padding: 20, textAlign: "center" }}>
-          All prices are up to date.
-        </p>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <span className="badge badge-success" style={{ padding: "6px 16px", fontSize: 13 }}>
+            All prices up to date
+          </span>
+        </div>
       ) : (
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 13,
-          }}
-        >
+        <table style={tableStyle}>
           <thead>
-            <tr
-              style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}
-            >
-              <th style={{ padding: "8px 12px" }}>Material</th>
-              <th style={{ padding: "8px 12px" }}>Supplier</th>
-              <th style={{ padding: "8px 12px" }}>Price</th>
-              <th style={{ padding: "8px 12px" }}>Last Scraped</th>
-              <th style={{ padding: "8px 12px" }}>Days Stale</th>
+            <tr>
+              <th style={thStyle}>Material</th>
+              <th style={thStyle}>Supplier</th>
+              <th style={thStyle}>Price</th>
+              <th style={thStyle}>Last Scraped</th>
+              <th style={thStyle}>Stale</th>
             </tr>
           </thead>
           <tbody>
             {stale.map((s, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "8px 12px", fontWeight: 500 }}>
-                  {s.material_name}
-                </td>
-                <td style={{ padding: "8px 12px" }}>{s.supplier_name}</td>
-                <td style={{ padding: "8px 12px" }}>
+              <tr
+                key={i}
+                style={{ animation: `fadeIn 0.2s ease-out ${i * 0.04}s both` }}
+              >
+                <td style={{ ...tdStyle, fontWeight: 500 }}>{s.material_name}</td>
+                <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{s.supplier_name}</td>
+                <td style={{ ...tdStyle, fontFamily: "var(--font-mono)", fontSize: 12 }}>
                   {s.unit_price.toFixed(2)} EUR
                 </td>
-                <td style={{ padding: "8px 12px", color: "#666" }}>
+                <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                   {new Date(s.last_scraped_at).toLocaleDateString()}
                 </td>
-                <td style={{ padding: "8px 12px" }}>
-                  <span
-                    style={{
-                      background:
-                        s.days_stale > 60 ? "#fee2e2" : "#fef3c7",
-                      color: s.days_stale > 60 ? "#dc2626" : "#d97706",
-                      padding: "2px 8px",
-                      borderRadius: 10,
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
+                <td style={tdStyle}>
+                  <span className={`badge ${s.days_stale > 60 ? "badge-danger" : "badge-warning"}`}>
                     {s.days_stale}d
                   </span>
                 </td>
@@ -299,67 +286,57 @@ export default function AdminPage() {
 
   if (!authorized) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "#666" }}>
+      <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
         Checking access...
       </div>
     );
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "materials", label: "Materials" },
-    { key: "suppliers", label: "Suppliers" },
-    { key: "pricing", label: "Pricing" },
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: "materials", label: "Materials", icon: "M4 6h16M4 12h16M4 18h16" },
+    { key: "suppliers", label: "Suppliers", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
+    { key: "pricing", label: "Pricing", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
   ];
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px" }}>
+    <div className="animate-in" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 24,
+          marginBottom: 32,
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 24 }}>Admin Panel</h1>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px" }}>Admin</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
+            Manage materials, suppliers, and pricing data
+          </p>
+        </div>
         <button
+          className="btn btn-ghost"
           onClick={() => (window.location.href = "/")}
-          style={{
-            background: "none",
-            border: "1px solid #ddd",
-            padding: "6px 14px",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
-          }}
         >
-          Back to Projects
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back
         </button>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          marginBottom: 24,
-          borderBottom: "1px solid #e5e7eb",
-        }}
-      >
+      <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
         {tabs.map((t) => (
           <button
             key={t.key}
+            className="btn"
             onClick={() => setTab(t.key)}
             style={{
               padding: "10px 20px",
-              border: "none",
-              background: "none",
-              cursor: "pointer",
-              fontSize: 14,
+              background: tab === t.key ? "var(--accent-muted)" : "transparent",
+              color: tab === t.key ? "var(--accent)" : "var(--text-muted)",
               fontWeight: tab === t.key ? 600 : 400,
-              color: tab === t.key ? "#2563eb" : "#666",
-              borderBottom:
-                tab === t.key ? "2px solid #2563eb" : "2px solid transparent",
-              marginBottom: -1,
+              borderRadius: "var(--radius-sm)",
             }}
           >
             {t.label}
@@ -368,12 +345,8 @@ export default function AdminPage() {
       </div>
 
       <div
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          padding: 24,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-        }}
+        className="card"
+        style={{ padding: 24 }}
       >
         {tab === "materials" && <MaterialsTab />}
         {tab === "suppliers" && <SuppliersTab />}

@@ -42,23 +42,26 @@ function SceneEditor({
 }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-      <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#666" }}>
-        Scene Script (JavaScript)
-      </h3>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }} />
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Scene Script
+        </span>
+      </div>
       <textarea
         value={sceneJs}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
         style={{
           flex: 1,
-          fontFamily: "ui-monospace, 'Cascadia Code', Menlo, monospace",
+          fontFamily: "var(--font-mono)",
           fontSize: 13,
-          lineHeight: 1.5,
-          padding: 12,
-          border: "1px solid #ddd",
-          borderRadius: 8,
+          lineHeight: 1.7,
+          padding: 20,
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)",
           resize: "none",
-          background: "#1e1e2e",
+          background: "var(--bg-tertiary)",
           color: "#cdd6f4",
           outline: "none",
           tabSize: 2,
@@ -103,67 +106,61 @@ function BomPanel({
     <div
       style={{
         width: 360,
-        borderLeft: "1px solid #e5e7eb",
+        borderLeft: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
-        background: "#fff",
+        background: "var(--bg-secondary)",
       }}
     >
-      <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #e5e7eb" }}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>Bill of Materials</h3>
-        <p style={{ margin: 0, fontSize: 13, color: "#666" }}>
-          Est. total:{" "}
-          <strong style={{ color: "#059669" }}>{total.toFixed(2)} EUR</strong>
-        </p>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Bill of Materials</h3>
+          <span className="badge badge-success" style={{ fontSize: 12, padding: "3px 10px" }}>
+            {total.toFixed(2)} EUR
+          </span>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
         {bom.length === 0 ? (
-          <p style={{ color: "#999", textAlign: "center", padding: 20, fontSize: 13 }}>
-            No materials added yet.
-          </p>
+          <div style={{ textAlign: "center", padding: "32px 16px" }}>
+            <div style={{ color: "var(--text-muted)", fontSize: 13 }}>
+              No materials added yet
+            </div>
+          </div>
         ) : (
           bom.map((item) => (
             <div
               key={item.material_id}
               style={{
-                padding: "10px 12px",
-                background: "#f9fafb",
-                borderRadius: 8,
-                marginBottom: 8,
+                padding: "12px 14px",
+                background: "var(--bg-tertiary)",
+                borderRadius: "var(--radius-sm)",
+                marginBottom: 6,
                 fontSize: 13,
+                border: "1px solid var(--border)",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <strong>{item.material_name}</strong>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong style={{ fontSize: 13, fontWeight: 500 }}>{item.material_name}</strong>
                 <button
                   onClick={() => onRemove(item.material_id)}
                   style={{
                     background: "none",
                     border: "none",
-                    color: "#dc2626",
+                    color: "var(--danger)",
                     cursor: "pointer",
-                    fontSize: 16,
+                    fontSize: 14,
                     padding: "0 4px",
+                    opacity: 0.6,
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
                 >
                   x
                 </button>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginTop: 6,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
                 <input
                   type="number"
                   min={0.01}
@@ -173,22 +170,26 @@ function BomPanel({
                     onUpdateQty(item.material_id, parseFloat(e.target.value) || 0)
                   }
                   style={{
-                    width: 60,
+                    width: 56,
                     padding: "4px 6px",
-                    border: "1px solid #ddd",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border)",
                     borderRadius: 4,
-                    fontSize: 13,
+                    fontSize: 12,
+                    color: "var(--text-primary)",
+                    outline: "none",
+                    fontFamily: "var(--font-mono)",
                   }}
                 />
-                <span style={{ color: "#666" }}>
-                  {item.unit} x {(item.unit_price || 0).toFixed(2)} EUR
+                <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                  {item.unit} x {(item.unit_price || 0).toFixed(2)}
                 </span>
-                <span style={{ marginLeft: "auto", fontWeight: 600 }}>
+                <span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--success)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                   {(item.total || 0).toFixed(2)}
                 </span>
               </div>
               {item.supplier && (
-                <div style={{ color: "#999", fontSize: 11, marginTop: 4 }}>
+                <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 6 }}>
                   {item.supplier}
                 </div>
               )}
@@ -200,7 +201,7 @@ function BomPanel({
       <div
         style={{
           padding: 12,
-          borderTop: "1px solid #e5e7eb",
+          borderTop: "1px solid var(--border)",
           display: "flex",
           gap: 6,
           alignItems: "center",
@@ -211,10 +212,13 @@ function BomPanel({
           onChange={(e) => setSelectedMat(e.target.value)}
           style={{
             flex: 1,
-            padding: "6px 8px",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            fontSize: 13,
+            padding: "7px 8px",
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            fontSize: 12,
+            color: "var(--text-primary)",
+            outline: "none",
           }}
         >
           <option value="">Add material...</option>
@@ -232,14 +236,19 @@ function BomPanel({
           value={qty}
           onChange={(e) => setQty(parseInt(e.target.value) || 1)}
           style={{
-            width: 50,
-            padding: "6px 8px",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            fontSize: 13,
+            width: 48,
+            padding: "7px 6px",
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            fontSize: 12,
+            color: "var(--text-primary)",
+            outline: "none",
+            fontFamily: "var(--font-mono)",
           }}
         />
         <button
+          className={`btn ${selectedMat ? "btn-primary" : ""}`}
           onClick={() => {
             if (selectedMat) {
               onAdd(selectedMat, qty);
@@ -249,13 +258,9 @@ function BomPanel({
           }}
           disabled={!selectedMat}
           style={{
-            padding: "6px 14px",
-            background: selectedMat ? "#2563eb" : "#e5e7eb",
-            color: selectedMat ? "#fff" : "#999",
-            border: "none",
-            borderRadius: 6,
-            cursor: selectedMat ? "pointer" : "default",
-            fontSize: 13,
+            padding: "7px 14px",
+            fontSize: 12,
+            opacity: selectedMat ? 1 : 0.4,
           }}
         >
           Add
@@ -295,7 +300,7 @@ function ChatPanel({
     } catch {
       setMessages([
         ...newMessages,
-        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
+        { role: "assistant", content: "Something went wrong. Please try again." },
       ]);
     }
     setLoading(false);
@@ -308,22 +313,29 @@ function ChatPanel({
 
   return (
     <div
+      className="animate-slide"
       style={{
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "#fff",
+        background: "var(--bg-secondary)",
       }}
     >
       <div
         style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid #e5e7eb",
-          fontSize: 14,
+          padding: "14px 16px",
+          borderBottom: "1px solid var(--border)",
+          fontSize: 13,
           fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
         }}
       >
-        AI Scene Assistant
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        AI Assistant
       </div>
       <div
         style={{
@@ -336,14 +348,16 @@ function ChatPanel({
         }}
       >
         {messages.length === 0 && (
-          <div style={{ color: "#999", fontSize: 13, padding: 12, textAlign: "center" }}>
-            Describe what you want to build or change. For example:
+          <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "24px 12px", textAlign: "center", lineHeight: 2 }}>
+            Describe what you want to build or change.
             <br />
-            <em>&quot;Add a roof to the building&quot;</em>
+            <span style={{ color: "var(--accent)", opacity: 0.7 }}>
+              &ldquo;Add a roof to the building&rdquo;
+            </span>
             <br />
-            <em>&quot;Make the walls taller&quot;</em>
-            <br />
-            <em>&quot;Add a window to the back wall&quot;</em>
+            <span style={{ color: "var(--accent)", opacity: 0.7 }}>
+              &ldquo;Add a window to the back wall&rdquo;
+            </span>
           </div>
         )}
         {messages.map((msg, i) => {
@@ -355,19 +369,20 @@ function ChatPanel({
           return (
             <div
               key={i}
+              className="animate-in"
               style={{
                 alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "85%",
+                maxWidth: "88%",
               }}
             >
               <div
                 style={{
                   padding: "8px 12px",
-                  borderRadius: 12,
+                  borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
                   fontSize: 13,
                   lineHeight: 1.5,
-                  background: msg.role === "user" ? "#2563eb" : "#f3f4f6",
-                  color: msg.role === "user" ? "#fff" : "#1f2937",
+                  background: msg.role === "user" ? "var(--accent)" : "var(--bg-elevated)",
+                  color: msg.role === "user" ? "#fff" : "var(--text-primary)",
                   whiteSpace: "pre-wrap",
                 }}
               >
@@ -375,16 +390,15 @@ function ChatPanel({
               </div>
               {code && (
                 <button
+                  className="btn"
                   onClick={() => onApplyCode(code)}
                   style={{
-                    marginTop: 4,
+                    marginTop: 6,
                     padding: "4px 10px",
-                    background: "#059669",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 12,
+                    background: "var(--success-muted)",
+                    color: "var(--success)",
+                    fontSize: 11,
+                    fontWeight: 600,
                   }}
                 >
                   Apply to Scene
@@ -394,45 +408,41 @@ function ChatPanel({
           );
         })}
         {loading && (
-          <div style={{ color: "#999", fontSize: 13, padding: 8 }}>Thinking...</div>
+          <div style={{ color: "var(--accent)", fontSize: 13, padding: 8 }}>
+            <span style={{ animation: "pulse 1.5s infinite" }}>Thinking...</span>
+          </div>
         )}
       </div>
       <div
         style={{
           padding: 12,
-          borderTop: "1px solid #e5e7eb",
+          borderTop: "1px solid var(--border)",
           display: "flex",
           gap: 6,
         }}
       >
         <input
+          className="input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
           placeholder="Describe a change..."
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            fontSize: 13,
-            outline: "none",
-          }}
+          style={{ flex: 1, padding: "8px 12px", fontSize: 13 }}
         />
         <button
+          className="btn btn-primary"
           onClick={send}
           disabled={loading || !input.trim()}
           style={{
             padding: "8px 14px",
-            background: loading || !input.trim() ? "#e5e7eb" : "#2563eb",
-            color: loading || !input.trim() ? "#999" : "#fff",
-            border: "none",
-            borderRadius: 8,
-            cursor: loading || !input.trim() ? "default" : "pointer",
             fontSize: 13,
+            opacity: loading || !input.trim() ? 0.4 : 1,
           }}
         >
-          Send
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
         </button>
       </div>
     </div>
@@ -550,20 +560,10 @@ export default function ProjectPage() {
 
   if (error) {
     return (
-      <div style={{ padding: 40, textAlign: "center" }}>
-        <h2>Error</h2>
-        <p style={{ color: "#dc2626" }}>{error}</p>
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            padding: "8px 16px",
-            background: "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-          }}
-        >
+      <div className="animate-in" style={{ padding: 60, textAlign: "center" }}>
+        <h2 style={{ marginBottom: 8 }}>Error</h2>
+        <p style={{ color: "var(--danger)", marginBottom: 16 }}>{error}</p>
+        <button className="btn btn-primary" onClick={() => router.push("/")}>
           Back to Projects
         </button>
       </div>
@@ -572,7 +572,7 @@ export default function ProjectPage() {
 
   if (!project) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "#666" }}>
+      <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
         Loading project...
       </div>
     );
@@ -584,7 +584,6 @@ export default function ProjectPage() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        background: "#f5f5f5",
       }}
     >
       {/* Header */}
@@ -592,35 +591,29 @@ export default function ProjectPage() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: 10,
           padding: "8px 16px",
-          background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
+          background: "var(--bg-secondary)",
+          borderBottom: "1px solid var(--border)",
           flexShrink: 0,
         }}
       >
-        <button
-          onClick={() => router.push("/")}
-          style={{
-            background: "none",
-            border: "1px solid #ddd",
-            padding: "6px 12px",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
-          Back
+        <button className="btn btn-ghost" onClick={() => router.push("/")} style={{ padding: "6px 10px" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </button>
+        <div style={{ width: 1, height: 20, background: "var(--border)" }} />
         <input
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
           style={{
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: 600,
             border: "none",
             background: "transparent",
             outline: "none",
+            color: "var(--text-primary)",
             flex: 1,
           }}
         />
@@ -630,71 +623,44 @@ export default function ProjectPage() {
           placeholder="Description..."
           style={{
             fontSize: 13,
-            color: "#666",
+            color: "var(--text-muted)",
             border: "none",
             background: "transparent",
             outline: "none",
-            width: 200,
+            width: 180,
           }}
         />
-        <span style={{ fontSize: 12, color: "#999" }}>
-          {saving
-            ? "Saving..."
-            : lastSaved
-            ? `Saved ${lastSaved}`
-            : ""}
+        <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+          {saving ? "saving..." : lastSaved ? `saved ${lastSaved}` : ""}
         </span>
-        <button
-          onClick={save}
-          style={{
-            padding: "6px 16px",
-            background: "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
+        <button className="btn btn-primary" onClick={save} style={{ padding: "6px 16px" }}>
           Save
         </button>
-        <button
-          onClick={async () => {
-            const res = await api.exportBOM(projectId);
-            const blob = new Blob([JSON.stringify(res, null, 2)], {
-              type: "application/json",
-            });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `bom_${projectId}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          style={{
-            padding: "6px 12px",
-            background: "#f3f4f6",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
-          Export BOM
+        <button className="btn btn-ghost" onClick={async () => {
+          const res = await api.exportBOM(projectId);
+          const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `bom_${projectId}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }}>
+          Export
         </button>
         <button
+          className="btn"
           onClick={() => setShowChat(!showChat)}
           style={{
             padding: "6px 12px",
-            background: showChat ? "#2563eb" : "#f3f4f6",
-            color: showChat ? "#fff" : "#333",
-            border: showChat ? "none" : "1px solid #ddd",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
+            background: showChat ? "var(--accent)" : "var(--accent-muted)",
+            color: showChat ? "#fff" : "var(--accent)",
           }}
         >
-          AI Chat
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          AI
         </button>
       </div>
 
@@ -712,13 +678,7 @@ export default function ProjectPage() {
           <SceneEditor sceneJs={sceneJs} onChange={setSceneJs} />
         </div>
         {showChat && (
-          <div
-            style={{
-              width: 340,
-              borderLeft: "1px solid #e5e7eb",
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ width: 340, borderLeft: "1px solid var(--border)", flexShrink: 0 }}>
             <ChatPanel sceneJs={sceneJs} onApplyCode={setSceneJs} />
           </div>
         )}
