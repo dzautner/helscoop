@@ -601,6 +601,7 @@ int main(int argc, char *argv[]) {
   const int locGPShadowsActive = GetShaderLocation(groundPlaneShader, "shadowsActive");
   const int locGPLightSpaceMatrix = GetShaderLocation(groundPlaneShader, "lightSpaceMatrix");
   const int locGPGridSpacing = GetShaderLocation(groundPlaneShader, "gridSpacing");
+  const int locGPCleanMode = GetShaderLocation(groundPlaneShader, "cleanMode");
 
   Material groundPlaneMat = LoadMaterialDefault();
   groundPlaneMat.shader = groundPlaneShader;
@@ -1589,18 +1590,26 @@ int main(int argc, char *argv[]) {
     }
 
     BeginMode3D(camera);
-    if (pbrModeEnabled && !renderWhiteBackground) {
+    if (pbrModeEnabled) {
       // Draw ground plane positioned at cached scene bounds
       float minY = cachedSceneBounds.min.y;
       float centerX = (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f;
       float centerZ = (cachedSceneBounds.min.z + cachedSceneBounds.max.z) * 0.5f;
 
       // Set ground plane shader uniforms
-      float gpGroundCol[3] = {0.60f, 0.58f, 0.55f};   // Neutral warm stone
-      float gpHorizonCol[3] = {skyGroundCol[0], skyGroundCol[1], skyGroundCol[2]};
-      float gpFadeRadius = groundPlaneSize * 0.5f;
+      float gpGroundCol[3], gpHorizonCol[3];
+      float gpCleanMode = 0.0f;
+      if (renderWhiteBackground) {
+        gpGroundCol[0] = 0.96f; gpGroundCol[1] = 0.95f; gpGroundCol[2] = 0.94f;
+        gpHorizonCol[0] = 0.98f; gpHorizonCol[1] = 0.98f; gpHorizonCol[2] = 0.98f;
+        gpCleanMode = 1.0f;
+      } else {
+        gpGroundCol[0] = 0.60f; gpGroundCol[1] = 0.58f; gpGroundCol[2] = 0.55f;
+        gpHorizonCol[0] = skyGroundCol[0]; gpHorizonCol[1] = skyGroundCol[1]; gpHorizonCol[2] = skyGroundCol[2];
+      }
+      float gpFadeRadius = groundPlaneSize * (renderWhiteBackground ? 0.35f : 0.5f);
       float gpCenter[3] = {centerX, 0.0f, centerZ};
-      float gpLightCol[3] = {1.0f, 0.95f, 0.9f};      // Warm white light
+      float gpLightCol[3] = {1.0f, 0.95f, 0.9f};
       float gpCamPos[3] = {camera.position.x, camera.position.y, camera.position.z};
       SetShaderValue(groundPlaneShader, locGroundColor, gpGroundCol, SHADER_UNIFORM_VEC3);
       SetShaderValue(groundPlaneShader, locHorizonColor, gpHorizonCol, SHADER_UNIFORM_VEC3);
@@ -1609,6 +1618,7 @@ int main(int argc, char *argv[]) {
       SetShaderValue(groundPlaneShader, locGPLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
       SetShaderValue(groundPlaneShader, locGPLightColor, gpLightCol, SHADER_UNIFORM_VEC3);
       SetShaderValue(groundPlaneShader, locGPCameraPos, gpCamPos, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPCleanMode, &gpCleanMode, SHADER_UNIFORM_FLOAT);
       float gpGridSpacing = static_cast<float>(currentDisplayScale * 1000.0);
       SetShaderValue(groundPlaneShader, locGPGridSpacing, &gpGridSpacing, SHADER_UNIFORM_FLOAT);
 

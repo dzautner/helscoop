@@ -895,6 +895,7 @@ uniform vec3 cameraPos;
 uniform sampler2D shadowMap;
 uniform int shadowsActive;
 uniform float gridSpacing;
+uniform float cleanMode;   // 0.0 = normal textured ground, 1.0 = clean white-ish studio floor
 
 float gridLine(vec2 worldPos, float spacing, float lineWidth) {
     vec2 grid = abs(fract(worldPos / spacing - 0.5) - 0.5) / fwidth(worldPos / spacing);
@@ -984,31 +985,33 @@ void main() {
         }
     }
 
-    // Diffuse lighting with shadow
+    // Diffuse lighting with shadow (reduced shadow in clean mode)
     float NdotL = max(dot(N, lightDir), 0.0);
-    vec3 ambient = vec3(0.50) * (1.0 - shadow * 0.20);
-    vec3 diffuse = lightColor * NdotL * 0.50 * (1.0 - shadow * 0.75);
+    float shadowAmt = shadow * mix(1.0, 0.4, cleanMode);
+    vec3 ambient = mix(vec3(0.50), vec3(0.85), cleanMode) * (1.0 - shadowAmt * 0.20);
+    vec3 diffuse = lightColor * NdotL * mix(0.50, 0.15, cleanMode) * (1.0 - shadowAmt * 0.75);
     vec3 lighting = ambient + diffuse;
 
-    // Subtle procedural variation for natural ground texture
+    // Procedural texture variation (suppressed in clean mode)
     vec2 p = fragWorldPos.xz;
     float macroN = fbm(p * 0.09);
     float microN = fbm(p * 0.55 + vec2(19.7, -13.1));
-    vec3 warmTint = vec3(0.62, 0.60, 0.56);
-    vec3 coolTint = vec3(0.56, 0.57, 0.55);
+    vec3 warmTint = groundColor * vec3(1.02, 1.00, 0.98);
+    vec3 coolTint = groundColor * vec3(0.97, 0.98, 0.97);
     vec3 localGround = mix(coolTint, warmTint, smoothstep(0.3, 0.7, macroN));
-    localGround *= mix(0.95, 1.05, microN);
+    float variation = mix(1.0, mix(0.95, 1.05, microN), 1.0 - cleanMode * 0.8);
+    localGround *= variation;
 
     // Blend toward horizon tint with distance
-    vec3 baseColor = mix(localGround, horizonColor * 0.92, smoothstep(fadeRadius * 0.12, fadeRadius, dist) * 0.4);
+    vec3 baseColor = mix(localGround, horizonColor * 0.96, smoothstep(fadeRadius * 0.12, fadeRadius, dist) * 0.4);
 
-    // Apply lighting and a subtle grazing highlight to avoid flatness.
+    // Grazing highlight (reduced in clean mode)
     vec3 V = normalize(cameraPos - fragWorldPos);
     float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-    vec3 color = baseColor * lighting + rim * vec3(0.045, 0.05, 0.04);
+    vec3 color = baseColor * lighting + rim * vec3(0.045, 0.05, 0.04) * (1.0 - cleanMode * 0.7);
 
-    // Grid overlay
-    if (gridSpacing > 0.0) {
+    // Grid overlay (hidden in clean mode)
+    if (gridSpacing > 0.0 && cleanMode < 0.5) {
         float minorGrid = gridLine(fragWorldPos.xz, gridSpacing, 1.0);
         float majorGrid = gridLine(fragWorldPos.xz, gridSpacing * 5.0, 1.0);
         float gridFade = 1.0 - smoothstep(fadeRadius * 0.15, fadeRadius * 0.6, dist);
