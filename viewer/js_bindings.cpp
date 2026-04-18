@@ -1258,6 +1258,31 @@ JSValue JsOffset2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return result;
 }
 
+// star2D(outerRadius, innerRadius, points) — returns a star polygon
+JSValue JsStar2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 3) return JS_ThrowTypeError(ctx, "star2D expects (outerRadius, innerRadius, points)");
+  double outerR = 10.0, innerR = 5.0;
+  int32_t points = 5;
+  if (JS_ToFloat64(ctx, &outerR, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &innerR, argv[1]) < 0) return JS_EXCEPTION;
+  if (JS_ToInt32(ctx, &points, argv[2]) < 0) return JS_EXCEPTION;
+  if (points < 3) points = 3;
+
+  int totalVerts = points * 2;
+  JSValue poly = JS_NewArray(ctx);
+  for (int i = 0; i < totalVerts; i++) {
+    double angle = 2.0 * M_PI * i / totalVerts - M_PI / 2.0;
+    double r = (i % 2 == 0) ? outerR : innerR;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, r * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, r * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
 // hull2D(polygon) or hull2D(polygon1, polygon2, ...) or hull2D([pt1, pt2, ...])
 // Returns the convex hull as a polygon array
 JSValue JsHull2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
@@ -2096,6 +2121,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsRect2D, "rect2D", 3));
   JS_SetPropertyStr(ctx, global, "hull2D",
                     JS_NewCFunction(ctx, JsHull2D, "hull2D", 1));
+  JS_SetPropertyStr(ctx, global, "star2D",
+                    JS_NewCFunction(ctx, JsStar2D, "star2D", 3));
   JS_SetPropertyStr(ctx, global, "torus",
                     JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",
