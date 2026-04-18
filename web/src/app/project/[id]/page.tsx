@@ -132,11 +132,32 @@ function BomPanel({
       }}
     >
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
-          <span className="badge badge-success" style={{ fontSize: 12, padding: "3px 10px" }}>
-            {total.toFixed(2)} EUR
+          <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
+            {bom.length} {bom.length === 1 ? 'rivi' : 'rivia'}
           </span>
+        </div>
+        <div style={{
+          padding: "14px 16px",
+          background: "linear-gradient(135deg, rgba(196,145,92,0.12) 0%, rgba(196,145,92,0.04) 100%)",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--amber-border)",
+        }}>
+          <div className="label-mono" style={{ fontSize: 10, color: "var(--amber)", marginBottom: 6 }}>
+            ARVIOITU KOKONAISHINTA
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span className="heading-display" style={{ fontSize: 24, color: "var(--text-primary)" }}>
+              {total > 0 ? total.toLocaleString('fi-FI', { maximumFractionDigits: 0 }) : '0'}
+            </span>
+            <span style={{ fontSize: 14, color: "var(--text-muted)" }}>&euro;</span>
+            {total > 0 && (
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                sis. ALV 25.5%
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
