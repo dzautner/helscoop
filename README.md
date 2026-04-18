@@ -126,6 +126,7 @@ See `examples/` for parametric examples:
 | bracket | circle2D, rect2D, offset2D, rounded corners, bolt holes |
 | badge | hull2D, offset2D, multi-material, boolean cutouts |
 | medallion | arc2D, star2D, ellipse2D, decorative relief patterns |
+| wrench | hull2D, arc2D, slot2D, parametric open-end wrench |
 | helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode
