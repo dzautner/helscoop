@@ -83,7 +83,7 @@ function MaterialsTab() {
           onChange={(e) => setFilter(e.target.value)}
           style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
         />
-        <span className="badge badge-accent">
+        <span className="badge badge-amber">
           {filtered.length}/{materials.length}
         </span>
       </div>
@@ -164,7 +164,7 @@ function MaterialsTab() {
                   </td>
                   <td style={tdStyle}>
                     {altCount > 0 ? (
-                      <span className="badge badge-accent">+{altCount}</span>
+                      <span className="badge badge-amber">+{altCount}</span>
                     ) : (
                       <span style={{ color: "var(--text-muted)" }}>-</span>
                     )}
@@ -221,7 +221,7 @@ function SuppliersTab() {
                 )}
               </td>
               <td style={tdStyle}>
-                <span className="badge badge-accent">{s.product_count}</span>
+                <span className="badge badge-amber">{s.product_count}</span>
               </td>
               <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 {s.oldest_price ? new Date(s.oldest_price).toLocaleDateString() : "-"}
@@ -245,11 +245,11 @@ function PricingTab() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Vanhentuneet hinnat</h3>
-        <span className="badge badge-warning">&gt;30 paivaa</span>
+        <span className="badge badge-amber">&gt;30 paivaa</span>
       </div>
       {stale.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px" }}>
-          <span className="badge badge-success" style={{ padding: "6px 16px", fontSize: 13 }}>
+          <span className="badge badge-forest" style={{ padding: "6px 16px", fontSize: 13 }}>
             Kaikki hinnat ajan tasalla
           </span>
         </div>
@@ -332,7 +332,7 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="animate-in" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
+    <div className="anim-up" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
       <div
         style={{
           display: "flex",
@@ -342,7 +342,7 @@ export default function AdminPage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px" }}>Hallintapaneeli</h1>
+          <h1 className="heading-display" style={{ fontSize: 24, margin: "0 0 4px" }}>Hallintapaneeli</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
             Materiaalit, toimittajat ja hinnoittelu
           </p>
@@ -366,10 +366,11 @@ export default function AdminPage() {
             onClick={() => setTab(t.key)}
             style={{
               padding: "10px 20px",
-              background: tab === t.key ? "var(--accent-muted)" : "transparent",
-              color: tab === t.key ? "var(--accent)" : "var(--text-muted)",
+              background: tab === t.key ? "var(--amber-glow)" : "transparent",
+              color: tab === t.key ? "var(--amber)" : "var(--text-muted)",
               fontWeight: tab === t.key ? 600 : 400,
               borderRadius: "var(--radius-sm)",
+              border: tab === t.key ? "1px solid var(--amber-border)" : "1px solid transparent",
             }}
           >
             {t.label}

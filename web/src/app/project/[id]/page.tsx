@@ -574,11 +574,11 @@ export default function ProjectPage() {
 
   if (error) {
     return (
-      <div className="animate-in" style={{ padding: 60, textAlign: "center" }}>
-        <h2 style={{ marginBottom: 8 }}>Error</h2>
+      <div className="anim-up" style={{ padding: 60, textAlign: "center" }}>
+        <h2 className="heading-display" style={{ marginBottom: 8 }}>Virhe</h2>
         <p style={{ color: "var(--danger)", marginBottom: 16 }}>{error}</p>
         <button className="btn btn-primary" onClick={() => router.push("/")}>
-          Back to Projects
+          Takaisin projekteihin
         </button>
       </div>
     );
@@ -587,7 +587,7 @@ export default function ProjectPage() {
   if (!project) {
     return (
       <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
-        Loading project...
+        Ladataan...
       </div>
     );
   }
@@ -622,8 +622,9 @@ export default function ProjectPage() {
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
           style={{
-            fontSize: 15,
+            fontSize: 16,
             fontWeight: 600,
+            fontFamily: "var(--font-display)",
             border: "none",
             background: "transparent",
             outline: "none",
@@ -634,7 +635,7 @@ export default function ProjectPage() {
         <input
           value={projectDesc}
           onChange={(e) => setProjectDesc(e.target.value)}
-          placeholder="Description..."
+          placeholder="Kuvaus..."
           style={{
             fontSize: 13,
             color: "var(--text-muted)",
