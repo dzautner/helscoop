@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { login, register, signToken, requireAuth } from "./auth";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
@@ -10,22 +12,92 @@ import chatRouter from "./routes/chat";
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
 
-app.use(cors());
-app.use(express.json());
+// Security headers
+app.use(helmet());
+
+// CORS configuration
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(",")
+      : ["http://localhost:3000", "http://localhost:3002"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Request body size limit
+app.use(express.json({ limit: "1mb" }));
+
+// General rate limiter: 100 requests per 15 minutes per IP
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later" },
+});
+app.use(generalLimiter);
+
+// Stricter rate limiter for auth endpoints: 10 requests per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many auth attempts, please try again later" },
+});
+
+// Stricter rate limiter for chat endpoint: 20 requests per 15 minutes per IP
+const chatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many chat requests, please try again later" },
+});
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-app.post("/auth/login", async (req, res) => {
+// Email validation regex
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Strip HTML tags from user input to prevent XSS
+function sanitize(input: string): string {
+  return input.replace(/<[^>]*>/g, "").trim();
+}
+
+app.post("/auth/login", authLimiter, async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
   const user = await login(email, password);
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
   res.json({ token: signToken(user), user });
 });
 
-app.post("/auth/register", async (req, res) => {
+app.post("/auth/register", authLimiter, async (req, res) => {
   const { email, password, name } = req.body;
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: "Email, password, and name are required" });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  }
+  if (name.length > 200) {
+    return res.status(400).json({ error: "Name must be 200 characters or fewer" });
+  }
+  const sanitizedName = sanitize(name);
   try {
-    const user = await register(email, password, name);
+    const user = await register(email, password, sanitizedName);
     res.status(201).json({ token: signToken(user), user });
   } catch (e: unknown) {
     console.error("Registration error:", e);
@@ -45,7 +117,7 @@ app.use("/materials", materialsRouter);
 app.use("/projects", projectsRouter);
 app.use("/suppliers", suppliersRouter);
 app.use("/pricing", pricingRouter);
-app.use("/chat", chatRouter);
+app.use("/chat", chatLimiter, chatRouter);
 
 app.get("/materials/export/viewer", async (_req, res) => {
   const { query: dbQuery } = await import("./db");
