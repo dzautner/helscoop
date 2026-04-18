@@ -96,15 +96,23 @@ router.put("/:id/bom", async (req, res) => {
   if (proj.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
 
-  await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
-  for (const item of items) {
-    await query(
-      `INSERT INTO project_bom (project_id, material_id, quantity, unit)
-       VALUES ($1, $2, $3, $4)`,
-      [req.params.id, item.material_id, item.quantity, item.unit || "kpl"]
-    );
+  try {
+    await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
+    let inserted = 0;
+    for (const item of items) {
+      const matExists = await query("SELECT id FROM materials WHERE id=$1", [item.material_id]);
+      if (matExists.rows.length === 0) continue;
+      await query(
+        `INSERT INTO project_bom (project_id, material_id, quantity, unit)
+         VALUES ($1, $2, $3, $4)`,
+        [req.params.id, item.material_id, item.quantity, item.unit || "kpl"]
+      );
+      inserted++;
+    }
+    res.json({ ok: true, count: inserted, skipped: items.length - inserted });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to save BOM", detail: err.message });
   }
-  res.json({ ok: true, count: items.length });
 });
 
 router.post("/:id/duplicate", async (req, res) => {
