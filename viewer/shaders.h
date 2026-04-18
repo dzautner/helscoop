@@ -1144,29 +1144,55 @@ void main() {
 }
 )glsl";
 
-// SSAO blur shader - simple box blur to smooth the noisy SSAO
+// SSAO blur shader - edge-preserving bilateral blur
 inline const char* kSSAOBlurFS = R"glsl(
 #version 330
 in vec2 uv;
 out vec4 finalColor;
 
 uniform sampler2D texture0;  // SSAO raw texture (auto-bound by raylib)
+uniform sampler2D normalDepthTex;
 uniform vec2 texelSize;
 
 void main() {
+    float centerAO = texture(texture0, uv).r;
+    vec4 centerND = texture(normalDepthTex, uv);
+    float centerDepth = centerND.a;
+    vec3 centerNormal = centerND.rgb;
+
+    if (centerDepth > 0.99) {
+        finalColor = vec4(1.0);
+        return;
+    }
+
     float result = 0.0;
-    const int BLUR_SIZE = 2;
-    float count = 0.0;
+    float totalWeight = 0.0;
+    const int BLUR_SIZE = 3;
 
     for (int x = -BLUR_SIZE; x <= BLUR_SIZE; x++) {
         for (int y = -BLUR_SIZE; y <= BLUR_SIZE; y++) {
             vec2 offset = vec2(float(x), float(y)) * texelSize;
-            result += texture(texture0, uv + offset).r;
-            count += 1.0;
+            vec2 sampleUV = uv + offset;
+            float sampleAO = texture(texture0, sampleUV).r;
+            vec4 sampleND = texture(normalDepthTex, sampleUV);
+
+            float depthDiff = abs(centerDepth - sampleND.a);
+            float depthWeight = exp(-depthDiff * depthDiff * 10000.0);
+
+            float normalDot = dot(centerNormal, sampleND.rgb);
+            float normalWeight = max(0.0, normalDot);
+            normalWeight = normalWeight * normalWeight;
+
+            float spatialDist = length(vec2(float(x), float(y)));
+            float spatialWeight = exp(-spatialDist * spatialDist * 0.08);
+
+            float w = depthWeight * normalWeight * spatialWeight;
+            result += sampleAO * w;
+            totalWeight += w;
         }
     }
 
-    result /= count;
+    result = totalWeight > 0.0 ? result / totalWeight : centerAO;
     finalColor = vec4(result, result, result, 1.0);
 }
 )glsl";

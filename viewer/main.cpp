@@ -698,6 +698,7 @@ int main(int argc, char *argv[]) {
 
   // SSAO blur shader setup (texture0 is auto-bound by raylib)
   const int locSSAOBlurTexelSize = GetShaderLocation(ssaoBlurShader, "texelSize");
+  const int locSSAOBlurNDTex = GetShaderLocation(ssaoBlurShader, "normalDepthTex");
 
   // FXAA shader setup
   const int locFXAATexelSize = GetShaderLocation(fxaaShader, "texelSize");
@@ -1933,6 +1934,7 @@ int main(int argc, char *argv[]) {
         1.0f / static_cast<float>(rtSSAORaw.texture.height)
     };
     SetShaderValue(ssaoBlurShader, locSSAOBlurTexelSize, ssaoBlurTexelSize, SHADER_UNIFORM_VEC2);
+    SetShaderValueTexture(ssaoBlurShader, locSSAOBlurNDTex, rtNormalDepth.texture);
 
     BeginShaderMode(ssaoBlurShader);
     const Rectangle blurSrcRect = {0.0f, 0.0f,
