@@ -63,49 +63,138 @@
 
   --text-primary: #12110f;
   --text-secondary: #3a3632;
-  --text-muted: #8a8480;
+  --text-muted: #706a65;           /* WCAG AA 5.03:1 against #faf8f5 */
 
-  --amber-glow: rgba(196, 145, 92, 0.1);
-  --amber-border: rgba(196, 145, 92, 0.25);
+  --amber: #9a6d3a;               /* Warmed/darkened for light bg — 4.29:1 (large text AA) */
+  --amber-light: #85592d;         /* Darkened for AA compliance — 5.72:1 */
+  --amber-dim: #7b5028;           /* Deep amber for text — 6.56:1 */
+  --amber-glow: rgba(154, 109, 58, 0.12);
+  --amber-border: rgba(154, 109, 58, 0.3);
 
-  --forest-dim: rgba(74, 124, 89, 0.1);
-  --danger-dim: rgba(199, 95, 95, 0.08);
+  --forest: #3a6b48;              /* Slightly darkened for light bg contrast */
+  --forest-dim: rgba(58, 107, 72, 0.1);
 
-  --border: rgba(0, 0, 0, 0.07);
-  --border-strong: rgba(0, 0, 0, 0.12);
+  --danger: #b04040;              /* Darkened red for light bg */
+  --danger-dim: rgba(176, 64, 64, 0.08);
 
-  --shadow-subtle: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 20px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.1);
-  --shadow-amber: 0 4px 30px rgba(196,145,92,0.06);
+  --warning: #92731e;             /* Darkened yellow for light bg — 4.22:1 */
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+
+  --shadow-subtle: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-amber: 0 4px 20px rgba(154,109,58,0.1);
   --shadow-sm: var(--shadow-subtle);
 
   --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
 }
 
+/* --- Light-theme component overrides --- */
+
 [data-theme="light"] .card {
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 4px 16px rgba(0,0,0,0.06);
+}
+
+[data-theme="light"] .btn-ghost {
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 [data-theme="light"] .btn-ghost:hover {
-  border-color: rgba(0,0,0,0.15);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0,0,0,0.2);
+}
+
+[data-theme="light"] .btn-danger {
+  background: rgba(176, 64, 64, 0.08);
+  border-color: rgba(176, 64, 64, 0.15);
 }
 
 [data-theme="light"] ::selection {
-  background: rgba(196, 145, 92, 0.2);
+  background: rgba(154, 109, 58, 0.25);
   color: #12110f;
 }
 
 [data-theme="light"] .badge-muted {
-  background: rgba(0,0,0,0.04);
+  background: rgba(0,0,0,0.05);
+  color: var(--text-muted);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="light"] .badge-amber {
   color: var(--amber-dim);
+  background: rgba(154, 109, 58, 0.1);
+  border-color: rgba(154, 109, 58, 0.2);
+}
+
+[data-theme="light"] .badge-forest {
+  color: var(--forest);
+}
+
+[data-theme="light"] .badge-danger {
+  color: var(--danger);
 }
 
 [data-theme="light"] .nav-bar {
-  background: rgba(250,248,245,0.85);
+  background: rgba(250,248,245,0.9);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Inputs & selects in light mode */
+[data-theme="light"] .input {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(154, 109, 58, 0.12);
+}
+
+[data-theme="light"] .input::placeholder {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] select,
+[data-theme="light"] input[type="number"] {
+  color-scheme: light;
+}
+
+/* Login panel border */
+[data-theme="light"] .login-form-panel {
+  border-left-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Divider in light mode */
+[data-theme="light"] .divider-amber {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(154,109,58,0.08) 15%,
+    rgba(154,109,58,0.3) 50%,
+    rgba(154,109,58,0.08) 85%,
+    transparent 100%
+  );
+}
+
+/* Label-mono contrast fix */
+[data-theme="light"] .label-mono {
+  color: var(--text-muted);
+}
+
+/* Scrollbar in light mode */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 /* Keep 3D viewport dark regardless of theme */
