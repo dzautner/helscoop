@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
+import { useTranslation } from "@/components/LocaleProvider";
 
 interface Viewport3DProps {
   sceneJs: string;
@@ -11,6 +12,34 @@ interface Viewport3DProps {
   onObjectCount?: (count: number) => void;
   onError?: (error: string | null) => void;
 }
+
+interface CameraPreset {
+  position: [number, number, number];
+  target: [number, number, number];
+  key: string;
+}
+
+const CAMERA_PRESETS: CameraPreset[] = [
+  { position: [0, 2, 8], target: [0, 1.5, 0], key: "editor.cameraFront" },
+  { position: [8, 2, 0], target: [0, 1.5, 0], key: "editor.cameraSide" },
+  { position: [0, 10, 0.01], target: [0, 0, 0], key: "editor.cameraTop" },
+  { position: [5, 4, 5], target: [0, 1.5, 0], key: "editor.cameraIso" },
+];
+
+const TOOLBAR_BTN: React.CSSProperties = {
+  padding: "4px 7px",
+  fontSize: 11,
+  fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace',
+  background: "rgba(0,0,0,0.55)",
+  color: "rgba(255,255,255,0.78)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 4,
+  cursor: "pointer",
+  backdropFilter: "blur(6px)",
+  WebkitBackdropFilter: "blur(6px)",
+  lineHeight: 1,
+  transition: "background 0.15s, color 0.15s",
+};
 
 function createGeometry(obj: SceneObject): THREE.BufferGeometry {
   switch (obj.geometry) {
@@ -69,6 +98,159 @@ function addSceneObjects(
   return count;
 }
 
+/** Smoothly animate camera + controls target to a new position over ~400ms */
+function animateCamera(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  toPos: [number, number, number],
+  toTarget: [number, number, number],
+  duration = 400
+) {
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const endPos = new THREE.Vector3(...toPos);
+  const endTarget = new THREE.Vector3(...toTarget);
+  const startTime = performance.now();
+
+  function step() {
+    const elapsed = performance.now() - startTime;
+    const raw = Math.min(elapsed / duration, 1);
+    // ease-out cubic
+    const t = 1 - Math.pow(1 - raw, 3);
+
+    camera.position.lerpVectors(startPos, endPos, t);
+    controls.target.lerpVectors(startTarget, endTarget, t);
+    controls.update();
+
+    if (raw < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function hoverIn(e: React.MouseEvent<HTMLButtonElement>) {
+  e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+  e.currentTarget.style.color = "rgba(255,255,255,0.95)";
+}
+function hoverOut(e: React.MouseEvent<HTMLButtonElement>) {
+  e.currentTarget.style.background = "rgba(0,0,0,0.55)";
+  e.currentTarget.style.color = "rgba(255,255,255,0.78)";
+}
+
+function CameraToolbar({
+  cameraRef,
+  controlsRef,
+  rendererRef,
+  sceneRef,
+}: {
+  cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
+  controlsRef: React.RefObject<OrbitControls | null>;
+  rendererRef: React.RefObject<THREE.WebGLRenderer | null>;
+  sceneRef: React.RefObject<THREE.Scene | null>;
+}) {
+  const { t } = useTranslation();
+
+  const handlePreset = useCallback(
+    (preset: CameraPreset) => {
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!camera || !controls) return;
+      animateCamera(camera, controls, preset.position, preset.target);
+    },
+    [cameraRef, controlsRef]
+  );
+
+  const handleScreenshot = useCallback(() => {
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!renderer || !scene || !camera) return;
+
+    // Render one clean frame
+    renderer.render(scene, camera);
+
+    const canvas = renderer.domElement;
+    // Create an offscreen canvas to composite watermark
+    const offscreen = document.createElement("canvas");
+    offscreen.width = canvas.width;
+    offscreen.height = canvas.height;
+    const ctx = offscreen.getContext("2d")!;
+    ctx.drawImage(canvas, 0, 0);
+
+    // Watermark
+    const fontSize = Math.max(12, Math.round(canvas.height * 0.018));
+    ctx.font = `${fontSize}px "SF Mono", "Fira Code", "Cascadia Code", monospace`;
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(
+      "helscoop.fi",
+      canvas.width - fontSize,
+      canvas.height - fontSize * 0.6
+    );
+
+    // Download
+    const link = document.createElement("a");
+    link.download = "helscoop-screenshot.png";
+    link.href = offscreen.toDataURL("image/png");
+    link.click();
+  }, [rendererRef, sceneRef, cameraRef]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 10,
+        left: 10,
+        display: "flex",
+        gap: 4,
+        zIndex: 10,
+        pointerEvents: "auto",
+      }}
+    >
+      {CAMERA_PRESETS.map((preset, i) => (
+        <button
+          key={i}
+          onClick={() => handlePreset(preset)}
+          title={t(preset.key)}
+          style={TOOLBAR_BTN}
+          onMouseEnter={hoverIn}
+          onMouseLeave={hoverOut}
+        >
+          {t(preset.key)}
+        </button>
+      ))}
+      <button
+        onClick={handleScreenshot}
+        title={t("editor.screenshot")}
+        style={{
+          ...TOOLBAR_BTN,
+          display: "flex",
+          alignItems: "center",
+          gap: 3,
+        }}
+        onMouseEnter={hoverIn}
+        onMouseLeave={hoverOut}
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function Viewport3D({
   sceneJs,
   wireframe = false,
@@ -108,17 +290,18 @@ export default function Viewport3D({
     bgTexture.magFilter = THREE.LinearFilter;
     scene.background = bgTexture;
 
-    // Camera
+    // Camera — default to Iso preset
     const aspect = container.clientWidth / container.clientHeight;
     const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 200);
-    camera.position.set(8, 6, 8);
-    camera.lookAt(0, 1, 0);
+    camera.position.set(5, 4, 5);
+    camera.lookAt(0, 1.5, 0);
     cameraRef.current = camera;
 
-    // Renderer
+    // Renderer — preserveDrawingBuffer for screenshot support
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
+      preserveDrawingBuffer: true,
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -133,7 +316,7 @@ export default function Viewport3D({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.target.set(0, 1, 0);
+    controls.target.set(0, 1.5, 0);
     controls.minDistance = 2;
     controls.maxDistance = 50;
     controls.maxPolarAngle = Math.PI * 0.85;
@@ -279,9 +462,7 @@ export default function Viewport3D({
         const camera = cameraRef.current;
         const controls = controlsRef.current;
         if (camera && controls) {
-          camera.position.set(8, 6, 8);
-          controls.target.set(0, 1, 0);
-          controls.update();
+          animateCamera(camera, controls, [5, 4, 5], [0, 1.5, 0]);
         }
       };
   }, []);
@@ -296,7 +477,15 @@ export default function Viewport3D({
         background: "#1a1816",
         borderRadius: "var(--radius-md)",
         overflow: "hidden",
+        position: "relative",
       }}
-    />
+    >
+      <CameraToolbar
+        cameraRef={cameraRef}
+        controlsRef={controlsRef}
+        rendererRef={rendererRef}
+        sceneRef={sceneRef}
+      />
+    </div>
   );
 }
