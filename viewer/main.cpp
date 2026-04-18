@@ -591,7 +591,17 @@ int main(int argc, char *argv[]) {
     if (camDist > 0.0f) {
       orbitDistance = camDist;
     } else {
-      orbitDistance = std::max(cameraFitSize * 1.2f * camDistScale, 0.01f);
+      float extentY = framingBounds.max.y - framingBounds.min.y;
+      float extentX = std::max(framingBounds.max.x - framingBounds.min.x,
+                               framingBounds.max.z - framingBounds.min.z);
+      float halfFovY = camera.fovy * 0.5f * DEG2RAD;
+      float aspect = static_cast<float>(renderWidth) / static_cast<float>(renderHeight);
+      float halfFovX = atanf(tanf(halfFovY) * aspect);
+      float distForHeight = (extentY * 0.5f) / tanf(halfFovY);
+      float distForWidth = (extentX * 0.5f) / tanf(halfFovX);
+      float fovFitDist = std::max(distForHeight, distForWidth) * 1.35f;
+      float diagDist = cameraFitSize * 1.2f;
+      orbitDistance = std::max({fovFitDist, diagDist, 0.01f}) * camDistScale;
     }
 
     // Apply yaw and pitch from command line by default.
