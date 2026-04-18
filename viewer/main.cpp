@@ -1712,6 +1712,52 @@ int main(int argc, char *argv[]) {
         rlActiveTextureSlot(0);
       }
       rlSetBlendMode(RL_BLEND_ALPHA);
+    } else if (!pbrModeEnabled && renderMode) {
+      // Toon render mode: draw the same ground plane for consistent output
+      float minY = cachedSceneBounds.min.y;
+      float centerX = (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f;
+      float centerZ = (cachedSceneBounds.min.z + cachedSceneBounds.max.z) * 0.5f;
+      float gpGroundCol[3] = {0.85f, 0.83f, 0.80f};
+      float gpHorizonCol[3] = {skyGroundCol[0], skyGroundCol[1], skyGroundCol[2]};
+      float gpCleanMode = 0.6f;
+      float gpFadeRadius = groundPlaneSize * 0.5f;
+      float gpCenter[3] = {centerX, 0.0f, centerZ};
+      float gpLightCol[3] = {1.0f, 0.95f, 0.9f};
+      float gpCamPos[3] = {camera.position.x, camera.position.y, camera.position.z};
+      float gpGridSpacing = static_cast<float>(currentDisplayScale * 1000.0);
+      SetShaderValue(groundPlaneShader, locGroundColor, gpGroundCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locHorizonColor, gpHorizonCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locFadeRadius, &gpFadeRadius, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(groundPlaneShader, locSceneCenter, gpCenter, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPLightDir, &lightDirWS.x, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPLightColor, gpLightCol, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPCameraPos, gpCamPos, SHADER_UNIFORM_VEC3);
+      SetShaderValue(groundPlaneShader, locGPCleanMode, &gpCleanMode, SHADER_UNIFORM_FLOAT);
+      SetShaderValue(groundPlaneShader, locGPGridSpacing, &gpGridSpacing, SHADER_UNIFORM_FLOAT);
+      if (shadowsEnabled) {
+        int gpShadowTexUnit = 3;
+        SetShaderValue(groundPlaneShader, locGPShadowMap, &gpShadowTexUnit, SHADER_UNIFORM_INT);
+        int gpShadowActive = 1;
+        SetShaderValue(groundPlaneShader, locGPShadowsActive, &gpShadowActive, SHADER_UNIFORM_INT);
+        SetShaderValueMatrix(groundPlaneShader, locGPLightSpaceMatrix, lightSpaceMatrix);
+      } else {
+        int gpShadowActive = 0;
+        SetShaderValue(groundPlaneShader, locGPShadowsActive, &gpShadowActive, SHADER_UNIFORM_INT);
+      }
+      rlEnableColorBlend();
+      rlSetBlendMode(RL_BLEND_ALPHA);
+      if (shadowsEnabled) {
+        rlActiveTextureSlot(3);
+        rlEnableTexture(shadowMap.texture.id);
+      }
+      Matrix groundTransform = MatrixTranslate(centerX, minY - 0.002f, centerZ);
+      DrawMesh(groundPlaneMesh, groundPlaneMat, groundTransform);
+      if (shadowsEnabled) {
+        rlActiveTextureSlot(3);
+        rlDisableTexture();
+        rlActiveTextureSlot(0);
+      }
+      rlSetBlendMode(RL_BLEND_ALPHA);
     } else if (!renderMode) {
       DrawXZGrid(40, 0.5f, Fade(LIGHTGRAY, 0.4f));
       DrawAxes(2.0f);
