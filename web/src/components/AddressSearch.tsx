@@ -30,9 +30,11 @@ const HEATING_LABELS: Record<string, Record<string, string>> = {
   en: { kaukolampo: "District heating", sahko: "Electric", maalampopumppu: "Ground source heat pump", oljy: "Oil" },
 };
 
-export default function AddressSearch({ onCreateProject }: { onCreateProject: (building: BuildingResult) => void }) {
+export default function AddressSearch({ onCreateProject }: { onCreateProject: (building: BuildingResult) => Promise<void> | void }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(false);
   const [result, setResult] = useState<BuildingResult | null>(null);
   const [searched, setSearched] = useState(false);
   const { t, locale } = useTranslation();
@@ -165,12 +167,27 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
                 ))}
               </div>
 
+              {createError && (
+                <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "#dc3232", fontSize: 13 }}>
+                  {t('search.createError')}
+                </div>
+              )}
               <button
                 className="btn btn-primary"
-                onClick={() => onCreateProject(result)}
-                style={{ width: "100%", padding: "14px 16px", fontSize: 15, fontWeight: 600 }}
+                onClick={async () => {
+                  setCreating(true);
+                  setCreateError(false);
+                  try {
+                    await onCreateProject(result);
+                  } catch {
+                    setCreateError(true);
+                    setCreating(false);
+                  }
+                }}
+                disabled={creating}
+                style={{ width: "100%", padding: "14px 16px", fontSize: 15, fontWeight: 600, opacity: creating ? 0.7 : 1 }}
               >
-                {t('search.createFromBuilding')}
+                {creating ? t('search.creatingProject') : t('search.createFromBuilding')}
               </button>
             </div>
           </div>
