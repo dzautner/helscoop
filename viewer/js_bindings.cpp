@@ -1393,6 +1393,107 @@ JSValue JsLevelSet(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return WrapManifold(ctx, std::move(manifoldPtr));
 }
 
+JSValue JsWarp(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "warp expects (manifold, function)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  if (!JS_IsFunction(ctx, argv[1])) {
+    return JS_ThrowTypeError(ctx, "warp second argument must be a function");
+  }
+  JSValue warpFunc = JS_DupValue(ctx, argv[1]);
+  bool errorOccurred = false;
+  std::string errorMessage;
+
+  auto warpFn = [ctx, warpFunc, &errorOccurred, &errorMessage](manifold::vec3 &v) {
+    if (errorOccurred) return;
+    JSValue point = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, point, 0, JS_NewFloat64(ctx, v.x));
+    JS_SetPropertyUint32(ctx, point, 1, JS_NewFloat64(ctx, v.y));
+    JS_SetPropertyUint32(ctx, point, 2, JS_NewFloat64(ctx, v.z));
+    JSValueConst args[1] = {point};
+    JSValue result = JS_Call(ctx, warpFunc, JS_UNDEFINED, 1, args);
+    JS_FreeValue(ctx, point);
+    if (JS_IsException(result)) {
+      JSValue exc = JS_GetException(ctx);
+      const char *msg = JS_ToCString(ctx, exc);
+      errorOccurred = true;
+      errorMessage = msg ? msg : "warp function threw";
+      if (msg) JS_FreeCString(ctx, msg);
+      JS_FreeValue(ctx, exc);
+      return;
+    }
+    if (!JS_IsArray(result)) {
+      errorOccurred = true;
+      errorMessage = "warp function must return [x,y,z]";
+      JS_FreeValue(ctx, result);
+      return;
+    }
+    JSValue x = JS_GetPropertyUint32(ctx, result, 0);
+    JSValue y = JS_GetPropertyUint32(ctx, result, 1);
+    JSValue z = JS_GetPropertyUint32(ctx, result, 2);
+    double vx, vy, vz;
+    if (JS_ToFloat64(ctx, &vx, x) < 0 || JS_ToFloat64(ctx, &vy, y) < 0 ||
+        JS_ToFloat64(ctx, &vz, z) < 0) {
+      errorOccurred = true;
+      errorMessage = "warp function must return [number, number, number]";
+    } else {
+      v.x = vx;
+      v.y = vy;
+      v.z = vz;
+    }
+    JS_FreeValue(ctx, x);
+    JS_FreeValue(ctx, y);
+    JS_FreeValue(ctx, z);
+    JS_FreeValue(ctx, result);
+  };
+
+  auto manifold = std::make_shared<manifold::Manifold>(target->handle->Warp(warpFn));
+  JS_FreeValue(ctx, warpFunc);
+  if (errorOccurred) {
+    return JS_ThrowInternalError(ctx, "%s", errorMessage.c_str());
+  }
+  return WrapManifold(ctx, std::move(manifold));
+}
+
+JSValue JsSplitByPlane(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 3) {
+    return JS_ThrowTypeError(ctx, "splitByPlane expects (manifold, [nx,ny,nz], offset)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  std::array<double, 3> normal{};
+  if (!GetVec3(ctx, argv[1], normal)) return JS_EXCEPTION;
+  double offset = 0.0;
+  if (JS_ToFloat64(ctx, &offset, argv[2]) < 0) return JS_EXCEPTION;
+  manifold::vec3 n{normal[0], normal[1], normal[2]};
+  auto pair = target->handle->SplitByPlane(n, offset);
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.first))));
+  JS_SetPropertyUint32(ctx, result, 1,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.second))));
+  return result;
+}
+
+JSValue JsSplit(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "split expects (manifold, cutter)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  JsManifold *cutter = GetJsManifold(ctx, argv[1]);
+  if (!cutter) return JS_EXCEPTION;
+  auto pair = target->handle->Split(*cutter->handle);
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.first))));
+  JS_SetPropertyUint32(ctx, result, 1,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.second))));
+  return result;
+}
+
 JSValue JsAsOriginal(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 1) {
     return JS_ThrowTypeError(ctx, "asOriginal expects a manifold");
@@ -1793,6 +1894,12 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsSmooth, "smooth", 2));
   JS_SetPropertyStr(ctx, global, "minGap",
                     JS_NewCFunction(ctx, JsMinGap, "minGap", 3));
+  JS_SetPropertyStr(ctx, global, "warp",
+                    JS_NewCFunction(ctx, JsWarp, "warp", 2));
+  JS_SetPropertyStr(ctx, global, "splitByPlane",
+                    JS_NewCFunction(ctx, JsSplitByPlane, "splitByPlane", 3));
+  JS_SetPropertyStr(ctx, global, "split",
+                    JS_NewCFunction(ctx, JsSplit, "split", 2));
   JS_FreeValue(ctx, global);
 }
 
