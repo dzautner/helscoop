@@ -94,12 +94,32 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
 
   auto captureException = [&]() {
     JSValue exc = JS_GetException(ctx);
+    // Try to get a meaningful error: message property, then string conversion, then stack
+    std::string errMsg;
+    JSValue msgVal = JS_GetPropertyStr(ctx, exc, "message");
+    if (!JS_IsUndefined(msgVal)) {
+      const char* msgStr = JS_ToCString(ctx, msgVal);
+      if (msgStr && msgStr[0]) errMsg = msgStr;
+      JS_FreeCString(ctx, msgStr);
+    }
+    JS_FreeValue(ctx, msgVal);
+    if (errMsg.empty()) {
+      const char* excStr = JS_ToCString(ctx, exc);
+      if (excStr && excStr[0]) errMsg = excStr;
+      JS_FreeCString(ctx, excStr);
+    }
     JSValue stack = JS_GetPropertyStr(ctx, exc, "stack");
-    const char* stackStr = JS_ToCString(ctx, JS_IsUndefined(stack) ? exc : stack);
-    result.message = stackStr ? stackStr : "JavaScript error";
-    JS_FreeCString(ctx, stackStr);
+    if (!JS_IsUndefined(stack)) {
+      const char* stackStr = JS_ToCString(ctx, stack);
+      if (stackStr && stackStr[0]) {
+        if (!errMsg.empty()) errMsg += "\n";
+        errMsg += stackStr;
+      }
+      JS_FreeCString(ctx, stackStr);
+    }
     JS_FreeValue(ctx, stack);
     JS_FreeValue(ctx, exc);
+    result.message = errMsg.empty() ? "JavaScript error (no details available)" : errMsg;
   };
   auto assignDependencies = [&]() {
     result.dependencies.assign(data->dependencies.begin(), data->dependencies.end());
@@ -151,9 +171,26 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
   if (JS_IsException(sceneVal)) {
     JS_FreeValue(ctx, moduleNamespace);
     captureException();
+    if (result.message.find("not initialized") != std::string::npos) {
+      result.message = "Scene threw an error during evaluation (exports never assigned)";
+    }
     assignDependencies();
     JS_FreeContext(ctx);
     return result;
+  }
+  // Check for uninitialized exports (module threw before const was assigned)
+  if (!JS_IsUndefined(sceneVal) && !JS_IsObject(sceneVal) && !JS_IsArray(sceneVal)) {
+    const char* valStr = JS_ToCString(ctx, sceneVal);
+    std::string valRepr = valStr ? valStr : "(unknown)";
+    JS_FreeCString(ctx, valStr);
+    if (valRepr == "[uninitialized]" || valRepr.find("not initialized") != std::string::npos) {
+      JS_FreeValue(ctx, sceneVal);
+      JS_FreeValue(ctx, moduleNamespace);
+      result.message = "Scene threw an error during evaluation (exports never assigned)";
+      assignDependencies();
+      JS_FreeContext(ctx);
+      return result;
+    }
   }
 
   JSValue materialsVal = JS_GetPropertyStr(ctx, moduleNamespace, "materials");
