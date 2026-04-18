@@ -4,7 +4,7 @@
 #include <string>
 #include "manifold/manifold.h"
 
-namespace dingcad {
+namespace helscoop {
 namespace primitives {
 
 enum class ConstructionType {
@@ -52,4 +52,4 @@ manifold::Manifold CreateSolidWall(const WallParams& params);
 manifold::Manifold CreateStickFrameWall(const WallParams& params);
 
 }  // namespace primitives
-}  // namespace dingcad
+}  // namespace helscoop

@@ -1,5 +1,5 @@
 /**
- * DingCAD Materials Library
+ * Helscoop Materials Library
  *
  * Provides material database loading and helpers for assigning
  * materials to geometry with visual properties and pricing info.

@@ -6,7 +6,7 @@
 #include <map>
 #include <set>
 
-namespace dingcad {
+namespace helscoop {
 
 // Order of construction phases for default assembly generation
 static const std::vector<std::string> kConstructionOrder = {
@@ -319,4 +319,4 @@ void ResolveAssemblyMaterials(AssemblyInstructions& assembly, const SceneData& s
   }
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

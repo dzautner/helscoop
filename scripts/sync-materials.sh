@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sync materials from DingCAD API to local materials.json for the C++ viewer
+# Sync materials from Helscoop API to local materials.json for the C++ viewer
 # Usage: ./scripts/sync-materials.sh [API_URL]
 
 API_URL="${1:-http://localhost:3001}"

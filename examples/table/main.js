@@ -1,4 +1,4 @@
-// Parametric Table - DingCAD example
+// Parametric Table - Helscoop example
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 
 // @param width "Table" Width (400-2000)

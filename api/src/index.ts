@@ -309,7 +309,7 @@ app.get("/bom/export/:projectId", requireAuth, async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`DingCAD API running on port ${PORT}`);
+  console.log(`Helscoop API running on port ${PORT}`);
 });
 
 export default app;

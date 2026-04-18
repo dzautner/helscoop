@@ -4,14 +4,14 @@ let token: string | null = null;
 
 export function setToken(t: string | null) {
   token = t;
-  if (t) localStorage.setItem("dingcad_token", t);
-  else localStorage.removeItem("dingcad_token");
+  if (t) localStorage.setItem("helscoop_token", t);
+  else localStorage.removeItem("helscoop_token");
 }
 
 export function getToken(): string | null {
   if (token) return token;
   if (typeof window !== "undefined") {
-    token = localStorage.getItem("dingcad_token");
+    token = localStorage.getItem("helscoop_token");
   }
   return token;
 }

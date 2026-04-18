@@ -5,7 +5,7 @@ const router = Router();
 
 router.use(requireAuth);
 
-const SYSTEM_PROMPT = `You are a DingCAD scene editing assistant. You help users modify their parametric CAD scenes written in JavaScript.
+const SYSTEM_PROMPT = `You are a Helscoop scene editing assistant. You help users modify their parametric CAD scenes written in JavaScript.
 
 Available primitives:
 - box(width, height, depth) - creates a box

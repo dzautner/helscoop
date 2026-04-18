@@ -1,4 +1,4 @@
-# DingCAD Feature Implementation Plan
+# Helscoop Feature Implementation Plan
 
 ## Overview
 
@@ -390,7 +390,7 @@ struct StructuralAnalysisResult {
 #include "structural.h"
 #include "material_loader.h"
 
-namespace dingcad {
+namespace helscoop {
 
 StructuralAnalysisResult AnalyzeStructure(
     const std::vector<ModelWithColor>& models,
@@ -470,7 +470,7 @@ std::string FindSuitableMaterial(
   return bestMaterial.empty() ? "Consider engineered lumber" : bestMaterial;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop
 ```
 
 #### 3.4 Create Structural Panel UI (ui_panels.cpp)
@@ -572,7 +572,7 @@ Export scenes to IFC-SPF format for BIM interoperability.
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // IFC entity types we'll support
 enum class IfcEntityType {
@@ -597,7 +597,7 @@ bool ExportToIFC(
 // Generate unique IFC GUID
 std::string GenerateIfcGuid();
 
-}  // namespace dingcad
+}  // namespace helscoop
 ```
 
 #### 4.2 IFC Export Implementation (ifc_export.cpp)
@@ -608,7 +608,7 @@ std::string GenerateIfcGuid();
 #include <chrono>
 #include <random>
 
-namespace dingcad {
+namespace helscoop {
 
 // Category to IFC entity type mapping
 IfcEntityType CategoryToIfcType(const std::string& category) {
@@ -659,7 +659,7 @@ bool ExportToIFC(
   file << "HEADER;\n";
   file << "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');\n";
   file << "FILE_NAME('" << outputPath.filename().string() << "','" << timestamp << "',";
-  file << "('DingCAD'),(''),''," << "'DingCAD','');\n";
+  file << "('Helscoop'),(''),''," << "'Helscoop','');\n";
   file << "FILE_SCHEMA(('IFC4'));\n";
   file << "ENDSEC;\n";
   file << "DATA;\n";
@@ -673,13 +673,13 @@ bool ExportToIFC(
   std::string ownerGuid = GenerateIfcGuid();
 
   // #1 = Organization
-  file << "#" << entityId++ << " = IFCORGANIZATION($,'DingCAD',$,$,$);\n";
+  file << "#" << entityId++ << " = IFCORGANIZATION($,'Helscoop',$,$,$);\n";
   // #2 = Person
   file << "#" << entityId++ << " = IFCPERSON($,$,$,$,$,$,$,$);\n";
   // #3 = PersonAndOrganization
   file << "#" << entityId++ << " = IFCPERSONANDORGANIZATION(#2,#1,$);\n";
   // #4 = Application
-  file << "#" << entityId++ << " = IFCAPPLICATION(#1,'1.0','DingCAD','DingCAD');\n";
+  file << "#" << entityId++ << " = IFCAPPLICATION(#1,'1.0','Helscoop','Helscoop');\n";
   // #5 = OwnerHistory
   file << "#" << entityId++ << " = IFCOWNERHISTORY(#3,#4,$,.NOCHANGE.,$,$,$," << time << ");\n";
 
@@ -704,7 +704,7 @@ bool ExportToIFC(
 
   // Project
   file << "#" << entityId++ << " = IFCPROJECT('" << GenerateIfcGuid() << "',#" << ownerHistoryId;
-  file << ",'DingCAD Export',$,$,$,$,(#" << contextId << "),$);\n";
+  file << ",'Helscoop Export',$,$,$,$,(#" << contextId << "),$);\n";
   int projectId = entityId - 1;
 
   // Site
@@ -834,7 +834,7 @@ bool ExportToIFC(
   return true;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop
 ```
 
 #### 4.3 Add Export Button/UI (main.cpp)

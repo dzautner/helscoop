@@ -4,9 +4,9 @@
 
 set -e
 
-VIEWER="./build/viewer/dingcad_viewer"
+VIEWER="./build/viewer/helscoop_viewer"
 SCENE="tests/scenes/test_parameter_update.js"
-OUT_DIR="/tmp/dingcad_param_test"
+OUT_DIR="/tmp/helscoop_param_test"
 PASS=0
 FAIL=0
 

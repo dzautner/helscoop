@@ -1,14 +1,14 @@
 #!/bin/bash
-# Test rendering script for dingcad
+# Test rendering script for helscoop
 # Usage: ./scripts/test-render.sh [scene.js] [output.png]
 
 set -e  # Exit on error
 
-DINGCAD_VIEWER="./build/viewer/dingcad_viewer"
+HELSCOOP_VIEWER="./build/viewer/helscoop_viewer"
 
 # Check if viewer is built
-if [ ! -f "$DINGCAD_VIEWER" ]; then
-    echo "Error: dingcad_viewer not found. Run 'cmake --build build' first."
+if [ ! -f "$HELSCOOP_VIEWER" ]; then
+    echo "Error: helscoop_viewer not found. Run 'cmake --build build' first."
     exit 1
 fi
 
@@ -23,7 +23,7 @@ echo "Output: $OUTPUT"
 mkdir -p "$(dirname "$OUTPUT")"
 
 # Render the scene
-$DINGCAD_VIEWER --render "$SCENE" "$OUTPUT"
+$HELSCOOP_VIEWER --render "$SCENE" "$OUTPUT"
 
 # Check if output was created (raylib may save to cwd, so check both locations)
 OUTPUT_BASENAME=$(basename "$OUTPUT")

@@ -1,4 +1,4 @@
-// Parametric Vase - DingCAD extrude example
+// Parametric Vase - Helscoop extrude example
 
 // @param radius "Vase" Base Radius (20-100)
 const radius = 50;

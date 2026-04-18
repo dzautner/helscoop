@@ -1,4 +1,4 @@
-// scene.js - Entry point for DingCAD viewer
+// scene.js - Entry point for Helscoop viewer
 // Re-exports the Helscoop (Nordic Chicken Coop) project
 
 import {

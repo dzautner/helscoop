@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // IFC entity types we support
 enum class IfcEntityType {
@@ -31,4 +31,4 @@ bool ExportToIFC(
 // Generate unique IFC GUID (22-character base64)
 std::string GenerateIfcGuid();
 
-}  // namespace dingcad
+}  // namespace helscoop

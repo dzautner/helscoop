@@ -462,7 +462,7 @@ function ChatPanel({
   );
 }
 
-const DEFAULT_SCENE = `// DingCAD Scene Script
+const DEFAULT_SCENE = `// Helscoop Scene Script
 // Available: box(w,h,d), cylinder(r,h), sphere(r)
 // Transforms: translate(mesh, x,y,z), rotate(mesh, rx,ry,rz)
 // Boolean: union(a,b), subtract(a,b), intersect(a,b)

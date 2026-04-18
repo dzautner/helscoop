@@ -8,7 +8,7 @@
 #include <random>
 #include <sstream>
 
-namespace dingcad {
+namespace helscoop {
 
 IfcEntityType CategoryToIfcType(const std::string& category) {
   if (category == "lumber" || category == "sheathing") return IfcEntityType::Wall;
@@ -89,7 +89,7 @@ bool ExportToIFC(
   file << "HEADER;\n";
   file << "FILE_DESCRIPTION(('ViewDefinition [CoordinationView_V2.0]'),'2;1');\n";
   file << "FILE_NAME('" << outputPath.filename().string() << "','" << timestamp << "',";
-  file << "(''),(''),'','DingCAD','');\n";
+  file << "(''),(''),'','Helscoop','');\n";
   file << "FILE_SCHEMA(('IFC2X3'));\n";
   file << "ENDSEC;\n";
   file << "DATA;\n";
@@ -97,13 +97,13 @@ bool ExportToIFC(
   int entityId = 1;
 
   // #1 = Organization
-  file << "#" << entityId++ << " = IFCORGANIZATION($,'DingCAD',$,$,$);\n";
+  file << "#" << entityId++ << " = IFCORGANIZATION($,'Helscoop',$,$,$);\n";
   // #2 = Person
   file << "#" << entityId++ << " = IFCPERSON($,$,$,$,$,$,$,$);\n";
   // #3 = PersonAndOrganization
   file << "#" << entityId++ << " = IFCPERSONANDORGANIZATION(#2,#1,$);\n";
   // #4 = Application
-  file << "#" << entityId++ << " = IFCAPPLICATION(#1,'1.0','DingCAD','DingCAD');\n";
+  file << "#" << entityId++ << " = IFCAPPLICATION(#1,'1.0','Helscoop','Helscoop');\n";
   // #5 = OwnerHistory (IFC2X3 format)
   file << "#" << entityId++ << " = IFCOWNERHISTORY(#3,#4,$,.NOCHANGE.,$,$,$," << time << ");\n";
 
@@ -140,7 +140,7 @@ bool ExportToIFC(
 
   // Project with units
   file << "#" << entityId++ << " = IFCPROJECT('" << GenerateIfcGuid() << "',#" << ownerHistoryId;
-  file << ",'DingCAD Export',$,$,$,$,(#" << contextId << "),#" << unitAssignmentId << ");\n";
+  file << ",'Helscoop Export',$,$,$,$,(#" << contextId << "),#" << unitAssignmentId << ");\n";
   int projectId = entityId - 1;
 
   // Site placement
@@ -297,4 +297,4 @@ bool ExportToIFC(
   return true;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

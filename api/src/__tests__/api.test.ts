@@ -112,7 +112,7 @@ describe("SQL migrations", () => {
     const sqlPath = path.resolve(__dirname, "../../../db/migrations/002_seed_from_json.sql");
     const sql = fs.readFileSync(sqlPath, "utf-8");
 
-    expect(sql).toContain("admin@dingcad.local");
+    expect(sql).toContain("admin@helscoop.local");
     expect(sql).toContain("admin");
     expect(sql).toContain("password_hash");
   });

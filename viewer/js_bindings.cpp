@@ -556,7 +556,7 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 }
 
 JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
-  dingcad::primitives::WallParams params;
+  helscoop::primitives::WallParams params;
 
   if (argc >= 1 && JS_IsObject(argv[0])) {
     // Get start position [x, y]
@@ -632,9 +632,9 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
       if (constructionStr) {
         std::string construction(constructionStr);
         if (construction == "stickFrame" || construction == "STICK_FRAME") {
-          params.constructionType = dingcad::primitives::ConstructionType::STICK_FRAME;
+          params.constructionType = helscoop::primitives::ConstructionType::STICK_FRAME;
         } else if (construction == "solid" || construction == "SOLID") {
-          params.constructionType = dingcad::primitives::ConstructionType::SOLID;
+          params.constructionType = helscoop::primitives::ConstructionType::SOLID;
         }
         JS_FreeCString(ctx, constructionStr);
       }
@@ -687,7 +687,7 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
     JS_FreeValue(ctx, sheathingThicknessVal);
   }
 
-  auto manifold = std::make_shared<manifold::Manifold>(dingcad::primitives::CreateWall(params));
+  auto manifold = std::make_shared<manifold::Manifold>(helscoop::primitives::CreateWall(params));
   return WrapManifold(ctx, std::move(manifold));
 }
 

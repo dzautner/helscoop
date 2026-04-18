@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <optional>
 
-namespace dingcad {
+namespace helscoop {
 
 // Load material library from JSON file
 std::optional<MaterialLibrary> LoadMaterialLibrary(const std::filesystem::path& jsonPath);
@@ -26,4 +26,4 @@ void LoadMaterialTextures();
 // Unload all loaded textures
 void UnloadMaterialTextures();
 
-}  // namespace dingcad
+}  // namespace helscoop

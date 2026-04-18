@@ -12,7 +12,7 @@
 #include <set>
 #include <unordered_map>
 
-namespace dingcad {
+namespace helscoop {
 
 // Helper function to wrap text to fit within a given width
 // Returns vector of lines
@@ -1868,4 +1868,4 @@ bool DrawToolbar(UIState& uiState,
   return anyToggled;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

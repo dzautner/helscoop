@@ -41,7 +41,7 @@ extern "C" {
 #include "blueprint_export.h"
 #include "assembly.h"
 
-using namespace dingcad;
+using namespace helscoop;
 
 static void ExpandBounds(BoundingBox& dst, const BoundingBox& src, bool& hasAny) {
   if (!hasAny) {
@@ -114,8 +114,8 @@ int main(int argc, char *argv[]) {
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--help" || arg == "-h") {
-      std::cout << "Usage: dingcad_viewer [scene.js] [options]\n"
-                << "       dingcad_viewer --render scene.js output.png [options]\n\n"
+      std::cout << "Usage: helscoop_viewer [scene.js] [options]\n"
+                << "       helscoop_viewer --render scene.js output.png [options]\n\n"
                 << "Render options:\n"
                 << "  --render SCENE OUTPUT   Headless render to PNG\n"
                 << "  --size W H              Output dimensions (default: 1280 720)\n"
@@ -350,9 +350,9 @@ int main(int argc, char *argv[]) {
   const int ssWidth = renderWidth * renderSupersample;
   const int ssHeight = renderHeight * renderSupersample;
   if (renderMode) {
-    InitWindow(ssWidth, ssHeight, "dingcad");
+    InitWindow(ssWidth, ssHeight, "helscoop");
   } else {
-    InitWindow(1280, 720, "dingcad");
+    InitWindow(1280, 720, "helscoop");
   }
   TraceLog(LOG_INFO, "Window init complete");
   SetTargetFPS(60);
@@ -363,7 +363,7 @@ int main(int argc, char *argv[]) {
   bool uiFontCustom = false;
 
   bool skipCustomFonts = headlessRender;
-  if (const char *skipFontsEnv = std::getenv("DINGCAD_SKIP_CUSTOM_FONTS")) {
+  if (const char *skipFontsEnv = std::getenv("HELSCOOP_SKIP_CUSTOM_FONTS")) {
     skipCustomFonts = (std::string(skipFontsEnv) == "1");
   }
 

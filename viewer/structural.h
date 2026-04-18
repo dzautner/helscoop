@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Types of structural issues
 enum class StructuralIssueType {
@@ -88,4 +88,4 @@ const char* GetSeverityString(StructuralSeverity severity);
 // Get issue type string for display
 const char* GetIssueTypeString(StructuralIssueType type);
 
-}  // namespace dingcad
+}  // namespace helscoop

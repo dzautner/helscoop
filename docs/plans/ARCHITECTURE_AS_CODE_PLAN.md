@@ -1,8 +1,8 @@
-# Architecture-as-Code: Transforming dingcad into a Professional Architecture Tool
+# Architecture-as-Code: Transforming helscoop into a Professional Architecture Tool
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to transform dingcad from a general-purpose CAD tool into a specialized "architecture-as-code" platform. The vision is to bring the benefits of Infrastructure-as-Code (version control, CI/CD, code review, testing) to architectural design while maintaining parametric flexibility and BIM interoperability.
+This document outlines a comprehensive plan to transform helscoop from a general-purpose CAD tool into a specialized "architecture-as-code" platform. The vision is to bring the benefits of Infrastructure-as-Code (version control, CI/CD, code review, testing) to architectural design while maintaining parametric flexibility and BIM interoperability.
 
 **Target Users:**
 - Architects working on parametric/computational design
@@ -15,7 +15,7 @@ This document outlines a comprehensive plan to transform dingcad from a general-
 
 ## Part 1: Current State Analysis
 
-### What dingcad Does Well
+### What helscoop Does Well
 
 **1. Robust Geometry Foundation**
 - Manifold geometry kernel ensures watertight, valid solids
@@ -120,9 +120,9 @@ This document outlines a comprehensive plan to transform dingcad from a general-
 ### Target Workflow Example
 
 ```javascript
-import { Wall, Floor, Roof, Door, Window } from '@dingcad/architecture';
-import { StickFrame, Joist } from '@dingcad/wood-framing';
-import { IBC2024 } from '@dingcad/codes';
+import { Wall, Floor, Roof, Door, Window } from '@helscoop/architecture';
+import { StickFrame, Joist } from '@helscoop/wood-framing';
+import { IBC2024 } from '@helscoop/codes';
 
 // Define building parameters
 const params = {
@@ -214,7 +214,7 @@ export const scene = {
 ## Part 3: Implementation Roadmap
 
 ### Phase 1: Foundation (3-4 months)
-**Goal:** Make dingcad usable for basic architectural modeling
+**Goal:** Make helscoop usable for basic architectural modeling
 
 #### 1.1 Building Primitives Library
 **Effort:** 6 weeks
@@ -301,7 +301,7 @@ Features:
 - `library/core/component.js`: Component definition system
 - `library/wood-framing/`: Example component library
 - `library/modular/`: Modular construction components
-- CLI command: `dingcad components list`
+- CLI command: `helscoop components list`
 
 #### 1.4 Basic Building Code Validation
 **Effort:** 3 weeks
@@ -344,7 +344,7 @@ Implement checks for:
 - Integration with component validation system
 
 ### Phase 2: Professional Features (4-5 months)
-**Goal:** Make dingcad production-ready for professional use
+**Goal:** Make helscoop production-ready for professional use
 
 #### 2.1 Multi-Viewport System
 **Effort:** 6 weeks
@@ -473,7 +473,7 @@ Implement IFC4 file format export:
 
 **Technical approach:**
 - Use IFC++ library (open source C++)
-- Map dingcad components to IFC entities
+- Map helscoop components to IFC entities
 - Preserve metadata in IFC property sets
 
 **Validation:**
@@ -576,10 +576,10 @@ struct Building {
 ### File Format Evolution
 
 **Current:** `scene.js` exports geometry
-**Proposed:** `project.dingcad/` directory structure:
+**Proposed:** `project.helscoop/` directory structure:
 
 ```
-project.dingcad/
+project.helscoop/
 ├── project.json           # Project metadata
 ├── main.js               # Main scene code
 ├── components/           # Custom components
@@ -603,15 +603,15 @@ project.dingcad/
 Components distributed via npm:
 
 ```bash
-npm install @dingcad/wood-framing
-npm install @dingcad/modular-housing
-npm install @dingcad/codes-ibc2024
+npm install @helscoop/wood-framing
+npm install @helscoop/modular-housing
+npm install @helscoop/codes-ibc2024
 ```
 
 Used in code:
 ```javascript
-import { StickFrame, TrusRoof } from '@dingcad/wood-framing';
-import { IBC2024 } from '@dingcad/codes-ibc2024';
+import { StickFrame, TrusRoof } from '@helscoop/wood-framing';
+import { IBC2024 } from '@helscoop/codes-ibc2024';
 ```
 
 Enables community contribution and standardization.
@@ -768,7 +768,7 @@ Enables community contribution and standardization.
 
 3. **Set Up Infrastructure**
    - GitHub repo for component libraries
-   - Documentation site (docs.dingcad.dev)
+   - Documentation site (docs.helscoop.dev)
    - CI/CD for automated testing
 
 ### Short Term (Month 1-3)
@@ -820,7 +820,7 @@ Enables community contribution and standardization.
 
 ## Conclusion
 
-dingcad has a **strong foundation** for becoming a world-class architecture-as-code tool:
+helscoop has a **strong foundation** for becoming a world-class architecture-as-code tool:
 
 ✅ Robust geometry engine (Manifold)
 ✅ Fast, code-first workflow
@@ -837,11 +837,11 @@ The **path forward is clear**:
 
 **This plan is ambitious but achievable.** Each phase delivers value incrementally, allowing validation with real users before committing to the next phase.
 
-The **opportunity is significant**: No existing tool combines parametric flexibility, code-first workflow, and BIM interoperability in the way dingcad can. By focusing on architecture-as-code differentiation (Git, testing, CI/CD), dingcad can carve out a unique position in the market.
+The **opportunity is significant**: No existing tool combines parametric flexibility, code-first workflow, and BIM interoperability in the way helscoop can. By focusing on architecture-as-code differentiation (Git, testing, CI/CD), helscoop can carve out a unique position in the market.
 
 **Recommended immediate action:** Start with Phase 1, Task 1.1 (Building Primitives Library). Implement `Wall()`, `Floor()`, and `Roof()` functions as a proof-of-concept, then validate with target users before committing to the full roadmap.
 
-The future of architecture is code. dingcad is positioned to lead that transformation.
+The future of architecture is code. helscoop is positioned to lead that transformation.
 
 ---
 

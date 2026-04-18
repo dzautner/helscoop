@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Read entire text file into string
 std::optional<std::string> ReadTextFile(const std::filesystem::path& path);
@@ -32,4 +32,4 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
 // Write parameter value back to JS file
 bool WriteParameterToFile(const std::filesystem::path& path, const SceneParameter& param);
 
-}  // namespace dingcad
+}  // namespace helscoop

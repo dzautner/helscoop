@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Climate location with monthly temperature data
 struct ClimateLocation {
@@ -36,4 +36,4 @@ int GetClimateLocationCount();
 const char* GetMonthName(int month);  // 0-11
 const char* GetMonthShortName(int month);  // 0-11
 
-}  // namespace dingcad
+}  // namespace helscoop

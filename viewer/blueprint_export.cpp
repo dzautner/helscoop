@@ -8,7 +8,7 @@
 #include <set>
 #include <sstream>
 
-namespace dingcad {
+namespace helscoop {
 
 namespace {
 
@@ -698,4 +698,4 @@ bool ExportAssemblyInstructions(
   return true;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

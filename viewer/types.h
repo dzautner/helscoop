@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // UI constants
 inline const Color kBaseColor = {210, 210, 220, 255};
@@ -288,4 +288,4 @@ struct BackgroundLoadResult {
   double displayScale = 1.0;
 };
 
-}  // namespace dingcad
+}  // namespace helscoop

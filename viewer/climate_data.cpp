@@ -1,6 +1,6 @@
 #include "climate_data.h"
 
-namespace dingcad {
+namespace helscoop {
 
 // Nordic climate data based on meteorological records
 // Monthly temperatures are 30-year averages
@@ -110,4 +110,4 @@ const char* GetMonthShortName(int month) {
   return kMonthShortNames[month];
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

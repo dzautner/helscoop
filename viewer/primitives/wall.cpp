@@ -2,7 +2,7 @@
 #include <cmath>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 namespace primitives {
 
 manifold::Manifold CreateSolidWall(const WallParams& params) {
@@ -120,4 +120,4 @@ manifold::Manifold CreateWall(const WallParams& params) {
 }
 
 }  // namespace primitives
-}  // namespace dingcad
+}  // namespace helscoop

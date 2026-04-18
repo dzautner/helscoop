@@ -1,4 +1,4 @@
-# DingCAD Materials System Plan
+# Helscoop Materials System Plan
 
 ## Current State
 

@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { query } from "./db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dingcad-dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
 export interface AuthUser {
   id: string;

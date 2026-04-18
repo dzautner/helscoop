@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Blueprint export options
 struct BlueprintOptions {
@@ -47,4 +47,4 @@ bool ExportAssemblyInstructions(
     const std::filesystem::path& outputDir,
     std::string& errorMsg);
 
-}  // namespace dingcad
+}  // namespace helscoop

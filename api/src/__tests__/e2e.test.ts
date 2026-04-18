@@ -150,7 +150,7 @@ describe.skipIf(!process.env.E2E)("E2E Integration Tests", () => {
   it("stale prices works for admin", async () => {
     const { body: loginBody } = await apiFetch("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email: "admin@dingcad.local", password: "admin123" }),
+      body: JSON.stringify({ email: "admin@helscoop.local", password: "admin123" }),
     });
     if (!loginBody.token) return;
     const { status, body } = await apiFetch("/pricing/stale", { token: loginBody.token });
