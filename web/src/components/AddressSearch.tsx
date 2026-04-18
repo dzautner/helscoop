@@ -115,9 +115,9 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
             <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.15em", fontSize: 11 }}>
               {t('search.demoLabel')}
             </div>
-            <h2 className="heading-display" style={{ fontSize: 36, marginBottom: 10, lineHeight: 1.1 }}>
+            <h1 className="heading-display" style={{ fontSize: 36, marginBottom: 10, lineHeight: 1.1 }}>
               {t('search.title')}
-            </h2>
+            </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: 16, marginBottom: 32, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>
               {t('search.subtitle')}
             </p>
