@@ -224,6 +224,9 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef __APPLE__
+  if (renderMode) {
+    system("caffeinate -u -t 15 &");
+  }
   {
     uint32_t displayCount = 0;
     CGGetOnlineDisplayList(0, nullptr, &displayCount);
