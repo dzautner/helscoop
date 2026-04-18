@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
 
@@ -481,6 +481,10 @@ scene.add(wall3, { material: "lumber", color: [0.85, 0.75, 0.55] });
 scene.add(wall4, { material: "lumber", color: [0.85, 0.75, 0.55] });
 `;
 
+type SaveStatus = "saved" | "saving" | "unsaved";
+
+const HISTORY_LIMIT = 50;
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -490,12 +494,55 @@ export default function ProjectPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bom, setBom] = useState<BomItem[]>([]);
   const [sceneJs, setSceneJs] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
   const [showChat, setShowChat] = useState(false);
+
+  // Undo/redo history for scene script
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+
+  // Debounce timer for auto-save
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track whether BOM changed since last save
+  const bomChangedRef = useRef(false);
+  // Track whether initial load is done (to avoid auto-saving on mount)
+  const initialLoadDoneRef = useRef(false);
+
+  // Push a scene script entry to the history stack
+  const pushHistory = useCallback((code: string) => {
+    const history = historyRef.current;
+    const idx = historyIndexRef.current;
+    // Remove any forward history when a new change is made
+    const newHistory = history.slice(0, idx + 1);
+    newHistory.push(code);
+    // Enforce limit
+    if (newHistory.length > HISTORY_LIMIT) {
+      newHistory.shift();
+    }
+    historyRef.current = newHistory;
+    historyIndexRef.current = newHistory.length - 1;
+  }, []);
+
+  const canUndo = historyIndexRef.current > 0;
+  const canRedo = historyIndexRef.current < historyRef.current.length - 1;
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current -= 1;
+      setSceneJs(historyRef.current[historyIndexRef.current]);
+    }
+  }, []);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current += 1;
+      setSceneJs(historyRef.current[historyIndexRef.current]);
+    }
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -507,9 +554,17 @@ export default function ProjectPage() {
         setProject(proj);
         setProjectName(proj.name);
         setProjectDesc(proj.description || "");
-        setSceneJs(proj.scene_js || DEFAULT_SCENE);
+        const initialScene = proj.scene_js || DEFAULT_SCENE;
+        setSceneJs(initialScene);
+        // Initialize history with the loaded scene
+        historyRef.current = [initialScene];
+        historyIndexRef.current = 0;
         setMaterials(mats);
         if (proj.bom) setBom(proj.bom);
+        // Mark initial load as done after a tick so auto-save doesn't fire for initial state
+        setTimeout(() => {
+          initialLoadDoneRef.current = true;
+        }, 0);
       })
       .catch((err) => {
         if (err.message?.includes("401") || err.message?.includes("authorization")) {
@@ -521,26 +576,115 @@ export default function ProjectPage() {
       });
   }, [projectId, router]);
 
+  // Save function (used by both auto-save and manual save)
   const save = useCallback(async () => {
-    setSaving(true);
+    setSaveStatus("saving");
     try {
-      await api.updateProject(projectId, {
-        name: projectName,
-        description: projectDesc,
-        scene_js: sceneJs,
-      });
+      const savePromises: Promise<unknown>[] = [
+        api.updateProject(projectId, {
+          name: projectName,
+          description: projectDesc,
+          scene_js: sceneJs,
+        }),
+      ];
+      if (bomChangedRef.current) {
+        savePromises.push(
+          api.saveBOM(
+            projectId,
+            bom.map((b) => ({
+              material_id: b.material_id,
+              quantity: b.quantity,
+              unit: b.unit,
+            }))
+          )
+        );
+        bomChangedRef.current = false;
+      }
+      await Promise.all(savePromises);
       setLastSaved(new Date().toLocaleTimeString());
+      setSaveStatus("saved");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+      setSaveStatus("unsaved");
     }
-    setSaving(false);
-  }, [projectId, projectName, projectDesc, sceneJs]);
+  }, [projectId, projectName, projectDesc, sceneJs, bom]);
+
+  // Schedule auto-save (debounced 2 seconds)
+  const scheduleAutoSave = useCallback(() => {
+    if (!initialLoadDoneRef.current) return;
+    setSaveStatus("unsaved");
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      save();
+    }, 2000);
+  }, [save]);
+
+  // Auto-save when project data changes
+  useEffect(() => {
+    if (!initialLoadDoneRef.current) return;
+    scheduleAutoSave();
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [sceneJs, projectName, projectDesc, bom, scheduleAutoSave]);
+
+  // beforeunload warning for unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (saveStatus === "unsaved" || saveStatus === "saving") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [saveStatus]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key === "z" && !e.shiftKey) {
+        // Only intercept if the active element is not the scene textarea
+        // Actually, we want undo/redo for scene regardless
+        e.preventDefault();
+        undo();
+      } else if (isMod && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo]);
+
+  // Handle scene changes: push to history and update state
+  const handleSceneChange = useCallback(
+    (code: string) => {
+      setSceneJs(code);
+      pushHistory(code);
+    },
+    [pushHistory]
+  );
+
+  // Handle AI chat applying code: push to history as single unit
+  const handleApplyCode = useCallback(
+    (code: string) => {
+      setSceneJs(code);
+      pushHistory(code);
+    },
+    [pushHistory]
+  );
 
   const addBomItem = useCallback(
     (materialId: string, quantity: number) => {
       const mat = materials.find((m) => m.id === materialId);
       if (!mat) return;
       const pricing = mat.pricing?.find((p) => p.is_primary) || mat.pricing?.[0];
+      bomChangedRef.current = true;
       setBom((prev) => [
         ...prev,
         {
@@ -559,10 +703,12 @@ export default function ProjectPage() {
   );
 
   const removeBomItem = useCallback((materialId: string) => {
+    bomChangedRef.current = true;
     setBom((prev) => prev.filter((b) => b.material_id !== materialId));
   }, []);
 
   const updateBomQty = useCallback((materialId: string, qty: number) => {
+    bomChangedRef.current = true;
     setBom((prev) =>
       prev.map((b) =>
         b.material_id === materialId
@@ -645,8 +791,56 @@ export default function ProjectPage() {
             width: 180,
           }}
         />
-        <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-          {saving ? "saving..." : lastSaved ? `saved ${lastSaved}` : ""}
+        {/* Undo/Redo buttons */}
+        <div style={{ display: "flex", gap: 2 }}>
+          <button
+            className="btn btn-ghost"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Kumoa (Ctrl+Z)"
+            style={{ padding: "6px 8px", opacity: canUndo ? 1 : 0.3 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Tee uudelleen (Ctrl+Shift+Z)"
+            style={{ padding: "6px 8px", opacity: canRedo ? 1 : 0.3 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
+            </svg>
+          </button>
+        </div>
+        <div style={{ width: 1, height: 20, background: "var(--border)" }} />
+        <span style={{
+          fontSize: 11,
+          color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--success)",
+          fontFamily: "var(--font-mono)",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}>
+          {saveStatus === "saving" && (
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: "pulse 1.5s infinite" }} />
+          )}
+          {saveStatus === "saved" && (
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />
+          )}
+          {saveStatus === "unsaved" && (
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--warning, #e5c07b)" }} />
+          )}
+          {saveStatus === "saving"
+            ? "Tallentaa..."
+            : saveStatus === "saved"
+              ? `Tallennettu${lastSaved ? ` ${lastSaved}` : ""}`
+              : "Ei tallennettu"}
         </span>
         <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
           Tallenna
@@ -690,11 +884,11 @@ export default function ProjectPage() {
             gap: 12,
           }}
         >
-          <SceneEditor sceneJs={sceneJs} onChange={setSceneJs} />
+          <SceneEditor sceneJs={sceneJs} onChange={handleSceneChange} />
         </div>
         {showChat && (
           <div style={{ width: 340, borderLeft: "1px solid var(--border)", flexShrink: 0 }}>
-            <ChatPanel sceneJs={sceneJs} onApplyCode={setSceneJs} />
+            <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
           </div>
         )}
         <BomPanel
