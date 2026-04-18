@@ -149,24 +149,24 @@ export function WelcomeModal({
       >
         <div
           style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             margin: "0 auto 20px",
-            borderRadius: "50%",
-            background: "var(--amber-glow)",
-            border: "1px solid var(--amber-border)",
+            borderRadius: 12,
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border-strong)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
           <svg
-            width="24"
-            height="24"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--amber)"
-            strokeWidth="2"
+            stroke="var(--text-secondary)"
+            strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -265,7 +265,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   // Build the spotlight clip-path (inverted rectangle)
   const spotlightStyle: React.CSSProperties = targetRect
     ? {
-        boxShadow: `0 0 0 9999px rgba(0,0,0,0.55), 0 0 20px 4px rgba(196,145,92,0.15)`,
+        boxShadow: `0 0 0 9999px rgba(0,0,0,0.55), 0 0 16px 4px rgba(229,160,75,0.1)`,
         position: "fixed" as const,
         top: targetRect.top - padding,
         left: targetRect.left - padding,

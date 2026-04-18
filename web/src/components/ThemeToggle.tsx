@@ -14,7 +14,7 @@ export function ThemeToggle() {
       title={`Theme: ${label}`}
       aria-label={`Theme: ${label}`}
       style={{
-        background: "rgba(196,145,92,0.08)",
+        background: "transparent",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-sm)",
         padding: "4px 8px",

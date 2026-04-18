@@ -80,22 +80,22 @@ export default function TemplateGrid({
             >
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 10 }}>
                 <div style={{
-                  width: 48,
-                  height: 48,
+                  width: 40,
+                  height: 40,
                   borderRadius: "var(--radius-sm)",
-                  background: "var(--amber-glow)",
-                  border: "1px solid var(--amber-border)",
+                  background: "var(--bg-tertiary)",
+                  border: "1px solid var(--border)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
                 }}>
                   <svg
-                    width="24"
-                    height="24"
+                    width="20"
+                    height="20"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="var(--amber)"
+                    stroke="var(--text-secondary)"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"

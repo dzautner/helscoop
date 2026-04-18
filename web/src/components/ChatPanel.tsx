@@ -66,7 +66,7 @@ export default function ChatPanel({
           gap: 8,
         }}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
         {t('editor.aiAssistant')}
@@ -85,11 +85,11 @@ export default function ChatPanel({
           <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "24px 12px", textAlign: "center", lineHeight: 2 }}>
             {t('editor.describePrompt')}
             <br />
-            <span style={{ color: "#c4915c", opacity: 0.7 }}>
+            <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>
               &ldquo;{t('editor.exampleRoof')}&rdquo;
             </span>
             <br />
-            <span style={{ color: "#c4915c", opacity: 0.7 }}>
+            <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>
               &ldquo;{t('editor.exampleWindow')}&rdquo;
             </span>
           </div>
@@ -142,8 +142,8 @@ export default function ChatPanel({
           );
         })}
         {loading && (
-          <div style={{ color: "var(--accent)", fontSize: 13, padding: 8 }}>
-            <span style={{ animation: "pulse 1.5s infinite" }}>{t('editor.thinking')}</span>
+          <div style={{ color: "var(--text-muted)", fontSize: 13, padding: 8 }}>
+            <span style={{ animation: "breathe 1.5s infinite" }}>{t('editor.thinking')}</span>
           </div>
         )}
       </div>

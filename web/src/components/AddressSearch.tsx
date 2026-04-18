@@ -9,7 +9,7 @@ import type { BuildingResult } from "@/types";
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
   ssr: false,
   loading: () => (
-    <div style={{ width: "100%", height: "100%", background: "#1a1816", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+    <div style={{ width: "100%", height: "100%", background: "#111113", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
       Ladataan 3D...
     </div>
   ),
@@ -104,8 +104,7 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
   return (
     <div style={{
       width: "100%",
-      padding: result ? "48px 24px 24px" : "80px 24px 64px",
-      background: "linear-gradient(180deg, rgba(196,145,92,0.08) 0%, rgba(196,145,92,0.02) 50%, transparent 100%)",
+      padding: result ? "32px 24px 24px" : "56px 24px 48px",
       borderBottom: "1px solid var(--border)",
       transition: "padding 0.3s ease",
     }}>
@@ -156,7 +155,7 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
               borderRadius: "var(--radius-lg)",
               overflow: "hidden",
               border: "1px solid var(--border)",
-              background: "#1a1816",
+              background: "#111113",
               minHeight: 320,
             }}>
               <Viewport3D
@@ -182,12 +181,12 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
                       className="badge"
                       style={{
                         background: result.confidence === "verified"
-                          ? "rgba(76,135,80,0.15)"
-                          : "rgba(196,145,92,0.15)",
+                          ? "var(--forest-dim)"
+                          : "var(--amber-glow)",
                         color: result.confidence === "verified"
-                          ? "var(--forest, #4c8750)"
+                          ? "var(--forest)"
                           : "var(--amber)",
-                        border: `1px solid ${result.confidence === "verified" ? "rgba(76,135,80,0.3)" : "rgba(196,145,92,0.3)"}`,
+                        border: `1px solid ${result.confidence === "verified" ? "rgba(34,197,94,0.2)" : "var(--amber-border)"}`,
                       }}
                     >
                       {result.confidence === "verified" ? t('search.verified') : t('search.estimated')}

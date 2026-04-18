@@ -84,7 +84,7 @@ export default function RootLayout({
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("helscoop-theme");var d=t==="light"?"light":t==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light":"dark";document.documentElement.setAttribute("data-theme",d);document.documentElement.style.background=d==="light"?"#faf8f5":"#12110f"}catch(e){}})()`
+            __html: `(function(){try{var t=localStorage.getItem("helscoop-theme");var d=t==="light"?"light":t==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light":"dark";document.documentElement.setAttribute("data-theme",d);document.documentElement.style.background=d==="light"?"#fafafa":"#09090b"}catch(e){}})()`
           }}
         />
       </head>

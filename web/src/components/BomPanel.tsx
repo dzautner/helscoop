@@ -501,15 +501,15 @@ export default function BomPanel({
         </div>
         <div style={{
           padding: "14px 16px",
-          background: "linear-gradient(135deg, rgba(196,145,92,0.12) 0%, rgba(196,145,92,0.04) 100%)",
+          background: "var(--bg-tertiary)",
           borderRadius: "var(--radius-md)",
-          border: "1px solid var(--amber-border)",
+          border: "1px solid var(--border)",
         }}>
-          <div className="label-mono" style={{ fontSize: 10, color: "var(--amber)", marginBottom: 6 }}>
+          <div className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6 }}>
             {t('editor.estimatedTotal')}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span className="heading-display" style={{ fontSize: 24, color: "var(--text-primary)" }}>
+            <span style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--text-primary)" }}>
               {total > 0 ? total.toLocaleString('fi-FI', { maximumFractionDigits: 0 }) : '0'}
             </span>
             <span style={{ fontSize: 14, color: "var(--text-muted)" }}>&euro;</span>
@@ -712,7 +712,7 @@ export default function BomPanel({
                   border: "1px solid",
                   borderColor: !activeCategory ? "var(--amber-border)" : "var(--border)",
                   borderRadius: 12,
-                  background: !activeCategory ? "rgba(196,145,92,0.12)" : "transparent",
+                  background: !activeCategory ? "var(--amber-glow)" : "transparent",
                   color: !activeCategory ? "var(--amber)" : "var(--text-muted)",
                   cursor: "pointer",
                   transition: "all 0.12s ease",
@@ -735,7 +735,7 @@ export default function BomPanel({
                       border: "1px solid",
                       borderColor: isActive ? "var(--amber-border)" : "var(--border)",
                       borderRadius: 12,
-                      background: isActive ? "rgba(196,145,92,0.12)" : "transparent",
+                      background: isActive ? "var(--amber-glow)" : "transparent",
                       color: isActive ? "var(--amber)" : "var(--text-muted)",
                       cursor: "pointer",
                       transition: "all 0.12s ease",
@@ -774,7 +774,7 @@ export default function BomPanel({
                   key={m.id}
                   style={{
                     padding: "8px 10px",
-                    background: isSelected ? "rgba(196,145,92,0.08)" : "var(--bg-tertiary)",
+                    background: isSelected ? "var(--amber-glow)" : "var(--bg-tertiary)",
                     border: isSelected ? "1px solid var(--amber-border)" : "1px solid var(--border)",
                     borderRadius: "var(--radius-sm)",
                     cursor: "pointer",

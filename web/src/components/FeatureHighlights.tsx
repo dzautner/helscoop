@@ -16,7 +16,7 @@ export default function FeatureHighlights() {
 
   return (
     <section style={{
-      padding: "56px 24px",
+      padding: "40px 24px",
       borderBottom: "1px solid var(--border)",
     }}>
       <h2 className="sr-only">{locale === 'fi' ? 'Ominaisuudet' : 'Features'}</h2>
@@ -27,22 +27,22 @@ export default function FeatureHighlights() {
         {features.map((f, i) => (
           <div key={i} className="anim-up" style={{ animationDelay: `${i * 0.1}s`, textAlign: "center" }}>
             <div style={{
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              background: "var(--amber-glow)",
-              border: "1px solid var(--amber-border)",
+              width: 44,
+              height: 44,
+              borderRadius: 8,
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: 18,
+              marginBottom: 14,
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
                 <path d={f.icon} />
               </svg>
             </div>
-            <h3 className="heading-display" style={{ fontSize: 17, marginBottom: 8 }}>{f.title}</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: 14, lineHeight: 1.6 }}>{f.desc}</p>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{f.title}</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5 }}>{f.desc}</p>
           </div>
         ))}
       </div>

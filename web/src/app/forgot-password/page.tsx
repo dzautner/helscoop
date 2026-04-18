@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
             <div style={{
               padding: "16px 20px",
               borderRadius: "var(--radius-sm)",
-              background: "rgba(196,145,92,0.08)",
+              background: "var(--amber-glow)",
               border: "1px solid var(--amber-border)",
               color: "var(--text-primary)",
               fontSize: 14,

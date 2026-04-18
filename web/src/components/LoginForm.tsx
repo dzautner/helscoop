@@ -36,35 +36,21 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
     <div className="login-grid">
       {/* Left: Brand panel */}
       <div className="login-brand">
-        {/* Decorative diagonal lines */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          opacity: 0.03,
-          backgroundImage: `repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 40px,
-            var(--amber) 40px,
-            var(--amber) 41px
-          )`,
-        }} />
-
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="anim-up" style={{ marginBottom: 48 }}>
-            <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.12em" }}>
+          <div className="anim-up" style={{ marginBottom: 40 }}>
+            <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 12, letterSpacing: "0.06em" }}>
               {t('brand.tagline')}
             </div>
-            <h1 className="heading-display" style={{ fontSize: 56, lineHeight: 1.05, marginBottom: 20 }}>
+            <h1 className="heading-display" style={{ fontSize: 40, lineHeight: 1.1, marginBottom: 16 }}>
               <span style={{ color: "var(--text-primary)" }}>Hel</span>
               <span style={{ color: "var(--amber)" }}>scoop</span>
             </h1>
-            <p style={{ fontSize: 18, lineHeight: 1.7, color: "var(--text-secondary)", maxWidth: 420 }}>
+            <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--text-secondary)", maxWidth: 380 }}>
               {t('brand.description')}
             </p>
           </div>
 
-          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {[
               { num: "28", label: t('brand.featureMaterials'), desc: t('brand.featureMaterialsDesc') },
               { num: "6", label: t('brand.featureSuppliers'), desc: t('brand.featureSuppliersDesc') },
@@ -73,30 +59,30 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
               <div key={i} style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
-                padding: "14px 0",
+                gap: 12,
+                padding: "12px 0",
                 borderBottom: "1px solid var(--border)",
               }}>
                 <div style={{
-                  width: 48,
-                  height: 48,
+                  width: 36,
+                  height: 36,
                   borderRadius: "var(--radius-sm)",
                   background: "var(--amber-glow)",
                   border: "1px solid var(--amber-border)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 700,
-                  fontSize: item.num === "AI" ? 14 : 18,
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 600,
+                  fontSize: item.num === "AI" ? 11 : 13,
                   color: "var(--amber)",
                   flexShrink: 0,
                 }}>
                   {item.num}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{item.label}</div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 13 }}>{item.desc}</div>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>{item.label}</div>
+                  <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.desc}</div>
                 </div>
               </div>
             ))}
@@ -111,8 +97,8 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
             <LanguageSwitcher />
         </div>
         <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
-          <div style={{ marginBottom: 36 }}>
-            <h2 className="heading-display" style={{ fontSize: 28, marginBottom: 8 }}>
+          <div style={{ marginBottom: 28 }}>
+            <h2 className="heading-display" style={{ fontSize: 22, marginBottom: 6 }}>
               {isRegister ? t('auth.registerTitle') : t('auth.loginTitle')}
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>

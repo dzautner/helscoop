@@ -22,7 +22,7 @@ import type { Material, BomItem, Project } from "@/types";
 function Viewport3DLoading() {
   const { t } = useTranslation();
   return (
-    <div style={{ width: "100%", height: "100%", background: "#1a1816", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+    <div style={{ width: "100%", height: "100%", background: "#111113", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
       {t('editor.loading3D')}
     </div>
   );
@@ -437,7 +437,7 @@ export default function ProjectPage() {
                 ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
                 : t('editor.unsaved')}
           </span>
-          <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
+          <button className="btn btn-primary" onClick={save} style={{ padding: "6px 16px" }}>
             {t('editor.save')}
           </button>
           <button className="btn btn-ghost" data-tour="export-btn" onClick={async () => {
@@ -478,8 +478,9 @@ export default function ProjectPage() {
             onClick={() => setShowChat(!showChat)}
             style={{
               padding: "6px 12px",
-              background: showChat ? "#c4915c" : "rgba(196,145,92,0.12)",
-              color: showChat ? "#fff" : "#c4915c",
+              background: showChat ? "var(--amber)" : "var(--amber-glow)",
+              color: showChat ? "#09090b" : "var(--amber)",
+              border: showChat ? "none" : "1px solid var(--amber-border)",
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -543,9 +544,9 @@ export default function ProjectPage() {
                 padding: "4px 10px",
                 fontSize: 11,
                 fontWeight: 600,
-                background: showCode ? "rgba(196,145,92,0.2)" : "transparent",
-                color: showCode ? "#c4915c" : "var(--text-muted)",
-                border: showCode ? "1px solid rgba(196,145,92,0.3)" : "1px solid transparent",
+                background: showCode ? "var(--bg-hover)" : "transparent",
+                color: showCode ? "var(--text-primary)" : "var(--text-muted)",
+                border: showCode ? "1px solid var(--border-strong)" : "1px solid transparent",
               }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
@@ -562,9 +563,9 @@ export default function ProjectPage() {
                 padding: "4px 10px",
                 fontSize: 11,
                 fontWeight: 600,
-                background: wireframe ? "rgba(196,145,92,0.2)" : "transparent",
-                color: wireframe ? "#c4915c" : "var(--text-muted)",
-                border: wireframe ? "1px solid rgba(196,145,92,0.3)" : "1px solid transparent",
+                background: wireframe ? "var(--bg-hover)" : "transparent",
+                color: wireframe ? "var(--text-primary)" : "var(--text-muted)",
+                border: wireframe ? "1px solid var(--border-strong)" : "1px solid transparent",
               }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
@@ -601,7 +602,7 @@ export default function ProjectPage() {
             <div style={{ flex: 1 }} />
             <span style={{
               fontSize: 11,
-              color: sceneError ? "var(--danger, #e06c75)" : "var(--text-muted)",
+              color: sceneError ? "var(--danger)" : "var(--text-muted)",
               fontFamily: "var(--font-mono)",
             }}>
               {sceneError
@@ -632,7 +633,7 @@ export default function ProjectPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "#1a1816",
+                    background: "#111113",
                     borderRadius: "var(--radius-md)",
                   }}
                 >
@@ -643,7 +644,7 @@ export default function ProjectPage() {
                         height: 48,
                         margin: "0 auto 16px",
                         borderRadius: "50%",
-                        background: "rgba(224,108,117,0.12)",
+                        background: "rgba(239,68,68,0.1)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -654,7 +655,7 @@ export default function ProjectPage() {
                         height="24"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#e06c75"
+                        stroke="#ef4444"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -666,10 +667,9 @@ export default function ProjectPage() {
                     </div>
                     <h3
                       style={{
-                        color: "var(--text-primary, #e0dcd4)",
+                        color: "#fafafa",
                         fontSize: 16,
                         fontWeight: 600,
-                        fontFamily: "var(--font-display)",
                         marginBottom: 8,
                       }}
                     >
@@ -677,7 +677,7 @@ export default function ProjectPage() {
                     </h3>
                     <p
                       style={{
-                        color: "var(--text-muted, #8a857d)",
+                        color: "#52525b",
                         fontSize: 13,
                         lineHeight: 1.5,
                         marginBottom: 8,
@@ -687,7 +687,7 @@ export default function ProjectPage() {
                     </p>
                     <p
                       style={{
-                        color: "var(--danger, #e06c75)",
+                        color: "#ef4444",
                         fontSize: 12,
                         fontFamily: "var(--font-mono)",
                         marginBottom: 20,
@@ -701,13 +701,7 @@ export default function ProjectPage() {
                       onClick={reset}
                       style={{
                         padding: "8px 20px",
-                        background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        cursor: "pointer",
                         fontSize: 13,
-                        fontWeight: 600,
                       }}
                     >
                       {t('editor.resetScene')}

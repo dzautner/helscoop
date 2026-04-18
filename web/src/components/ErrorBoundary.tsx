@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#1a1816",
+            background: "#111113",
             borderRadius: "var(--radius-md)",
           }}
         >
@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 height: 48,
                 margin: "0 auto 16px",
                 borderRadius: "50%",
-                background: "rgba(224,108,117,0.12)",
+                background: "rgba(239,68,68,0.1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -68,7 +68,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 height="24"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#e06c75"
+                stroke="#ef4444"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </div>
             <h3
               style={{
-                color: "var(--text-primary, #e0dcd4)",
+                color: "#fafafa",
                 fontSize: 16,
                 fontWeight: 600,
                 marginBottom: 8,
@@ -90,7 +90,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </h3>
             <p
               style={{
-                color: "var(--text-muted, #8a857d)",
+                color: "#52525b",
                 fontSize: 13,
                 lineHeight: 1.5,
                 marginBottom: 20,
@@ -103,13 +103,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               onClick={this.reset}
               style={{
                 padding: "8px 20px",
-                background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
                 fontSize: 13,
-                fontWeight: 600,
               }}
             >
               Reset

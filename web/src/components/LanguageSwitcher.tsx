@@ -9,7 +9,7 @@ export function LanguageSwitcher() {
     <button
       onClick={() => setLocale(locale === "fi" ? "en" : "fi")}
       style={{
-        background: "rgba(196,145,92,0.08)",
+        background: "transparent",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-sm)",
         padding: "4px 8px",

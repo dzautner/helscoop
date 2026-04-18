@@ -5,14 +5,14 @@ import { useTranslation } from "@/components/LocaleProvider";
 
 /* ── Syntax highlighting colours ─────────────────────────────────── */
 const COLORS = {
-  primitive: "#c4915c",   // box, cylinder, sphere
-  transform: "#89b4fa",   // translate, rotate, scale
-  boolean:   "#a6e3a1",   // union, subtract, intersect
-  sceneAdd:  "#c4915c",   // scene.add
-  number:    "#cba6f7",
-  comment:   "#6f6860",
-  string:    "#a6e3a1",
-  default:   "#cdd6f4",
+  primitive: "#e5a04b",   // box, cylinder, sphere
+  transform: "#60a5fa",   // translate, rotate, scale
+  boolean:   "#4ade80",   // union, subtract, intersect
+  sceneAdd:  "#e5a04b",   // scene.add
+  number:    "#c084fc",
+  comment:   "#52525b",
+  string:    "#4ade80",
+  default:   "#a1a1aa",
 };
 
 /* ── Token types & patterns ──────────────────────────────────────── */
@@ -205,7 +205,7 @@ export default function SceneEditor({
             flexShrink: 0,
             overflow: "hidden",
             textAlign: "right",
-            color: "#4a4640",
+            color: "#3f3f46",
             userSelect: "none",
             borderRight: "1px solid var(--border)",
             minWidth: 52,
@@ -216,7 +216,7 @@ export default function SceneEditor({
               key={i}
               style={{
                 height: "22.1px",
-                ...(i === cursorLine ? { color: "#8a8478" } : {}),
+                ...(i === cursorLine ? { color: "#71717a" } : {}),
               }}
             >
               {i + 1}
