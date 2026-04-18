@@ -80,6 +80,10 @@ hull(a, b, c)                          // convex hull of geometries
 levelSet({sdf, bounds, edgeLength})     // sdf: ([x,y,z]) => number, bounds: {min, max}
 trimByPlane(geometry, [nx,ny,nz], offset)
 
+// 2D polygon operations
+offset2D(polygon, delta)                   // offset polygon outward (+) or inward (-)
+offset2D(polygon, {delta, join, segments}) // join: "round"|"square"|"miter"|"bevel"
+
 // Deformation & splitting
 warp(geometry, ([x,y,z]) => [x',y',z'])  // per-vertex coordinate transform
 splitByPlane(geometry, [nx,ny,nz], offset)  // returns [inside, outside]

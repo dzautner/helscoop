@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "manifold/manifold.h"
+#include "manifold/cross_section.h"
 #include "manifold/polygon.h"
 #include "manifold/meshIO.h"
 #include "primitives/wall.h"
@@ -1147,6 +1148,67 @@ JSValue JsRevolve(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return WrapManifold(ctx, std::move(manifold));
 }
 
+// offset2D(polygon, delta) or offset2D(polygon, {delta, join, miterLimit, segments})
+// Returns an offset polygon array (positive delta = outward, negative = inward)
+JSValue JsOffset2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "offset2D expects (polygon, delta_or_options)");
+  }
+  manifold::Polygons polys;
+  if (!JsValueToPolygons(ctx, argv[0], polys)) return JS_EXCEPTION;
+
+  double delta = 0.0;
+  auto joinType = manifold::CrossSection::JoinType::Round;
+  double miterLimit = 2.0;
+  int32_t circularSegments = 0;
+
+  if (JS_IsNumber(argv[1])) {
+    if (JS_ToFloat64(ctx, &delta, argv[1]) < 0) return JS_EXCEPTION;
+  } else if (JS_IsObject(argv[1])) {
+    JSValue v;
+    v = JS_GetPropertyStr(ctx, argv[1], "delta");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &delta, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[1], "miterLimit");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &miterLimit, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[1], "segments");
+    if (!JS_IsUndefined(v)) { if (JS_ToInt32(ctx, &circularSegments, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[1], "join");
+    if (JS_IsString(v)) {
+      const char* s = JS_ToCString(ctx, v);
+      if (s) {
+        std::string jt(s);
+        if (jt == "square") joinType = manifold::CrossSection::JoinType::Square;
+        else if (jt == "miter") joinType = manifold::CrossSection::JoinType::Miter;
+        else if (jt == "bevel") joinType = manifold::CrossSection::JoinType::Bevel;
+        JS_FreeCString(ctx, s);
+      }
+    }
+    JS_FreeValue(ctx, v);
+  } else {
+    return JS_ThrowTypeError(ctx, "offset2D second arg must be a number or options object");
+  }
+
+  manifold::CrossSection cs(polys, manifold::CrossSection::FillRule::Positive);
+  manifold::CrossSection offset = cs.Offset(delta, joinType, miterLimit, circularSegments);
+
+  auto paths = offset.ToPolygons();
+  JSValue result = JS_NewArray(ctx);
+  for (size_t i = 0; i < paths.size(); i++) {
+    JSValue poly = JS_NewArray(ctx);
+    for (size_t j = 0; j < paths[i].size(); j++) {
+      JSValue pt = JS_NewArray(ctx);
+      JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, paths[i][j].x));
+      JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, paths[i][j].y));
+      JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(j), pt);
+    }
+    JS_SetPropertyUint32(ctx, result, static_cast<uint32_t>(i), poly);
+  }
+  return result;
+}
+
 // torus(majorRadius, minorRadius) or torus({majorRadius, minorRadius, segments?, minorSegments?})
 JSValue JsTorus(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double majorR = 10.0;
@@ -1895,6 +1957,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsExtrude, "extrude", 2));
   JS_SetPropertyStr(ctx, global, "revolve",
                     JS_NewCFunction(ctx, JsRevolve, "revolve", 2));
+  JS_SetPropertyStr(ctx, global, "offset2D",
+                    JS_NewCFunction(ctx, JsOffset2D, "offset2D", 2));
   JS_SetPropertyStr(ctx, global, "torus",
                     JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",
