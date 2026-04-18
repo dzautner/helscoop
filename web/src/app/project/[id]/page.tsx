@@ -14,6 +14,7 @@ import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { generateQuotePdf } from "@/lib/pdf";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
@@ -458,9 +459,15 @@ export default function ProjectPage() {
           }}>
             {t('editor.export')}
           </button>
-          <button className="btn btn-ghost" onClick={async () => {
+          <button className="btn btn-ghost" onClick={() => {
             try {
-              await api.exportPdf(projectId, projectName, locale);
+              generateQuotePdf({
+                projectName,
+                projectDescription: projectDesc,
+                bom,
+                locale,
+              });
+              toast(t('toast.bomExported'), "success");
             } catch (err) {
               toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
             }
