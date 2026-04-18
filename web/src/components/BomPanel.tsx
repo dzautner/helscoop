@@ -418,33 +418,66 @@ export default function BomPanel({
       .catch(() => { /* ignore */ });
   }, []);
 
-  // Calculate potential savings across all BOM items
+  // Price cache: only fetch prices for materials we haven't seen before.
+  // Keyed by material_id -> savings_per_unit.
+  const priceCacheRef = useRef<Map<string, number>>(new Map());
+  const savingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Calculate potential savings across all BOM items.
+  // Debounced: waits 1.5s after the last bom change before firing.
+  // Cached: only fetches prices for newly-added materials; quantity changes
+  // recalculate from cached savings_per_unit without any API calls.
   useEffect(() => {
     if (bom.length === 0) {
       setTotalSavings(0);
       return;
     }
-    let cancelled = false;
-    async function calcSavings() {
-      const promises = bom.map(async (item) => {
-        try {
-          const data: MaterialPriceData = await api.getMaterialPrices(item.material_id);
-          if (data.savings_per_unit > 0) {
-            return data.savings_per_unit * item.quantity;
-          }
-        } catch {
-          // ignore errors
-        }
-        return 0;
-      });
-      const results = await Promise.all(promises);
-      if (!cancelled) {
-        const savings = results.reduce((a, b) => a + b, 0);
-        setTotalSavings(savings);
-      }
+
+    // Clear any pending debounce timer
+    if (savingsTimerRef.current) {
+      clearTimeout(savingsTimerRef.current);
     }
-    calcSavings();
-    return () => { cancelled = true; };
+
+    let cancelled = false;
+
+    savingsTimerRef.current = setTimeout(async () => {
+      const cache = priceCacheRef.current;
+      const newMaterialIds = bom
+        .map((item) => item.material_id)
+        .filter((id) => !cache.has(id));
+
+      // Fetch prices only for materials not yet in cache
+      if (newMaterialIds.length > 0) {
+        const fetches = newMaterialIds.map(async (id) => {
+          try {
+            const data: MaterialPriceData = await api.getMaterialPrices(id);
+            cache.set(id, data.savings_per_unit);
+          } catch {
+            cache.set(id, 0);
+          }
+        });
+        await Promise.all(fetches);
+      }
+
+      if (cancelled) return;
+
+      // Recalculate total savings from cache + current quantities
+      let savings = 0;
+      for (const item of bom) {
+        const perUnit = cache.get(item.material_id) ?? 0;
+        if (perUnit > 0) {
+          savings += perUnit * item.quantity;
+        }
+      }
+      setTotalSavings(savings);
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      if (savingsTimerRef.current) {
+        clearTimeout(savingsTimerRef.current);
+      }
+    };
   }, [bom]);
 
   // Filter materials: exclude already-in-BOM, match search query, match category
