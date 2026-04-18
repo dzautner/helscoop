@@ -124,7 +124,7 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
           </>
         )}
 
-        <div className="address-search-bar">
+        <div className="address-search-bar" data-tour="address-input">
           <input
             className="input"
             placeholder={t('search.placeholder')}
