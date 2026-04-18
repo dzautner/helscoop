@@ -107,6 +107,7 @@ int main(int argc, char *argv[]) {
   bool renderWhiteBackground = false;
   int renderSupersample = 1;
   int turntableFrames = 0;
+  bool renderWireframe = false;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -195,6 +196,8 @@ int main(int argc, char *argv[]) {
     } else if (arg == "--supersample" && i + 1 < argc) {
       renderSupersample = std::clamp(std::atoi(argv[i + 1]), 1, 4);
       i += 1;
+    } else if (arg == "--wireframe") {
+      renderWireframe = true;
     } else if (arg == "--turntable" && i + 1 < argc) {
       turntableFrames = std::clamp(std::atoi(argv[i + 1]), 2, 360);
       i += 1;
@@ -1829,6 +1832,11 @@ int main(int argc, char *argv[]) {
       SetShaderValue(toonShader, locToonUseShadows, &useShadowsVal, SHADER_UNIFORM_INT);
     }
 
+    if (renderWireframe) {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+      glLineWidth(1.0f);
+    }
+
     // Main shading pass
     for (size_t modelIdx = 0; modelIdx < models.size(); ++modelIdx) {
       const auto &modelWithColor = models[modelIdx];
@@ -1932,6 +1940,10 @@ int main(int argc, char *argv[]) {
           DrawMesh(modelWithColor.model.meshes[i], toonMat, modelWithColor.model.transform);
         }
       }
+    }
+
+    if (renderWireframe) {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
 
     // Unbind shadow map from unit 3 after the object loop
