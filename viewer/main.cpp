@@ -1468,6 +1468,11 @@ int main(int argc, char *argv[]) {
       lightCam.fovy = orthoSize * 2.0f;  // Full width for ortho
       lightCam.projection = CAMERA_ORTHOGRAPHIC;
 
+      // Set tight clip planes so shadow depth has usable precision
+      float shadowNear = 0.01f;
+      float shadowFar = sceneRadius * 4.0f;
+      rlSetClipPlanes(shadowNear, shadowFar);
+
       BeginMode3D(lightCam);
 
       // Get the actual view-projection matrix that Raylib is using
@@ -1484,6 +1489,9 @@ int main(int argc, char *argv[]) {
 
       EndMode3D();
       EndTextureMode();
+
+      // Restore default clip planes for main camera
+      rlSetClipPlanes(RL_CULL_DISTANCE_NEAR, RL_CULL_DISTANCE_FAR);
 
       // Update PBR shadow shader with light space matrix
       SetShaderValueMatrix(pbrShadowShader, locPbrShadowLightSpaceMatrix, lightSpaceMatrix);

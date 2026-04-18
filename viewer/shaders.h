@@ -722,7 +722,7 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
     float currentDepth = projCoords.z;
 
     float cosTheta = max(dot(normal, lightDir), 0.0);
-    float bias = max(0.01 * (1.0 - cosTheta), 0.003);
+    float bias = max(0.08 * (1.0 - cosTheta), 0.008);
 
     // Poisson disk samples for soft shadow edges
     const vec2 poissonDisk[12] = vec2[](
@@ -945,7 +945,7 @@ void main() {
             projCoords.y >= 0.0 && projCoords.y <= 1.0) {
 
             float currentDepth = projCoords.z;
-            float bias = 0.003;
+            float bias = 0.005;
 
             vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
             for (int x = -1; x <= 1; ++x) {
@@ -960,8 +960,8 @@ void main() {
 
     // Diffuse lighting with shadow
     float NdotL = max(dot(N, lightDir), 0.0);
-    vec3 ambient = vec3(0.52);
-    vec3 diffuse = lightColor * NdotL * 0.48 * (1.0 - shadow * 0.6);
+    vec3 ambient = vec3(0.50) * (1.0 - shadow * 0.25);
+    vec3 diffuse = lightColor * NdotL * 0.50 * (1.0 - shadow * 0.85);
     vec3 lighting = ambient + diffuse;
 
     // Subtle procedural variation for natural ground texture
@@ -990,7 +990,6 @@ void main() {
         color = mix(color, vec3(0.2), gridAlpha);
     }
 
-    // Output with fade to transparent at edges
     finalColor = vec4(color, fade);
 }
 )glsl";
