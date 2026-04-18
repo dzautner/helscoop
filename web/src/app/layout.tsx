@@ -3,7 +3,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
-
+import ConnectionBanner from "@/components/ConnectionBanner";
 
 export const metadata: Metadata = {
   title: {
@@ -92,6 +92,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LocaleProvider>
             <ToastProvider>
+              <ConnectionBanner />
               {children}
             </ToastProvider>
           </LocaleProvider>
