@@ -10,7 +10,8 @@ async function apiFetch(path: string, opts?: RequestInit & { token?: string }) {
   if (opts?.token) headers.Authorization = `Bearer ${opts.token}`;
 
   const res = await fetch(`${API}${path}`, { ...opts, headers });
-  const body = await res.json().catch(() => ({}));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: any = await res.json().catch(() => ({}));
   return { status: res.status, body };
 }
 
