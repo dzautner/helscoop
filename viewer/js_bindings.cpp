@@ -1031,12 +1031,19 @@ JSValue JsProject(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
 JSValue JsExtrude(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) {
-    return JS_ThrowTypeError(ctx, "extrude expects (polygons, options)");
+    return JS_ThrowTypeError(ctx, "extrude expects (polygons, height_or_options)");
   }
   manifold::Polygons polys;
   if (!JsValueToPolygons(ctx, argv[0], polys)) return JS_EXCEPTION;
+  if (JS_IsNumber(argv[1])) {
+    double height = 1.0;
+    if (JS_ToFloat64(ctx, &height, argv[1]) < 0) return JS_EXCEPTION;
+    auto manifold = std::make_shared<manifold::Manifold>(
+        manifold::Manifold::Extrude(polys, height));
+    return WrapManifold(ctx, std::move(manifold));
+  }
   if (!JS_IsObject(argv[1])) {
-    return JS_ThrowTypeError(ctx, "extrude options must be an object");
+    return JS_ThrowTypeError(ctx, "extrude second arg must be a number or options object");
   }
   JSValue opts = argv[1];
   double height = 1.0;
