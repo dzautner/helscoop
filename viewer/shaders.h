@@ -224,8 +224,7 @@ void main() {
     vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
     fragPos = worldPos.xyz;
 
-    // Transform normal to world space (using normal matrix for non-uniform scaling)
-    fragNormal = normalize(mat3(matModel) * vertexNormal);
+    fragNormal = normalize(transpose(inverse(mat3(matModel))) * vertexNormal);
 
     fragTexCoord = vertexTexCoord;
 
@@ -603,7 +602,7 @@ out vec4 fragPosLightSpace;
 void main() {
     vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
     fragPos = worldPos.xyz;
-    fragNormal = normalize(mat3(matModel) * vertexNormal);
+    fragNormal = normalize(transpose(inverse(mat3(matModel))) * vertexNormal);
     fragTexCoord = vertexTexCoord;
     viewPos = -vec3(matView[3]) * mat3(matView);
     fragPosLightSpace = lightSpaceMatrix * worldPos;
