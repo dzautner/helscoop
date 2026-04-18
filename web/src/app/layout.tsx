@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ToastProvider } from "@/components/ToastProvider";
 
 export const metadata: Metadata = {
   title: "Helscoop - Rakennusprojektien suunnittelu",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fi">
-      <body className="grain">{children}</body>
+      <body className="grain">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }
