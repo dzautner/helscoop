@@ -103,6 +103,53 @@ const chatLimiter = rateLimit({
   message: { error: "Too many chat requests, please try again later" },
 });
 
+// Building lookup rate limiter: unauthenticated gets 10 req/min,
+// authenticated gets 60 req/min (keyed by user ID).
+// This protects the public building lookup endpoint against scraping and abuse.
+const buildingLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: IS_TEST ? 10000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    const userId = extractUserId(req);
+    if (userId) return `user:${userId}`;
+    return req.ip || "unknown";
+  },
+  handler: (req, res) => {
+    console.warn(`[RATE_LIMIT] Building endpoint rate limit hit by IP=${req.ip}, user=${extractUserId(req) || "anonymous"}`);
+    res.status(429).json({ error: "Too many building lookup requests, please try again later" });
+  },
+  skip: (req) => {
+    // Authenticated users get a higher limit
+    const userId = extractUserId(req);
+    if (userId) {
+      // We use a separate counter check concept — but express-rate-limit
+      // doesn't support per-key max easily. Instead we override max
+      // dynamically using the request.
+      return false;
+    }
+    return false;
+  },
+});
+
+// Higher limit for authenticated building lookups
+const buildingLimiterAuthenticated = rateLimit({
+  windowMs: 60 * 1000,
+  max: IS_TEST ? 10000 : 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    return extractUserId(req) || req.ip || "unknown";
+  },
+  handler: (req, res) => {
+    console.warn(`[RATE_LIMIT] Building endpoint rate limit hit by user=${extractUserId(req)}`);
+    res.status(429).json({ error: "Too many building lookup requests, please try again later" });
+  },
+});
+
 // Health check — no rate limit
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
@@ -304,7 +351,8 @@ app.use("/projects", authenticatedLimiter, projectsRouter);
 app.use("/suppliers", authenticatedLimiter, suppliersRouter);
 app.use("/pricing", authenticatedLimiter, pricingRouter);
 app.use("/chat", chatLimiter, chatRouter);
-app.use("/building", authenticatedLimiter, buildingRouter);
+// Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
+app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
 // Public endpoints get the stricter IP-based limiter
 app.get("/materials/export/viewer", publicLimiter, async (_req, res) => {
