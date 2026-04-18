@@ -79,7 +79,9 @@ export default function ProjectPage() {
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
   const [viewportKey, setViewportKey] = useState(0);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
@@ -215,6 +217,25 @@ export default function ProjectPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [saveStatus]);
 
+  // Close export menu on outside click or Escape
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowExportMenu(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [showExportMenu]);
+
   const handleSceneChange = useCallback(
     (code: string) => {
       setSceneJs(code);
@@ -289,6 +310,13 @@ export default function ProjectPage() {
       code: "z",
       action: redo,
       descriptionKey: "shortcuts.redo",
+    },
+    {
+      key: "Cmd+E",
+      mod: true,
+      code: "e",
+      action: () => setShowExportMenu((v) => !v),
+      descriptionKey: "shortcuts.exportMenu",
     },
   ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo]);
 
@@ -408,45 +436,146 @@ export default function ProjectPage() {
             </svg>
           </button>
           <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
-          <button className="btn btn-ghost" data-tour="export-btn" title={t('editor.export')} onClick={async () => {
-            try {
-              const res = await api.exportBOM(projectId);
-              const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `bom_${projectId}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-              toast(t('toast.bomExported'), "success");
-            } catch (err) {
-              toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-            }
-          }} style={{ padding: "5px 7px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          </button>
-          <button className="btn btn-ghost" title={t('editor.exportPdf')} onClick={async () => {
-            try {
-              generateQuotePdf({
-                projectName,
-                projectDescription: projectDesc,
-                bom,
-                locale,
-              });
-              toast(t('toast.bomExported'), "success");
-            } catch (err) {
-              toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-            }
-          }} style={{ padding: "5px 7px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          </button>
+          {/* Export dropdown */}
+          <div ref={exportMenuRef} style={{ position: "relative" }}>
+            <button
+              className="btn btn-ghost"
+              data-tour="export-btn"
+              title={`${t('editor.exportMenu')} (${navigator.platform?.includes("Mac") ? "\u2318" : "Ctrl+"}E)`}
+              onClick={() => setShowExportMenu((v) => !v)}
+              style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {showExportMenu && (
+              <div
+                className="card"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  width: 220,
+                  padding: "6px",
+                  zIndex: 100,
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+                  border: "1px solid var(--border)",
+                  animation: "fadeIn 0.12s ease-out",
+                }}
+              >
+                {/* PDF export */}
+                <button
+                  className="btn btn-ghost"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 10px",
+                    justifyContent: "flex-start",
+                    fontSize: 13,
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    try {
+                      generateQuotePdf({
+                        projectName,
+                        projectDescription: projectDesc,
+                        bom,
+                        locale,
+                      });
+                      toast(t('toast.bomExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    }
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span style={{ flex: 1, textAlign: "left" }}>{t('editor.exportPdf')}</span>
+                  <span style={{ fontSize: 10, padding: "2px 5px", borderRadius: 3, background: "rgba(229,160,75,0.15)", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>.pdf</span>
+                </button>
+                {/* CSV export */}
+                <button
+                  className="btn btn-ghost"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 10px",
+                    justifyContent: "flex-start",
+                    fontSize: 13,
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    try {
+                      await api.exportBOMCsv(projectId, projectName);
+                      toast(t('toast.bomExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    }
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="3" y1="15" x2="21" y2="15" />
+                    <line x1="9" y1="3" x2="9" y2="21" />
+                  </svg>
+                  <span style={{ flex: 1, textAlign: "left" }}>{t('editor.exportCsv')}</span>
+                  <span style={{ fontSize: 10, padding: "2px 5px", borderRadius: 3, background: "rgba(34,197,94,0.15)", color: "#22c55e", fontFamily: "var(--font-mono)" }}>.csv</span>
+                </button>
+                {/* JSON export */}
+                <button
+                  className="btn btn-ghost"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 10px",
+                    justifyContent: "flex-start",
+                    fontSize: 13,
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    try {
+                      const res = await api.exportBOM(projectId);
+                      const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `bom_${projectId}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast(t('toast.bomExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    }
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 18 22 12 16 6" />
+                    <polyline points="8 6 2 12 8 18" />
+                  </svg>
+                  <span style={{ flex: 1, textAlign: "left" }}>{t('editor.exportJson')}</span>
+                  <span style={{ fontSize: 10, padding: "2px 5px", borderRadius: 3, background: "rgba(99,102,241,0.15)", color: "#818cf8", fontFamily: "var(--font-mono)" }}>.json</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
