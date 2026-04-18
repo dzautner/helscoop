@@ -65,8 +65,8 @@ scale(geometry, factor)                 // or scale(geometry, [sx, sy, sz])
 mirror(geometry, [nx, ny, nz])
 
 // Extrusion & revolution
-extrude(polygon, {height, twistDegrees, scaleTop, divisions})
-revolve(polygon, {segments, degrees})   // defaults: 360°, auto segments
+extrude(polygon, height)                // or extrude(polygon, {height, twistDegrees, scaleTop, divisions})
+revolve(polygon, segments)              // or revolve(polygon, {segments, degrees}), defaults: 360°
 
 // Patterns
 linearPattern(geometry, count, [dx, dy, dz])   // count copies offset by [dx,dy,dz]
@@ -110,6 +110,7 @@ See `examples/` for parametric examples:
 | gyroid | levelSet SDF, lattice structures |
 | lamp | Multi-material: brass metal + cream matte shade |
 | tower | warp() twist deformation, refineToLength |
+| showroom | Multi-object PBR: revolve, warp, boolean, patterns |
 | helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode
