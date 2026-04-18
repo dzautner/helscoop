@@ -30,11 +30,7 @@ export default function TemplateGrid({
         {t('project.orStartFromTemplate')}
       </div>
       {loading ? (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-        }}>
+        <div className="template-grid">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
@@ -57,11 +53,7 @@ export default function TemplateGrid({
           ))}
         </div>
       ) : templates.length > 0 ? (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-        }}>
+        <div className="template-grid">
           {templates.map((tmpl, i) => (
             <button
               key={tmpl.id}

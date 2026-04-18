@@ -303,3 +303,369 @@ body {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* ===========================================
+   Responsive / Mobile-First Layout
+   =========================================== */
+
+/* -- Login page: 2-column grid stacks on mobile -- */
+.login-grid {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: relative;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 80px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1a1510 0%, #12110f 100%);
+}
+
+.login-form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  position: relative;
+}
+
+/* -- Nav bar -- */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(18,17,15,0.85);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  max-width: 1080;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-links {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.nav-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.nav-mobile-menu {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 24px 16px;
+  background: rgba(18,17,15,0.95);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-mobile-menu.open {
+  display: flex;
+}
+
+/* -- Project editor: main layout -- */
+.editor-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editor-viewport-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-bom-panel {
+  width: 360px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.editor-chat-panel {
+  width: 340px;
+  border-left: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* -- Editor page container -- */
+.editor-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* -- Editor header -- */
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.editor-header-meta {
+  display: contents;
+}
+
+.editor-header-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 180px;
+}
+
+.editor-header-actions {
+  display: contents;
+}
+
+/* -- Project cards -- */
+.project-card-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.project-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* -- Template cards grid -- */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+/* -- Building info grid -- */
+.building-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+/* -- Address search bar -- */
+.address-search-bar {
+  display: flex;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* -- Building result: 3D preview + info side by side -- */
+.building-result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* -- Feature highlights grid -- */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+/* -- Settings page card padding -- */
+.settings-card {
+  padding: 28px 32px;
+}
+
+/* ========= MOBILE BREAKPOINT (768px) ========= */
+
+@media (max-width: 768px) {
+  /* Login: stack vertically */
+  .login-grid {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .login-brand {
+    padding: 40px 24px;
+    min-height: auto;
+  }
+
+  .login-form-panel {
+    padding: 32px 20px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Nav: hamburger menu */
+  .nav-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .nav-links.mobile-open {
+    display: flex;
+  }
+
+  .nav-inner {
+    padding: 10px 16px;
+  }
+
+  /* Editor page: allow scrolling on mobile */
+  .editor-page {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Editor: stack viewport and BOM vertically */
+  .editor-main {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .editor-bom-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 50vh;
+  }
+
+  .editor-chat-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 50vh;
+  }
+
+  .editor-viewport-area {
+    min-height: 300px;
+  }
+
+  /* Editor header: wrap and collapse on mobile */
+  .editor-header {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .editor-header-desc {
+    display: none;
+  }
+
+  .editor-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Project cards: stack vertically */
+  .project-card-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .project-card-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Template cards: single column */
+  .template-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Building info: 2 columns on mobile */
+  .building-info-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Address search stacks */
+  .address-search-bar {
+    flex-direction: column;
+  }
+
+  /* Building result stacks */
+  .building-result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Feature highlights stack */
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  /* Settings */
+  .settings-card {
+    padding: 20px 16px;
+  }
+
+  /* Brand heading smaller */
+  .login-brand .heading-display {
+    font-size: 40px;
+  }
+
+  /* Fluid typography */
+  body {
+    font-size: 13px;
+  }
+}
+
+/* ========= SMALL MOBILE (480px) ========= */
+
+@media (max-width: 480px) {
+  .login-brand {
+    padding: 32px 16px;
+  }
+
+  .login-form-panel {
+    padding: 24px 16px;
+  }
+
+  .login-brand .heading-display {
+    font-size: 32px;
+  }
+
+  .building-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-inner {
+    padding: 8px 12px;
+  }
+
+  .editor-header {
+    padding: 6px 10px;
+  }
+}

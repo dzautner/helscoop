@@ -286,25 +286,10 @@ export default function ProjectPage() {
   }
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className="editor-page">
+
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "8px 16px",
-          background: "var(--bg-secondary)",
-          borderBottom: "1px solid var(--border)",
-          flexShrink: 0,
-        }}
-      >
+      <div className="editor-header">
         <button className="btn btn-ghost" onClick={() => router.push("/")} style={{ padding: "6px 10px" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
@@ -326,17 +311,10 @@ export default function ProjectPage() {
           }}
         />
         <input
+          className="editor-header-desc"
           value={projectDesc}
           onChange={(e) => setProjectDesc(e.target.value)}
           placeholder={t('project.descriptionPlaceholder')}
-          style={{
-            fontSize: 13,
-            color: "var(--text-muted)",
-            border: "none",
-            background: "transparent",
-            outline: "none",
-            width: 180,
-          }}
         />
         <div style={{ display: "flex", gap: 2 }}>
           <button
@@ -364,77 +342,73 @@ export default function ProjectPage() {
             </svg>
           </button>
         </div>
-        <div style={{ width: 1, height: 20, background: "var(--border)" }} />
-        <span style={{
-          fontSize: 11,
-          color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--success)",
-          fontFamily: "var(--font-mono)",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-        }}>
-          {saveStatus === "saving" && (
-            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: "pulse 1.5s infinite" }} />
-          )}
-          {saveStatus === "saved" && (
-            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />
-          )}
-          {saveStatus === "unsaved" && (
-            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--warning, #e5c07b)" }} />
-          )}
-          {saveStatus === "saving"
-            ? t('editor.saving')
-            : saveStatus === "saved"
-              ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
-              : t('editor.unsaved')}
-        </span>
-        <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
-          {t('editor.save')}
-        </button>
-        <button className="btn btn-ghost" onClick={async () => {
-          try {
-            const res = await api.exportBOM(projectId);
-            const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `bom_${projectId}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            toast(t('toast.bomExported'), "success");
-          } catch (err) {
-            toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-          }
-        }}>
-          {t('editor.export')}
-        </button>
-        <button
-          className="btn"
-          onClick={() => setShowChat(!showChat)}
-          style={{
-            padding: "6px 12px",
-            background: showChat ? "#c4915c" : "rgba(196,145,92,0.12)",
-            color: showChat ? "#fff" : "#c4915c",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          {t('editor.assistant')}
-        </button>
-        <LanguageSwitcher />
+        <div className="editor-header-actions">
+          <div style={{ width: 1, height: 20, background: "var(--border)" }} />
+          <span style={{
+            fontSize: 11,
+            color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--success)",
+            fontFamily: "var(--font-mono)",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}>
+            {saveStatus === "saving" && (
+              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: "pulse 1.5s infinite" }} />
+            )}
+            {saveStatus === "saved" && (
+              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />
+            )}
+            {saveStatus === "unsaved" && (
+              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--warning, #e5c07b)" }} />
+            )}
+            {saveStatus === "saving"
+              ? t('editor.saving')
+              : saveStatus === "saved"
+                ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
+                : t('editor.unsaved')}
+          </span>
+          <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
+            {t('editor.save')}
+          </button>
+          <button className="btn btn-ghost" onClick={async () => {
+            try {
+              const res = await api.exportBOM(projectId);
+              const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `bom_${projectId}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+              toast(t('toast.bomExported'), "success");
+            } catch (err) {
+              toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+            }
+          }}>
+            {t('editor.export')}
+          </button>
+          <button
+            className="btn"
+            onClick={() => setShowChat(!showChat)}
+            style={{
+              padding: "6px 12px",
+              background: showChat ? "#c4915c" : "rgba(196,145,92,0.12)",
+              color: showChat ? "#fff" : "#c4915c",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {t('editor.assistant')}
+          </button>
+          <LanguageSwitcher />
+        </div>
       </div>
 
       {/* Main content */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
+      <div className="editor-main">
+        {/* Left: Viewport + Code */}
+        <div className="editor-viewport-area">
           {/* Toolbar */}
           <div
             style={{
@@ -557,7 +531,7 @@ export default function ProjectPage() {
 
         {/* Chat panel */}
         {showChat && (
-          <div style={{ width: 340, borderLeft: "1px solid var(--border)", flexShrink: 0 }}>
+          <div className="editor-chat-panel">
             <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
           </div>
         )}

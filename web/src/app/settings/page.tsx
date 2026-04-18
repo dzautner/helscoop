@@ -135,26 +135,8 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight: "100vh" }}>
       {/* Top bar */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          background: "rgba(18,17,15,0.85)",
-          backdropFilter: "blur(16px) saturate(1.2)",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 720,
-            margin: "0 auto",
-            padding: "12px 24px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+      <div className="nav-bar">
+        <div className="nav-inner" style={{ maxWidth: 720 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
               <span style={{ color: "var(--text-primary)" }}>Hel</span>
@@ -197,8 +179,8 @@ export default function SettingsPage() {
 
         {/* Profile section */}
         <div
-          className="card anim-up"
-          style={{ padding: "28px 32px", marginBottom: 20 }}
+          className="card anim-up settings-card"
+          style={{ marginBottom: 20 }}
         >
           <h2
             className="heading-display"
@@ -264,8 +246,8 @@ export default function SettingsPage() {
 
         {/* Security section */}
         <div
-          className="card anim-up delay-1"
-          style={{ padding: "28px 32px", marginBottom: 20 }}
+          className="card anim-up delay-1 settings-card"
+          style={{ marginBottom: 20 }}
         >
           <h2
             className="heading-display"
@@ -352,8 +334,7 @@ export default function SettingsPage() {
 
         {/* Account section */}
         <div
-          className="card anim-up delay-2"
-          style={{ padding: "28px 32px" }}
+          className="card anim-up delay-2 settings-card"
         >
           <h2
             className="heading-display"
