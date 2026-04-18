@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import bcrypt from "bcryptjs";
 import { login, register, signToken, requireAuth, forgotPassword, resetPassword } from "./auth";
+import { query } from "./db";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
 import suppliersRouter from "./routes/suppliers";
@@ -110,8 +112,105 @@ app.post("/auth/register", authLimiter, async (req, res) => {
   }
 });
 
-app.get("/auth/me", requireAuth, (req, res) => {
-  res.json(req.user);
+app.get("/auth/me", requireAuth, async (req, res) => {
+  const result = await query(
+    "SELECT id, email, name, role FROM users WHERE id = $1",
+    [req.user!.id]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  res.json(result.rows[0]);
+});
+
+app.put("/auth/profile", requireAuth, async (req, res) => {
+  const { name, email } = req.body;
+  if (!name && !email) {
+    return res.status(400).json({ error: "Name or email is required" });
+  }
+  if (email && !EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+  if (name && name.length > 200) {
+    return res.status(400).json({ error: "Name must be 200 characters or fewer" });
+  }
+  try {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (name) {
+      fields.push(`name = $${idx++}`);
+      values.push(sanitize(name));
+    }
+    if (email) {
+      fields.push(`email = $${idx++}`);
+      values.push(email.trim().toLowerCase());
+    }
+    values.push(req.user!.id);
+    const result = await query(
+      `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, email, name, role`,
+      values
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    // Return a fresh token with updated user info
+    const user = result.rows[0];
+    res.json({ user, token: signToken(user) });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Update failed";
+    if (msg.includes("duplicate key")) {
+      return res.status(409).json({ error: "Email already in use" });
+    }
+    res.status(400).json({ error: msg || "Update failed" });
+  }
+});
+
+app.put("/auth/password", requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Current password and new password are required" });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters" });
+  }
+  try {
+    const userResult = await query(
+      "SELECT password_hash FROM users WHERE id = $1",
+      [req.user!.id]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const valid = await bcrypt.compare(currentPassword, userResult.rows[0].password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+    const hash = await bcrypt.hash(newPassword, 10);
+    await query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.user!.id]);
+    res.json({ message: "Password updated successfully" });
+  } catch (e) {
+    console.error("Password change error:", e);
+    res.status(500).json({ error: "Failed to change password" });
+  }
+});
+
+app.delete("/auth/account", requireAuth, async (req, res) => {
+  try {
+    // Delete all BOM entries for user's projects
+    await query(
+      "DELETE FROM project_bom WHERE project_id IN (SELECT id FROM projects WHERE user_id = $1)",
+      [req.user!.id]
+    );
+    // Delete all user's projects
+    await query("DELETE FROM projects WHERE user_id = $1", [req.user!.id]);
+    // Delete the user
+    await query("DELETE FROM users WHERE id = $1", [req.user!.id]);
+    res.json({ message: "Account deleted successfully" });
+  } catch (e) {
+    console.error("Account deletion error:", e);
+    res.status(500).json({ error: "Failed to delete account" });
+  }
 });
 
 app.post("/auth/forgot-password", authLimiter, async (req, res) => {
