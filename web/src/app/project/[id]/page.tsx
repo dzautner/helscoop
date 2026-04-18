@@ -14,13 +14,18 @@ import ChatPanel from "@/components/ChatPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { Material, BomItem, Project } from "@/types";
 
+function Viewport3DLoading() {
+  const { t } = useTranslation();
+  return (
+    <div style={{ width: "100%", height: "100%", background: "#1a1816", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+      {t('editor.loading3D')}
+    </div>
+  );
+}
+
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
   ssr: false,
-  loading: () => (
-    <div style={{ width: "100%", height: "100%", background: "#1a1816", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
-      Ladataan 3D-nakyma...
-    </div>
-  ),
+  loading: () => <Viewport3DLoading />,
 });
 
 const DEFAULT_SCENE = `// Helscoop Scene Script
@@ -446,7 +451,7 @@ export default function ProjectPage() {
                 <polyline points="16 18 22 12 16 6" />
                 <polyline points="8 6 2 12 8 18" />
               </svg>
-              {showCode ? "Piilota koodi" : "Nayta koodi"}
+              {showCode ? t('editor.hideCode') : t('editor.showCode')}
             </button>
             <div style={{ width: 1, height: 16, background: "var(--border)" }} />
             <button
@@ -466,7 +471,7 @@ export default function ProjectPage() {
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
               </svg>
-              Rautalanka
+              {t('editor.wireframe')}
             </button>
             <button
               className="btn"
@@ -490,7 +495,7 @@ export default function ProjectPage() {
                 <path d="M1 4v6h6" />
                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
               </svg>
-              Nollaa kamera
+              {t('editor.resetCamera')}
             </button>
             <div style={{ flex: 1 }} />
             <span style={{
@@ -499,8 +504,8 @@ export default function ProjectPage() {
               fontFamily: "var(--font-mono)",
             }}>
               {sceneError
-                ? `Virhe: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
-                : `${objectCount} objektia`}
+                ? `${t('editor.sceneErrorPrefix')}: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
+                : t('editor.objectCount', { count: objectCount })}
             </span>
           </div>
 

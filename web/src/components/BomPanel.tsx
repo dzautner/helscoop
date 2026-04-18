@@ -216,7 +216,7 @@ export default function BomPanel({
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
   const [totalSavings, setTotalSavings] = useState(0);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const total = bom.reduce((sum, item) => sum + (item.total || 0), 0);
 
@@ -266,7 +266,7 @@ export default function BomPanel({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
           <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            {bom.length} {bom.length === 1 ? 'rivi' : 'rivia'}
+            {t('editor.bomRowCount', { count: bom.length, suffix: bom.length === 1 ? '' : (locale === 'fi' ? 'a' : 's') })}
           </span>
         </div>
         <div style={{
@@ -276,7 +276,7 @@ export default function BomPanel({
           border: "1px solid var(--amber-border)",
         }}>
           <div className="label-mono" style={{ fontSize: 10, color: "var(--amber)", marginBottom: 6 }}>
-            ARVIOITU KOKONAISHINTA
+            {t('editor.estimatedTotal')}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
             <span className="heading-display" style={{ fontSize: 24, color: "var(--text-primary)" }}>
@@ -285,7 +285,7 @@ export default function BomPanel({
             <span style={{ fontSize: 14, color: "var(--text-muted)" }}>&euro;</span>
             {total > 0 && (
               <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                sis. ALV 25.5%
+                {t('editor.inclVat')}
               </span>
             )}
           </div>
