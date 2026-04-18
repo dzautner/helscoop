@@ -112,7 +112,48 @@ int main(int argc, char *argv[]) {
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg == "--render" && i + 2 < argc) {
+    if (arg == "--help" || arg == "-h") {
+      std::cout << "Usage: dingcad_viewer [scene.js] [options]\n"
+                << "       dingcad_viewer --render scene.js output.png [options]\n\n"
+                << "Render options:\n"
+                << "  --render SCENE OUTPUT   Headless render to PNG\n"
+                << "  --size W H              Output dimensions (default: 1280 720)\n"
+                << "  --supersample N         Supersampling factor 1-4 (default: 1)\n"
+                << "  --background MODE       white | transparent (default: sky gradient)\n"
+                << "  --wireframe             Render in wireframe mode\n"
+                << "  --toon                  Use toon shading instead of PBR\n"
+                << "  --turntable N           Render N-frame turntable sequence\n"
+                << "  --frames N              Capture at frame N (default: 1)\n"
+                << "  --show-ui / --hide-ui   Show/hide UI in render output\n\n"
+                << "Camera:\n"
+                << "  --camera PRESET         front|back|left|right|top|bottom|iso|three-quarter\n"
+                << "  --yaw DEG               Camera yaw in degrees\n"
+                << "  --pitch DEG             Camera pitch in degrees\n"
+                << "  --dist D                Camera distance (absolute)\n"
+                << "  --dist-scale S          Camera distance multiplier\n"
+                << "  --fov DEG               Field of view (default: 45)\n"
+                << "  --target X Y Z          Camera look-at point\n"
+                << "  --camera-pos X Y Z      Camera position (absolute)\n"
+                << "  --target-offset X Y Z   Offset from auto-computed target\n\n"
+                << "Filtering:\n"
+                << "  --hide-material NAME    Hide objects with material\n"
+                << "  --hide-category NAME    Hide objects in category\n"
+                << "  --hide-object NAME      Hide specific object\n"
+                << "  --show-object NAME      Show only specific object\n"
+                << "  --focus-material NAME   Highlight material\n"
+                << "  --focus-object NAME     Highlight object\n"
+                << "  --focus-category NAME   Highlight category\n"
+                << "  --interior-cutaway      Hide sheathing/roofing/cladding\n\n"
+                << "Interactive:\n"
+                << "  R         Reload scene\n"
+                << "  T         Toggle parameters panel\n"
+                << "  M         Toggle materials panel\n"
+                << "  F         Toggle fullscreen\n"
+                << "  1-4       Debug views (normal/depth/SSAO)\n"
+                << "  Scroll    Zoom\n"
+                << "  Drag      Orbit camera\n";
+      return 0;
+    } else if (arg == "--render" && i + 2 < argc) {
       renderMode = true;
       renderScenePath = argv[i + 1];
       renderOutputPath = argv[i + 2];
