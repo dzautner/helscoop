@@ -522,6 +522,8 @@ export default function ProjectPage() {
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const [showCode, setShowCode] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [objectCount, setObjectCount] = useState(0);
@@ -671,6 +673,18 @@ export default function ProjectPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [saveStatus]);
+
+  // Close export dropdown on click outside
+  useEffect(() => {
+    if (!showExport) return;
+    const handler = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setShowExport(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showExport]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -868,23 +882,71 @@ export default function ProjectPage() {
         <button className="btn" onClick={save} style={{ padding: "6px 16px", background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)", color: "#fff", border: "none" }}>
           {t('editor.save')}
         </button>
-        <button className="btn btn-ghost" onClick={async () => {
-          try {
-            const res = await api.exportBOM(projectId);
-            const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `bom_${projectId}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            toast(t('toast.bomExported'), "success");
-          } catch (err) {
-            toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-          }
-        }}>
-          {t('editor.export')}
-        </button>
+        <div ref={exportDropdownRef} style={{ position: 'relative' }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowExport(!showExport)}
+            style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 4 }}
+          >
+            {t('editor.export')} <span style={{ fontSize: 10 }}>{"\u25BE"}</span>
+          </button>
+          {showExport && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 4,
+              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)', overflow: 'hidden', zIndex: 10,
+              minWidth: 160, boxShadow: 'var(--shadow-md)',
+            }}>
+              <button
+                onClick={async () => {
+                  setShowExport(false);
+                  try {
+                    await api.exportBOMCsv(projectId, projectName);
+                    toast(t('toast.bomExported'), "success");
+                  } catch (err) {
+                    toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                  }
+                }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '10px 16px', fontSize: 13, border: 'none',
+                  background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                CSV (Excel)
+              </button>
+              <button
+                onClick={async () => {
+                  setShowExport(false);
+                  try {
+                    const res = await api.exportBOM(projectId);
+                    const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `bom_${projectId}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast(t('toast.bomExported'), "success");
+                  } catch (err) {
+                    toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                  }
+                }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '10px 16px', fontSize: 13, border: 'none',
+                  background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                JSON
+              </button>
+            </div>
+          )}
+        </div>
         <button
           className="btn"
           onClick={() => setShowChat(!showChat)}
