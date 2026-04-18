@@ -1236,6 +1236,52 @@ JSValue JsSlot2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return result;
 }
 
+// arc2D(radius, startAngle, endAngle, width, segments?) — thick arc segment
+// Angles in degrees. Returns a closed polygon for the arc band.
+JSValue JsArc2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 4) return JS_ThrowTypeError(ctx, "arc2D expects (radius, startAngle, endAngle, width, segments?)");
+  double radius = 20.0, startDeg = 0.0, endDeg = 180.0, width = 5.0;
+  int32_t segments = 32;
+  if (JS_ToFloat64(ctx, &radius, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &startDeg, argv[1]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &endDeg, argv[2]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &width, argv[3]) < 0) return JS_EXCEPTION;
+  if (argc >= 5 && JS_IsNumber(argv[4])) {
+    if (JS_ToInt32(ctx, &segments, argv[4]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 2) segments = 2;
+
+  double startRad = startDeg * M_PI / 180.0;
+  double endRad = endDeg * M_PI / 180.0;
+  double outerR = radius + width / 2.0;
+  double innerR = radius - width / 2.0;
+  if (innerR < 0) innerR = 0;
+
+  JSValue poly = JS_NewArray(ctx);
+  int idx = 0;
+  // Outer arc from start to end
+  for (int i = 0; i <= segments; i++) {
+    double t = static_cast<double>(i) / segments;
+    double angle = startRad + t * (endRad - startRad);
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, outerR * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, outerR * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  // Inner arc from end back to start
+  for (int i = segments; i >= 0; i--) {
+    double t = static_cast<double>(i) / segments;
+    double angle = startRad + t * (endRad - startRad);
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, innerR * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, innerR * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
 // rect2D(width, height, center?) — returns a polygon array for a rectangle
 JSValue JsRect2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) return JS_ThrowTypeError(ctx, "rect2D expects (width, height, center?)");
@@ -2191,6 +2237,8 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsEllipse2D, "ellipse2D", 3));
   JS_SetPropertyStr(ctx, global, "slot2D",
                     JS_NewCFunction(ctx, JsSlot2D, "slot2D", 3));
+  JS_SetPropertyStr(ctx, global, "arc2D",
+                    JS_NewCFunction(ctx, JsArc2D, "arc2D", 5));
   JS_SetPropertyStr(ctx, global, "torus",
                     JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",

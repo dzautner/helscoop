@@ -90,6 +90,7 @@ hull2D(polygon1, polygon2, ...)            // convex hull wrapping multiple poly
 star2D(outerRadius, innerRadius, points)   // star polygon (5=pentagram, 6=hexagram, etc.)
 ellipse2D(radiusX, radiusY, segments?)     // ellipse polygon
 slot2D(length, width, segments?)           // stadium/slot shape (rect with semicircle ends)
+arc2D(radius, startDeg, endDeg, width, segments?) // thick arc segment band
 
 // Deformation & splitting
 warp(geometry, ([x,y,z]) => [x',y',z'])  // per-vertex coordinate transform
@@ -124,6 +125,7 @@ See `examples/` for parametric examples:
 | showroom | Multi-object PBR: revolve, warp, boolean, patterns |
 | bracket | circle2D, rect2D, offset2D, rounded corners, bolt holes |
 | badge | hull2D, offset2D, multi-material, boolean cutouts |
+| medallion | arc2D, star2D, ellipse2D, decorative relief patterns |
 | helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode
