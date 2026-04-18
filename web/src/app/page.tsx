@@ -32,20 +32,16 @@ export default function Home() {
   }
 
   async function createProjectFromBuilding(building: BuildingResult) {
-    try {
-      const buildingTypeLabels = BUILDING_TYPE_LABELS.fi;
-      const project = await api.createProject({
-        name: building.address,
-        description: `${buildingTypeLabels[building.building_info.type] || building.building_info.type}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
-        scene_js: building.scene_js,
-      });
-      if (building.bom_suggestion.length > 0) {
-        await api.saveBOM(project.id, building.bom_suggestion);
-      }
-      window.location.href = `/project/${project.id}`;
-    } catch (err) {
-      console.error("Failed to create project from building:", err);
+    const buildingTypeLabels = BUILDING_TYPE_LABELS.fi;
+    const project = await api.createProject({
+      name: building.address,
+      description: `${buildingTypeLabels[building.building_info.type] || building.building_info.type}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
+      scene_js: building.scene_js,
+    });
+    if (building.bom_suggestion.length > 0) {
+      await api.saveBOM(project.id, building.bom_suggestion);
     }
+    window.location.href = `/project/${project.id}`;
   }
 
   async function handleLogin() {
