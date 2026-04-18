@@ -216,6 +216,10 @@ const translations = {
       noResults: 'Ei tuloksia',
       browseMaterials: 'SELAA MATERIAALEJA',
       setQuantity: 'Maara',
+      showHistory: 'Nayta hintahistoria',
+      hideHistory: 'Piilota hintahistoria',
+      showTrend: 'Nayta hintatrendi',
+      limitedHistory: 'Rajoitettu hintahistoria saatavilla',
     },
     dialog: {
       confirm: 'Vahvista',
@@ -484,6 +488,10 @@ const translations = {
       noResults: 'No results',
       browseMaterials: 'BROWSE MATERIALS',
       setQuantity: 'Qty',
+      showHistory: 'Show price history',
+      hideHistory: 'Hide price history',
+      showTrend: 'Show price trend',
+      limitedHistory: 'Limited price history available',
     },
     dialog: {
       confirm: 'Confirm',

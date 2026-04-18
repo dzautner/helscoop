@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
-import type { BomItem, Material, MaterialPriceData, Category } from "@/types";
+import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow } from "@/types";
 
 /* ── Category color palette ─────────────────────────────────── */
 const CATEGORY_COLORS: Record<string, string> = {
@@ -194,6 +194,237 @@ function CostBreakdownChart({
   );
 }
 
+/* ── SVG Sparkline component ───────────────────────────────── */
+function Sparkline({
+  data,
+  width = 80,
+  height = 24,
+  color = "var(--text-muted)",
+}: {
+  data: number[];
+  width?: number;
+  height?: number;
+  color?: string;
+}) {
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const padY = 2;
+  const usableH = height - padY * 2;
+
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * width;
+      const y = padY + usableH - ((v - min) / range) * usableH;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg width={width} height={height} style={{ display: "block", flexShrink: 0 }}>
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* ── Trend badge helper ────────────────────────────────────── */
+function computeTrend(
+  history: PriceHistoryRow[],
+  supplierId: string,
+  days: number
+): { pctChange: number; direction: "up" | "down" | "stable" } {
+  const cutoff = Date.now() - days * 86400000;
+  const rows = history
+    .filter((h) => h.supplier_id === supplierId && new Date(h.scraped_at).getTime() >= cutoff)
+    .sort((a, b) => new Date(a.scraped_at).getTime() - new Date(b.scraped_at).getTime());
+
+  if (rows.length < 2) return { pctChange: 0, direction: "stable" };
+
+  const oldest = parseFloat(rows[0].unit_price);
+  const newest = parseFloat(rows[rows.length - 1].unit_price);
+  if (oldest === 0) return { pctChange: 0, direction: "stable" };
+
+  const pct = ((newest - oldest) / oldest) * 100;
+  const direction = Math.abs(pct) < 1 ? "stable" : pct > 0 ? "up" : "down";
+  return { pctChange: Math.round(pct), direction };
+}
+
+/* ── Expanded price history chart ─────────────────────────── */
+type TimeRange = "30d" | "90d" | "180d" | "1y";
+const TIME_RANGE_DAYS: Record<TimeRange, number> = { "30d": 30, "90d": 90, "180d": 180, "1y": 365 };
+
+function PriceHistoryChart({
+  history,
+  supplierColors,
+}: {
+  history: PriceHistoryRow[];
+  supplierColors: Map<string, string>;
+}) {
+  const { t } = useTranslation();
+  const [range, setRange] = useState<TimeRange>("90d");
+  const days = TIME_RANGE_DAYS[range];
+  const cutoff = Date.now() - days * 86400000;
+
+  const filtered = useMemo(
+    () =>
+      history
+        .filter((h) => new Date(h.scraped_at).getTime() >= cutoff)
+        .sort((a, b) => new Date(a.scraped_at).getTime() - new Date(b.scraped_at).getTime()),
+    [history, cutoff]
+  );
+
+  // Group by supplier
+  const bySupplier = useMemo(() => {
+    const map = new Map<string, { name: string; points: { t: number; p: number }[] }>();
+    for (const row of filtered) {
+      if (!map.has(row.supplier_id)) {
+        map.set(row.supplier_id, { name: row.supplier_name, points: [] });
+      }
+      map.get(row.supplier_id)!.points.push({
+        t: new Date(row.scraped_at).getTime(),
+        p: parseFloat(row.unit_price),
+      });
+    }
+    return map;
+  }, [filtered]);
+
+  if (filtered.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: 16, color: "var(--text-muted)", fontSize: 12 }}>
+        {t("pricing.limitedHistory")}
+      </div>
+    );
+  }
+
+  // Compute chart bounds
+  const allPrices = filtered.map((r) => parseFloat(r.unit_price));
+  const minP = Math.min(...allPrices);
+  const maxP = Math.max(...allPrices);
+  const priceRange = maxP - minP || 1;
+
+  const allTimes = filtered.map((r) => new Date(r.scraped_at).getTime());
+  const minT = Math.min(...allTimes);
+  const maxT = Math.max(...allTimes);
+  const timeRange = maxT - minT || 1;
+
+  const chartW = 380;
+  const chartH = 120;
+  const padX = 4;
+  const padY = 6;
+  const usableW = chartW - padX * 2;
+  const usableH = chartH - padY * 2;
+
+  function toSVG(t: number, p: number) {
+    const x = padX + ((t - minT) / timeRange) * usableW;
+    const y = padY + usableH - ((p - minP) / priceRange) * usableH;
+    return { x, y };
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {/* Time range selector */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        {(["30d", "90d", "180d", "1y"] as TimeRange[]).map((r) => (
+          <button
+            key={r}
+            onClick={() => setRange(r)}
+            style={{
+              padding: "2px 8px",
+              fontSize: 10,
+              fontWeight: 600,
+              border: "1px solid",
+              borderColor: range === r ? "var(--amber-border)" : "var(--border)",
+              borderRadius: 10,
+              background: range === r ? "var(--amber-glow)" : "transparent",
+              color: range === r ? "var(--amber)" : "var(--text-muted)",
+              cursor: "pointer",
+              transition: "all 0.12s ease",
+            }}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+
+      {/* SVG chart */}
+      <svg
+        width={chartW}
+        height={chartH}
+        style={{
+          width: "100%",
+          height: "auto",
+          background: "var(--bg-tertiary)",
+          borderRadius: "var(--radius-sm)",
+          border: "1px solid var(--border)",
+        }}
+        viewBox={`0 0 ${chartW} ${chartH}`}
+        preserveAspectRatio="none"
+      >
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
+          const y = padY + usableH - frac * usableH;
+          return (
+            <line
+              key={frac}
+              x1={padX}
+              y1={y}
+              x2={padX + usableW}
+              y2={y}
+              stroke="var(--border)"
+              strokeWidth="0.5"
+              strokeDasharray="3,3"
+            />
+          );
+        })}
+
+        {/* Lines per supplier */}
+        {Array.from(bySupplier.entries()).map(([suppId, { points }]) => {
+          if (points.length < 2) return null;
+          const color = supplierColors.get(suppId) || "var(--text-muted)";
+          const d = points
+            .map((pt, i) => {
+              const { x, y } = toSVG(pt.t, pt.p);
+              return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+            })
+            .join(" ");
+          return (
+            <path
+              key={suppId}
+              d={d}
+              fill="none"
+              stroke={color}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          );
+        })}
+      </svg>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
+        {Array.from(bySupplier.entries()).map(([suppId, { name }]) => (
+          <div key={suppId} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--text-muted)" }}>
+            <span style={{ width: 8, height: 3, borderRadius: 1, background: supplierColors.get(suppId) || "var(--text-muted)", flexShrink: 0 }} />
+            {name}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Supplier chart colors ─────────────────────────────────── */
+const SUPPLIER_COLORS = ["#c4915c", "#6a9fb5", "#8b6f47", "#7c8a6e", "#a0665c", "#8e7b9a"];
+
 function PriceComparisonPopup({
   materialId,
   materialName,
@@ -204,15 +435,21 @@ function PriceComparisonPopup({
   onClose: () => void;
 }) {
   const [priceData, setPriceData] = useState<MaterialPriceData | null>(null);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showChart, setShowChart] = useState(false);
   const { t } = useTranslation();
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    api.getMaterialPrices(materialId)
-      .then((data: MaterialPriceData) => {
+    Promise.all([
+      api.getMaterialPrices(materialId),
+      api.getPriceHistory(materialId).catch(() => [] as PriceHistoryRow[]),
+    ])
+      .then(([data, history]: [MaterialPriceData, PriceHistoryRow[]]) => {
         setPriceData(data);
+        setPriceHistory(history);
         setLoading(false);
       })
       .catch(() => {
@@ -229,6 +466,33 @@ function PriceComparisonPopup({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
+
+  // Build supplier color map
+  const supplierColors = useMemo(() => {
+    const map = new Map<string, string>();
+    if (priceData) {
+      priceData.prices.forEach((p, i) => {
+        map.set(p.supplier_id, SUPPLIER_COLORS[i % SUPPLIER_COLORS.length]);
+      });
+    }
+    return map;
+  }, [priceData]);
+
+  // Build sparkline data per supplier (90-day window, chronological)
+  const sparklineData = useMemo(() => {
+    const map = new Map<string, number[]>();
+    const cutoff = Date.now() - 90 * 86400000;
+    const sorted = [...priceHistory]
+      .filter((h) => new Date(h.scraped_at).getTime() >= cutoff)
+      .sort((a, b) => new Date(a.scraped_at).getTime() - new Date(b.scraped_at).getTime());
+    for (const row of sorted) {
+      if (!map.has(row.supplier_id)) map.set(row.supplier_id, []);
+      map.get(row.supplier_id)!.push(parseFloat(row.unit_price));
+    }
+    return map;
+  }, [priceHistory]);
+
+  const hasHistory = priceHistory.length > 0;
 
   return (
     <div
@@ -250,8 +514,8 @@ function PriceComparisonPopup({
           background: "var(--bg-secondary)",
           border: "1px solid var(--border-strong)",
           borderRadius: "var(--radius-lg)",
-          width: 440,
-          maxHeight: "70vh",
+          width: 480,
+          maxHeight: "80vh",
           display: "flex",
           flexDirection: "column",
           boxShadow: "var(--shadow-lg)",
@@ -286,6 +550,9 @@ function PriceComparisonPopup({
               {priceData.prices.map((price, idx) => {
                 const isCheapest = idx === 0;
                 const unitPrice = parseFloat(price.unit_price);
+                const spark = sparklineData.get(price.supplier_id);
+                const trend = computeTrend(priceHistory, price.supplier_id, 30);
+                const sparkColor = supplierColors.get(price.supplier_id) || "var(--text-muted)";
                 return (
                   <div
                     key={price.id}
@@ -315,15 +582,49 @@ function PriceComparisonPopup({
                             {t('pricing.primary')}
                           </span>
                         )}
+                        {/* Trend badge */}
+                        {trend.direction !== "stable" && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: "2px 6px",
+                              borderRadius: 8,
+                              background: trend.direction === "down" ? "rgba(74, 124, 89, 0.12)" : "rgba(239, 68, 68, 0.08)",
+                              color: trend.direction === "down" ? "var(--success)" : "var(--danger)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 2,
+                            }}
+                          >
+                            {trend.direction === "down" ? "\u2193" : "\u2191"}
+                            {Math.abs(trend.pctChange)}%
+                          </span>
+                        )}
                       </div>
-                      <span style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: isCheapest ? "var(--success)" : "var(--text-primary)",
-                      }}>
-                        {unitPrice.toFixed(2)} EUR
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {/* Sparkline */}
+                        {spark && spark.length >= 2 && (
+                          <div
+                            style={{ cursor: "pointer", opacity: 0.8 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowChart(true);
+                            }}
+                            title={t("pricing.showTrend")}
+                          >
+                            <Sparkline data={spark} width={60} height={20} color={sparkColor} />
+                          </div>
+                        )}
+                        <span style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: isCheapest ? "var(--success)" : "var(--text-primary)",
+                        }}>
+                          {unitPrice.toFixed(2)} EUR
+                        </span>
+                      </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                       <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-muted)" }}>
@@ -360,6 +661,38 @@ function PriceComparisonPopup({
                   </div>
                 );
               })}
+
+              {/* Expanded chart area */}
+              {hasHistory && showChart && (
+                <PriceHistoryChart history={priceHistory} supplierColors={supplierColors} />
+              )}
+
+              {/* Toggle chart button */}
+              {hasHistory && (
+                <button
+                  onClick={() => setShowChart(!showChart)}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: "transparent",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    transition: "all 0.12s ease",
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  </svg>
+                  {showChart ? t("pricing.hideHistory") : t("pricing.showHistory")}
+                </button>
+              )}
             </div>
           )}
         </div>
