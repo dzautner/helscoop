@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dingcad
+      POSTGRES_USER: dingcad
+      POSTGRES_PASSWORD: dingcad_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dingcad"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgres://dingcad:dingcad_dev@db:5432/dingcad
+      JWT_SECRET: dingcad-dev-secret-change-in-prod
+      PORT: 3001
+      NODE_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./api/src:/app/src
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - api
+    volumes:
+      - ./web/src:/app/src
+
+  scraper:
+    build: ./scraper
+    environment:
+      DATABASE_URL: postgres://dingcad:dingcad_dev@db:5432/dingcad
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - scrape
+
+volumes:
+  pgdata:

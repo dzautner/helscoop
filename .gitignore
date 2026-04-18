@@ -17,6 +17,18 @@ renders/
 *.xcodeproj/
 *.xcworkspace/
 
+# Node
+node_modules/
+.next/
+dist/
+
+# Docker
+pgdata/
+
+# Environment
+.env
+.env.local
+
 # Temporary files
 *.tmp
 *.log
