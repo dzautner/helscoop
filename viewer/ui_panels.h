@@ -85,7 +85,6 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
                          UIState& state,
                          const Font& uiFont,
                          int screenWidth, int screenHeight,
-                         bool loadingInBackground,
                          const std::filesystem::path& scriptPath);
 
 // Check if mouse is over any UI panel

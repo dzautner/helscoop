@@ -2138,8 +2138,7 @@ int main(int argc, char *argv[]) {
 
       if (uiState.showParametersPanel) {
         bool paramWritten = DrawParametersPanel(sceneParameters, uiState, uiFont,
-                                                screenWidth, screenHeight,
-                                                loadingInBackground, scriptPath);
+                                                screenWidth, screenHeight, scriptPath);
         (void)paramWritten;  // File watcher handles reload
       }
 

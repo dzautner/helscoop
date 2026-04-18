@@ -465,7 +465,6 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
                          UIState& state,
                          const Font& uiFont,
                          int screenWidth, int screenHeight,
-                         bool loadingInBackground,
                          const std::filesystem::path& scriptPath) {
   if (parameters.empty()) return false;
 
@@ -613,7 +612,7 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
   bool paramWritten = false;
   if (state.draggingParamIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
     auto& param = parameters[state.draggingParamIndex];
-    if (param.value != state.draggingStartValue && !loadingInBackground) {
+    if (param.value != state.draggingStartValue) {
       if (WriteParameterToFile(scriptPath, param)) {
         paramWritten = true;
       }
