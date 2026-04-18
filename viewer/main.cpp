@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
   std::set<std::string> renderFocusObjects;
   std::set<std::string> renderFocusCategories;
   bool renderWhiteBackground = false;
+  bool renderTransparentBg = false;
   int renderSupersample = 1;
   int turntableFrames = 0;
   bool renderWireframe = false;
@@ -192,6 +193,7 @@ int main(int argc, char *argv[]) {
     } else if (arg == "--background" && i + 1 < argc) {
       std::string bg = argv[i + 1];
       if (bg == "white" || bg == "clean") renderWhiteBackground = true;
+      else if (bg == "transparent" || bg == "alpha") renderTransparentBg = true;
       i += 1;
     } else if (arg == "--supersample" && i + 1 < argc) {
       renderSupersample = std::clamp(std::atoi(argv[i + 1]), 1, 4);
@@ -712,6 +714,7 @@ int main(int argc, char *argv[]) {
 
   // FXAA shader setup
   const int locFXAATexelSize = GetShaderLocation(fxaaShader, "texelSize");
+  const int locFXAAPreserveAlpha = GetShaderLocation(fxaaShader, "preserveAlpha");
 
   // PBR shader setup
   const int locPbrAlbedoColor = GetShaderLocation(pbrShader, "albedoColor");
@@ -1617,10 +1620,10 @@ int main(int argc, char *argv[]) {
 
     // Render to color texture
     BeginTextureMode(rtColor);
-    ClearBackground(renderWhiteBackground ? WHITE : RAYWHITE);
+    ClearBackground(renderTransparentBg ? BLANK : (renderWhiteBackground ? WHITE : RAYWHITE));
 
     // Render sky gradient background
-    if (!renderWhiteBackground) {
+    if (!renderWhiteBackground && !renderTransparentBg) {
       Color skyTopC, skyHorizC, skyGroundC;
       if (pbrModeEnabled) {
         skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
@@ -1656,7 +1659,7 @@ int main(int argc, char *argv[]) {
     }
 
     BeginMode3D(camera);
-    if (pbrModeEnabled) {
+    if (pbrModeEnabled && !renderTransparentBg) {
       // Draw ground plane positioned at cached scene bounds
       float minY = cachedSceneBounds.min.y;
       float centerX = (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f;
@@ -1715,7 +1718,7 @@ int main(int argc, char *argv[]) {
         rlActiveTextureSlot(0);
       }
       rlSetBlendMode(RL_BLEND_ALPHA);
-    } else if (!pbrModeEnabled && renderMode) {
+    } else if (!pbrModeEnabled && renderMode && !renderTransparentBg) {
       // Toon render mode: draw the same ground plane for consistent output
       float minY = cachedSceneBounds.min.y;
       float centerX = (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f;
@@ -2065,7 +2068,7 @@ int main(int argc, char *argv[]) {
       // Normal rendering (mode 0) with edge detection, SSAO, and FXAA
       // Step 1: Apply edge shader and downsample to rtFXAA (screen resolution)
       BeginTextureMode(rtFXAA);
-      ClearBackground(BLACK);
+      ClearBackground(renderTransparentBg ? BLANK : BLACK);
       BeginShaderMode(edgeShader);
       // Downsample from supersampled buffer to screen resolution
       // Negative height in source rect flips Y (raylib render texture convention)
@@ -2082,6 +2085,8 @@ int main(int argc, char *argv[]) {
           1.0f / static_cast<float>(rtFXAA.texture.width),
           1.0f / static_cast<float>(rtFXAA.texture.height)};
       SetShaderValue(fxaaShader, locFXAATexelSize, fxaaTexel, SHADER_UNIFORM_VEC2);
+      float fxaaAlphaMode = renderTransparentBg ? 1.0f : 0.0f;
+      SetShaderValue(fxaaShader, locFXAAPreserveAlpha, &fxaaAlphaMode, SHADER_UNIFORM_FLOAT);
       BeginShaderMode(fxaaShader);
       const Rectangle fxaaSrcRect = {0.0f, 0.0f, static_cast<float>(rtFXAA.texture.width),
                                      -static_cast<float>(rtFXAA.texture.height)};
@@ -2169,7 +2174,13 @@ int main(int argc, char *argv[]) {
 
     // Screenshot for render mode
     if (renderMode && !screenshotTaken && frameCount >= std::max(renderCaptureFrame, 1)) {
-      Image screenImage = LoadImageFromScreen();
+      Image screenImage;
+      if (renderTransparentBg) {
+        screenImage = LoadImageFromTexture(rtFXAA.texture);
+        ImageFlipVertical(&screenImage);
+      } else {
+        screenImage = LoadImageFromScreen();
+      }
       if (screenImage.width != renderWidth || screenImage.height != renderHeight) {
         ImageResize(&screenImage, renderWidth, renderHeight);
       }

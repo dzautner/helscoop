@@ -1290,6 +1290,7 @@ out vec4 finalColor;
 
 uniform sampler2D texture0;
 uniform vec2 texelSize;
+uniform float preserveAlpha;
 
 // FXAA settings
 const float FXAA_REDUCE_MIN = 1.0/128.0;
@@ -1347,13 +1348,17 @@ void main() {
         fxaaResult = rgbB;
     }
 
-    // Subtle vignette: darken edges for a polished look
-    vec2 vignetteUV = uv * 2.0 - 1.0;
-    float vignette = 1.0 - dot(vignetteUV, vignetteUV) * 0.15;
-    vignette = clamp(vignette, 0.0, 1.0);
-    vignette = mix(0.85, 1.0, vignette);
-
-    finalColor = vec4(fxaaResult * vignette, 1.0);
+    if (preserveAlpha > 0.5) {
+        float srcAlpha = texture(texture0, uv).a;
+        finalColor = vec4(fxaaResult, srcAlpha);
+    } else {
+        // Subtle vignette: darken edges for a polished look
+        vec2 vignetteUV = uv * 2.0 - 1.0;
+        float vignette = 1.0 - dot(vignetteUV, vignetteUV) * 0.15;
+        vignette = clamp(vignette, 0.0, 1.0);
+        vignette = mix(0.85, 1.0, vignette);
+        finalColor = vec4(fxaaResult * vignette, 1.0);
+    }
 }
 )glsl";
 

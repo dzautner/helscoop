@@ -75,6 +75,7 @@ render_test "mode/camera-front" "examples/bolt/main.js" "--camera front"
 render_test "mode/camera-top" "examples/table/main.js" "--camera top"
 render_test "mode/camera-iso" "examples/showroom/main.js" "--camera iso"
 render_test "mode/wireframe" "examples/gear/main.js" "--wireframe"
+render_test "mode/transparent" "examples/gear/main.js" "--background transparent"
 
 echo ""
 echo "=== Results ==="
