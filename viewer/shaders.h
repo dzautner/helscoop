@@ -1054,8 +1054,8 @@ void main() {
     // Diffuse lighting with shadow (reduced shadow in clean mode)
     float NdotL = max(dot(N, lightDir), 0.0);
     float shadowAmt = shadow * mix(1.0, 0.4, cleanMode);
-    vec3 ambient = mix(vec3(0.50), vec3(0.85), cleanMode) * (1.0 - shadowAmt * 0.20);
-    vec3 diffuse = lightColor * NdotL * mix(0.50, 0.15, cleanMode) * (1.0 - shadowAmt * 0.75);
+    vec3 ambient = mix(vec3(0.50), vec3(0.97), cleanMode) * (1.0 - shadowAmt * mix(0.20, 0.08, cleanMode));
+    vec3 diffuse = lightColor * NdotL * mix(0.50, 0.05, cleanMode) * (1.0 - shadowAmt * 0.75);
     vec3 lighting = ambient + diffuse;
 
     // Procedural texture variation (suppressed in clean mode)
@@ -1291,6 +1291,7 @@ out vec4 finalColor;
 uniform sampler2D texture0;
 uniform vec2 texelSize;
 uniform float preserveAlpha;
+uniform float skipVignette;
 
 // FXAA settings
 const float FXAA_REDUCE_MIN = 1.0/128.0;
@@ -1351,8 +1352,9 @@ void main() {
     if (preserveAlpha > 0.5) {
         float srcAlpha = texture(texture0, uv).a;
         finalColor = vec4(fxaaResult, srcAlpha);
+    } else if (skipVignette > 0.5) {
+        finalColor = vec4(fxaaResult, 1.0);
     } else {
-        // Subtle vignette: darken edges for a polished look
         vec2 vignetteUV = uv * 2.0 - 1.0;
         float vignette = 1.0 - dot(vignetteUV, vignetteUV) * 0.15;
         vignette = clamp(vignette, 0.0, 1.0);

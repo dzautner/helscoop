@@ -809,6 +809,7 @@ int main(int argc, char *argv[]) {
   // FXAA shader setup
   const int locFXAATexelSize = GetShaderLocation(fxaaShader, "texelSize");
   const int locFXAAPreserveAlpha = GetShaderLocation(fxaaShader, "preserveAlpha");
+  const int locFXAASkipVignette = GetShaderLocation(fxaaShader, "skipVignette");
 
   // PBR shader setup
   const int locPbrAlbedoColor = GetShaderLocation(pbrShader, "albedoColor");
@@ -924,12 +925,12 @@ int main(int argc, char *argv[]) {
   SetShaderValue(pbrShadowShader, locPbrShadowExposure, &pbrExposure, SHADER_UNIFORM_FLOAT);
   SetShaderValue(pbrShadowShader, locPbrShadowLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
-  // Override PBR environment for white/clean background (brighter, more neutral)
+  // Override PBR environment for white/clean background (neutral studio lighting)
   if (renderWhiteBackground) {
-    const float whiteSkyTop[3] = {0.75f, 0.77f, 0.80f};
-    const float whiteSkyBottom[3] = {0.82f, 0.82f, 0.81f};
-    const float whiteGround[3] = {0.78f, 0.77f, 0.75f};
-    float whiteExposure = 0.90f;
+    const float whiteSkyTop[3] = {0.55f, 0.57f, 0.62f};
+    const float whiteSkyBottom[3] = {0.65f, 0.65f, 0.63f};
+    const float whiteGround[3] = {0.58f, 0.56f, 0.52f};
+    float whiteExposure = 0.85f;
     SetShaderValue(pbrShader, locPbrSkyTop, whiteSkyTop, SHADER_UNIFORM_VEC3);
     SetShaderValue(pbrShader, locPbrSkyBottom, whiteSkyBottom, SHADER_UNIFORM_VEC3);
     SetShaderValue(pbrShader, locPbrGround, whiteGround, SHADER_UNIFORM_VEC3);
@@ -1772,8 +1773,8 @@ int main(int argc, char *argv[]) {
       float gpGroundCol[3], gpHorizonCol[3];
       float gpCleanMode = 0.0f;
       if (renderWhiteBackground) {
-        gpGroundCol[0] = 0.96f; gpGroundCol[1] = 0.95f; gpGroundCol[2] = 0.94f;
-        gpHorizonCol[0] = 0.98f; gpHorizonCol[1] = 0.98f; gpHorizonCol[2] = 0.98f;
+        gpGroundCol[0] = 1.0f; gpGroundCol[1] = 1.0f; gpGroundCol[2] = 1.0f;
+        gpHorizonCol[0] = 1.0f; gpHorizonCol[1] = 1.0f; gpHorizonCol[2] = 1.0f;
         gpCleanMode = 1.0f;
       } else {
         gpGroundCol[0] = 0.60f; gpGroundCol[1] = 0.58f; gpGroundCol[2] = 0.55f;
@@ -2133,7 +2134,7 @@ int main(int argc, char *argv[]) {
     SetShaderValueTexture(edgeShader, locNormDepthTexture, rtNormalDepth.texture);
     // Bind SSAO texture and set strength for final composite
     SetShaderValueTexture(edgeShader, locEdgeSSAOTex, rtSSAOBlur.texture);
-    const float ssaoStrength = pbrModeEnabled ? 0.35f : 0.25f;
+    const float ssaoStrength = renderWhiteBackground ? 0.0f : (pbrModeEnabled ? 0.35f : 0.25f);
     SetShaderValue(edgeShader, locEdgeSSAOStrength, &ssaoStrength, SHADER_UNIFORM_FLOAT);
 
     // Final composite
@@ -2190,6 +2191,8 @@ int main(int argc, char *argv[]) {
       SetShaderValue(fxaaShader, locFXAATexelSize, fxaaTexel, SHADER_UNIFORM_VEC2);
       float fxaaAlphaMode = renderTransparentBg ? 1.0f : 0.0f;
       SetShaderValue(fxaaShader, locFXAAPreserveAlpha, &fxaaAlphaMode, SHADER_UNIFORM_FLOAT);
+      float fxaaSkipVignette = renderWhiteBackground ? 1.0f : 0.0f;
+      SetShaderValue(fxaaShader, locFXAASkipVignette, &fxaaSkipVignette, SHADER_UNIFORM_FLOAT);
       BeginShaderMode(fxaaShader);
       const Rectangle fxaaSrcRect = {0.0f, 0.0f, static_cast<float>(rtFXAA.texture.width),
                                      -static_cast<float>(rtFXAA.texture.height)};
