@@ -171,9 +171,13 @@ bool ExportToSVG(
   float sideViewHeight = modelHeight;
 
   // Calculate scale to fit (in mm per meter)
-  float scaleX = (availableWidth - viewMargin) / (topViewWidth + std::max(frontViewWidth, sideViewWidth));
-  float scaleY = (availableHeight - viewMargin) / (topViewHeight + frontViewHeight);
-  float drawScale = std::min(scaleX, scaleY) * 0.85f;  // Leave some padding
+  float denomX = topViewWidth + std::max(frontViewWidth, sideViewWidth);
+  float denomY = topViewHeight + frontViewHeight;
+  if (denomX < 0.001f) denomX = 1.0f;
+  if (denomY < 0.001f) denomY = 1.0f;
+  float scaleX = (availableWidth - viewMargin) / denomX;
+  float scaleY = (availableHeight - viewMargin) / denomY;
+  float drawScale = std::min(scaleX, scaleY) * 0.85f;
 
   // Convert to pixels (assuming 96 DPI, 1mm = 3.78 pixels)
   float mmToPixel = 3.78f;
@@ -395,6 +399,16 @@ bool ExportPartsList(
   // CSV header
   file << "Item,Material ID,Name,Category,Quantity,Unit,Surface Area (m²),Unit Price,Total Cost\n";
 
+  auto csvEscape = [](const std::string& s) -> std::string {
+    std::string out = "\"";
+    for (char c : s) {
+      if (c == '"') out += "\"\"";
+      else out += c;
+    }
+    out += '"';
+    return out;
+  };
+
   int itemNum = 1;
   float totalCost = 0.0f;
 
@@ -409,11 +423,11 @@ bool ExportPartsList(
     totalCost += itemCost;
 
     file << itemNum << ",";
-    file << "\"" << item.materialId << "\",";
-    file << "\"" << name << "\",";
-    file << category << ",";
+    file << csvEscape(item.materialId) << ",";
+    file << csvEscape(name) << ",";
+    file << csvEscape(category) << ",";
     file << item.quantity << ",";
-    file << unit << ",";
+    file << csvEscape(unit) << ",";
     file << std::fixed << std::setprecision(2) << item.surfaceArea << ",";
     file << std::setprecision(2) << item.unitPrice << ",";
     file << std::setprecision(2) << itemCost << "\n";

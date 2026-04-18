@@ -4,6 +4,7 @@
 #include "quickjs.h"
 
 #include <iostream>
+#include <set>
 
 namespace dingcad {
 
@@ -117,6 +118,32 @@ PBRMaterial ParseMaterial(JSContext* ctx, const std::string& id, JSValue matObj)
     mat.pricing.unitPrice = GetFloatProp(ctx, pricingVal, "unitPrice", 0.0f);
     mat.pricing.supplier = GetStringProp(ctx, pricingVal, "supplier");
     mat.pricing.link = GetStringProp(ctx, pricingVal, "link");
+    mat.pricing.sku = GetStringProp(ctx, pricingVal, "sku");
+    mat.pricing.ean = GetStringProp(ctx, pricingVal, "ean");
+    mat.pricing.lastPriceCheck = GetStringProp(ctx, pricingVal, "lastPriceCheck");
+    std::string cur = GetStringProp(ctx, pricingVal, "currency");
+    if (!cur.empty()) mat.pricing.currency = cur;
+
+    JSValue altArr = JS_GetPropertyStr(ctx, pricingVal, "alternativeSuppliers");
+    if (!JS_IsUndefined(altArr) && JS_IsArray(altArr)) {
+      JSValue lenVal = JS_GetPropertyStr(ctx, altArr, "length");
+      uint32_t len = 0;
+      JS_ToUint32(ctx, &len, lenVal);
+      JS_FreeValue(ctx, lenVal);
+      for (uint32_t i = 0; i < len; ++i) {
+        JSValue altObj = JS_GetPropertyUint32(ctx, altArr, i);
+        if (!JS_IsUndefined(altObj) && JS_IsObject(altObj)) {
+          PBRPricing::AltSupplier alt;
+          alt.supplier = GetStringProp(ctx, altObj, "supplier");
+          alt.unitPrice = GetFloatProp(ctx, altObj, "unitPrice", 0.0f);
+          alt.link = GetStringProp(ctx, altObj, "link");
+          alt.sku = GetStringProp(ctx, altObj, "sku");
+          mat.pricing.alternativeSuppliers.push_back(std::move(alt));
+        }
+        JS_FreeValue(ctx, altObj);
+      }
+    }
+    JS_FreeValue(ctx, altArr);
   }
   JS_FreeValue(ctx, pricingVal);
 
@@ -229,7 +256,6 @@ bool InitMaterialLibrary(const std::filesystem::path& basePath) {
 }
 
 void LoadMaterialTextures() {
-  int loadedCount = 0;
   int materialsWithTex = 0;
   TraceLog(LOG_INFO, "LoadMaterialTextures: checking %zu materials in library", g_materialLibrary.materials.size());
   for (auto& [id, mat] : g_materialLibrary.materials) {
@@ -239,22 +265,32 @@ void LoadMaterialTextures() {
     }
   }
   TraceLog(LOG_INFO, "Found %d materials with texture paths", materialsWithTex);
+
+  // Deduplicate: load each unique texture file once, share across materials
+  std::unordered_map<std::string, Texture2D> textureCache;
+  int filesLoaded = 0;
+
   for (auto& [id, mat] : g_materialLibrary.materials) {
     if (!mat.visual.albedoTexture.empty()) {
       std::filesystem::path texPath = mat.visual.albedoTexture;
-
-      // If relative path, resolve against material library base path
       if (texPath.is_relative()) {
         texPath = g_materialLibrary.basePath / texPath;
+      }
+
+      std::string canonical = std::filesystem::weakly_canonical(texPath).string();
+      auto cached = textureCache.find(canonical);
+      if (cached != textureCache.end()) {
+        g_materialLibrary.loadedTextures[id] = cached->second;
+        continue;
       }
 
       if (std::filesystem::exists(texPath)) {
         Texture2D tex = LoadTexture(texPath.string().c_str());
         if (tex.id != 0) {
-          // Set texture wrapping mode to repeat for tiling
           SetTextureWrap(tex, TEXTURE_WRAP_REPEAT);
+          textureCache[canonical] = tex;
           g_materialLibrary.loadedTextures[id] = tex;
-          loadedCount++;
+          filesLoaded++;
           TraceLog(LOG_INFO, "Loaded texture for material '%s': %s", id.c_str(), texPath.string().c_str());
         } else {
           TraceLog(LOG_WARNING, "Failed to load texture for material '%s': %s", id.c_str(), texPath.string().c_str());
@@ -265,14 +301,18 @@ void LoadMaterialTextures() {
     }
   }
 
-  if (loadedCount > 0) {
-    std::cout << "Loaded " << loadedCount << " material textures" << std::endl;
+  if (filesLoaded > 0) {
+    TraceLog(LOG_INFO, "Loaded %d unique texture files for %zu materials",
+             filesLoaded, g_materialLibrary.loadedTextures.size());
   }
 }
 
 void UnloadMaterialTextures() {
+  std::set<unsigned int> freed;
   for (auto& [id, tex] : g_materialLibrary.loadedTextures) {
-    UnloadTexture(tex);
+    if (freed.insert(tex.id).second) {
+      UnloadTexture(tex);
+    }
   }
   g_materialLibrary.loadedTextures.clear();
 }

@@ -41,9 +41,11 @@ in vec2 vertexTexCoord;
 uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matView;
+uniform mat4 lightSpaceMatrix;
 out vec3 vNvs;
 out vec3 vVdir;
 out vec2 vTexCoord;
+out vec4 vLightSpacePos;
 void main() {
     vec4 wpos = matModel * vec4(vertexPosition, 1.0);
     vec3 nvs  = mat3(matView) * mat3(matModel) * vertexNormal;
@@ -51,6 +53,7 @@ void main() {
     vec3 vpos = (matView * wpos).xyz;
     vVdir     = normalize(-vpos);
     vTexCoord = vertexTexCoord;
+    vLightSpacePos = lightSpaceMatrix * wpos;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
 )glsl";
@@ -60,6 +63,7 @@ inline const char* kToonFS = R"glsl(
 in vec3 vNvs;
 in vec3 vVdir;
 in vec2 vTexCoord;
+in vec4 vLightSpacePos;
 out vec4 finalColor;
 
 uniform vec3 lightDirVS;
@@ -71,11 +75,36 @@ uniform float rimWeight;
 uniform float specWeight;
 uniform float specShininess;
 uniform sampler2D albedoTex;
-uniform int useTexture;  // 0 = solid color, 1 = sample texture
+uniform int useTexture;
+uniform sampler2D shadowMap;
+uniform int useShadows;
 
 float quantize(float x, int steps){
     float s = max(1, steps-1);
     return floor(clamp(x,0.0,1.0)*s + 1e-4)/s;
+}
+
+float calcShadow() {
+    if (useShadows == 0) return 1.0;
+    vec3 projCoords = vLightSpacePos.xyz / vLightSpacePos.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0) return 1.0;
+
+    float currentDepth = projCoords.z;
+    float bias = 0.003;
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            vec2 sampleCoord = projCoords.xy + vec2(x, y) * texelSize * 2.0;
+            vec2 packed = texture(shadowMap, sampleCoord).rg;
+            float closestDepth = packed.r + packed.g / 255.0;
+            shadow += currentDepth - bias > closestDepth ? 0.0 : 1.0;
+        }
+    }
+    shadow /= 9.0;
+    return smoothstep(0.0, 1.0, shadow);
 }
 
 void main() {
@@ -83,19 +112,19 @@ void main() {
     vec3 l   = normalize(lightDirVS);
     vec3 v   = normalize(vVdir);
 
-    // Get albedo color - either from texture or solid baseColor
     vec3 albedo = baseColor.rgb;
     if (useTexture > 0) {
         albedo = texture(albedoTex, vTexCoord).rgb * baseColor.rgb;
     }
 
+    float shadow = calcShadow();
     float ndl = max(0.0, dot(n,l));
-    float cel = quantize(ndl, toonSteps);
+    float cel = quantize(ndl * shadow, toonSteps);
 
     float rim = pow(1.0 - max(0.0, dot(n, v)), 1.5);
 
     float spec = pow(max(0.0, dot(reflect(-l, n), v)), specShininess);
-    spec = step(0.5, spec) * specWeight;
+    spec = step(0.5, spec) * specWeight * shadow;
 
     float shade = clamp(ambient + diffuseWeight*cel + rimWeight*rim + spec, 0.0, 1.0);
     finalColor  = vec4(albedo * shade, 1.0);
@@ -224,8 +253,7 @@ void main() {
     vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
     fragPos = worldPos.xyz;
 
-    // Transform normal to world space (using normal matrix for non-uniform scaling)
-    fragNormal = normalize(mat3(matModel) * vertexNormal);
+    fragNormal = normalize(transpose(inverse(mat3(matModel))) * vertexNormal);
 
     fragTexCoord = vertexTexCoord;
 
@@ -269,6 +297,7 @@ uniform vec3 lightColor2;   // Secondary light color (usually dimmer, cooler)
 uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
 uniform vec3 groundColor;
+uniform float exposure;
 
 const float PI = 3.14159265359;
 
@@ -317,30 +346,53 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
     return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// Improved environment lighting with horizon band and proper hemisphere sampling
+// Procedural studio HDRI — adds bright rectangular highlights that metals reflect
 vec3 getEnvironmentLight(vec3 N, float rough) {
-    // Smoother hemisphere interpolation
-    float upFactor = N.y * 0.5 + 0.5;  // 0 at bottom, 1 at top
+    float upFactor = N.y * 0.5 + 0.5;
     upFactor = clamp(upFactor, 0.0, 1.0);
 
-    // Three-way blend: ground -> horizon -> sky
     vec3 skyColor;
     if (N.y > 0.0) {
-        // Above horizon: blend horizon to sky top
-        float t = pow(upFactor, 0.6);  // Non-linear for softer gradient
+        float t = pow(upFactor, 0.6);
         skyColor = mix(skyColorBottom, skyColorTop, t);
     } else {
-        // Below horizon: blend ground to horizon
         float t = pow(1.0 - upFactor, 0.8);
         skyColor = mix(skyColorBottom, groundColor, t);
     }
 
-    // Add subtle horizon glow (brighter at horizon)
     float horizonDist = abs(N.y);
     float horizonGlow = exp(-horizonDist * 3.0) * 0.15;
     skyColor += vec3(1.0, 0.95, 0.9) * horizonGlow;
 
-    // Roughness-based blur simulation (rough surfaces see averaged environment)
+    // Studio soft-box highlights (two rectangular area lights in upper hemisphere)
+    // Convert direction to spherical for highlight placement
+    float phi = atan(N.z, N.x);       // azimuth
+    float theta = acos(clamp(N.y, -1.0, 1.0));  // polar angle from up
+
+    // Key light soft-box: upper-left area
+    float h1_phi = 2.3;   // azimuth position
+    float h1_theta = 0.6;  // elevation
+    float h1_w = 0.5;      // width
+    float h1_h = 0.35;     // height
+    float d1_phi = smoothstep(h1_w, 0.0, abs(phi - h1_phi));
+    float d1_theta = smoothstep(h1_h, 0.0, abs(theta - h1_theta));
+    float highlight1 = d1_phi * d1_theta * 0.6;
+
+    // Fill light soft-box: upper-right, dimmer and wider
+    float h2_phi = -0.8;
+    float h2_theta = 0.8;
+    float h2_w = 0.7;
+    float h2_h = 0.4;
+    float d2_phi = smoothstep(h2_w, 0.0, abs(phi - h2_phi));
+    float d2_theta = smoothstep(h2_h, 0.0, abs(theta - h2_theta));
+    float highlight2 = d2_phi * d2_theta * 0.35;
+
+    // Highlights fade with roughness (rough surfaces blur them out)
+    float highlightFade = 1.0 - rough * rough;
+    vec3 warmWhite = vec3(1.0, 0.97, 0.92);
+    skyColor += warmWhite * (highlight1 + highlight2) * highlightFade;
+
+    // Roughness-based blur simulation
     vec3 avgEnv = (skyColorTop + skyColorBottom * 2.0 + groundColor) * 0.25;
     skyColor = mix(skyColor, avgEnv, rough * rough * 0.6);
 
@@ -358,8 +410,8 @@ vec2 approximateBRDF(float NdotV, float roughness) {
 }
 
 void main() {
-    // Get albedo
-    vec3 albedo = albedoColor.rgb;
+    // Get albedo — convert sRGB input to linear for PBR math
+    vec3 albedo = pow(albedoColor.rgb, vec3(2.2));
     if (useAlbedoTex > 0) {
         albedo *= texture(albedoTex, fragTexCoord).rgb;
     }
@@ -446,25 +498,27 @@ void main() {
     // Final AO - keep it subtle
     float finalAO = ao * normalAO * heightAO;
 
-    // === IMPROVED ENVIRONMENT REFLECTIONS ===
-    // Increase specular environment contribution for shinier look
-    vec3 ambientDiffuse = kD_env * diffuseEnv * shadowFactor;
-    vec3 ambientSpecular = specularEnv * (1.0 + metallic * 0.5);  // Boost metallic reflections
+    // === ENVIRONMENT REFLECTIONS ===
+    vec3 ambientDiffuse = kD_env * diffuseEnv * shadowFactor * 0.5;
+    float specBoost = 1.0 + metallic * 2.0 * (1.0 - roughness);
+    vec3 ambientSpecular = specularEnv * specBoost;
 
     vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
 
     // Direct lighting with shadow (both primary and secondary lights)
     vec3 directLighting = Lo * shadowFactor;
 
-    // Rim/fresnel lighting for depth (catches light at edges)
-    float rim = pow(1.0 - NdotV, 3.0) * 0.15;
+    // Rim/fresnel lighting for depth (stronger for metals)
+    float rimPower = mix(3.0, 2.0, metallic);
+    float rim = pow(1.0 - NdotV, rimPower) * mix(0.1, 0.25, metallic);
     vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
 
     // === FINAL COMPOSITION ===
     vec3 color = ambient + directLighting + rimColor;
 
-    // ACES Filmic tone mapping (better contrast and color preservation than Reinhard)
-    // From: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+    color *= exposure;
+
+    // ACES Filmic tone mapping
     float a = 2.51;
     float b = 0.03;
     float c = 2.43;
@@ -566,9 +620,11 @@ in float fragDepth;
 out vec4 fragColor;
 
 void main() {
-    // Convert from NDC (-1 to 1) to 0-1 range
     float depth = fragDepth * 0.5 + 0.5;
-    fragColor = vec4(depth, depth, depth, 1.0);
+    // Pack depth into RG channels for 16-bit precision (vs 8-bit single channel)
+    float r = floor(depth * 255.0) / 255.0;
+    float g = fract(depth * 255.0);
+    fragColor = vec4(r, g, 0.0, 1.0);
 }
 )glsl";
 
@@ -598,7 +654,7 @@ out vec4 fragPosLightSpace;
 void main() {
     vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
     fragPos = worldPos.xyz;
-    fragNormal = normalize(mat3(matModel) * vertexNormal);
+    fragNormal = normalize(transpose(inverse(mat3(matModel))) * vertexNormal);
     fragTexCoord = vertexTexCoord;
     viewPos = -vec3(matView[3]) * mat3(matView);
     fragPosLightSpace = lightSpaceMatrix * worldPos;
@@ -632,20 +688,15 @@ uniform sampler2D shadowMap;
 uniform vec3 lightDir;
 uniform vec3 lightColor;
 
+// Secondary light (fill/rim)
+uniform vec3 lightDir2;
+uniform vec3 lightColor2;
+
 // Environment
 uniform vec3 skyColorTop;
 uniform vec3 skyColorBottom;
 uniform vec3 groundColor;
-
-// Spotlights (up to 8)
-#define MAX_SPOTLIGHTS 8
-uniform int numSpotlights;
-uniform vec3 spotlightPos[MAX_SPOTLIGHTS];
-uniform vec3 spotlightDir[MAX_SPOTLIGHTS];
-uniform vec3 spotlightColor[MAX_SPOTLIGHTS];
-uniform float spotlightIntensity[MAX_SPOTLIGHTS];
-uniform float spotlightInnerCone[MAX_SPOTLIGHTS];  // cos of inner angle
-uniform float spotlightOuterCone[MAX_SPOTLIGHTS];  // cos of outer angle
+uniform float exposure;
 
 const float PI = 3.14159265359;
 
@@ -683,81 +734,98 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
 }
 
 vec3 getEnvironmentLight(vec3 N, float rough) {
-    float skyFactor = N.y * 0.5 + 0.5;
-    vec3 skyColor = mix(groundColor, mix(skyColorBottom, skyColorTop, skyFactor), max(0.0, N.y));
-    return mix(skyColor, (skyColorTop + skyColorBottom + groundColor) / 3.0, rough * 0.5);
+    float upFactor = N.y * 0.5 + 0.5;
+    upFactor = clamp(upFactor, 0.0, 1.0);
+
+    vec3 skyColor;
+    if (N.y > 0.0) {
+        float t = pow(upFactor, 0.6);
+        skyColor = mix(skyColorBottom, skyColorTop, t);
+    } else {
+        float t = pow(1.0 - upFactor, 0.8);
+        skyColor = mix(skyColorBottom, groundColor, t);
+    }
+
+    float horizonDist = abs(N.y);
+    float horizonGlow = exp(-horizonDist * 3.0) * 0.15;
+    skyColor += vec3(1.0, 0.95, 0.9) * horizonGlow;
+
+    float phi = atan(N.z, N.x);
+    float theta = acos(clamp(N.y, -1.0, 1.0));
+    float d1_phi = smoothstep(0.5, 0.0, abs(phi - 2.3));
+    float d1_theta = smoothstep(0.35, 0.0, abs(theta - 0.6));
+    float highlight1 = d1_phi * d1_theta * 0.6;
+    float d2_phi = smoothstep(0.7, 0.0, abs(phi - (-0.8)));
+    float d2_theta = smoothstep(0.4, 0.0, abs(theta - 0.8));
+    float highlight2 = d2_phi * d2_theta * 0.35;
+    float highlightFade = 1.0 - rough * rough;
+    skyColor += vec3(1.0, 0.97, 0.92) * (highlight1 + highlight2) * highlightFade;
+
+    vec3 avgEnv = (skyColorTop + skyColorBottom * 2.0 + groundColor) * 0.25;
+    skyColor = mix(skyColor, avgEnv, rough * rough * 0.6);
+
+    return skyColor;
+}
+
+vec2 approximateBRDF(float NdotV, float roughness) {
+    vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+    vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+    vec4 r = roughness * c0 + c1;
+    float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
+    return vec2(-1.04, 1.04) * a004 + r.zw;
+}
+
+float unpackDepth(vec4 rgba) {
+    return rgba.r + rgba.g / 255.0;
 }
 
 float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
-    // Perspective divide
     vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
     projCoords = projCoords * 0.5 + 0.5;
-
-    // Flip Y for render texture coordinate system
     projCoords.y = 1.0 - projCoords.y;
 
-    // Outside shadow map - no shadow
     if (projCoords.z > 1.0) return 0.0;
     if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
     float currentDepth = projCoords.z;
 
-    // Slope-scaled bias to reduce shadow acne on angled surfaces
     float cosTheta = max(dot(normal, lightDir), 0.0);
-    float bias = max(0.01 * (1.0 - cosTheta), 0.003);
+    float bias = max(0.03 * (1.0 - cosTheta), 0.003);
 
-    // PCF soft shadows (3x3 kernel)
+    const vec2 poissonDisk[12] = vec2[](
+        vec2(-0.94201624, -0.39906216),
+        vec2( 0.94558609, -0.76890725),
+        vec2(-0.09418410, -0.92938870),
+        vec2( 0.34495938,  0.29387760),
+        vec2(-0.91588581,  0.45771432),
+        vec2(-0.81544232, -0.87912464),
+        vec2(-0.38277543,  0.27676845),
+        vec2( 0.97484398,  0.75648379),
+        vec2( 0.44323325, -0.97511554),
+        vec2( 0.53742981, -0.47373420),
+        vec2(-0.26496911, -0.41893023),
+        vec2( 0.79197514,  0.19090188)
+    );
+
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for (int x = -1; x <= 1; ++x) {
-        for (int y = -1; y <= 1; ++y) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-        }
+    float spread = 3.0;
+
+    for (int i = 0; i < 12; i++) {
+        float pcfDepth = unpackDepth(texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread));
+        shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
     }
-    shadow /= 9.0;
+    shadow /= 12.0;
+
+    // Soften shadow edges (fade penumbra for more natural look)
+    shadow = smoothstep(0.0, 1.0, shadow);
 
     return shadow;
 }
 
-// Calculate spotlight contribution using Cook-Torrance BRDF
-vec3 calculateSpotlight(int i, vec3 N, vec3 V, vec3 fragPosition, vec3 albedo, vec3 F0, float rough, float metal) {
-    vec3 lightVec = spotlightPos[i] - fragPosition;
-    float distance = length(lightVec);
-    vec3 L = normalize(lightVec);
-
-    // Spotlight cone attenuation
-    float theta = dot(L, normalize(-spotlightDir[i]));
-    float epsilon = spotlightInnerCone[i] - spotlightOuterCone[i];
-    float spotAttenuation = clamp((theta - spotlightOuterCone[i]) / max(epsilon, 0.0001), 0.0, 1.0);
-
-    // Skip if outside cone
-    if (spotAttenuation <= 0.0) return vec3(0.0);
-
-    // Distance attenuation (quadratic falloff)
-    float attenuation = spotlightIntensity[i] / (1.0 + 0.09 * distance + 0.032 * distance * distance);
-    attenuation *= spotAttenuation;
-
-    // Cook-Torrance BRDF
-    vec3 H = normalize(V + L);
-    float NDF = DistributionGGX(N, H, rough);
-    float G = GeometrySmith(N, V, L, rough);
-    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
-
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-    vec3 specular = numerator / denominator;
-
-    vec3 kS = F;
-    vec3 kD = (vec3(1.0) - kS) * (1.0 - metal);
-
-    float NdotL = max(dot(N, L), 0.0);
-
-    return (kD * albedo / PI + specular) * spotlightColor[i] * NdotL * attenuation;
-}
-
 void main() {
-    vec3 albedo = albedoColor.rgb;
+    // Convert sRGB albedo to linear for PBR math
+    vec3 albedo = pow(albedoColor.rgb, vec3(2.2));
     if (useAlbedoTex > 0) {
         albedo *= texture(albedoTex, fragTexCoord).rgb;
     }
@@ -769,43 +837,67 @@ void main() {
 
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
-    // Cook-Torrance BRDF
+    // Cook-Torrance BRDF for primary light
     float NDF = DistributionGGX(N, H, roughness);
     float G = GeometrySmith(N, V, L, roughness);
     vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-    vec3 specular = numerator / denominator;
+    vec3 specular = (NDF * G * F) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001);
 
     vec3 kS = F;
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // Shadow calculation
+    // Shadow map
     float shadow = calculateShadow(fragPosLightSpace, N, L);
 
-    // Direct lighting with shadows
-    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
+    // Primary direct lighting with shadow — retain 15% light in shadow for softer look
+    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow * 0.85);
 
-    // Add spotlight contributions
-    for (int i = 0; i < numSpotlights && i < MAX_SPOTLIGHTS; i++) {
-        Lo += calculateSpotlight(i, N, V, fragPos, albedo, F0, roughness, metallic);
-    }
+    // Secondary fill light (unshadowed)
+    vec3 L2 = normalize(lightDir2);
+    vec3 H2 = normalize(V + L2);
+    float NDF2 = DistributionGGX(N, H2, roughness);
+    float G2 = GeometrySmith(N, V, L2, roughness);
+    vec3 F2 = fresnelSchlick(max(dot(H2, V), 0.0), F0);
+    vec3 spec2 = (NDF2 * G2 * F2) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L2), 0.0) + 0.0001);
+    vec3 kD2 = (vec3(1.0) - F2) * (1.0 - metallic);
+    float NdotL2 = max(dot(N, L2), 0.0);
+    Lo += (kD2 * albedo / PI + spec2) * lightColor2 * NdotL2;
 
     // Ambient/Environment lighting (not shadowed)
-    vec3 F_env = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-    vec3 kD_env = (1.0 - F_env) * (1.0 - metallic);
+    float NdotV = max(dot(N, V), 0.0);
+    vec3 F_env = fresnelSchlickRoughness(NdotV, F0, roughness);
+    vec3 kS_env = F_env;
+    vec3 kD_env = (1.0 - kS_env) * (1.0 - metallic);
+
     vec3 irradiance = getEnvironmentLight(N, 1.0);
     vec3 diffuseEnv = irradiance * albedo;
+
     vec3 R = reflect(-V, N);
     vec3 prefilteredColor = getEnvironmentLight(R, roughness);
-    vec2 envBRDF = vec2(1.0 - roughness * 0.5, roughness * 0.1);
-    vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
-    vec3 ambient = (kD_env * diffuseEnv + specularEnv) * ao;
 
-    vec3 color = ambient + Lo;
+    vec2 envBRDF = approximateBRDF(NdotV, roughness);
+    vec3 specularEnv = prefilteredColor * (F_env * envBRDF.x + envBRDF.y);
+
+    // Normal-based AO (bottom-facing slightly darker)
+    float normalAO = 0.7 + 0.3 * clamp(N.y * 0.5 + 0.5, 0.0, 1.0);
+    float finalAO = ao * normalAO;
+
+    vec3 ambientDiffuse = kD_env * diffuseEnv * 0.5;
+    float specBoost = 1.0 + metallic * 2.0 * (1.0 - roughness);
+    vec3 ambientSpecular = specularEnv * specBoost;
+    vec3 ambient = (ambientDiffuse + ambientSpecular) * finalAO;
+
+    // Rim/fresnel lighting for depth (stronger for metals)
+    float rimPower = mix(3.0, 2.0, metallic);
+    float rim = pow(1.0 - NdotV, rimPower) * mix(0.1, 0.25, metallic);
+    vec3 rimColor = mix(skyColorTop, vec3(1.0), 0.5) * rim;
+
+    vec3 color = ambient + Lo + rimColor;
+
+    color *= exposure;
 
     // ACES Filmic tone mapping
     float a = 2.51;
@@ -863,234 +955,137 @@ uniform vec3 groundColor;
 uniform vec3 horizonColor;
 uniform float fadeRadius;
 uniform vec3 sceneCenter;
-uniform vec3 lightDir;       // Sun direction for lighting
-uniform float ambientLevel;  // Ambient light level
+uniform vec3 lightDir;
+uniform vec3 lightColor;
+uniform vec3 cameraPos;
 uniform sampler2D shadowMap;
-uniform float shadowBias;
+uniform int shadowsActive;
+uniform float gridSpacing;
+uniform float cleanMode;   // 0.0 = normal textured ground, 1.0 = clean white-ish studio floor
 
-// Spotlight uniforms (same as PBR shader)
-#define MAX_SPOTLIGHTS 8
-uniform int numSpotlights;
-uniform vec3 spotlightPos[MAX_SPOTLIGHTS];
-uniform vec3 spotlightDir[MAX_SPOTLIGHTS];
-uniform vec3 spotlightColor[MAX_SPOTLIGHTS];
-uniform float spotlightIntensity[MAX_SPOTLIGHTS];
-uniform float spotlightInnerCone[MAX_SPOTLIGHTS];  // cos of inner angle
-uniform float spotlightOuterCone[MAX_SPOTLIGHTS];  // cos of outer angle
-
-// Shadow calculation with PCF soft shadows
-float calculateShadow(vec4 fragPosLS) {
-    vec3 projCoords = fragPosLS.xyz / fragPosLS.w;
-    projCoords = projCoords * 0.5 + 0.5;
-
-    // Flip Y for render texture coordinate system (raylib uses flipped textures)
-    projCoords.y = 1.0 - projCoords.y;
-
-    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
-        projCoords.y < 0.0 || projCoords.y > 1.0) {
-        return 0.0;
-    }
-
-    float currentDepth = projCoords.z;
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-
-    // PCF with 5x5 kernel for soft shadows
-    for (int x = -2; x <= 2; x++) {
-        for (int y = -2; y <= 2; y++) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - shadowBias > pcfDepth ? 1.0 : 0.0;
-        }
-    }
-    return shadow / 25.0;
+float gridLine(vec2 worldPos, float spacing, float lineWidth) {
+    vec2 grid = abs(fract(worldPos / spacing - 0.5) - 0.5) / fwidth(worldPos / spacing);
+    return 1.0 - min(min(grid.x, grid.y), 1.0);
 }
 
-// Noise functions for procedural texturing
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+float unpackDepthGround(vec4 rgba) {
+    return rgba.r + rgba.g / 255.0;
 }
 
-float noise(vec2 p) {
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float valueNoise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-        mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
-        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
-        f.y
-    );
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    float a = hash12(i + vec2(0.0, 0.0));
+    float b = hash12(i + vec2(1.0, 0.0));
+    float c = hash12(i + vec2(0.0, 1.0));
+    float d = hash12(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-float fbm(vec2 p, int octaves) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 1.0;
-    for (int i = 0; i < octaves; i++) {
-        value += amplitude * noise(p * frequency);
-        amplitude *= 0.5;
-        frequency *= 2.0;
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+    for (int i = 0; i < 4; i++) {
+      v += a * valueNoise(p);
+      p = m * p;
+      a *= 0.5;
     }
-    return value;
-}
-
-// Voronoi for leaf/stone patterns
-float voronoi(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    float minDist = 1.0;
-    for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-            vec2 neighbor = vec2(float(x), float(y));
-            vec2 point = hash(i + neighbor) * vec2(0.8) + vec2(0.1);
-            float d = length(neighbor + point - f);
-            minDist = min(minDist, d);
-        }
-    }
-    return minDist;
+    return v;
 }
 
 void main() {
-    vec2 pos = fragWorldPos.xz;
-
     // Distance from scene center for fade
-    float dist = length(pos - sceneCenter.xz);
-    float fade = 1.0 - smoothstep(fadeRadius * 0.6, fadeRadius, dist);
+    float dist = length(fragWorldPos.xz - sceneCenter.xz);
+    float fade = 1.0 - smoothstep(fadeRadius * 0.3, fadeRadius, dist);
 
-    // === Finnish Forest Floor Colors (brighter for visibility) ===
-    // Base soil/dirt
-    vec3 soilColor = vec3(0.35, 0.28, 0.18);
-    // Green moss (typical Sipoonkorpi)
-    vec3 mossColor = vec3(0.32, 0.50, 0.22);
-    // Dry moss/lichen
-    vec3 lichenColor = vec3(0.55, 0.60, 0.42);
-    // Pine needles/dead leaves
-    vec3 needleColor = vec3(0.45, 0.35, 0.22);
-    // Blueberry plant dark green
-    vec3 blueberryColor = vec3(0.22, 0.38, 0.18);
-    // Lingonberry lighter
-    vec3 lingonColor = vec3(0.35, 0.45, 0.25);
+    vec3 N = vec3(0.0, 1.0, 0.0);  // Ground normal (up)
 
-    // === Multi-layer Procedural Texture ===
+    // Shadow calculation with Poisson disk soft sampling
+    float shadow = 0.0;
+    if (shadowsActive > 0) {
+        vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+        projCoords = projCoords * 0.5 + 0.5;
+        projCoords.y = 1.0 - projCoords.y;
 
-    // Large-scale terrain variation
-    float largeNoise = fbm(pos * 0.15, 4);
+        if (projCoords.z <= 1.0 &&
+            projCoords.x >= 0.0 && projCoords.x <= 1.0 &&
+            projCoords.y >= 0.0 && projCoords.y <= 1.0) {
 
-    // Medium moss patches
-    float mossPatch = fbm(pos * 0.4 + vec2(50.0), 5);
-    mossPatch = smoothstep(0.35, 0.65, mossPatch);
+            float currentDepth = projCoords.z;
+            float bias = 0.002;
 
-    // Small grass/plant tufts
-    float grassNoise = fbm(pos * 2.0, 3);
-    float grassTuft = smoothstep(0.55, 0.7, grassNoise);
+            const vec2 poissonDisk[16] = vec2[](
+                vec2(-0.94201624, -0.39906216),
+                vec2( 0.94558609, -0.76890725),
+                vec2(-0.09418410, -0.92938870),
+                vec2( 0.34495938,  0.29387760),
+                vec2(-0.91588581,  0.45771432),
+                vec2(-0.81544232, -0.87912464),
+                vec2(-0.38277543,  0.27676845),
+                vec2( 0.97484398,  0.75648379),
+                vec2( 0.44323325, -0.97511554),
+                vec2( 0.53742981, -0.47373420),
+                vec2(-0.26496911, -0.41893023),
+                vec2( 0.79197514,  0.19090188),
+                vec2(-0.24188840,  0.99706507),
+                vec2(-0.81409955,  0.91437590),
+                vec2( 0.19984126,  0.78641367),
+                vec2( 0.14383161, -0.14100790)
+            );
 
-    // Pine needle clusters (elongated noise)
-    float needleNoise = fbm(pos * vec2(1.5, 0.8) * 1.2, 4);
-    float needlePatch = smoothstep(0.4, 0.55, needleNoise) * (1.0 - mossPatch * 0.7);
-
-    // Fallen leaves using voronoi
-    float leafPattern = voronoi(pos * 3.0);
-    float leaves = smoothstep(0.1, 0.25, leafPattern) * smoothstep(0.5, 0.3, leafPattern);
-    leaves *= fbm(pos * 0.8, 2);  // Cluster leaves
-
-    // Blueberry/lingonberry patches
-    float berryNoise = fbm(pos * 0.6 + vec2(100.0), 4);
-    float berryPatch = smoothstep(0.5, 0.7, berryNoise) * mossPatch;
-
-    // Small stones/pebbles
-    float stoneVoronoi = voronoi(pos * 8.0);
-    float stones = 1.0 - smoothstep(0.0, 0.12, stoneVoronoi);
-    stones *= step(0.7, hash(floor(pos * 8.0)));  // Sparse stones
-    vec3 stoneColor = vec3(0.4, 0.38, 0.35) * (0.8 + 0.4 * hash(floor(pos * 8.0) + vec2(5.0)));
-
-    // === Combine Layers ===
-
-    // Start with soil
-    vec3 groundCol = soilColor;
-
-    // Add moss (dominant in Finnish forest)
-    groundCol = mix(groundCol, mossColor, mossPatch * 0.85);
-
-    // Dry lichen patches on top of moss
-    float lichenPatch = fbm(pos * 0.7 + vec2(200.0), 3);
-    lichenPatch = smoothstep(0.55, 0.75, lichenPatch) * mossPatch * 0.5;
-    groundCol = mix(groundCol, lichenColor, lichenPatch);
-
-    // Berry plants in moss areas
-    groundCol = mix(groundCol, mix(blueberryColor, lingonColor, hash(floor(pos * 2.0))), berryPatch * 0.6);
-
-    // Pine needles
-    groundCol = mix(groundCol, needleColor, needlePatch * 0.5);
-
-    // Fallen leaves (autumn touch)
-    vec3 leafCol = mix(vec3(0.5, 0.3, 0.1), vec3(0.6, 0.4, 0.15), hash(floor(pos * 3.0)));
-    groundCol = mix(groundCol, leafCol, leaves * 0.3);
-
-    // Grass tufts
-    vec3 grassCol = mix(mossColor, vec3(0.3, 0.45, 0.2), 0.3);
-    groundCol = mix(groundCol, grassCol, grassTuft * 0.4);
-
-    // Stones
-    groundCol = mix(groundCol, stoneColor, stones);
-
-    // === Micro Detail ===
-    float microDetail = fbm(pos * 15.0, 2);
-    groundCol *= 0.9 + microDetail * 0.2;
-
-    // === Lighting ===
-    // Fake normal from height variation
-    float h = fbm(pos * 0.5, 3);
-    float hx = fbm((pos + vec2(0.01, 0.0)) * 0.5, 3);
-    float hz = fbm((pos + vec2(0.0, 0.01)) * 0.5, 3);
-    vec3 normal = normalize(vec3(h - hx, 0.15, h - hz));
-
-    // Calculate shadow from objects (sun only)
-    float shadow = calculateShadow(fragPosLightSpace);
-
-    // Diffuse lighting from sun (reduced in shadow)
-    float NdotL = max(dot(normal, lightDir), 0.0);
-    float shadowFactor = 1.0 - shadow * 0.7;  // Softer shadows
-    float sunDiffuse = NdotL * 0.6 * shadowFactor;
-
-    // Calculate spotlight contributions
-    vec3 spotlightContrib = vec3(0.0);
-    for (int i = 0; i < numSpotlights && i < MAX_SPOTLIGHTS; i++) {
-        vec3 lightVec = spotlightPos[i] - fragWorldPos;
-        float dist = length(lightVec);
-        vec3 L = normalize(lightVec);
-
-        // Spotlight cone attenuation
-        float theta = dot(L, normalize(-spotlightDir[i]));
-        float epsilon = spotlightInnerCone[i] - spotlightOuterCone[i];
-        float spotAtten = clamp((theta - spotlightOuterCone[i]) / max(epsilon, 0.001), 0.0, 1.0);
-
-        // Distance attenuation
-        float distAtten = 1.0 / (1.0 + 0.09 * dist + 0.032 * dist * dist);
-
-        // Diffuse lighting
-        float NdotL_spot = max(dot(vec3(0.0, 1.0, 0.0), L), 0.0);  // Ground normal is up
-
-        spotlightContrib += spotlightColor[i] * spotlightIntensity[i] * NdotL_spot * spotAtten * distAtten;
+            vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+            float spread = 2.5;
+            for (int i = 0; i < 16; i++) {
+                float pcfDepth = unpackDepthGround(texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread));
+                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+            }
+            shadow /= 16.0;
+        }
     }
 
-    // Combine sun and spotlight lighting
-    float totalDiffuse = sunDiffuse + ambientLevel * 0.5;
-    totalDiffuse = max(totalDiffuse, 0.1);  // Minimum ambient
+    // Diffuse lighting with shadow (reduced shadow in clean mode)
+    float NdotL = max(dot(N, lightDir), 0.0);
+    float shadowAmt = shadow * mix(1.0, 0.4, cleanMode);
+    vec3 ambient = mix(vec3(0.50), vec3(0.97), cleanMode) * (1.0 - shadowAmt * mix(0.20, 0.08, cleanMode));
+    vec3 diffuse = lightColor * NdotL * mix(0.50, 0.05, cleanMode) * (1.0 - shadowAmt * 0.75);
+    vec3 lighting = ambient + diffuse;
 
-    // Soft shadows in crevices (fake AO)
-    float ao = 0.7 + 0.3 * largeNoise;
-    ao *= 0.85 + 0.15 * mossPatch;  // Moss areas slightly darker
+    // Procedural texture variation (suppressed in clean mode)
+    vec2 p = fragWorldPos.xz;
+    float macroN = fbm(p * 0.09);
+    float microN = fbm(p * 0.55 + vec2(19.7, -13.1));
+    vec3 warmTint = groundColor * vec3(1.02, 1.00, 0.98);
+    vec3 coolTint = groundColor * vec3(0.97, 0.98, 0.97);
+    vec3 localGround = mix(coolTint, warmTint, smoothstep(0.3, 0.7, macroN));
+    float variation = mix(1.0, mix(0.95, 1.05, microN), 1.0 - cleanMode * 0.8);
+    localGround *= variation;
 
-    // Apply lighting
-    groundCol = groundCol * totalDiffuse * ao + groundCol * spotlightContrib;
+    // Blend toward horizon tint with distance
+    vec3 baseColor = mix(localGround, horizonColor * 0.96, smoothstep(fadeRadius * 0.12, fadeRadius, dist) * 0.4);
 
-    // Minimum floor brightness
-    groundCol = max(groundCol, vec3(0.02));
+    // Grazing highlight (reduced in clean mode)
+    vec3 V = normalize(cameraPos - fragWorldPos);
+    float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+    vec3 color = baseColor * lighting + rim * vec3(0.045, 0.05, 0.04) * (1.0 - cleanMode * 0.7);
 
-    // Slight color variation with distance (atmospheric)
-    groundCol = mix(groundCol, groundCol * vec3(0.95, 0.97, 1.0), smoothstep(0.0, fadeRadius, dist) * 0.15);
+    // Grid overlay (hidden in clean mode)
+    if (gridSpacing > 0.0 && cleanMode < 0.5) {
+        float minorGrid = gridLine(fragWorldPos.xz, gridSpacing, 1.0);
+        float majorGrid = gridLine(fragWorldPos.xz, gridSpacing * 5.0, 1.0);
+        float gridFade = 1.0 - smoothstep(fadeRadius * 0.15, fadeRadius * 0.6, dist);
+        float gridAlpha = max(minorGrid * 0.18, majorGrid * 0.4) * gridFade;
+        color = mix(color, vec3(0.2), gridAlpha);
+    }
 
-    // Output with fade at edges
-    finalColor = vec4(groundCol, fade * 0.95);
+    finalColor = vec4(color, fade);
 }
 )glsl";
 
@@ -1119,7 +1114,6 @@ void main() {
     vec4 nd = texture(texture0, uv);
     float depth = nd.a;
 
-    // Skip background
     if (depth > 0.99) {
         finalColor = vec4(1.0);
         return;
@@ -1128,11 +1122,10 @@ void main() {
     vec3 normal = normalize(nd.rgb * 2.0 - 1.0);
     float linearDepth = depth * (zFar - zNear) + zNear;
 
-    // Sample radius scales with depth - larger radius when zoomed out
     float sampleRadius = ssaoRadius * 50.0 * (linearDepth / 10.0);
     sampleRadius = clamp(sampleRadius, 10.0, 100.0);
 
-    const int SAMPLES = 12;
+    const int SAMPLES = 16;
     float occlusion = 0.0;
     float validSamples = 0.0;
 
@@ -1147,61 +1140,88 @@ void main() {
         vec4 neighborND = texture(texture0, uv + offset);
         float neighborDepth = neighborND.a;
 
-        // Skip background
         if (neighborDepth > 0.99) continue;
 
-        // Normal-based: only trigger at real corners (normals must differ significantly)
         vec3 neighborNormal = normalize(neighborND.rgb * 2.0 - 1.0);
-        float normalDot = max(0.0, dot(normal, neighborNormal));
-        float normalDiff = 1.0 - normalDot;
+        float normalDiff = 1.0 - max(0.0, dot(normal, neighborNormal));
 
-        // Only count as occlusion at real corners (threshold 0.3 = ~70 degree difference)
-        float occlusionContrib = 0.0;
-        if (normalDiff > 0.3) {
-            // Strong corners get full occlusion, weaker get less
-            occlusionContrib = smoothstep(0.3, 0.7, normalDiff);
+        // Depth-based occlusion: neighbor closer to camera = occluding
+        float depthDelta = depth - neighborDepth;
+        float depthOcclusion = 0.0;
+        if (depthDelta > 0.0005 && depthDelta < 0.05) {
+            depthOcclusion = smoothstep(0.0005, 0.005, depthDelta);
         }
+
+        // Normal-based occlusion at corners
+        float normalOcclusion = smoothstep(0.2, 0.6, normalDiff);
+
+        // Combine: either mechanism can trigger occlusion
+        float occlusionContrib = max(depthOcclusion, normalOcclusion * 0.8);
 
         occlusion += occlusionContrib;
         validSamples += 1.0;
     }
 
-    // Normalize
     if (validSamples > 0.0) {
         occlusion = occlusion / validSamples;
     }
 
-    // Apply intensity - output: 1=bright/no occlusion, 0=dark/full occlusion
-    float ao = 1.0 - occlusion * ssaoIntensity * 0.5;
+    float ao = 1.0 - occlusion * ssaoIntensity * 0.6;
     ao = clamp(ao, 0.0, 1.0);
 
     finalColor = vec4(ao, ao, ao, 1.0);
 }
 )glsl";
 
-// SSAO blur shader - simple box blur to smooth the noisy SSAO
+// SSAO blur shader - edge-preserving bilateral blur
 inline const char* kSSAOBlurFS = R"glsl(
 #version 330
 in vec2 uv;
 out vec4 finalColor;
 
 uniform sampler2D texture0;  // SSAO raw texture (auto-bound by raylib)
+uniform sampler2D normalDepthTex;
 uniform vec2 texelSize;
 
 void main() {
+    float centerAO = texture(texture0, uv).r;
+    vec4 centerND = texture(normalDepthTex, uv);
+    float centerDepth = centerND.a;
+    vec3 centerNormal = centerND.rgb;
+
+    if (centerDepth > 0.99) {
+        finalColor = vec4(1.0);
+        return;
+    }
+
     float result = 0.0;
-    const int BLUR_SIZE = 2;
-    float count = 0.0;
+    float totalWeight = 0.0;
+    const int BLUR_SIZE = 3;
 
     for (int x = -BLUR_SIZE; x <= BLUR_SIZE; x++) {
         for (int y = -BLUR_SIZE; y <= BLUR_SIZE; y++) {
             vec2 offset = vec2(float(x), float(y)) * texelSize;
-            result += texture(texture0, uv + offset).r;
-            count += 1.0;
+            vec2 sampleUV = uv + offset;
+            float sampleAO = texture(texture0, sampleUV).r;
+            vec4 sampleND = texture(normalDepthTex, sampleUV);
+
+            float depthDiff = abs(centerDepth - sampleND.a);
+            float depthWeight = exp(-depthDiff * depthDiff * 10000.0);
+
+            float normalDot = dot(centerNormal, sampleND.rgb);
+            float normalWeight = max(0.0, normalDot);
+            normalWeight = normalWeight * normalWeight;
+
+            float spatialDist = length(vec2(float(x), float(y)));
+            float spatialWeight = exp(-spatialDist * spatialDist * 0.08);
+
+            float w = depthWeight * normalWeight * spatialWeight;
+            result += sampleAO * w;
+            totalWeight += w;
         }
     }
 
-    result /= count;
+    result = totalWeight > 0.0 ? result / totalWeight : centerAO;
     finalColor = vec4(result, result, result, 1.0);
 }
 )glsl";
@@ -1253,6 +1273,93 @@ void main() {
             // Brighten normals based on proximity (near = full color, far = darker)
             finalColor = vec4(nd.rgb * (0.3 + d * 0.7), 1.0);
         }
+    }
+}
+)glsl";
+
+// ============================================================================
+// FXAA (Fast Approximate Anti-Aliasing) shader
+// Based on NVIDIA FXAA 3.11 by Timothy Lottes
+// Smooths aliased edges based on luminance contrast detection
+// ============================================================================
+
+inline const char* kFXAA_FS = R"glsl(
+#version 330
+in vec2 uv;
+out vec4 finalColor;
+
+uniform sampler2D texture0;
+uniform vec2 texelSize;
+uniform float preserveAlpha;
+uniform float skipVignette;
+
+// FXAA settings
+const float FXAA_REDUCE_MIN = 1.0/128.0;
+const float FXAA_REDUCE_MUL = 1.0/8.0;
+const float FXAA_SPAN_MAX = 8.0;
+
+float luma(vec3 color) {
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+    // Sample center and 4 corners
+    vec3 rgbNW = texture(texture0, uv + vec2(-1.0, -1.0) * texelSize).rgb;
+    vec3 rgbNE = texture(texture0, uv + vec2( 1.0, -1.0) * texelSize).rgb;
+    vec3 rgbSW = texture(texture0, uv + vec2(-1.0,  1.0) * texelSize).rgb;
+    vec3 rgbSE = texture(texture0, uv + vec2( 1.0,  1.0) * texelSize).rgb;
+    vec3 rgbM  = texture(texture0, uv).rgb;
+
+    // Convert to luminance
+    float lumaNW = luma(rgbNW);
+    float lumaNE = luma(rgbNE);
+    float lumaSW = luma(rgbSW);
+    float lumaSE = luma(rgbSE);
+    float lumaM  = luma(rgbM);
+
+    // Find luminance range
+    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+
+    // Compute edge direction
+    vec2 dir;
+    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+    dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+
+    // Scale direction by inverse of smallest component
+    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+    dir = min(vec2(FXAA_SPAN_MAX), max(vec2(-FXAA_SPAN_MAX), dir * rcpDirMin)) * texelSize;
+
+    // Sample along the detected edge direction
+    vec3 rgbA = 0.5 * (
+        texture(texture0, uv + dir * (1.0/3.0 - 0.5)).rgb +
+        texture(texture0, uv + dir * (2.0/3.0 - 0.5)).rgb);
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (
+        texture(texture0, uv + dir * -0.5).rgb +
+        texture(texture0, uv + dir *  0.5).rgb);
+
+    float lumaB = luma(rgbB);
+
+    // Use rgbB if within range, otherwise rgbA (avoid artifacts)
+    vec3 fxaaResult;
+    if (lumaB < lumaMin || lumaB > lumaMax) {
+        fxaaResult = rgbA;
+    } else {
+        fxaaResult = rgbB;
+    }
+
+    if (preserveAlpha > 0.5) {
+        float srcAlpha = texture(texture0, uv).a;
+        finalColor = vec4(fxaaResult, srcAlpha);
+    } else if (skipVignette > 0.5) {
+        finalColor = vec4(fxaaResult, 1.0);
+    } else {
+        vec2 vignetteUV = uv * 2.0 - 1.0;
+        float vignette = 1.0 - dot(vignetteUV, vignetteUV) * 0.15;
+        vignette = clamp(vignette, 0.0, 1.0);
+        vignette = mix(0.85, 1.0, vignette);
+        finalColor = vec4(fxaaResult * vignette, 1.0);
     }
 }
 )glsl";

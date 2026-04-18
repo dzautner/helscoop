@@ -109,6 +109,66 @@ bool WriteMeshAsBinaryStl(const manifold::MeshGL& mesh,
   return true;
 }
 
+bool WriteMeshAsObj(const manifold::MeshGL& mesh,
+                    const std::filesystem::path& path,
+                    std::string& error) {
+  const uint32_t triCount = static_cast<uint32_t>(mesh.NumTri());
+  if (triCount == 0) {
+    error = "Export failed: mesh is empty";
+    return false;
+  }
+
+  std::ofstream out(path);
+  if (!out) {
+    error = "Export failed: cannot open " + path.string();
+    return false;
+  }
+
+  out << "# dingcad OBJ export\n";
+  out << "# Vertices: " << mesh.NumVert() << " Triangles: " << triCount << "\n\n";
+
+  const uint32_t numVerts = static_cast<uint32_t>(mesh.NumVert());
+  for (uint32_t i = 0; i < numVerts; ++i) {
+    const Vec3f v = FetchVertex(mesh, i);
+    out << "v " << v.x << " " << v.y << " " << v.z << "\n";
+  }
+  out << "\n";
+
+  // Compute per-face normals and accumulate into per-vertex normals for smooth shading
+  std::vector<Vec3f> vertNormals(numVerts, {0.0f, 0.0f, 0.0f});
+  for (uint32_t tri = 0; tri < triCount; ++tri) {
+    const uint32_t i0 = mesh.triVerts[tri * 3 + 0];
+    const uint32_t i1 = mesh.triVerts[tri * 3 + 1];
+    const uint32_t i2 = mesh.triVerts[tri * 3 + 2];
+    const Vec3f v0 = FetchVertex(mesh, i0);
+    const Vec3f v1 = FetchVertex(mesh, i1);
+    const Vec3f v2 = FetchVertex(mesh, i2);
+    const Vec3f fn = Cross(Subtract(v1, v0), Subtract(v2, v0));
+    vertNormals[i0] = {vertNormals[i0].x + fn.x, vertNormals[i0].y + fn.y, vertNormals[i0].z + fn.z};
+    vertNormals[i1] = {vertNormals[i1].x + fn.x, vertNormals[i1].y + fn.y, vertNormals[i1].z + fn.z};
+    vertNormals[i2] = {vertNormals[i2].x + fn.x, vertNormals[i2].y + fn.y, vertNormals[i2].z + fn.z};
+  }
+  for (uint32_t i = 0; i < numVerts; ++i) {
+    vertNormals[i] = Normalize(vertNormals[i]);
+    out << "vn " << vertNormals[i].x << " " << vertNormals[i].y << " " << vertNormals[i].z << "\n";
+  }
+  out << "\n";
+
+  for (uint32_t tri = 0; tri < triCount; ++tri) {
+    const uint32_t i0 = mesh.triVerts[tri * 3 + 0] + 1;
+    const uint32_t i1 = mesh.triVerts[tri * 3 + 1] + 1;
+    const uint32_t i2 = mesh.triVerts[tri * 3 + 2] + 1;
+    out << "f " << i0 << "//" << i0 << " " << i1 << "//" << i1 << " " << i2 << "//" << i2 << "\n";
+  }
+
+  if (!out) {
+    error = "Export failed: write error";
+    return false;
+  }
+
+  return true;
+}
+
 std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& path) {
   std::vector<SceneParameter> params;
 
@@ -129,64 +189,65 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
     }
   }
 
-  struct ParamDef {
-    const char* name;
-    const char* displayName;
-    const char* section;
-    float minVal;
-    float maxVal;
+  // Parse @param annotations: // @param name "Section" Description (min-max)
+  struct PendingParam {
+    std::string name;
+    std::string displayName;
+    std::string section;
+    float minVal = 0;
+    float maxVal = 100;
   };
 
-  const std::vector<ParamDef> knownParams = {
-    // Coop Dimensions
-    {"coop_len", "Coop Length", "Coop Dimensions", 1500, 6000},
-    {"coop_w", "Coop Width", "Coop Dimensions", 1500, 6000},
-    {"wall_h", "Wall Height", "Coop Dimensions", 1500, 3000},
-    // Roof
-    {"roof_pitch_deg", "Roof Pitch", "Roof", 15, 45},
-    {"overhang", "Overhang", "Roof", 50, 400},
-    // Doors
-    {"door_w", "Door Width", "Doors", 500, 1000},
-    {"door_h", "Door Height", "Doors", 1200, 2200},
-    {"pop_w", "Pop Door Width", "Doors", 150, 400},
-    {"pop_opening_h", "Pop Opening Height", "Doors", 200, 500},
-    // Nesting Boxes
-    {"nest_boxes", "Number of Boxes", "Nesting Boxes", 1, 6},
-    {"nest_box_w", "Box Width", "Nesting Boxes", 200, 500},
-    {"nest_box_d", "Box Depth", "Nesting Boxes", 300, 600},
-    {"nest_box_h", "Box Height", "Nesting Boxes", 250, 500},
-    {"nest_height_off_floor", "Height Off Floor", "Nesting Boxes", 100, 600},
-    // Visibility Toggles
-    {"show_cladding", "Show Cladding", "Visibility", 0, 1},
-    {"show_roof", "Show Roof", "Visibility", 0, 1},
-    {"show_walls", "Show Wall Framing", "Visibility", 0, 1},
-    {"show_floor", "Show Floor", "Visibility", 0, 1},
-    {"show_insulation", "Show Insulation", "Visibility", 0, 1},
-    {"show_run", "Show Chicken Run", "Visibility", 0, 1},
-    {"show_tunnel", "Show Tunnel", "Visibility", 0, 1},
-    {"show_interior", "Show Interior", "Visibility", 0, 1},
-    {"show_chickens", "Show Chickens", "Visibility", 0, 1},
-    // Door Angles
-    {"human_door_angle", "Human Door", "Door Angles", 0, 120},
-    {"nest_lid_angle", "Nest Box Lid", "Door Angles", 0, 90},
-    {"tunnel_door_angle", "Tunnel Door", "Door Angles", 0, 90},
-    {"run_gate_angle", "Run Gate", "Door Angles", 0, 120},
-    // Energy & Heating
-    {"electricity_price", "Price c/kWh", "Energy", 5, 50},
-    {"heater_power", "Heater Watts", "Energy", 100, 2000},
-    {"chicken_body_heat", "Heat/Chicken W", "Energy", 5, 15},
-    {"num_chickens_for_heat", "Num Chickens", "Energy", 0, 20},
-  };
+  std::regex paramAnnotation(
+    R"re(//\s*@param\s+(\w+)\s+"([^"]+)"\s+(.*))re");
 
   std::istringstream stream(*source);
   std::string line;
   int lineNum = 0;
+  std::optional<PendingParam> pending;
 
   while (std::getline(stream, line)) {
     lineNum++;
 
-    for (const auto& def : knownParams) {
-      std::string pattern = std::string("const ") + def.name + " = ";
+    // Check for @param annotation
+    std::smatch paramMatch;
+    if (std::regex_search(line, paramMatch, paramAnnotation)) {
+      PendingParam p;
+      p.name = paramMatch[1].str();
+      p.section = paramMatch[2].str();
+      std::string rest = paramMatch[3].str();
+
+      // Extract (min-max) range from end of description
+      std::regex rangeRegex(R"(\((\-?[\d.]+)\s*-\s*(\-?[\d.]+)\)\s*$)");
+      std::smatch rangeMatch;
+      if (std::regex_search(rest, rangeMatch, rangeRegex)) {
+        p.minVal = std::stof(rangeMatch[1].str());
+        p.maxVal = std::stof(rangeMatch[2].str());
+        rest = rest.substr(0, rangeMatch.position());
+      }
+
+      // Clean up display name from remaining description
+      rest.erase(rest.find_last_not_of(" \t") + 1);
+      if (rest.empty()) {
+        // Convert snake_case name to Title Case
+        p.displayName = p.name;
+        for (auto& ch : p.displayName) {
+          if (ch == '_') ch = ' ';
+        }
+        if (!p.displayName.empty()) {
+          p.displayName[0] = std::toupper(p.displayName[0]);
+        }
+      } else {
+        p.displayName = rest;
+      }
+
+      pending = p;
+      continue;
+    }
+
+    // Check if this line has a const declaration matching a pending @param
+    if (pending) {
+      std::string pattern = "const " + pending->name + " = ";
       size_t pos = line.find(pattern);
       if (pos != std::string::npos) {
         size_t valueStart = pos + pattern.length();
@@ -195,24 +256,16 @@ std::vector<SceneParameter> ParseSceneParameters(const std::filesystem::path& pa
           std::string valueStr = line.substr(valueStart, valueEnd - valueStart);
           valueStr.erase(0, valueStr.find_first_not_of(" \t"));
           valueStr.erase(valueStr.find_last_not_of(" \t") + 1);
-
           try {
             float value = std::stof(valueStr);
             params.push_back({
-              def.name,
-              def.displayName,
-              def.section,
-              value,
-              def.minVal,
-              def.maxVal,
-              lineNum
+              pending->name, pending->displayName, pending->section,
+              value, pending->minVal, pending->maxVal, lineNum
             });
-          } catch (...) {
-            // Skip non-numeric values
-          }
+          } catch (...) {}
         }
-        break;
       }
+      pending.reset();
     }
   }
 
@@ -265,7 +318,12 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
         size_t valueEnd = line.find(';', valueStart);
         if (valueEnd != std::string::npos) {
           std::ostringstream newValue;
-          newValue << static_cast<int>(param.value);
+          float intpart;
+          if (std::modff(param.value, &intpart) == 0.0f) {
+            newValue << static_cast<int>(param.value);
+          } else {
+            newValue << param.value;
+          }
           result << line.substr(0, valueStart) << newValue.str() << line.substr(valueEnd) << "\n";
           continue;
         }
@@ -277,12 +335,29 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
   std::cerr << "WriteParameterToFile: Writing param '" << param.name << "' = " << param.value
             << " at line " << param.lineNumber << " to " << actualPath << std::endl;
 
-  std::ofstream out(actualPath);
-  if (!out) {
-    std::cerr << "WriteParameterToFile: Failed to open file for writing" << std::endl;
+  auto tmpPath = actualPath;
+  tmpPath += ".tmp";
+  {
+    std::ofstream out(tmpPath);
+    if (!out) {
+      std::cerr << "WriteParameterToFile: Failed to open temp file for writing" << std::endl;
+      return false;
+    }
+    out << result.str();
+    out.flush();
+    if (!out.good()) {
+      std::cerr << "WriteParameterToFile: Write failed" << std::endl;
+      std::filesystem::remove(tmpPath);
+      return false;
+    }
+  }
+  std::error_code ec;
+  std::filesystem::rename(tmpPath, actualPath, ec);
+  if (ec) {
+    std::cerr << "WriteParameterToFile: Rename failed: " << ec.message() << std::endl;
+    std::filesystem::remove(tmpPath);
     return false;
   }
-  out << result.str();
   std::cerr << "WriteParameterToFile: Success" << std::endl;
   return true;
 }

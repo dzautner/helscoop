@@ -90,7 +90,6 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
                          UIState& state,
                          const Font& uiFont,
                          int screenWidth, int screenHeight,
-                         bool loadingInBackground,
                          const std::filesystem::path& scriptPath);
 
 // Check if mouse is over any UI panel
@@ -137,7 +136,8 @@ bool DrawLightingPanel(UIState& uiState,
 bool DrawToolbar(UIState& uiState,
                  const Font& uiFont,
                  int screenWidth,
-                 const std::string& statusMessage);
+                 const std::string& statusMessage,
+                 float brandWidth = 145.0f);
 
 // Toolbar height constant for panel positioning
 inline constexpr float kToolbarHeight = 42.0f;

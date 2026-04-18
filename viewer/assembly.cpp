@@ -143,7 +143,7 @@ static std::string GenerateStepTitle(const std::string& category,
 AssemblyInstructions GenerateDefaultAssembly(const SceneData& sceneData,
                                               const std::vector<MaterialItem>& materials) {
   AssemblyInstructions assembly;
-  assembly.projectName = "HELSCOOP";
+  assembly.projectName = "Project";
 
   // Maximum parts per step - IKEA style is 1-4 parts per step
   const size_t kMaxPartsPerStep = 3;

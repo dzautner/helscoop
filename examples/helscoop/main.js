@@ -7,9 +7,12 @@
 // ============================================================================
 
 // Coop dimensions
-const coop_len = 2933;           // Coop length (X direction)
-const coop_w = 3246;             // Coop width (Y direction)
-const wall_h = 2404;             // Wall height (Z direction)
+// @param coop_len "Coop Dimensions" Coop Length (1500-6000)
+const coop_len = 1526;           // Coop length (X direction)
+// @param coop_w "Coop Dimensions" Coop Width (1500-6000)
+const coop_w = 4841;             // Coop width (Y direction)
+// @param wall_h "Coop Dimensions" Wall Height (1500-3000)
+const wall_h = 2630;             // Wall height (Z direction)
 
 // Structural members
 const joist_sec = [48, 98];      // Joist cross-section [thickness, height]
@@ -19,8 +22,10 @@ const stud_sp = 400;             // Stud spacing
 const floor_th = 18;             // Floor sheet thickness
 
 // Roof
+// @param roof_pitch_deg "Roof" Roof Pitch (15-45)
 const roof_pitch_deg = 28;       // Roof pitch in degrees
-const overhang = 50;            // Roof overhang on all sides
+// @param overhang "Roof" Overhang (50-400)
+const overhang = 117;            // Roof overhang on all sides
 
 // Base
 const paver_size = [200, 200, 50]; // Paver dimensions [width, depth, height]
@@ -29,10 +34,14 @@ const skid_sec = [148, 148];       // Skid cross-section [thickness, height]
 const skirting_t = 12;             // Skirting panel thickness
 
 // Doors
+// @param door_w "Doors" Door Width (500-1000)
 const door_w = 588;              // Human door width - Finnish standard 9M
+// @param door_h "Doors" Door Height (1200-2200)
 const door_h = 2100;             // Human door height - Finnish standard 21M
-const pop_w = 150;               // Pop door width
-const pop_opening_h = 261;       // Pop door opening height
+// @param pop_w "Doors" Pop Door Width (150-400)
+const pop_w = 195;               // Pop door width
+// @param pop_opening_h "Doors" Pop Opening Height (200-500)
+const pop_opening_h = 200;       // Pop door opening height
 const pop_ramp_angle = 30;       // Ramp angle in degrees
 
 // Calculate pop door height
@@ -47,10 +56,15 @@ const vent_top_clearance = 20;
 const front_vent_clearance_over_door = 20;
 
 // Nesting boxes
-const nest_boxes = 2;
-const nest_box_w = 200;
+// @param nest_boxes "Nesting Boxes" Number of Boxes (1-6)
+const nest_boxes = 6;
+// @param nest_box_w "Nesting Boxes" Box Width (200-500)
+const nest_box_w = 305;
+// @param nest_box_d "Nesting Boxes" Box Depth (300-600)
 const nest_box_d = 400;
+// @param nest_box_h "Nesting Boxes" Box Height (250-500)
 const nest_box_h = 350;
+// @param nest_height_off_floor "Nesting Boxes" Height Off Floor (100-600)
 const nest_height_off_floor = 200;  // Lowered from 400mm to 200mm
 const nest_access_lip_h = 90;
 
@@ -85,14 +99,32 @@ const show_interior = 1;       // 1=show, 0=hide interior
 const show_chickens = 1;       // 1=show, 0=hide chickens
 
 // ============================================================================
+// EXTERIOR COLORS - Classic Finnish wooden house colors
+// ============================================================================
+// 0=Yellow (Keltamulta), 1=Falu Red (Punamulta), 2=Gray, 3=Blue, 4=Green, 5=White
+// @param cladding_color "Exterior" Cladding Color (0-5)
+const cladding_color = 1;
+
+// Finnish exterior color palette
+const FINNISH_COLORS = [
+  [0.85, 0.78, 0.45],   // 0: Yellow ochre (Keltamulta) - golden yellow
+  [0.55, 0.18, 0.12],   // 1: Falu red (Punamulta) - classic Swedish/Finnish red
+  [0.45, 0.47, 0.50],   // 2: Gray - traditional gray
+  [0.35, 0.45, 0.58],   // 3: Blue - muted dusty blue
+  [0.28, 0.42, 0.32],   // 4: Green - forest green
+  [0.92, 0.90, 0.85],   // 5: White/cream
+];
+const CLADDING_RGB = FINNISH_COLORS[Math.floor(cladding_color) % FINNISH_COLORS.length];
+
+// ============================================================================
 // DOOR ANGLES - Simulate doors open/closed (degrees)
 // ============================================================================
 // @param human_door_angle "Doors" Human door swing angle (0-120)
-const human_door_angle = 0;    // 0=closed, 90=fully open
+const human_door_angle = 80;    // 0=closed, 90=fully open
 // @param nest_lid_angle "Doors" Nest box lid angle (0-90)
-const nest_lid_angle = 90;     // 0=closed, 90=fully open
+const nest_lid_angle = 24;     // 0=closed, 90=fully open
 // @param tunnel_door_angle "Doors" Tunnel access door angle (0-90)
-const tunnel_door_angle = 30;  // 0=closed, 90=fully open
+const tunnel_door_angle = 58;  // 0=closed, 90=fully open
 // @param run_gate_angle "Doors" Run gate swing angle (0-120)
 const run_gate_angle = 44;      // 0=closed, 90=open
 
@@ -267,8 +299,8 @@ function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25,
 
   // Board dimensions - thin faces mounted on backing
   const board_height = 145;     // Visible board height
-  const board_thickness = 3;    // Very thin - just a face, no volume gradient
-  const shadow_gap = 6;         // Small gap creates shadow line against backing
+  const board_thickness = 12;   // Thicker boards for better MSAA edge coverage, no volume gradient
+  const shadow_gap = 8;         // Gap between boards
   // Board position depends on facing direction
   const board_y = facing < 0 ? panel_y - board_thickness : panel_y + backing_thickness;
 
@@ -300,10 +332,10 @@ function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25,
     z += board_height + shadow_gap;
   }
 
-  // Union backing + all boards
-  let panel = backing;
-  for (let i = 0; i < boards.length; i++) {
-    panel = union(panel, boards[i]);
+  // Union all boards (keep backing separate for darker shadow color)
+  let boardsUnion = boards[0];
+  for (let i = 1; i < boards.length; i++) {
+    boardsUnion = union(boardsUnion, boards[i]);
   }
 
   // Corner trim boards - thicker to stand proud
@@ -331,7 +363,8 @@ function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25,
   );
 
   return {
-    panel: panel,
+    backing: backing,
+    boards: boardsUnion,
     trim: union(left_trim, right_trim, top_trim, bottom_trim)
   };
 }
@@ -339,11 +372,13 @@ function horizontal_cladding_x(len, height, base_pos, cutouts = [], margin = 25,
 // Horizontal cladding for walls running along Y axis (left/right walls)
 // Solid backing panel with thin board faces creating shadow lines
 // facing: -1 for left wall (faces -X), +1 for right wall (faces +X)
-function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45, facing = -1) {
+function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 25, thickness = 18, trim_w = 45, facing = -1, back_margin = null) {
+  const front_m = margin;
+  const back_m = back_margin !== null ? back_margin : margin;
   const panel_x = base_pos[0];
-  const panel_y = base_pos[1] - margin;
+  const panel_y = base_pos[1] - front_m;
   const panel_z = base_pos[2];
-  const panel_width = width + 2 * margin;
+  const panel_width = width + front_m + back_m;
 
   // Backing panel (wall sheathing) - solid, no gaps
   const backing_thickness = 12;
@@ -365,8 +400,8 @@ function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 2
 
   // Board dimensions - thin faces mounted on backing
   const board_height = 145;     // Visible board height
-  const board_thickness = 3;    // Very thin - just a face
-  const shadow_gap = 6;         // Small gap creates shadow line
+  const board_thickness = 12;   // Thicker boards for better MSAA edge coverage
+  const shadow_gap = 8;         // Gap between boards
   // Board position depends on facing direction
   const board_x = facing < 0 ? panel_x - board_thickness : panel_x + backing_thickness;
 
@@ -398,10 +433,10 @@ function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 2
     z += board_height + shadow_gap;
   }
 
-  // Union backing + all boards
-  let panel = backing;
-  for (let i = 0; i < boards.length; i++) {
-    panel = union(panel, boards[i]);
+  // Union all boards (keep backing separate for darker shadow color)
+  let boardsUnion = boards[0];
+  for (let i = 1; i < boards.length; i++) {
+    boardsUnion = union(boardsUnion, boards[i]);
   }
 
   // Corner trim boards - thicker to stand proud
@@ -410,26 +445,27 @@ function horizontal_cladding_y(width, height, base_pos, cutouts = [], margin = 2
 
   const front_trim = translate(
     cube({ size: [trim_thickness, trim_w, height + 40], center: false }),
-    [trim_x, base_pos[1] - margin - trim_w, panel_z - 20]
+    [trim_x, base_pos[1] - front_m - trim_w, panel_z - 20]
   );
   const back_trim = translate(
     cube({ size: [trim_thickness, trim_w, height + 40], center: false }),
-    [trim_x, base_pos[1] + width + margin, panel_z - 20]
+    [trim_x, base_pos[1] + width + back_m, panel_z - 20]
   );
 
   // Top and bottom trim
-  const trim_total_width = width + 2 * margin + 2 * trim_w;
+  const trim_total_width = width + front_m + back_m + 2 * trim_w;
   const top_trim = translate(
     cube({ size: [trim_thickness, trim_total_width, 20], center: false }),
-    [trim_x, base_pos[1] - margin - trim_w, panel_z + height]
+    [trim_x, base_pos[1] - front_m - trim_w, panel_z + height]
   );
   const bottom_trim = translate(
     cube({ size: [trim_thickness, trim_total_width, 20], center: false }),
-    [trim_x, base_pos[1] - margin - trim_w, panel_z - 20]
+    [trim_x, base_pos[1] - front_m - trim_w, panel_z - 20]
   );
 
   return {
-    panel: panel,
+    backing: backing,
+    boards: boardsUnion,
     trim: union(front_trim, back_trim, top_trim, bottom_trim)
   };
 }
@@ -1011,11 +1047,11 @@ function gable_roof(len, width, wall_h, floor_stack, pitch_deg, overhang, roof_t
 // ============================================================================
 
 // Build the foundation - separate pavers and skids for material tracking
-const foundationPavers = foundation_pavers(coop_len, coop_w, paver_size, max_paver_spacing);
-const foundationSkids = foundation_skids(coop_len, coop_w, skid_sec, paver_size);
+const foundationPavers = foundation_pavers(coop_len, coop_w + stud_sec[1], paver_size, max_paver_spacing);
+const foundationSkids = foundation_skids(coop_len, coop_w + stud_sec[1], skid_sec, paver_size);
 
 // Build the skirting
-const skirting = coop_skirting(coop_len, coop_w, floor_stack, skirting_t, 25);
+const skirting = coop_skirting(coop_len, coop_w + stud_sec[1], floor_stack, skirting_t, 25);
 
 // Build the floor frame
 const floor = floor_frame(coop_len, coop_w, joist_sec, joist_sp, paver_size[2], skid_sec[1], floor_th);
@@ -1195,6 +1231,72 @@ const right_wall_frame = Wall({
 });
 const right_wall = translate(right_wall_frame, [0, 0, floor_stack]);
 
+// Interior cladding on right wall - plywood panel covering studs from inside
+// Panel sits 1mm inside of stud face to avoid z-fighting
+const interior_panel_t = 12;
+const right_interior_base = translate(
+  cube({ size: [interior_panel_t, coop_w, wall_h], center: false }),
+  [coop_len - interior_panel_t - 1, 0, floor_stack]
+);
+
+// Tunnel access opening through interior panel
+// Position matches where the tunnel connects (centered on pop door)
+const tunnel_opening_y = stud_sec[1] + 50 + pop_w / 2 - 175;  // pop_door_y + pop_w/2 - opening_w/2
+const tunnel_opening_w = 350;   // Wide enough for chickens
+const tunnel_opening_h = 400;   // Tall enough for chickens
+const interior_cutout = translate(
+  cube({ size: [interior_panel_t + 4, tunnel_opening_w, tunnel_opening_h], center: false }),
+  [coop_len - interior_panel_t - 2, tunnel_opening_y, floor_stack]
+);
+const right_interior_panel = difference(right_interior_base, interior_cutout);
+
+// Trim/frame around the tunnel access opening (interior side)
+const ita_frame_w = 40;
+const ita_frame_d = 15;
+const ita_frame_parts = [];
+const ita_panel_x = coop_len - interior_panel_t - 1;  // Match panel position
+// Left jamb
+ita_frame_parts.push(translate(
+  cube({ size: [ita_frame_d, ita_frame_w, tunnel_opening_h], center: false }),
+  [ita_panel_x - ita_frame_d, tunnel_opening_y - ita_frame_w, floor_stack]
+));
+// Right jamb
+ita_frame_parts.push(translate(
+  cube({ size: [ita_frame_d, ita_frame_w, tunnel_opening_h], center: false }),
+  [ita_panel_x - ita_frame_d, tunnel_opening_y + tunnel_opening_w, floor_stack]
+));
+// Head (top piece)
+ita_frame_parts.push(translate(
+  cube({ size: [ita_frame_d, tunnel_opening_w + 2 * ita_frame_w, ita_frame_w], center: false }),
+  [ita_panel_x - ita_frame_d, tunnel_opening_y - ita_frame_w, floor_stack + tunnel_opening_h]
+));
+// Threshold
+ita_frame_parts.push(translate(
+  cube({ size: [ita_frame_d + 20, tunnel_opening_w + 2 * ita_frame_w, 15], center: false }),
+  [ita_panel_x - ita_frame_d - 10, tunnel_opening_y - ita_frame_w, floor_stack - 15]
+));
+const tunnel_access_interior_frame = union(...ita_frame_parts);
+
+// Small ramp from coop floor into tunnel opening
+const ramp_w = tunnel_opening_w - 20;  // Slightly narrower than opening
+const ramp_length = 250;               // Extends into coop from wall
+const ramp_t = 12;
+const ramp_cleat_h = 8;
+const ramp_parts = [];
+// Ramp board - starts at interior panel face
+ramp_parts.push(translate(
+  cube({ size: [ramp_length, ramp_w, ramp_t], center: false }),
+  [ita_panel_x - ramp_length, tunnel_opening_y + 10, floor_stack]
+));
+// Grip cleats on ramp (every 60mm)
+for (let i = 1; i < Math.floor(ramp_length / 60); i++) {
+  ramp_parts.push(translate(
+    cube({ size: [10, ramp_w - 20, ramp_cleat_h], center: false }),
+    [ita_panel_x - i * 60, tunnel_opening_y + 20, floor_stack + ramp_t]
+  ));
+}
+const tunnel_access_ramp = union(...ramp_parts);
+
 // Nesting box support structure
 // Build a proper platform with posts directly under joists
 const nest_ledger_h = 48;  // Support frame height
@@ -1249,6 +1351,25 @@ const nesting_box_doors = translate(
   nest_result.doors,
   [nest_box_x, 0, floor_stack + nest_height_off_floor]
 );
+// Small pull handles on each exterior nest door for egg-collection access.
+const nest_handle_parts = [];
+for (let i = 0; i < nest_boxes; i += 1) {
+  const x_offset = nest_box_x + nest_spacing + i * (nest_box_w + nest_spacing);
+  const door_w = nest_box_w - 2 * 12;
+  const handle_x = x_offset + door_w * 0.72;
+  const handle_y = -12 - 26;
+  const handle_z = floor_stack + nest_height_off_floor + nest_box_h * 0.58;
+  const grip = translate(
+    cube({ size: [92, 16, 16], center: true }),
+    [handle_x, handle_y, handle_z]
+  );
+  const stem = translate(
+    cube({ size: [22, 22, 22], center: true }),
+    [handle_x, handle_y + 12, handle_z]
+  );
+  nest_handle_parts.push(union(grip, stem));
+}
+const nesting_box_handles = nest_handle_parts.length > 0 ? union(...nest_handle_parts) : cube({ size: [1, 1, 1], center: false });
 
 // Build the roof
 const roof = gable_roof(coop_len, coop_w, wall_h, floor_stack, roof_pitch_deg, overhang, 8);
@@ -1433,16 +1554,23 @@ const back_cladding = horizontal_cladding_x(
 const left_cladding = horizontal_cladding_y(
   coop_w, wall_h,
   [-cladding_th, 0, floor_stack],
-  []  // No cutouts on left wall
+  [],  // No cutouts on left wall
+  25, 18, 45, -1, stud_sec[1]  // back_margin covers back wall stud depth at corner
 );
 
-// Right wall cladding (at X = coop_len + stud depth) - solid wall (tunnel connects to run, no pop door)
+// Right wall cladding (at X = coop_len + stud depth) - with tunnel opening cutout
 const pop_door_y = stud_sec[1] + 50;  // Used for tunnel positioning
+const right_tunnel_y = pop_door_y + pop_w / 2 - 600 / 2;  // Tunnel Y position (600 = tunnel_width)
+// Cutout must exactly match tunnel exterior so no sky gap is visible
+const right_cladding_cutouts = [
+  [[coop_len + stud_sec[1] - 1, right_tunnel_y, floor_stack],
+   [40, 600, 600]]  // tunnel_width x tunnel_height, no margin
+];
 const right_cladding = horizontal_cladding_y(
   coop_w, wall_h,
   [coop_len + stud_sec[1], 0, floor_stack],  // Outside the wall studs (stud depth is 98mm)
-  [],  // No cutouts - pop door removed, tunnel exits to run
-  25, 18, 45, +1  // facing = +1 for right wall (faces +X)
+  right_cladding_cutouts,  // Cutout for tunnel opening
+  25, 18, 45, +1, stud_sec[1]  // back_margin covers back wall stud depth at corner
 );
 
 // ============================================================================
@@ -1450,20 +1578,22 @@ const right_cladding = horizontal_cladding_y(
 // ============================================================================
 
 // Human door - positioned at front wall, hinged on left edge
-// Rotates around the left hinge point based on human_door_angle parameter
+// Mirror in X so handle is on free edge (hinge is at X=0 for this door)
 const human_door_parts = door_panel(door_w, door_h, 18);
+const human_door_body_mirrored = translate(scale(human_door_parts.body, [-1, 1, 1]), [door_w, 0, 0]);
+const human_door_hw_mirrored = translate(scale(human_door_parts.hardware, [-1, 1, 1]), [door_w, 0, 0]);
 const human_door_hinge_x = coop_len / 2 - door_w / 2;
 const human_door_hinge_y = -cladding_th - 18;
 const human_door_body = translate(
   rotate(
-    human_door_parts.body,
+    human_door_body_mirrored,
     [0, 0, -human_door_angle]  // Swing outward (negative Y direction)
   ),
   [human_door_hinge_x, human_door_hinge_y, floor_stack + stud_sec[0]]
 );
 const human_door_hardware = translate(
   rotate(
-    human_door_parts.hardware,
+    human_door_hw_mirrored,
     [0, 0, -human_door_angle]
   ),
   [human_door_hinge_x, human_door_hinge_y, floor_stack + stud_sec[0]]
@@ -1613,10 +1743,37 @@ const tunnel_roof_t = 8;
 const tunnel_window_inset = 50;
 const tunnel_window_height = tunnel_height - 200;
 
-// Tunnel position - attached to right wall, centered on pop door
-const tunnel_base_x = coop_len;
+// Tunnel position - starts at outer cladding face so it doesn't protrude into coop
+const tunnel_base_x = coop_len + stud_sec[1] + 24;  // past studs (98) + backing (12) + boards (12)
 const tunnel_base_y = pop_door_y + pop_w / 2 - tunnel_width / 2;
 const tunnel_base_z = floor_stack;
+
+// Wall passthrough sleeve - rectangular tube through the stud wall connecting interior to tunnel
+// Starts at stud inner face (hidden behind interior panel) and extends to tunnel start
+const passthrough_start_x = coop_len;  // Stud inner face - hidden behind interior panel
+const passthrough_end_x = tunnel_base_x;
+const passthrough_length = passthrough_end_x - passthrough_start_x;
+// Floor
+const passthrough_floor = translate(
+  cube({ size: [passthrough_length, tunnel_width, tunnel_wall_t], center: false }),
+  [passthrough_start_x, tunnel_base_y, tunnel_base_z]
+);
+// Left wall
+const passthrough_left = translate(
+  cube({ size: [passthrough_length, tunnel_wall_t, tunnel_height], center: false }),
+  [passthrough_start_x, tunnel_base_y, tunnel_base_z]
+);
+// Right wall
+const passthrough_right = translate(
+  cube({ size: [passthrough_length, tunnel_wall_t, tunnel_height], center: false }),
+  [passthrough_start_x, tunnel_base_y + tunnel_width - tunnel_wall_t, tunnel_base_z]
+);
+// Ceiling
+const passthrough_ceiling = translate(
+  cube({ size: [passthrough_length, tunnel_width, tunnel_wall_t], center: false }),
+  [passthrough_start_x, tunnel_base_y, tunnel_base_z + tunnel_height - tunnel_wall_t]
+);
+const wall_passthrough = union(passthrough_floor, passthrough_left, passthrough_right, passthrough_ceiling);
 
 // Create tunnel floor
 const tunnel_floor = translate(
@@ -1652,14 +1809,59 @@ const tunnel_access_door_cutout = translate(
 );
 const tunnel_left_wall = difference(tunnel_left_wall_base, tunnel_access_door_cutout);
 
-// Hinged access door panel - uses tunnel_door_angle parameter
-const tunnel_access_door_panel = translate(
+// Hinged access door panel - proper 4-panel door using door_panel()
+// Mirror in X so handle is on free edge (hinge is at X=0 for this door)
+const tunnel_door_parts = door_panel(tunnel_access_door_width, tunnel_access_door_height, tunnel_wall_t);
+const tunnel_door_body_mirrored = translate(scale(tunnel_door_parts.body, [-1, 1, 1]), [tunnel_access_door_width, 0, 0]);
+const tunnel_door_hw_mirrored = translate(scale(tunnel_door_parts.hardware, [-1, 1, 1]), [tunnel_access_door_width, 0, 0]);
+const tunnel_access_door_body = translate(
   rotate(
-    cube({ size: [tunnel_access_door_width, tunnel_wall_t, tunnel_access_door_height], center: false }),
+    tunnel_door_body_mirrored,
     [0, 0, -tunnel_door_angle]  // Swing outward based on parameter
   ),
   [tunnel_base_x + 50, tunnel_base_y, tunnel_base_z + 40]
 );
+const tunnel_access_door_hardware = translate(
+  rotate(
+    tunnel_door_hw_mirrored,
+    [0, 0, -tunnel_door_angle]
+  ),
+  [tunnel_base_x + 50, tunnel_base_y, tunnel_base_z + 40]
+);
+
+// Door frame/casing around tunnel access opening
+const tad_frame_w = 40;          // Width of frame pieces
+const tad_frame_d = 15;          // Depth (how much it stands proud)
+const tad_frame_reveal = 3;      // Gap between frame and door edge
+const tad_opening_w = tunnel_access_door_width + 2 * tad_frame_reveal;
+const tad_opening_h = tunnel_access_door_height + tad_frame_reveal;
+const tad_frame_x = tunnel_base_x + 50 - tad_frame_reveal;
+const tad_frame_y = tunnel_base_y - tad_frame_d;
+const tad_frame_z = tunnel_base_z + 40;
+
+const tunnel_door_frame_parts = [];
+// Left jamb
+tunnel_door_frame_parts.push(translate(
+  cube({ size: [tad_frame_w, tad_frame_d, tad_opening_h + tad_frame_w], center: false }),
+  [tad_frame_x - tad_frame_w, tad_frame_y, tad_frame_z]
+));
+// Right jamb
+tunnel_door_frame_parts.push(translate(
+  cube({ size: [tad_frame_w, tad_frame_d, tad_opening_h + tad_frame_w], center: false }),
+  [tad_frame_x + tad_opening_w, tad_frame_y, tad_frame_z]
+));
+// Head (top piece)
+tunnel_door_frame_parts.push(translate(
+  cube({ size: [tad_opening_w + 2 * tad_frame_w, tad_frame_d, tad_frame_w], center: false }),
+  [tad_frame_x - tad_frame_w, tad_frame_y, tad_frame_z + tad_opening_h]
+));
+// Threshold/sill
+const tad_threshold_h = 12;
+tunnel_door_frame_parts.push(translate(
+  cube({ size: [tad_opening_w + 2 * tad_frame_w, tad_frame_d + 10, tad_threshold_h], center: false }),
+  [tad_frame_x - tad_frame_w, tad_frame_y - 5, tad_frame_z - tad_threshold_h]
+));
+const tunnel_door_frame = union(...tunnel_door_frame_parts);
 
 // Right wall - with window cutout
 const tunnel_right_wall_base = translate(
@@ -1698,14 +1900,95 @@ const tunnel_roof_right = translate(
   [tunnel_base_x, tunnel_base_y + tunnel_width / 2, tunnel_peak_z]
 );
 
-// Combine tunnel walls and roof
-const tunnel_walls = union(tunnel_floor, tunnel_front_wall, tunnel_left_wall, tunnel_right_wall);
+// Gable end panel at run-facing end of tunnel (closes the triangular opening)
+// Build as horizontal slices that narrow toward the peak (like createGableMesh but solid)
+const tunnel_gable_parts = [];
+const tunnel_gable_x = tunnel_base_x + tunnel_length - tunnel_wall_t;
+const tunnel_gable_base_z = tunnel_base_z + tunnel_height;
+const tunnel_gable_slice_h = 20;  // Slice thickness
+const tunnel_gable_num_slices = Math.ceil(tunnel_rise / tunnel_gable_slice_h);
+for (let i = 0; i < tunnel_gable_num_slices; i++) {
+  const z = i * tunnel_gable_slice_h;
+  const next_z = Math.min((i + 1) * tunnel_gable_slice_h, tunnel_rise);
+  const slice_h = next_z - z;
+  // Width narrows linearly from tunnel_width at base to 0 at peak
+  const width_at_z = tunnel_width * (1 - z / tunnel_rise);
+  const offset = (tunnel_width - width_at_z) / 2;
+  if (width_at_z > 0 && slice_h > 0) {
+    tunnel_gable_parts.push(translate(
+      cube({ size: [tunnel_wall_t, width_at_z, slice_h], center: false }),
+      [tunnel_gable_x, tunnel_base_y + offset, tunnel_gable_base_z + z]
+    ));
+  }
+}
+const tunnel_gable_end = tunnel_gable_parts.length > 0 ? union(...tunnel_gable_parts) : null;
+
+// Combine tunnel walls, roof, and wall passthrough sleeve
+const tunnel_walls = union(tunnel_floor, tunnel_front_wall, tunnel_left_wall, tunnel_right_wall,
+  wall_passthrough,
+  ...(tunnel_gable_end ? [tunnel_gable_end] : []));
 const tunnel_roof = union(tunnel_roof_left, tunnel_roof_right);
+
+// Corner framing posts at tunnel corners (visible structural detail)
+const tunnel_post_sec = 38;  // 38x38mm posts
+const tunnel_corner_posts = [];
+const tunnel_post_positions = [
+  [tunnel_base_x, tunnel_base_y, tunnel_base_z],
+  [tunnel_base_x, tunnel_base_y + tunnel_width - tunnel_post_sec, tunnel_base_z],
+  [tunnel_base_x + tunnel_length - tunnel_post_sec, tunnel_base_y, tunnel_base_z],
+  [tunnel_base_x + tunnel_length - tunnel_post_sec, tunnel_base_y + tunnel_width - tunnel_post_sec, tunnel_base_z]
+];
+for (const pos of tunnel_post_positions) {
+  tunnel_corner_posts.push(translate(
+    cube({ size: [tunnel_post_sec, tunnel_post_sec, tunnel_height], center: false }),
+    pos
+  ));
+}
+const tunnel_posts = union(...tunnel_corner_posts);
+
+// Interior shelf/platform for feeder and waterer
+const shelf_thickness = 18;
+const shelf_width = tunnel_width - 2 * tunnel_wall_t - 2 * tunnel_post_sec;
+const shelf_depth = 500;  // Extends partway along tunnel length
+const shelf_height = 50;  // Raised platform 50mm above tunnel floor
+const tunnel_shelf = translate(
+  cube({ size: [shelf_depth, shelf_width, shelf_thickness], center: false }),
+  [tunnel_base_x + tunnel_length - tunnel_wall_t - shelf_depth - tunnel_post_sec,
+   tunnel_base_y + tunnel_wall_t + tunnel_post_sec,
+   tunnel_base_z + tunnel_wall_t + shelf_height]
+);
+
+// Chicken door frame on front wall of tunnel
+const cdf_frame_w = 30;          // Width of frame pieces
+const cdf_frame_d = 12;          // Depth (stands proud of wall)
+const cdf_frame_parts = [];
+// Left jamb
+cdf_frame_parts.push(translate(
+  cube({ size: [cdf_frame_d, cdf_frame_w, chicken_door_height], center: false }),
+  [tunnel_base_x + tunnel_length - tunnel_wall_t - cdf_frame_d,
+   tunnel_base_y + tunnel_width / 2 - chicken_door_width / 2 - cdf_frame_w,
+   tunnel_base_z + tunnel_wall_t]
+));
+// Right jamb
+cdf_frame_parts.push(translate(
+  cube({ size: [cdf_frame_d, cdf_frame_w, chicken_door_height], center: false }),
+  [tunnel_base_x + tunnel_length - tunnel_wall_t - cdf_frame_d,
+   tunnel_base_y + tunnel_width / 2 + chicken_door_width / 2,
+   tunnel_base_z + tunnel_wall_t]
+));
+// Head (top piece)
+cdf_frame_parts.push(translate(
+  cube({ size: [cdf_frame_d, chicken_door_width + 2 * cdf_frame_w, cdf_frame_w], center: false }),
+  [tunnel_base_x + tunnel_length - tunnel_wall_t - cdf_frame_d,
+   tunnel_base_y + tunnel_width / 2 - chicken_door_width / 2 - cdf_frame_w,
+   tunnel_base_z + tunnel_wall_t + chicken_door_height]
+));
+const chicken_door_frame = union(...cdf_frame_parts);
 
 // Extended skid for tunnel support
 const tunnel_skid = translate(
   cube({ size: [tunnel_length, skid_sec[0], skid_sec[1]], center: false }),
-  [coop_len, tunnel_base_y + tunnel_width / 2 - skid_sec[0] / 2, paver_size[2]]
+  [tunnel_base_x, tunnel_base_y + tunnel_width / 2 - skid_sec[0] / 2, paver_size[2]]
 );
 
 // ============================================================================
@@ -1717,8 +2000,8 @@ const run_width = 3000;   // Run width along Y axis
 const run_height = 2000;  // Run height (to eaves)
 const post_sec = [98, 98]; // Run posts cross-section
 
-// Run position - starts at end of viewing tunnel
-const run_base_x = tunnel_base_x + tunnel_length;
+// Run position - near posts overlap with tunnel end so mesh aligns with tunnel front wall
+const run_base_x = tunnel_base_x + tunnel_length - post_sec[0] / 2;
 const run_base_y = tunnel_base_y + tunnel_width / 2 - run_width / 2;
 const run_base_z = paver_size[2];
 
@@ -1980,35 +2263,45 @@ const run_mesh_right = translate(
   [run_base_x + run_length - post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z]
 );
 
-// Left wall mesh (west side) - sections around tunnel opening
-const tunnel_connect_height = 800;
-const left_wall_top_height = mesh_height - tunnel_connect_height;
+// Left wall mesh (west side) - sections around chicken door opening only
+// Only cut mesh for the small chicken door (not the entire tunnel face)
 const left_width = run_width - post_sec[1] * 2;
+const mesh_x_left = run_base_x + post_sec[0] / 2 - wire_diameter / 2;
 
-// Top section - full width above tunnel
-const run_mesh_left_top = translate(
-  createWireMesh(left_width, left_wall_top_height, wire_diameter, 'yz'),
-  [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z + tunnel_connect_height]
-);
+// Chicken door position relative to run base Y
+const chicken_door_center_y = tunnel_base_y + tunnel_width / 2 - run_base_y;
+const chicken_door_start_y = chicken_door_center_y - chicken_door_width / 2;
+const chicken_door_end_y = chicken_door_start_y + chicken_door_width;
+const chicken_door_top_z = tunnel_base_z + tunnel_wall_t + chicken_door_height;
 
-// Lower sections around tunnel opening
-// Tunnel opening: from tunnel_base_y to tunnel_base_y + tunnel_width, height 0 to tunnel_connect_height
-const tunnel_opening_start_y = tunnel_base_y - run_base_y;  // Relative to run
-const tunnel_opening_end_y = tunnel_opening_start_y + tunnel_width;
-
-// Front lower section (from front post to tunnel opening)
-const front_lower_width = tunnel_opening_start_y - post_sec[1];
-const run_mesh_left_front_lower = front_lower_width > 0 ? translate(
-  createWireMesh(front_lower_width, tunnel_connect_height, wire_diameter, 'yz'),
-  [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + post_sec[1], mesh_bottom_z]
+// Top section - full width, above the chicken door
+const left_top_height = mesh_top_z - chicken_door_top_z;
+const run_mesh_left_top = left_top_height > 0 ? translate(
+  createWireMesh(left_width, left_top_height, wire_diameter, 'yz'),
+  [mesh_x_left, run_base_y + post_sec[1], chicken_door_top_z]
 ) : null;
 
-// Back lower section (from tunnel opening to back post)
-const back_lower_start = tunnel_opening_end_y;
+// Bottom section - full width, below the chicken door (from mesh bottom to tunnel floor)
+const left_bottom_height = (tunnel_base_z + tunnel_wall_t) - mesh_bottom_z;
+const run_mesh_left_bottom = left_bottom_height > 0 ? translate(
+  createWireMesh(left_width, left_bottom_height, wire_diameter, 'yz'),
+  [mesh_x_left, run_base_y + post_sec[1], mesh_bottom_z]
+) : null;
+
+// Middle-left section (from front post to chicken door opening, at door height)
+const mid_height = chicken_door_height;
+const front_lower_width = chicken_door_start_y - post_sec[1];
+const run_mesh_left_front_lower = front_lower_width > 0 ? translate(
+  createWireMesh(front_lower_width, mid_height, wire_diameter, 'yz'),
+  [mesh_x_left, run_base_y + post_sec[1], tunnel_base_z + tunnel_wall_t]
+) : null;
+
+// Middle-right section (from chicken door opening to back post, at door height)
+const back_lower_start = chicken_door_end_y;
 const back_lower_width = run_width - post_sec[1] - back_lower_start;
 const run_mesh_left_back_lower = back_lower_width > 0 ? translate(
-  createWireMesh(back_lower_width, tunnel_connect_height, wire_diameter, 'yz'),
-  [run_base_x + post_sec[0] / 2 - wire_diameter / 2, run_base_y + back_lower_start, mesh_bottom_z]
+  createWireMesh(back_lower_width, mid_height, wire_diameter, 'yz'),
+  [mesh_x_left, run_base_y + back_lower_start, tunnel_base_z + tunnel_wall_t]
 ) : null;
 
 // Roof mesh - two sloped panels following the A-frame roof structure
@@ -2094,7 +2387,9 @@ const run_mesh_gable_left = left_gable_mesh ? translate(
 ) : null;
 
 // Combine all mesh walls including sloped roof panels and gables
-const left_wall_parts = [run_mesh_left_top];
+const left_wall_parts = [];
+if (run_mesh_left_top) left_wall_parts.push(run_mesh_left_top);
+if (run_mesh_left_bottom) left_wall_parts.push(run_mesh_left_bottom);
 if (run_mesh_left_front_lower) left_wall_parts.push(run_mesh_left_front_lower);
 if (run_mesh_left_back_lower) left_wall_parts.push(run_mesh_left_back_lower);
 const front_wall_parts = [run_mesh_front];
@@ -2207,24 +2502,185 @@ const bushes = bush_positions.map(pos => bush(400, pos));
 const all_bushes = union(...bushes);
 
 // ============================================================================
+// FINNISH NATURE - Sipoonkorpi-inspired landscape
+// ============================================================================
+
+// Pine tree: trunk + layered cone canopy
+function pine_tree(height, trunk_r, position) {
+  const trunk = translate(
+    cylinder({ height: height * 0.6, radius: trunk_r, center: false }),
+    [position[0], position[1], position[2]]
+  );
+  const layers = [];
+  const canopy_base = height * 0.3;
+  const canopy_top = height;
+  const layer_count = 4;
+  for (let i = 0; i < layer_count; i++) {
+    const t = i / layer_count;
+    const layer_z = canopy_base + (canopy_top - canopy_base) * t;
+    const layer_r = height * 0.28 * (1 - t * 0.6);
+    const layer_h = (canopy_top - canopy_base) / layer_count * 1.3;
+    layers.push(translate(
+      cylinder({ height: layer_h, radius: layer_r, radiusTop: layer_r * 0.15, segments: 8, center: false }),
+      [position[0], position[1], position[2] + layer_z]
+    ));
+  }
+  return { trunk, canopy: union(...layers) };
+}
+
+// Birch tree: white trunk + oval canopy
+function birch_tree(height, position) {
+  const trunk_r = height * 0.025;
+  const trunk = translate(
+    cylinder({ height: height * 0.65, radius: trunk_r, center: false }),
+    [position[0], position[1], position[2]]
+  );
+  const canopy_r = height * 0.22;
+  const canopy_h = height * 0.55;
+  const canopy = translate(
+    scale(sphere({ radius: canopy_r }), [1.0, 1.0, canopy_h / canopy_r]),
+    [position[0], position[1], position[2] + height * 0.65]
+  );
+  return { trunk, canopy };
+}
+
+// Small spruce: dense conical shape
+function spruce(height, position) {
+  const trunk = translate(
+    cylinder({ height: height * 0.9, radius: height * 0.03, center: false }),
+    [position[0], position[1], position[2]]
+  );
+  const canopy = translate(
+    cylinder({ height: height * 0.85, radius: height * 0.3, radiusTop: 0, segments: 8, center: false }),
+    [position[0], position[1], position[2] + height * 0.15]
+  );
+  return { trunk, canopy };
+}
+
+// Ground cover: flat rounded moss/grass patches
+function ground_patch(radius, position) {
+  return translate(
+    cylinder({ height: 30, radius: radius, segments: 12, center: false }),
+    [position[0], position[1], position[2]]
+  );
+}
+
+// Place trees around the scene - scattered like a Finnish forest clearing
+const coop_center_x = coop_len / 2;
+const coop_center_y = coop_w / 2;
+
+// Background pines (well away from coop to avoid roof shadows)
+const pine1 = pine_tree(3500, 80, [-4000, coop_center_y + 2500, 0]);
+const pine2 = pine_tree(4200, 90, [-4500, coop_center_y - 1500, 0]);
+const pine3 = pine_tree(3800, 85, [-3000, -3500, 0]);
+const pine4 = pine_tree(4500, 95, [coop_len + 8000, coop_center_y + 3500, 0]);
+const pine5 = pine_tree(3200, 75, [coop_len + 7500, -2500, 0]);
+const pine6 = pine_tree(3900, 85, [-5000, coop_center_y, 0]);
+const pine7 = pine_tree(3600, 80, [coop_len + 9000, coop_center_y, 0]);
+
+// Birch trees (lighter, scattered — iconic Finnish landscape)
+const birch1 = birch_tree(3800, [-3500, -2500, 0]);
+const birch2 = birch_tree(3200, [coop_len + 8500, coop_center_y - 1000, 0]);
+const birch3 = birch_tree(4000, [-5500, coop_center_y + 3500, 0]);
+const birch4 = birch_tree(3500, [coop_len + 7000, -3000, 0]);
+const birch5 = birch_tree(3000, [-3800, coop_center_y + 4000, 0]);
+
+// Small spruces (forest understory, still clear of coop)
+const spruce1 = spruce(2200, [-2500, coop_center_y + 4000, 0]);
+const spruce2 = spruce(1800, [coop_len + 9500, coop_center_y + 2500, 0]);
+const spruce3 = spruce(2000, [-4500, -2000, 0]);
+
+// Collect all tree parts
+const all_pine_trunks = union(
+  pine1.trunk, pine2.trunk, pine3.trunk, pine4.trunk, pine5.trunk, pine6.trunk, pine7.trunk
+);
+const all_pine_canopies = union(
+  pine1.canopy, pine2.canopy, pine3.canopy, pine4.canopy, pine5.canopy, pine6.canopy, pine7.canopy
+);
+const all_birch_trunks = union(birch1.trunk, birch2.trunk, birch3.trunk, birch4.trunk, birch5.trunk);
+const all_birch_canopies = union(birch1.canopy, birch2.canopy, birch3.canopy, birch4.canopy, birch5.canopy);
+const all_spruce_trunks = union(spruce1.trunk, spruce2.trunk, spruce3.trunk);
+const all_spruce_canopies = union(spruce1.canopy, spruce2.canopy, spruce3.canopy);
+
+// Ground cover patches (moss, grass, blueberry)
+const ground_patches_list = [
+  ground_patch(600, [-1500, coop_center_y, 0]),
+  ground_patch(800, [coop_len + 4500, coop_center_y + 1000, 0]),
+  ground_patch(500, [-2800, coop_center_y + 2000, 0]),
+  ground_patch(700, [coop_len + 5500, -800, 0]),
+  ground_patch(900, [-1000, -1500, 0]),
+  ground_patch(650, [coop_len + 6500, coop_center_y + 2800, 0]),
+];
+const all_ground_patches = union(...ground_patches_list);
+
+// Stone/boulder accents (Finnish granite)
+const boulder1 = translate(
+  scale(sphere({ radius: 250 }), [1.3, 1.0, 0.6]),
+  [-2500, coop_center_y + 3000, 80]
+);
+const boulder2 = translate(
+  scale(sphere({ radius: 200 }), [1.0, 1.2, 0.5]),
+  [coop_len + 7000, -1500, 60]
+);
+const boulder3 = translate(
+  scale(sphere({ radius: 280 }), [1.1, 0.9, 0.55]),
+  [-3500, -1800, 90]
+);
+const boulder4 = translate(
+  scale(sphere({ radius: 160 }), [1.2, 1.1, 0.5]),
+  [coop_len + 8000, coop_center_y + 2000, 50]
+);
+const all_boulders = union(boulder1, boulder2, boulder3, boulder4);
+
+// Gravel path leading to the door
+const path_width = 600;
+const path1 = translate(
+  cube({ size: [path_width, 3000, 15], center: false }),
+  [-2500, coop_center_y - path_width / 2, 0]
+);
+const all_paths = path1;
+
+// Log pile (firewood stack — very Finnish)
+function log_row(count, log_r, log_len, base_pos) {
+  const logs = [];
+  for (let i = 0; i < count; i++) {
+    logs.push(translate(
+      rotate(
+        cylinder({ height: log_len, radius: log_r, segments: 8, center: false }),
+        [0, 90, 0]
+      ),
+      [base_pos[0], base_pos[1] + i * log_r * 2.1, base_pos[2] + log_r]
+    ));
+  }
+  return union(...logs);
+}
+const log_stack_row1 = log_row(5, 60, 500, [-1800, coop_center_y - 400, 0]);
+const log_stack_row2 = log_row(4, 60, 500, [-1800, coop_center_y - 400 + 63, 130]);
+const log_stack = union(log_stack_row1, log_stack_row2);
+
+// ============================================================================
 // TUNNEL SKIRTING - Covers tunnel foundation
 // ============================================================================
 
+// Front skirting starts at tunnel_base_x (outer cladding face)
+const tunnel_skirting_front_x = tunnel_base_x;
 const tunnel_skirting_front = translate(
   cube({ size: [skirting_t, tunnel_width, floor_stack], center: false }),
-  [tunnel_base_x - skirting_t, tunnel_base_y, 0]
+  [tunnel_skirting_front_x, tunnel_base_y, 0]
 );
 const tunnel_skirting_back = translate(
   cube({ size: [skirting_t, tunnel_width, floor_stack], center: false }),
   [tunnel_base_x + tunnel_length, tunnel_base_y, 0]
 );
+// Left/right skirting starts at outer cladding face, not inside the wall
+const tunnel_skirting_len = tunnel_base_x + tunnel_length - tunnel_skirting_front_x;
 const tunnel_skirting_left = translate(
-  cube({ size: [tunnel_length, skirting_t, floor_stack], center: false }),
-  [tunnel_base_x, tunnel_base_y - skirting_t, 0]
+  cube({ size: [tunnel_skirting_len, skirting_t, floor_stack], center: false }),
+  [tunnel_skirting_front_x, tunnel_base_y - skirting_t, 0]
 );
 const tunnel_skirting_right = translate(
-  cube({ size: [tunnel_length, skirting_t, floor_stack], center: false }),
-  [tunnel_base_x, tunnel_base_y + tunnel_width, 0]
+  cube({ size: [tunnel_skirting_len, skirting_t, floor_stack], center: false }),
+  [tunnel_skirting_front_x, tunnel_base_y + tunnel_width, 0]
 );
 const tunnel_skirting = union(tunnel_skirting_front, tunnel_skirting_back, tunnel_skirting_left, tunnel_skirting_right);
 
@@ -2232,34 +2688,46 @@ const tunnel_skirting = union(tunnel_skirting_front, tunnel_skirting_back, tunne
 // FEEDER AND WATERER - Inside viewing tunnel
 // ============================================================================
 
-// Feeder - red cylinder with tray
-function chicken_feeder(diameter = 250, height = 300) {
-  const container = translate(
-    cylinder({ height: height * 0.7, radius: diameter * 0.4, center: false }),
-    [0, 0, height * 0.3]
+// Feeder - compact gravity feeder with tray and stand
+function chicken_feeder(diameter = 180, height = 240) {
+  const hopper = translate(
+    cylinder({ height: height * 0.65, radius: diameter * 0.27, center: false }),
+    [0, 0, height * 0.33]
   );
-  const tray = cylinder({ height: height * 0.2, radius: diameter * 0.5, center: false });
-  return union(container, tray);
+  const tray = cylinder({ height: height * 0.12, radius: diameter * 0.45, center: false });
+  const stand = translate(
+    cylinder({ height: height * 0.25, radius: diameter * 0.11, center: false }),
+    [0, 0, height * 0.08]
+  );
+  return union(hopper, tray, stand);
 }
 
-// Waterer - blue cylinder with trough
-function chicken_waterer(diameter = 250, height = 280) {
+// Waterer - compact bell waterer with trough and stand
+function chicken_waterer(diameter = 170, height = 220) {
   const reservoir = translate(
-    cylinder({ height: height * 0.6, radius: diameter * 0.35, center: false }),
-    [0, 0, height * 0.25]
+    cylinder({ height: height * 0.58, radius: diameter * 0.25, center: false }),
+    [0, 0, height * 0.34]
   );
-  const trough = cylinder({ height: height * 0.15, radius: diameter * 0.45, center: false });
-  return union(reservoir, trough);
+  const trough = cylinder({ height: height * 0.12, radius: diameter * 0.42, center: false });
+  const stand = translate(
+    cylinder({ height: height * 0.24, radius: diameter * 0.1, center: false }),
+    [0, 0, height * 0.1]
+  );
+  return union(reservoir, trough, stand);
 }
 
 // Position feeder and waterer in tunnel
+const shelf_x = tunnel_base_x + tunnel_length - tunnel_wall_t - shelf_depth - tunnel_post_sec;
+const shelf_y = tunnel_base_y + tunnel_wall_t + tunnel_post_sec;
+const shelf_z = tunnel_base_z + tunnel_wall_t + shelf_height + shelf_thickness;
+
 const feeder = translate(
-  chicken_feeder(250, 300),
-  [tunnel_base_x + tunnel_length - 400, tunnel_base_y + tunnel_width / 2 - 100, tunnel_base_z + 18]
+  chicken_feeder(180, 240),
+  [shelf_x + shelf_depth * 0.64, shelf_y + shelf_width * 0.36, shelf_z]
 );
 const waterer = translate(
-  chicken_waterer(250, 280),
-  [tunnel_base_x + tunnel_length - 600, tunnel_base_y + tunnel_width / 2 + 100, tunnel_base_z + 18]
+  chicken_waterer(170, 220),
+  [shelf_x + shelf_depth * 0.35, shelf_y + shelf_width * 0.72, shelf_z]
 );
 
 // ============================================================================
@@ -2368,7 +2836,7 @@ function chicken(scale_factor = 1.0, pose = 0) {
 }
 
 // Place chickens around the scene
-const chicken_scale = 6.0;  // Increased for better visibility in renders
+const chicken_scale = 4.2;
 
 // Chicken in run near entrance
 const chicken1 = translate(
@@ -2391,13 +2859,13 @@ const chicken3 = translate(
 // Chicken in viewing tunnel
 const chicken4 = translate(
   rotate(chicken(chicken_scale * 0.9, 0.9), [0, 0, -45]),
-  [tunnel_base_x + tunnel_length - 350, tunnel_base_y + tunnel_width / 2 - 50, tunnel_base_z + 18]
+  [tunnel_base_x + tunnel_length - 320, tunnel_base_y + tunnel_width / 2 - 70, tunnel_base_z + 18]
 );
 
 // Chicken at waterer
 const chicken5 = translate(
   rotate(chicken(chicken_scale * 0.9, 0.7), [0, 0, 120]),
-  [tunnel_base_x + tunnel_length - 550, tunnel_base_y + tunnel_width / 2 + 80, tunnel_base_z + 18]
+  [tunnel_base_x + tunnel_length - 560, tunnel_base_y + tunnel_width / 2 + 110, tunnel_base_z + 18]
 );
 
 // Chicken on gym platform
@@ -2418,7 +2886,34 @@ const chicken8 = translate(
   [run_base_x + run_length * 0.5, run_base_y + run_width * 0.6, run_base_z]
 );
 
-const all_chickens = union(chicken1, chicken2, chicken3, chicken4, chicken5, chicken6, chicken7, chicken8);
+// Perched birds for roost ergonomics/readability in architectural shots.
+const chicken9 = translate(
+  rotate(chicken(chicken_scale * 0.82, 0.3), [0, 0, -90]),
+  [coop_len / 2 - door_w / 2 - nest_total_w / 2, stud_sec[1] + 180, lower_roost_h + roost_dia / 2]
+);
+const chicken10 = translate(
+  rotate(chicken(chicken_scale * 0.78, 0.5), [0, 0, 90]),
+  [stud_sec[1] + 100 + mid_roost_length * 0.58, coop_w * 0.75, mid_roost_h + roost_dia / 2]
+);
+
+// Additional perched birds on chicken-gym bars for interior behavioral reads.
+const chicken11 = translate(
+  rotate(chicken(chicken_scale * 0.72, 0.2), [0, 0, -90]),
+  [gym_base_x + gym_width * 0.3 + gym_width * 0.14, gym_base_y + gym_depth * 0.4 - 25, gym_base_z + 575]
+);
+const chicken12 = translate(
+  rotate(chicken(chicken_scale * 0.70, 0.35), [0, 0, 90]),
+  [gym_base_x + gym_width * 0.45 + gym_width * 0.18, gym_base_y + gym_depth * 0.25 + 10, gym_base_z + 875]
+);
+const chicken13 = translate(
+  rotate(chicken(chicken_scale * 0.66, 0.1), [0, 0, 0]),
+  [gym_base_x + gym_width * 0.52, gym_base_y + gym_depth * 0.78, gym_base_z + 1225]
+);
+
+const all_chickens = union(
+  chicken1, chicken2, chicken3, chicken4, chicken5, chicken6, chicken7, chicken8,
+  chicken9, chicken10, chicken11, chicken12, chicken13
+);
 
 // ============================================================================
 // MESH APRON - Predator-proof skirt around run base
@@ -2522,58 +3017,98 @@ const l_extension_frame = l_extension_enabled ? union(...l_posts, ...l_top_rails
 // LOUNGE AREA - Table and chairs in L-extension corner
 // ============================================================================
 
-const table_diameter = 700;
-const table_height = 550;
-const chair_spacing = 800;
+const table_diameter = 760;
+const table_height = 560;
+const chair_spacing = 760;
 
 // Table position - in center of L-extension
 const table_x = l_junction_x + l_extension_length / 2;
 const table_y = l_junction_y - l_extension_width / 2;
 const table_z = l_junction_z;
 
-// Table top (circular - approximated with cylinder)
+// Table top with a thin lip for a more furniture-like profile
 const table_top = translate(
-  cylinder({ height: 40, radius: table_diameter / 2, center: false }),
+  cylinder({ height: 28, radius: table_diameter / 2, center: false }),
   [table_x, table_y, table_z + table_height]
 );
-
-// Table pedestal
-const table_pedestal = translate(
-  cylinder({ height: table_height, radius: 80, center: false }),
-  [table_x, table_y, table_z]
+const table_top_lip = translate(
+  cylinder({ height: 18, radius: table_diameter / 2 - 35, center: false }),
+  [table_x, table_y, table_z + table_height + 28]
 );
 
-// Simple chair (seat + back)
+// Table pedestal and base ring
+const table_pedestal = translate(
+  cylinder({ height: table_height, radius: 55, center: false }),
+  [table_x, table_y, table_z]
+);
+const table_base_ring = translate(
+  cylinder({ height: 22, radius: 170, center: false }),
+  [table_x, table_y, table_z]
+);
+const table_base_cross = union(
+  translate(cube({ size: [300, 36, 24], center: true }), [table_x, table_y, table_z + 12]),
+  translate(cube({ size: [36, 300, 24], center: true }), [table_x, table_y, table_z + 12])
+);
+
+// Slightly more refined outdoor chair
 function make_chair(x, y, z, angle) {
-  const seat_w = 450;
-  const seat_h = 450;
+  const seat_w = 430;
+  const seat_h = 430;
+  const seat_th = 34;
+  const leg_r = 16;
+  const back_h = 360;
+  const back_t = 30;
+  const arm_h = 610;
+
   const seat = translate(
     rotate(
-      cube({ size: [seat_w, seat_w, 40], center: true }),
+      cube({ size: [seat_w, seat_w - 20, seat_th], center: true }),
       [0, 0, angle]
     ),
-    [x, y, z + seat_h]
+    [x, y, z + seat_h + seat_th / 2]
   );
+
+  const seat_support = translate(
+    rotate(
+      cylinder({ height: 16, radius: 130, center: false }),
+      [0, 0, angle]
+    ),
+    [x, y, z + seat_h - 8]
+  );
+
   const back = translate(
     rotate(
-      cube({ size: [seat_w, 40, 400], center: true }),
+      rotate(
+        cube({ size: [seat_w - 30, back_t, back_h], center: true }),
+        [10, 0, 0]
+      ),
       [0, 0, angle]
     ),
-    [x - seat_w / 3 * Math.cos(angle * Math.PI / 180),
-     y - seat_w / 3 * Math.sin(angle * Math.PI / 180),
-     z + seat_h + 200]
+    [x - seat_w * 0.34 * Math.cos(angle * Math.PI / 180),
+     y - seat_w * 0.34 * Math.sin(angle * Math.PI / 180),
+     z + seat_h + back_h * 0.52]
   );
+
+  const arm_left = translate(
+    rotate(cube({ size: [seat_w * 0.82, back_t, 24], center: true }), [0, 0, angle]),
+    [x, y - seat_w * 0.23, z + arm_h]
+  );
+  const arm_right = translate(
+    rotate(cube({ size: [seat_w * 0.82, back_t, 24], center: true }), [0, 0, angle]),
+    [x, y + seat_w * 0.23, z + arm_h]
+  );
+
   const legs = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i += 1) {
     const leg_angle = i * 90 + 45;
-    const leg_x = x + 150 * Math.cos((angle + leg_angle) * Math.PI / 180);
-    const leg_y = y + 150 * Math.sin((angle + leg_angle) * Math.PI / 180);
+    const leg_x = x + 145 * Math.cos((angle + leg_angle) * Math.PI / 180);
+    const leg_y = y + 128 * Math.sin((angle + leg_angle) * Math.PI / 180);
     legs.push(translate(
-      cylinder({ height: seat_h, radius: 20, center: false }),
+      cylinder({ height: seat_h + seat_th, radius: leg_r, center: false }),
       [leg_x, leg_y, z]
     ));
   }
-  return union(seat, back, ...legs);
+  return union(seat, seat_support, back, arm_left, arm_right, ...legs);
 }
 
 // Four chairs around the table
@@ -2582,7 +3117,7 @@ const chair2 = l_extension_enabled ? make_chair(table_x - chair_spacing, table_y
 const chair3 = l_extension_enabled ? make_chair(table_x, table_y + chair_spacing, table_z, 270) : cube({ size: [1, 1, 1], center: false });
 const chair4 = l_extension_enabled ? make_chair(table_x, table_y - chair_spacing, table_z, 90) : cube({ size: [1, 1, 1], center: false });
 
-const lounge_table = l_extension_enabled ? union(table_top, table_pedestal) : cube({ size: [1, 1, 1], center: false });
+const lounge_table = l_extension_enabled ? union(table_top, table_top_lip, table_pedestal, table_base_ring, table_base_cross) : cube({ size: [1, 1, 1], center: false });
 const lounge_chairs = l_extension_enabled ? union(chair1, chair2, chair3, chair4) : cube({ size: [1, 1, 1], center: false });
 
 // ============================================================================
@@ -2824,6 +3359,13 @@ function withMaterial(geometry, materialId, objectId = null) {
   return obj;
 }
 
+// Helper to create explicitly colored object with optional objectId
+function withColorId(geometry, color, objectId = null) {
+  const obj = withColor(geometry, color);
+  if (objectId) obj.objectId = objectId;
+  return obj;
+}
+
 // Define realistic colors for architectural elements (fallback for non-material items)
 const CONCRETE_GRAY = [0.65, 0.65, 0.68];     // Pavers
 const WOOD_TAN = [0.76, 0.60, 0.42];          // Skids (pressure-treated wood)
@@ -2840,7 +3382,7 @@ const RAMP_WOOD = [0.65, 0.50, 0.32];         // Ramps
 // Using material references from materials.json where applicable
 const scaledFoundationPavers = withMaterial(scale(foundationPavers, DISPLAY_SCALE), 'concrete_block', 'foundation_pavers');
 const scaledFoundationSkids = withMaterial(scale(foundationSkids, DISPLAY_SCALE), 'pressure_treated_148x148', 'foundation_skids');
-const scaledSkirting = withColor(scale(skirting, DISPLAY_SCALE), SKIRTING_DARK);
+const scaledSkirting = withColorId(scale(skirting, DISPLAY_SCALE), SKIRTING_DARK, 'coop_skirting');
 const scaledFloor = withMaterial(scale(floor, DISPLAY_SCALE), 'osb_18mm', 'floor_deck');
 const scaledFloorHangers = withMaterial(scale(floor_hangers, DISPLAY_SCALE), 'joist_hanger', 'floor_hangers');
 const scaledLumberPile = withMaterial(scale(lumber_pile, DISPLAY_SCALE), 'assembly_lumber_preview', 'lumber_pile');
@@ -2856,41 +3398,65 @@ const scaledFrontWall = withMaterial(scale(front_wall, DISPLAY_SCALE), 'pine_48x
 const scaledBackWall = withMaterial(scale(back_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'back_wall');
 const scaledLeftWall = withMaterial(scale(left_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'left_wall');
 const scaledRightWall = withMaterial(scale(right_wall, DISPLAY_SCALE), 'pine_48x98_c24', 'right_wall');
+const scaledRightInteriorPanel = withColorId(scale(right_interior_panel, DISPLAY_SCALE), PLYWOOD_LIGHT, 'right_interior_panel');
+const scaledTunnelAccessFrame = withColorId(scale(tunnel_access_interior_frame, DISPLAY_SCALE), WOOD_NATURAL, 'tunnel_access_interior_frame');
+const scaledTunnelAccessRamp = withColorId(scale(tunnel_access_ramp, DISPLAY_SCALE), RAMP_WOOD, 'tunnel_access_ramp');
 const scaledRoof = withMaterial(scale(roof, DISPLAY_SCALE), 'galvanized_roofing', 'roof');
-const scaledNestSupport = withMaterial(scale(nest_support_structure, DISPLAY_SCALE), 'pine_48x98_c24');
-const scaledNestingBoxes = withMaterial(scale(nesting_box_array, DISPLAY_SCALE), 'nest_box_plywood');
-const scaledNestDoors = withColor(scale(nesting_box_doors, DISPLAY_SCALE), DOOR_WOOD);
+const scaledNestSupport = withMaterial(scale(nest_support_structure, DISPLAY_SCALE), 'pine_48x98_c24', 'nest_support');
+const scaledNestingBoxes = withMaterial(scale(nesting_box_array, DISPLAY_SCALE), 'nest_box_plywood', 'nesting_boxes');
+const scaledNestDoors = withColorId(scale(nesting_box_doors, DISPLAY_SCALE), DOOR_WOOD, 'nest_doors');
+const scaledNestDoorHandles = withColorId(scale(nesting_box_handles, DISPLAY_SCALE), [0.25, 0.25, 0.27], 'nest_door_handles');
 
-// Cladding - using plywood for exterior panels, trim for trim boards
-const scaledFrontCladding = withMaterial(scale(front_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
-const scaledFrontTrim = withMaterial(scale(front_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledBackCladding = withMaterial(scale(back_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
-const scaledBackTrim = withMaterial(scale(back_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledLeftCladding = withMaterial(scale(left_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
-const scaledLeftTrim = withMaterial(scale(left_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledRightCladding = withMaterial(scale(right_cladding.panel, DISPLAY_SCALE), 'exterior_board_yellow');
-const scaledRightTrim = withMaterial(scale(right_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white');
+// Cladding - boards use selected color, backing gets darker shadow version
+// Shadow color is a darkened version of the main cladding color
+const SHADOW_COLOR = [
+  CLADDING_RGB[0] * 0.25,
+  CLADDING_RGB[1] * 0.22,
+  CLADDING_RGB[2] * 0.18
+];
+
+// Front cladding
+const scaledFrontBacking = withColorId(scale(front_cladding.backing, DISPLAY_SCALE), SHADOW_COLOR, 'front_cladding_backing');
+const scaledFrontBoards = withColorId(scale(front_cladding.boards, DISPLAY_SCALE), CLADDING_RGB, 'front_cladding_boards');
+const scaledFrontTrim = withMaterial(scale(front_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white', 'front_cladding_trim');
+// Back cladding
+const scaledBackBacking = withColorId(scale(back_cladding.backing, DISPLAY_SCALE), SHADOW_COLOR, 'back_cladding_backing');
+const scaledBackBoards = withColorId(scale(back_cladding.boards, DISPLAY_SCALE), CLADDING_RGB, 'back_cladding_boards');
+const scaledBackTrim = withMaterial(scale(back_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white', 'back_cladding_trim');
+// Left cladding
+const scaledLeftBacking = withColorId(scale(left_cladding.backing, DISPLAY_SCALE), SHADOW_COLOR, 'left_cladding_backing');
+const scaledLeftBoards = withColorId(scale(left_cladding.boards, DISPLAY_SCALE), CLADDING_RGB, 'left_cladding_boards');
+const scaledLeftTrim = withMaterial(scale(left_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white', 'left_cladding_trim');
+// Right cladding
+const scaledRightBacking = withColorId(scale(right_cladding.backing, DISPLAY_SCALE), SHADOW_COLOR, 'right_cladding_backing');
+const scaledRightBoards = withColorId(scale(right_cladding.boards, DISPLAY_SCALE), CLADDING_RGB, 'right_cladding_boards');
+const scaledRightTrim = withMaterial(scale(right_cladding.trim, DISPLAY_SCALE), 'exterior_paint_white', 'right_cladding_trim');
 
 // Doors - Finnish gray painted wood with metal hardware
 const DOOR_NAVY = [0.12, 0.17, 0.30];  // Navy blue - classic complement to yellow
 const HARDWARE_METAL = [0.25, 0.25, 0.27];  // Dark metal/iron
-const scaledHumanDoorBody = withColor(scale(human_door_body, DISPLAY_SCALE), DOOR_NAVY);
-const scaledHumanDoorHardware = withColor(scale(human_door_hardware, DISPLAY_SCALE), HARDWARE_METAL);
-const scaledHumanDoorFrame = withMaterial(scale(human_door_frame, DISPLAY_SCALE), 'exterior_paint_white');
-const scaledNestBoxFrame = withMaterial(scale(nest_box_frame, DISPLAY_SCALE), 'exterior_paint_white');
+const scaledHumanDoorBody = withColorId(scale(human_door_body, DISPLAY_SCALE), DOOR_NAVY, 'human_door_body');
+const scaledHumanDoorHardware = withColorId(scale(human_door_hardware, DISPLAY_SCALE), HARDWARE_METAL, 'human_door_hardware');
+const scaledHumanDoorFrame = withMaterial(scale(human_door_frame, DISPLAY_SCALE), 'exterior_paint_white', 'human_door_frame');
+const scaledNestBoxFrame = withMaterial(scale(nest_box_frame, DISPLAY_SCALE), 'exterior_paint_white', 'nest_box_frame');
 const scaledHumanDoor = withMaterial(scale(human_door, DISPLAY_SCALE), 'door_thermal_bridge');
 
 // Roosting perches
-const scaledLowerRoost = withColor(scale(lower_roost, DISPLAY_SCALE), ROOST_BROWN);
-const scaledMidRoost = withColor(scale(mid_roost, DISPLAY_SCALE), ROOST_BROWN);
-const scaledUpperRoost = withColor(scale(upper_roost, DISPLAY_SCALE), ROOST_BROWN);
+const scaledLowerRoost = withColorId(scale(lower_roost, DISPLAY_SCALE), ROOST_BROWN, 'lower_roost');
+const scaledMidRoost = withColorId(scale(mid_roost, DISPLAY_SCALE), ROOST_BROWN, 'mid_roost');
+const scaledUpperRoost = withColorId(scale(upper_roost, DISPLAY_SCALE), ROOST_BROWN, 'upper_roost');
 
 // Viewing tunnel
 const TUNNEL_WALL_COLOR = [0.87, 0.72, 0.53];  // BurlyWood
-const scaledTunnelWalls = withColor(scale(tunnel_walls, DISPLAY_SCALE), TUNNEL_WALL_COLOR);
-const scaledTunnelRoof = withColor(scale(tunnel_roof, DISPLAY_SCALE), ROOF_CHARCOAL);
-const scaledTunnelSkid = withColor(scale(tunnel_skid, DISPLAY_SCALE), WOOD_TAN);
-const scaledTunnelAccessDoor = withColor(scale(tunnel_access_door_panel, DISPLAY_SCALE), DOOR_WOOD);
+const scaledTunnelWalls = withColorId(scale(tunnel_walls, DISPLAY_SCALE), TUNNEL_WALL_COLOR, 'tunnel_walls');
+const scaledTunnelRoof = withColorId(scale(tunnel_roof, DISPLAY_SCALE), ROOF_CHARCOAL, 'tunnel_roof');
+const scaledTunnelSkid = withColorId(scale(tunnel_skid, DISPLAY_SCALE), WOOD_TAN, 'tunnel_skid');
+const scaledTunnelAccessDoorBody = withColorId(scale(tunnel_access_door_body, DISPLAY_SCALE), DOOR_WOOD, 'tunnel_access_door_body');
+const scaledTunnelAccessDoorHardware = withColorId(scale(tunnel_access_door_hardware, DISPLAY_SCALE), HARDWARE_METAL, 'tunnel_access_door_hardware');
+const scaledTunnelDoorFrame = withMaterial(scale(tunnel_door_frame, DISPLAY_SCALE), 'exterior_paint_white', 'tunnel_door_frame');
+const scaledTunnelPosts = withColorId(scale(tunnel_posts, DISPLAY_SCALE), WOOD_NATURAL, 'tunnel_posts');
+const scaledTunnelShelf = withColorId(scale(tunnel_shelf, DISPLAY_SCALE), PLYWOOD_LIGHT, 'tunnel_shelf');
+const scaledChickenDoorFrame = withMaterial(scale(chicken_door_frame, DISPLAY_SCALE), 'exterior_paint_white', 'tunnel_chicken_door_frame');
 
 // Run structure - individual components for step-by-step assembly
 const scaledRunCornerPosts = withMaterial(scale(run_corner_posts, DISPLAY_SCALE), 'cedar_post_98x98', 'run_corner_posts');
@@ -2910,14 +3476,37 @@ const scaledChickenGym = withMaterial(scale(chicken_gym, DISPLAY_SCALE), 'cedar_
 const BUSH_GREEN = [0.33, 0.42, 0.18];  // DarkOliveGreen
 const scaledBushes = withColor(scale(all_bushes, DISPLAY_SCALE), BUSH_GREEN);
 
+// Finnish nature colors
+const PINE_TRUNK = [0.40, 0.28, 0.18];
+const PINE_GREEN = [0.18, 0.32, 0.15];
+const BIRCH_WHITE = [0.88, 0.86, 0.82];
+const BIRCH_LEAF = [0.38, 0.52, 0.22];
+const SPRUCE_GREEN = [0.12, 0.25, 0.12];
+const MOSS_GREEN = [0.28, 0.38, 0.15];
+const BOULDER_GRAY = [0.52, 0.50, 0.48];
+
+const scaledPineTrunks = withColor(scale(all_pine_trunks, DISPLAY_SCALE), PINE_TRUNK);
+const scaledPineCanopies = withColor(scale(all_pine_canopies, DISPLAY_SCALE), PINE_GREEN);
+const scaledBirchTrunks = withColor(scale(all_birch_trunks, DISPLAY_SCALE), BIRCH_WHITE);
+const scaledBirchCanopies = withColor(scale(all_birch_canopies, DISPLAY_SCALE), BIRCH_LEAF);
+const scaledSpruceTrunks = withColor(scale(all_spruce_trunks, DISPLAY_SCALE), SPRUCE_GREEN);
+const scaledSpruceCanopies = withColor(scale(all_spruce_canopies, DISPLAY_SCALE), SPRUCE_GREEN);
+const scaledGroundPatches = withColor(scale(all_ground_patches, DISPLAY_SCALE), MOSS_GREEN);
+const scaledBoulders = withColor(scale(all_boulders, DISPLAY_SCALE), BOULDER_GRAY);
+
+const GRAVEL_BEIGE = [0.72, 0.68, 0.60];
+const LOG_BROWN = [0.45, 0.30, 0.18];
+const scaledPaths = withColor(scale(all_paths, DISPLAY_SCALE), GRAVEL_BEIGE);
+const scaledLogStack = withColor(scale(log_stack, DISPLAY_SCALE), LOG_BROWN);
+
 // Tunnel skirting
-const scaledTunnelSkirting = withColor(scale(tunnel_skirting, DISPLAY_SCALE), SKIRTING_DARK);
+const scaledTunnelSkirting = withColorId(scale(tunnel_skirting, DISPLAY_SCALE), SKIRTING_DARK, 'tunnel_skirting');
 
 // Feeder and waterer
 const FEEDER_RED = [0.8, 0.2, 0.15];
 const WATERER_BLUE = [0.2, 0.4, 0.8];
-const scaledFeeder = withColor(scale(feeder, DISPLAY_SCALE), FEEDER_RED);
-const scaledWaterer = withColor(scale(waterer, DISPLAY_SCALE), WATERER_BLUE);
+const scaledFeeder = withColorId(scale(feeder, DISPLAY_SCALE), FEEDER_RED, 'tunnel_feeder');
+const scaledWaterer = withColorId(scale(waterer, DISPLAY_SCALE), WATERER_BLUE, 'tunnel_waterer');
 
 // Run gate (the swinging door, not the frame)
 const scaledRunGate = withMaterial(scale(run_gate, DISPLAY_SCALE), 'cedar_post_98x98', 'run_gate');
@@ -2929,7 +3518,7 @@ const scaledRunMeshWalls = withMaterial(scale(run_mesh_walls, DISPLAY_SCALE), 'h
 const scaledLExtension = withMaterial(scale(l_extension_frame, DISPLAY_SCALE), 'cedar_post_98x98', 'l_extension');
 
 // Chickens - decorative but need objectId for final assembly stage
-const CHICKEN_WHITE = [0.95, 0.95, 0.9];
+const CHICKEN_WHITE = [0.82, 0.74, 0.58];
 const scaledChickensGeom = scale(all_chickens, DISPLAY_SCALE);
 const scaledChickens = { geometry: scaledChickensGeom, color: CHICKEN_WHITE, objectId: 'chickens' };
 
@@ -2946,9 +3535,10 @@ const scaledRightWallInsulation = withMaterial(scale(right_wall_insulation, DISP
 const scaledFloorInsulation = withMaterial(scale(floor_insulation, DISPLAY_SCALE), 'insulation_100mm');
 
 // Lounge area
-const TABLE_WOOD = [0.87, 0.72, 0.53];
-const scaledLoungeTable = withColor(scale(lounge_table, DISPLAY_SCALE), TABLE_WOOD);
-const scaledLoungeChairs = withColor(scale(lounge_chairs, DISPLAY_SCALE), TABLE_WOOD);
+const TABLE_WOOD = [0.70, 0.58, 0.44];
+const CHAIR_WOOD = [0.74, 0.64, 0.52];
+const scaledLoungeTable = withColorId(scale(lounge_table, DISPLAY_SCALE), TABLE_WOOD, 'lounge_table');
+const scaledLoungeChairs = withColorId(scale(lounge_chairs, DISPLAY_SCALE), CHAIR_WOOD, 'lounge_chairs');
 
 // Assembly preview objects - these are ONLY visible in assembly mode via showObjects
 // They must be in the scene array for the assembly panel to reference them by objectId,
@@ -2973,12 +3563,12 @@ export const scene = [
   ...assemblyOnlyObjects,
   // Wall framing (conditional)
   ...(show_walls ? [scaledFrontWall, scaledBackWall, scaledLeftWall, scaledRightWall] : []),
-  // Cladding (conditional)
+  // Cladding (conditional) - backing (dark shadow) + boards (yellow) + trim (white)
   ...(show_cladding ? [
-    scaledFrontCladding, scaledFrontTrim,
-    scaledBackCladding, scaledBackTrim,
-    scaledLeftCladding, scaledLeftTrim,
-    scaledRightCladding, scaledRightTrim
+    scaledFrontBacking, scaledFrontBoards, scaledFrontTrim,
+    scaledBackBacking, scaledBackBoards, scaledBackTrim,
+    scaledLeftBacking, scaledLeftBoards, scaledLeftTrim,
+    scaledRightBacking, scaledRightBoards, scaledRightTrim
   ] : []),
   // Roof (conditional)
   ...(show_roof ? [scaledRoof] : []),
@@ -2986,14 +3576,18 @@ export const scene = [
   ...(show_insulation && show_roof ? [scaledRoofInsulation] : []),
   ...(show_insulation && show_walls ? [scaledFrontWallInsulation, scaledBackWallInsulation, scaledLeftWallInsulation, scaledRightWallInsulation] : []),
   ...(show_insulation && show_floor ? [scaledFloorInsulation] : []),
-  // Interior elements (nesting, roosts) - conditional
+  // Interior elements (nesting, roosts, interior panel) - conditional
   ...(show_interior ? [
     scaledNestSupport,
     scaledNestingBoxes,
     scaledNestDoors,
+    scaledNestDoorHandles,
     scaledLowerRoost,
     scaledMidRoost,
-    scaledUpperRoost
+    scaledUpperRoost,
+    scaledRightInteriorPanel,
+    scaledTunnelAccessFrame,
+    scaledTunnelAccessRamp
   ] : []),
   // Doors (show with cladding OR insulation for thermal calculation)
   ...((show_cladding || show_insulation) ? [scaledHumanDoorBody, scaledHumanDoorHardware, scaledHumanDoorFrame, scaledNestBoxFrame] : []),
@@ -3001,7 +3595,12 @@ export const scene = [
   ...(show_tunnel ? [
     scaledTunnelWalls,
     scaledTunnelSkid,
-    scaledTunnelAccessDoor,
+    scaledTunnelAccessDoorBody,
+    scaledTunnelAccessDoorHardware,
+    scaledTunnelDoorFrame,
+    scaledTunnelPosts,
+    scaledTunnelShelf,
+    scaledChickenDoorFrame,
     scaledTunnelSkirting,
     scaledFeeder,
     scaledWaterer
@@ -3024,6 +3623,11 @@ export const scene = [
   ] : []),
   // Landscaping (always shown)
   scaledBushes,
+  // Finnish nature - trees and ground cover
+  scaledPineTrunks, scaledPineCanopies,
+  scaledBirchTrunks, scaledBirchCanopies,
+  scaledSpruceTrunks, scaledSpruceCanopies,
+  scaledGroundPatches, scaledBoulders, scaledPaths, scaledLogStack,
   // Chickens (conditional)
   ...(show_chickens ? [scaledChickens] : []),
   // Lounge area (always shown)

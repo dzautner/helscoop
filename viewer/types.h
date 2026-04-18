@@ -134,6 +134,17 @@ struct PBRPricing {
   float unitPrice = 0.0f;
   std::string supplier;
   std::string link;
+  std::string sku;
+  std::string ean;
+  std::string lastPriceCheck;
+  std::string currency = "EUR";
+  struct AltSupplier {
+    std::string supplier;
+    float unitPrice = 0.0f;
+    std::string link;
+    std::string sku;
+  };
+  std::vector<AltSupplier> alternativeSuppliers;
 };
 
 // Structural properties for lumber and framing
@@ -189,6 +200,8 @@ struct ColoredObject {
   std::string objectId;    // Optional unique ID for assembly step filtering
   int quantity = 1;        // For BOM calculation
   bool assemblyOnly = false; // If true, only visible in assembly mode
+  float roughness = -1.0f;   // PBR roughness override (-1 = use default/material)
+  float metallic = -1.0f;    // PBR metallic override (-1 = use default/material)
 };
 
 // Collection of scene objects
@@ -202,6 +215,8 @@ struct ModelWithColor {
   Color color;
   std::string materialId;  // For texture lookup
   size_t sceneObjectIndex = 0;  // Index into sceneData.objects (for assemblyOnly check)
+  float roughness = -1.0f;   // PBR roughness override (-1 = use default/material)
+  float metallic = -1.0f;    // PBR metallic override (-1 = use default/material)
 };
 
 // Module loader state for QuickJS
@@ -247,6 +262,7 @@ struct LoadResult {
   std::vector<std::filesystem::path> dependencies;
   std::vector<MaterialItem> materials;
   AssemblyInstructions assembly;  // Scene-defined assembly (empty if not defined)
+  double displayScale = 1.0;
 };
 
 // Pre-computed mesh for GPU upload
@@ -256,6 +272,8 @@ struct PrecomputedMesh {
   std::string materialId;
   std::string objectId;  // For assembly step filtering
   size_t sceneObjectIndex = 0;  // Index into sceneData.objects (for assemblyOnly check)
+  float roughness = -1.0f;
+  float metallic = -1.0f;
 };
 
 // Result of background loading (JS eval + CSG + tessellation)
@@ -267,6 +285,7 @@ struct BackgroundLoadResult {
   std::vector<std::filesystem::path> dependencies;
   std::vector<MaterialItem> materials;
   AssemblyInstructions assembly;  // Scene-defined assembly (empty if not defined)
+  double displayScale = 1.0;
 };
 
 }  // namespace dingcad

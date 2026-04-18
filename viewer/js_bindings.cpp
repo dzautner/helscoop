@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "manifold/manifold.h"
+#include "manifold/cross_section.h"
 #include "manifold/polygon.h"
 #include "manifold/meshIO.h"
 #include "primitives/wall.h"
@@ -169,19 +170,35 @@ bool JsValueToPolygons(JSContext *ctx, JSValueConst value,
     return false;
   }
   JSValue lengthVal = JS_GetPropertyStr(ctx, value, "length");
-  uint32_t numLoops = 0;
-  if (JS_ToUint32(ctx, &numLoops, lengthVal) < 0) {
+  uint32_t numItems = 0;
+  if (JS_ToUint32(ctx, &numItems, lengthVal) < 0) {
     JS_FreeValue(ctx, lengthVal);
     return false;
   }
   JS_FreeValue(ctx, lengthVal);
-  manifold::Polygons result;
-  result.reserve(numLoops);
-  for (uint32_t i = 0; i < numLoops; ++i) {
-    JSValue loopVal = JS_GetPropertyUint32(ctx, value, i);
-    if (JS_IsException(loopVal)) return false;
+  if (numItems == 0) {
+    JS_ThrowTypeError(ctx, "polygons array is empty");
+    return false;
+  }
+
+  // Auto-detect: flat polygon [[x,y], ...] vs nested [[[x,y], ...], ...]
+  // Check if first element is a 2-number array (flat) or array of arrays (nested)
+  bool isFlatPolygon = false;
+  JSValue first = JS_GetPropertyUint32(ctx, value, 0);
+  if (JS_IsArray(first)) {
+    JSValue firstLenVal = JS_GetPropertyStr(ctx, first, "length");
+    uint32_t firstLen = 0;
+    if (JS_ToUint32(ctx, &firstLen, firstLenVal) == 0 && firstLen == 2) {
+      JSValue elem0 = JS_GetPropertyUint32(ctx, first, 0);
+      isFlatPolygon = JS_IsNumber(elem0);
+      JS_FreeValue(ctx, elem0);
+    }
+    JS_FreeValue(ctx, firstLenVal);
+  }
+  JS_FreeValue(ctx, first);
+
+  auto parseLoop = [&](JSValueConst loopVal, manifold::SimplePolygon &loop) -> bool {
     if (!JS_IsArray(loopVal)) {
-      JS_FreeValue(ctx, loopVal);
       JS_ThrowTypeError(ctx, "each loop must be an array of [x,y] points");
       return false;
     }
@@ -189,30 +206,40 @@ bool JsValueToPolygons(JSContext *ctx, JSValueConst value,
     uint32_t loopLen = 0;
     if (JS_ToUint32(ctx, &loopLen, loopLenVal) < 0) {
       JS_FreeValue(ctx, loopLenVal);
-      JS_FreeValue(ctx, loopVal);
       return false;
     }
     JS_FreeValue(ctx, loopLenVal);
-    manifold::SimplePolygon loop;
     loop.reserve(loopLen);
     for (uint32_t j = 0; j < loopLen; ++j) {
       JSValue pointVal = JS_GetPropertyUint32(ctx, loopVal, j);
-      if (JS_IsException(pointVal)) {
-        JS_FreeValue(ctx, loopVal);
-        return false;
-      }
+      if (JS_IsException(pointVal)) return false;
       std::array<double, 2> point{};
       bool ok = GetVec2(ctx, pointVal, point);
       JS_FreeValue(ctx, pointVal);
-      if (!ok) {
+      if (!ok) return false;
+      loop.push_back({point[0], point[1]});
+    }
+    return true;
+  };
+
+  manifold::Polygons result;
+  if (isFlatPolygon) {
+    manifold::SimplePolygon loop;
+    if (!parseLoop(value, loop)) return false;
+    result.push_back(std::move(loop));
+  } else {
+    result.reserve(numItems);
+    for (uint32_t i = 0; i < numItems; ++i) {
+      JSValue loopVal = JS_GetPropertyUint32(ctx, value, i);
+      if (JS_IsException(loopVal)) return false;
+      manifold::SimplePolygon loop;
+      if (!parseLoop(loopVal, loop)) {
         JS_FreeValue(ctx, loopVal);
         return false;
       }
-      manifold::vec2 pt{point[0], point[1]};
-      loop.push_back(pt);
+      JS_FreeValue(ctx, loopVal);
+      result.push_back(std::move(loop));
     }
-    JS_FreeValue(ctx, loopVal);
-    result.push_back(loop);
   }
   out = std::move(result);
   return true;
@@ -414,28 +441,33 @@ JSValue JsCube(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double sx = 1.0, sy = 1.0, sz = 1.0;
   bool center = false;
   if (argc >= 1 && JS_IsObject(argv[0])) {
-    JSValue sizeVal = JS_GetPropertyStr(ctx, argv[0], "size");
-    if (!JS_IsUndefined(sizeVal)) {
+    // Accept both cube([w,h,d]) and cube({size: [w,h,d], center: true})
+    if (JS_IsArray(argv[0])) {
       std::array<double, 3> size{};
-      if (!GetVec3(ctx, sizeVal, size)) {
-        JS_FreeValue(ctx, sizeVal);
-        return JS_EXCEPTION;
+      if (!GetVec3(ctx, argv[0], size)) return JS_EXCEPTION;
+      sx = size[0]; sy = size[1]; sz = size[2];
+    } else {
+      JSValue sizeVal = JS_GetPropertyStr(ctx, argv[0], "size");
+      if (!JS_IsUndefined(sizeVal)) {
+        std::array<double, 3> size{};
+        if (!GetVec3(ctx, sizeVal, size)) {
+          JS_FreeValue(ctx, sizeVal);
+          return JS_EXCEPTION;
+        }
+        sx = size[0]; sy = size[1]; sz = size[2];
       }
-      sx = size[0];
-      sy = size[1];
-      sz = size[2];
-    }
-    JS_FreeValue(ctx, sizeVal);
-    JSValue centerVal = JS_GetPropertyStr(ctx, argv[0], "center");
-    if (!JS_IsUndefined(centerVal)) {
-      int c = JS_ToBool(ctx, centerVal);
-      if (c < 0) {
-        JS_FreeValue(ctx, centerVal);
-        return JS_EXCEPTION;
+      JS_FreeValue(ctx, sizeVal);
+      JSValue centerVal = JS_GetPropertyStr(ctx, argv[0], "center");
+      if (!JS_IsUndefined(centerVal)) {
+        int c = JS_ToBool(ctx, centerVal);
+        if (c < 0) {
+          JS_FreeValue(ctx, centerVal);
+          return JS_EXCEPTION;
+        }
+        center = c == 1;
       }
-      center = c == 1;
+      JS_FreeValue(ctx, centerVal);
     }
-    JS_FreeValue(ctx, centerVal);
   }
   auto manifold = std::make_shared<manifold::Manifold>(manifold::Manifold::Cube({sx, sy, sz}, center));
   return WrapManifold(ctx, std::move(manifold));
@@ -443,7 +475,9 @@ JSValue JsCube(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
 JSValue JsSphere(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double radius = 1.0;
-  if (argc >= 1 && JS_IsObject(argv[0])) {
+  if (argc >= 1 && JS_IsNumber(argv[0])) {
+    if (JS_ToFloat64(ctx, &radius, argv[0]) < 0) return JS_EXCEPTION;
+  } else if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue radiusVal = JS_GetPropertyStr(ctx, argv[0], "radius");
     if (!JS_IsUndefined(radiusVal)) {
       if (JS_ToFloat64(ctx, &radius, radiusVal) < 0) {
@@ -461,8 +495,13 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double height = 1.0;
   double radius = 0.5;
   double radiusTop = -1.0;
+  int32_t segments = 0;
   bool center = false;
-  if (argc >= 1 && JS_IsObject(argv[0])) {
+  // Accept cylinder(height, radius) shorthand
+  if (argc >= 2 && JS_IsNumber(argv[0]) && JS_IsNumber(argv[1])) {
+    if (JS_ToFloat64(ctx, &height, argv[0]) < 0) return JS_EXCEPTION;
+    if (JS_ToFloat64(ctx, &radius, argv[1]) < 0) return JS_EXCEPTION;
+  } else if (argc >= 1 && JS_IsObject(argv[0])) {
     JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
     if (!JS_IsUndefined(heightVal)) {
       if (JS_ToFloat64(ctx, &height, heightVal) < 0) {
@@ -490,6 +529,15 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
     }
     JS_FreeValue(ctx, radiusTopVal);
 
+    JSValue segVal = JS_GetPropertyStr(ctx, argv[0], "segments");
+    if (!JS_IsUndefined(segVal)) {
+      if (JS_ToInt32(ctx, &segments, segVal) < 0) {
+        JS_FreeValue(ctx, segVal);
+        return JS_EXCEPTION;
+      }
+    }
+    JS_FreeValue(ctx, segVal);
+
     JSValue centerVal = JS_GetPropertyStr(ctx, argv[0], "center");
     if (!JS_IsUndefined(centerVal)) {
       int c = JS_ToBool(ctx, centerVal);
@@ -503,7 +551,7 @@ JSValue JsCylinder(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   }
   double radiusHigh = (radiusTop < 0.0) ? radius : radiusTop;
   auto manifold = std::make_shared<manifold::Manifold>(
-      manifold::Manifold::Cylinder(height, radius, radiusHigh, 0, center));
+      manifold::Manifold::Cylinder(height, radius, radiusHigh, segments, center));
   return WrapManifold(ctx, std::move(manifold));
 }
 
@@ -522,8 +570,12 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
         JSValue x = JS_GetPropertyUint32(ctx, startVal, 0);
         JSValue y = JS_GetPropertyUint32(ctx, startVal, 1);
         if (!JS_IsUndefined(x) && !JS_IsUndefined(y)) {
-          JS_ToFloat64(ctx, &params.start[0], x);
-          JS_ToFloat64(ctx, &params.start[1], y);
+          if (JS_ToFloat64(ctx, &params.start[0], x) < 0 ||
+              JS_ToFloat64(ctx, &params.start[1], y) < 0) {
+            JS_FreeValue(ctx, x); JS_FreeValue(ctx, y);
+            JS_FreeValue(ctx, startVal);
+            return JS_EXCEPTION;
+          }
         }
         JS_FreeValue(ctx, x);
         JS_FreeValue(ctx, y);
@@ -542,8 +594,12 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
         JSValue x = JS_GetPropertyUint32(ctx, endVal, 0);
         JSValue y = JS_GetPropertyUint32(ctx, endVal, 1);
         if (!JS_IsUndefined(x) && !JS_IsUndefined(y)) {
-          JS_ToFloat64(ctx, &params.end[0], x);
-          JS_ToFloat64(ctx, &params.end[1], y);
+          if (JS_ToFloat64(ctx, &params.end[0], x) < 0 ||
+              JS_ToFloat64(ctx, &params.end[1], y) < 0) {
+            JS_FreeValue(ctx, x); JS_FreeValue(ctx, y);
+            JS_FreeValue(ctx, endVal);
+            return JS_EXCEPTION;
+          }
         }
         JS_FreeValue(ctx, x);
         JS_FreeValue(ctx, y);
@@ -551,17 +607,21 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
     }
     JS_FreeValue(ctx, endVal);
 
-    // Get height
     JSValue heightVal = JS_GetPropertyStr(ctx, argv[0], "height");
     if (!JS_IsUndefined(heightVal)) {
-      JS_ToFloat64(ctx, &params.height, heightVal);
+      if (JS_ToFloat64(ctx, &params.height, heightVal) < 0) {
+        JS_FreeValue(ctx, heightVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, heightVal);
 
-    // Get thickness (optional)
     JSValue thicknessVal = JS_GetPropertyStr(ctx, argv[0], "thickness");
     if (!JS_IsUndefined(thicknessVal)) {
-      JS_ToFloat64(ctx, &params.thickness, thicknessVal);
+      if (JS_ToFloat64(ctx, &params.thickness, thicknessVal) < 0) {
+        JS_FreeValue(ctx, thicknessVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, thicknessVal);
 
@@ -587,8 +647,12 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
       JSValue w = JS_GetPropertyUint32(ctx, studSizeVal, 0);
       JSValue d = JS_GetPropertyUint32(ctx, studSizeVal, 1);
       if (!JS_IsUndefined(w) && !JS_IsUndefined(d)) {
-        JS_ToFloat64(ctx, &params.studSize[0], w);
-        JS_ToFloat64(ctx, &params.studSize[1], d);
+        if (JS_ToFloat64(ctx, &params.studSize[0], w) < 0 ||
+            JS_ToFloat64(ctx, &params.studSize[1], d) < 0) {
+          JS_FreeValue(ctx, w); JS_FreeValue(ctx, d);
+          JS_FreeValue(ctx, studSizeVal);
+          return JS_EXCEPTION;
+        }
       }
       JS_FreeValue(ctx, w);
       JS_FreeValue(ctx, d);
@@ -597,7 +661,10 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
     JSValue studSpacingVal = JS_GetPropertyStr(ctx, argv[0], "studSpacing");
     if (!JS_IsUndefined(studSpacingVal)) {
-      JS_ToFloat64(ctx, &params.studSpacing, studSpacingVal);
+      if (JS_ToFloat64(ctx, &params.studSpacing, studSpacingVal) < 0) {
+        JS_FreeValue(ctx, studSpacingVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, studSpacingVal);
 
@@ -612,7 +679,10 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
     JSValue sheathingThicknessVal = JS_GetPropertyStr(ctx, argv[0], "sheathingThickness");
     if (!JS_IsUndefined(sheathingThicknessVal)) {
-      JS_ToFloat64(ctx, &params.sheathingThickness, sheathingThicknessVal);
+      if (JS_ToFloat64(ctx, &params.sheathingThickness, sheathingThicknessVal) < 0) {
+        JS_FreeValue(ctx, sheathingThicknessVal);
+        return JS_EXCEPTION;
+      }
     }
     JS_FreeValue(ctx, sheathingThicknessVal);
   }
@@ -623,20 +693,11 @@ JSValue JsWall(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
 JSValue JsBoolean(JSContext *ctx, int argc, JSValueConst *argv,
                   manifold::OpType op) {
-  if (argc < 2) {
+  std::vector<manifold::Manifold> parts;
+  if (!CollectManifoldArgs(ctx, argc, argv, parts)) return JS_EXCEPTION;
+  if (parts.size() < 2) {
     return JS_ThrowTypeError(ctx, "boolean operation requires at least two manifolds");
   }
-
-  // Collect all manifolds for batch operation (MUCH faster than sequential!)
-  std::vector<manifold::Manifold> parts;
-  parts.reserve(argc);
-  for (int i = 0; i < argc; ++i) {
-    JsManifold *m = GetJsManifold(ctx, argv[i]);
-    if (!m) return JS_EXCEPTION;
-    parts.push_back(*m->handle);
-  }
-
-  // Use BatchBoolean for efficient multi-operand boolean operations
   auto result = std::make_shared<manifold::Manifold>(
     manifold::Manifold::BatchBoolean(parts, op)
   );
@@ -971,12 +1032,19 @@ JSValue JsProject(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 
 JSValue JsExtrude(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) {
-    return JS_ThrowTypeError(ctx, "extrude expects (polygons, options)");
+    return JS_ThrowTypeError(ctx, "extrude expects (polygons, height_or_options)");
   }
   manifold::Polygons polys;
   if (!JsValueToPolygons(ctx, argv[0], polys)) return JS_EXCEPTION;
+  if (JS_IsNumber(argv[1])) {
+    double height = 1.0;
+    if (JS_ToFloat64(ctx, &height, argv[1]) < 0) return JS_EXCEPTION;
+    auto manifold = std::make_shared<manifold::Manifold>(
+        manifold::Manifold::Extrude(polys, height));
+    return WrapManifold(ctx, std::move(manifold));
+  }
   if (!JS_IsObject(argv[1])) {
-    return JS_ThrowTypeError(ctx, "extrude options must be an object");
+    return JS_ThrowTypeError(ctx, "extrude second arg must be a number or options object");
   }
   JSValue opts = argv[1];
   double height = 1.0;
@@ -1031,6 +1099,10 @@ JSValue JsExtrude(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   }
   JS_FreeValue(ctx, scaleVal);
 
+  if (height <= 0.0)
+    return JS_ThrowRangeError(ctx, "extrude height must be > 0");
+  if (divisions < 0)
+    return JS_ThrowRangeError(ctx, "extrude divisions must be >= 0");
   auto manifold = std::make_shared<manifold::Manifold>(
       manifold::Manifold::Extrude(polys, height, divisions, twist, scaleTop));
   return WrapManifold(ctx, std::move(manifold));
@@ -1044,28 +1116,407 @@ JSValue JsRevolve(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (!JsValueToPolygons(ctx, argv[0], polys)) return JS_EXCEPTION;
   int32_t segments = 0;
   double degrees = 360.0;
-  if (argc >= 2 && JS_IsObject(argv[1])) {
-    JSValue opts = argv[1];
-    JSValue segVal = JS_GetPropertyStr(ctx, opts, "segments");
-    if (!JS_IsUndefined(segVal)) {
-      if (JS_ToInt32(ctx, &segments, segVal) < 0) {
-        JS_FreeValue(ctx, segVal);
-        return JS_EXCEPTION;
+  if (argc >= 2) {
+    if (JS_IsNumber(argv[1])) {
+      if (JS_ToInt32(ctx, &segments, argv[1]) < 0) return JS_EXCEPTION;
+    } else if (JS_IsObject(argv[1])) {
+      JSValue opts = argv[1];
+      JSValue segVal = JS_GetPropertyStr(ctx, opts, "segments");
+      if (!JS_IsUndefined(segVal)) {
+        if (JS_ToInt32(ctx, &segments, segVal) < 0) {
+          JS_FreeValue(ctx, segVal);
+          return JS_EXCEPTION;
+        }
       }
-    }
-    JS_FreeValue(ctx, segVal);
-    JSValue degVal = JS_GetPropertyStr(ctx, opts, "degrees");
-    if (!JS_IsUndefined(degVal)) {
-      if (JS_ToFloat64(ctx, &degrees, degVal) < 0) {
-        JS_FreeValue(ctx, degVal);
-        return JS_EXCEPTION;
+      JS_FreeValue(ctx, segVal);
+      JSValue degVal = JS_GetPropertyStr(ctx, opts, "degrees");
+      if (!JS_IsUndefined(degVal)) {
+        if (JS_ToFloat64(ctx, &degrees, degVal) < 0) {
+          JS_FreeValue(ctx, degVal);
+          return JS_EXCEPTION;
+        }
       }
+      JS_FreeValue(ctx, degVal);
     }
-    JS_FreeValue(ctx, degVal);
   }
+  if (segments < 0)
+    return JS_ThrowRangeError(ctx, "revolve segments must be >= 0");
+  if (degrees == 0.0)
+    return JS_ThrowRangeError(ctx, "revolve degrees must be non-zero");
   auto manifold = std::make_shared<manifold::Manifold>(
       manifold::Manifold::Revolve(polys, segments, degrees));
   return WrapManifold(ctx, std::move(manifold));
+}
+
+// circle2D(radius, segments?) — returns a polygon array for a circle
+JSValue JsCircle2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 1) return JS_ThrowTypeError(ctx, "circle2D expects (radius, segments?)");
+  double radius = 10.0;
+  int32_t segments = 32;
+  if (JS_ToFloat64(ctx, &radius, argv[0]) < 0) return JS_EXCEPTION;
+  if (argc >= 2 && JS_IsNumber(argv[1])) {
+    if (JS_ToInt32(ctx, &segments, argv[1]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 3) segments = 3;
+
+  JSValue poly = JS_NewArray(ctx);
+  for (int i = 0; i < segments; i++) {
+    double angle = 2.0 * M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, radius * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, radius * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// ellipse2D(radiusX, radiusY, segments?) — returns a polygon array for an ellipse
+JSValue JsEllipse2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "ellipse2D expects (radiusX, radiusY, segments?)");
+  double rx = 10.0, ry = 5.0;
+  int32_t segments = 48;
+  if (JS_ToFloat64(ctx, &rx, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &ry, argv[1]) < 0) return JS_EXCEPTION;
+  if (argc >= 3 && JS_IsNumber(argv[2])) {
+    if (JS_ToInt32(ctx, &segments, argv[2]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 3) segments = 3;
+
+  JSValue poly = JS_NewArray(ctx);
+  for (int i = 0; i < segments; i++) {
+    double angle = 2.0 * M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, rx * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, ry * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// slot2D(length, width, segments?) — stadium/slot shape (rect with semicircle ends)
+JSValue JsSlot2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "slot2D expects (length, width, segments?)");
+  double length = 40.0, width = 10.0;
+  int32_t segments = 16;
+  if (JS_ToFloat64(ctx, &length, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &width, argv[1]) < 0) return JS_EXCEPTION;
+  if (argc >= 3 && JS_IsNumber(argv[2])) {
+    if (JS_ToInt32(ctx, &segments, argv[2]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 4) segments = 4;
+
+  double r = width / 2.0;
+  double halfLen = (length - width) / 2.0;
+  if (halfLen < 0) halfLen = 0;
+
+  JSValue poly = JS_NewArray(ctx);
+  int idx = 0;
+  // Right semicircle (centered at +halfLen, 0)
+  for (int i = 0; i <= segments; i++) {
+    double angle = -M_PI / 2.0 + M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, halfLen + r * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, r * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  // Left semicircle (centered at -halfLen, 0)
+  for (int i = 0; i <= segments; i++) {
+    double angle = M_PI / 2.0 + M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, -halfLen + r * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, r * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// arc2D(radius, startAngle, endAngle, width, segments?) — thick arc segment
+// Angles in degrees. Returns a closed polygon for the arc band.
+JSValue JsArc2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 4) return JS_ThrowTypeError(ctx, "arc2D expects (radius, startAngle, endAngle, width, segments?)");
+  double radius = 20.0, startDeg = 0.0, endDeg = 180.0, width = 5.0;
+  int32_t segments = 32;
+  if (JS_ToFloat64(ctx, &radius, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &startDeg, argv[1]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &endDeg, argv[2]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &width, argv[3]) < 0) return JS_EXCEPTION;
+  if (argc >= 5 && JS_IsNumber(argv[4])) {
+    if (JS_ToInt32(ctx, &segments, argv[4]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 2) segments = 2;
+
+  double startRad = startDeg * M_PI / 180.0;
+  double endRad = endDeg * M_PI / 180.0;
+  double outerR = radius + width / 2.0;
+  double innerR = radius - width / 2.0;
+  if (innerR < 0) innerR = 0;
+
+  JSValue poly = JS_NewArray(ctx);
+  int idx = 0;
+  // Outer arc from start to end
+  for (int i = 0; i <= segments; i++) {
+    double t = static_cast<double>(i) / segments;
+    double angle = startRad + t * (endRad - startRad);
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, outerR * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, outerR * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  // Inner arc from end back to start
+  for (int i = segments; i >= 0; i--) {
+    double t = static_cast<double>(i) / segments;
+    double angle = startRad + t * (endRad - startRad);
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, innerR * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, innerR * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// rect2D(width, height, center?) — returns a polygon array for a rectangle
+JSValue JsRect2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "rect2D expects (width, height, center?)");
+  double w = 10.0, h = 10.0;
+  bool center = false;
+  if (JS_ToFloat64(ctx, &w, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &h, argv[1]) < 0) return JS_EXCEPTION;
+  if (argc >= 3) center = JS_ToBool(ctx, argv[2]);
+
+  double x0 = center ? -w / 2.0 : 0.0;
+  double y0 = center ? -h / 2.0 : 0.0;
+
+  JSValue poly = JS_NewArray(ctx);
+  double pts[4][2] = {{x0, y0}, {x0 + w, y0}, {x0 + w, y0 + h}, {x0, y0 + h}};
+  for (int i = 0; i < 4; i++) {
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, pts[i][0]));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, pts[i][1]));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// offset2D(polygon, delta) or offset2D(polygon, {delta, join, miterLimit, segments})
+// Returns an offset polygon array (positive delta = outward, negative = inward)
+JSValue JsOffset2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "offset2D expects (polygon, delta_or_options)");
+  }
+  manifold::Polygons polys;
+  if (!JsValueToPolygons(ctx, argv[0], polys)) return JS_EXCEPTION;
+
+  double delta = 0.0;
+  auto joinType = manifold::CrossSection::JoinType::Round;
+  double miterLimit = 2.0;
+  int32_t circularSegments = 0;
+
+  if (JS_IsNumber(argv[1])) {
+    if (JS_ToFloat64(ctx, &delta, argv[1]) < 0) return JS_EXCEPTION;
+  } else if (JS_IsObject(argv[1])) {
+    JSValue v;
+    v = JS_GetPropertyStr(ctx, argv[1], "delta");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &delta, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[1], "miterLimit");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &miterLimit, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[1], "segments");
+    if (!JS_IsUndefined(v)) { if (JS_ToInt32(ctx, &circularSegments, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[1], "join");
+    if (JS_IsString(v)) {
+      const char* s = JS_ToCString(ctx, v);
+      if (s) {
+        std::string jt(s);
+        if (jt == "square") joinType = manifold::CrossSection::JoinType::Square;
+        else if (jt == "miter") joinType = manifold::CrossSection::JoinType::Miter;
+        else if (jt == "bevel") joinType = manifold::CrossSection::JoinType::Bevel;
+        JS_FreeCString(ctx, s);
+      }
+    }
+    JS_FreeValue(ctx, v);
+  } else {
+    return JS_ThrowTypeError(ctx, "offset2D second arg must be a number or options object");
+  }
+
+  manifold::CrossSection cs(polys, manifold::CrossSection::FillRule::Positive);
+  manifold::CrossSection offset = cs.Offset(delta, joinType, miterLimit, circularSegments);
+
+  auto paths = offset.ToPolygons();
+  JSValue result = JS_NewArray(ctx);
+  for (size_t i = 0; i < paths.size(); i++) {
+    JSValue poly = JS_NewArray(ctx);
+    for (size_t j = 0; j < paths[i].size(); j++) {
+      JSValue pt = JS_NewArray(ctx);
+      JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, paths[i][j].x));
+      JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, paths[i][j].y));
+      JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(j), pt);
+    }
+    JS_SetPropertyUint32(ctx, result, static_cast<uint32_t>(i), poly);
+  }
+  return result;
+}
+
+// star2D(outerRadius, innerRadius, points) — returns a star polygon
+JSValue JsStar2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 3) return JS_ThrowTypeError(ctx, "star2D expects (outerRadius, innerRadius, points)");
+  double outerR = 10.0, innerR = 5.0;
+  int32_t points = 5;
+  if (JS_ToFloat64(ctx, &outerR, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &innerR, argv[1]) < 0) return JS_EXCEPTION;
+  if (JS_ToInt32(ctx, &points, argv[2]) < 0) return JS_EXCEPTION;
+  if (points < 3) points = 3;
+
+  int totalVerts = points * 2;
+  JSValue poly = JS_NewArray(ctx);
+  for (int i = 0; i < totalVerts; i++) {
+    double angle = 2.0 * M_PI * i / totalVerts - M_PI / 2.0;
+    double r = (i % 2 == 0) ? outerR : innerR;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, r * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, r * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// hull2D(polygon) or hull2D(polygon1, polygon2, ...) or hull2D([pt1, pt2, ...])
+// Returns the convex hull as a polygon array
+JSValue JsHull2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "hull2D expects at least one argument");
+  }
+
+  // Check if first arg looks like a flat list of points [[x,y], [x,y], ...]
+  // vs polygon format [[[x,y], ...]]
+  manifold::Polygons polys;
+  bool isPointList = false;
+  if (argc == 1 && JS_IsArray(argv[0])) {
+    JSValue first = JS_GetPropertyUint32(ctx, argv[0], 0);
+    if (JS_IsArray(first)) {
+      JSValue inner = JS_GetPropertyUint32(ctx, first, 0);
+      if (JS_IsNumber(inner)) {
+        isPointList = true;
+      }
+      JS_FreeValue(ctx, inner);
+    }
+    JS_FreeValue(ctx, first);
+  }
+
+  if (isPointList) {
+    manifold::SimplePolygon pts;
+    int32_t len = 0;
+    JSValue lenVal = JS_GetPropertyStr(ctx, argv[0], "length");
+    JS_ToInt32(ctx, &len, lenVal);
+    JS_FreeValue(ctx, lenVal);
+    for (int32_t i = 0; i < len; i++) {
+      JSValue pt = JS_GetPropertyUint32(ctx, argv[0], i);
+      double x = 0, y = 0;
+      JSValue xv = JS_GetPropertyUint32(ctx, pt, 0);
+      JSValue yv = JS_GetPropertyUint32(ctx, pt, 1);
+      JS_ToFloat64(ctx, &x, xv);
+      JS_ToFloat64(ctx, &y, yv);
+      JS_FreeValue(ctx, xv);
+      JS_FreeValue(ctx, yv);
+      JS_FreeValue(ctx, pt);
+      pts.push_back({x, y});
+    }
+    auto hull = manifold::CrossSection::Hull(pts);
+    auto paths = hull.ToPolygons();
+    JSValue result = JS_NewArray(ctx);
+    for (size_t i = 0; i < paths.size(); i++) {
+      JSValue poly = JS_NewArray(ctx);
+      for (size_t j = 0; j < paths[i].size(); j++) {
+        JSValue pt = JS_NewArray(ctx);
+        JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, paths[i][j].x));
+        JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, paths[i][j].y));
+        JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(j), pt);
+      }
+      JS_SetPropertyUint32(ctx, result, static_cast<uint32_t>(i), poly);
+    }
+    return result;
+  }
+
+  // Multiple polygon arguments or single polygon — collect all and hull
+  std::vector<manifold::CrossSection> sections;
+  for (int i = 0; i < argc; i++) {
+    manifold::Polygons p;
+    if (JsValueToPolygons(ctx, argv[i], p)) {
+      sections.push_back(manifold::CrossSection(p, manifold::CrossSection::FillRule::Positive));
+    }
+  }
+
+  auto hull = manifold::CrossSection::Hull(sections);
+  auto paths = hull.ToPolygons();
+  JSValue result = JS_NewArray(ctx);
+  for (size_t i = 0; i < paths.size(); i++) {
+    JSValue poly = JS_NewArray(ctx);
+    for (size_t j = 0; j < paths[i].size(); j++) {
+      JSValue pt = JS_NewArray(ctx);
+      JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, paths[i][j].x));
+      JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, paths[i][j].y));
+      JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(j), pt);
+    }
+    JS_SetPropertyUint32(ctx, result, static_cast<uint32_t>(i), poly);
+  }
+  return result;
+}
+
+// torus(majorRadius, minorRadius) or torus({majorRadius, minorRadius, segments?, minorSegments?})
+JSValue JsTorus(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  double majorR = 10.0;
+  double minorR = 3.0;
+  int32_t segments = 48;
+  int32_t minorSegments = 24;
+  if (argc >= 2 && JS_IsNumber(argv[0]) && JS_IsNumber(argv[1])) {
+    if (JS_ToFloat64(ctx, &majorR, argv[0]) < 0) return JS_EXCEPTION;
+    if (JS_ToFloat64(ctx, &minorR, argv[1]) < 0) return JS_EXCEPTION;
+  } else if (argc >= 1 && JS_IsObject(argv[0])) {
+    JSValue v;
+    v = JS_GetPropertyStr(ctx, argv[0], "majorRadius");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &majorR, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[0], "minorRadius");
+    if (!JS_IsUndefined(v)) { if (JS_ToFloat64(ctx, &minorR, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[0], "segments");
+    if (!JS_IsUndefined(v)) { if (JS_ToInt32(ctx, &segments, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+    v = JS_GetPropertyStr(ctx, argv[0], "minorSegments");
+    if (!JS_IsUndefined(v)) { if (JS_ToInt32(ctx, &minorSegments, v) < 0) { JS_FreeValue(ctx, v); return JS_EXCEPTION; } }
+    JS_FreeValue(ctx, v);
+  }
+  if (majorR <= 0.0 || minorR <= 0.0)
+    return JS_ThrowRangeError(ctx, "torus radii must be > 0");
+  if (minorR >= majorR)
+    return JS_ThrowRangeError(ctx, "minorRadius must be < majorRadius");
+
+  manifold::Polygons polys(1);
+  auto& ring = polys[0];
+  ring.reserve(minorSegments);
+  for (int i = 0; i < minorSegments; ++i) {
+    double angle = 2.0 * M_PI * i / minorSegments;
+    double x = majorR + minorR * std::cos(angle);
+    double y = minorR * std::sin(angle);
+    ring.push_back({x, y});
+  }
+
+  auto result = std::make_shared<manifold::Manifold>(
+      manifold::Manifold::Revolve(polys, segments));
+  return WrapManifold(ctx, std::move(result));
 }
 
 JSValue JsBatchBoolean(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
@@ -1307,6 +1758,107 @@ JSValue JsLevelSet(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return WrapManifold(ctx, std::move(manifoldPtr));
 }
 
+JSValue JsWarp(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "warp expects (manifold, function)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  if (!JS_IsFunction(ctx, argv[1])) {
+    return JS_ThrowTypeError(ctx, "warp second argument must be a function");
+  }
+  JSValue warpFunc = JS_DupValue(ctx, argv[1]);
+  bool errorOccurred = false;
+  std::string errorMessage;
+
+  auto warpFn = [ctx, warpFunc, &errorOccurred, &errorMessage](manifold::vec3 &v) {
+    if (errorOccurred) return;
+    JSValue point = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, point, 0, JS_NewFloat64(ctx, v.x));
+    JS_SetPropertyUint32(ctx, point, 1, JS_NewFloat64(ctx, v.y));
+    JS_SetPropertyUint32(ctx, point, 2, JS_NewFloat64(ctx, v.z));
+    JSValueConst args[1] = {point};
+    JSValue result = JS_Call(ctx, warpFunc, JS_UNDEFINED, 1, args);
+    JS_FreeValue(ctx, point);
+    if (JS_IsException(result)) {
+      JSValue exc = JS_GetException(ctx);
+      const char *msg = JS_ToCString(ctx, exc);
+      errorOccurred = true;
+      errorMessage = msg ? msg : "warp function threw";
+      if (msg) JS_FreeCString(ctx, msg);
+      JS_FreeValue(ctx, exc);
+      return;
+    }
+    if (!JS_IsArray(result)) {
+      errorOccurred = true;
+      errorMessage = "warp function must return [x,y,z]";
+      JS_FreeValue(ctx, result);
+      return;
+    }
+    JSValue x = JS_GetPropertyUint32(ctx, result, 0);
+    JSValue y = JS_GetPropertyUint32(ctx, result, 1);
+    JSValue z = JS_GetPropertyUint32(ctx, result, 2);
+    double vx, vy, vz;
+    if (JS_ToFloat64(ctx, &vx, x) < 0 || JS_ToFloat64(ctx, &vy, y) < 0 ||
+        JS_ToFloat64(ctx, &vz, z) < 0) {
+      errorOccurred = true;
+      errorMessage = "warp function must return [number, number, number]";
+    } else {
+      v.x = vx;
+      v.y = vy;
+      v.z = vz;
+    }
+    JS_FreeValue(ctx, x);
+    JS_FreeValue(ctx, y);
+    JS_FreeValue(ctx, z);
+    JS_FreeValue(ctx, result);
+  };
+
+  auto manifold = std::make_shared<manifold::Manifold>(target->handle->Warp(warpFn));
+  JS_FreeValue(ctx, warpFunc);
+  if (errorOccurred) {
+    return JS_ThrowInternalError(ctx, "%s", errorMessage.c_str());
+  }
+  return WrapManifold(ctx, std::move(manifold));
+}
+
+JSValue JsSplitByPlane(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 3) {
+    return JS_ThrowTypeError(ctx, "splitByPlane expects (manifold, [nx,ny,nz], offset)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  std::array<double, 3> normal{};
+  if (!GetVec3(ctx, argv[1], normal)) return JS_EXCEPTION;
+  double offset = 0.0;
+  if (JS_ToFloat64(ctx, &offset, argv[2]) < 0) return JS_EXCEPTION;
+  manifold::vec3 n{normal[0], normal[1], normal[2]};
+  auto pair = target->handle->SplitByPlane(n, offset);
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.first))));
+  JS_SetPropertyUint32(ctx, result, 1,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.second))));
+  return result;
+}
+
+JSValue JsSplit(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "split expects (manifold, cutter)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  JsManifold *cutter = GetJsManifold(ctx, argv[1]);
+  if (!cutter) return JS_EXCEPTION;
+  auto pair = target->handle->Split(*cutter->handle);
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.first))));
+  JS_SetPropertyUint32(ctx, result, 1,
+                       WrapManifold(ctx, std::make_shared<manifold::Manifold>(std::move(pair.second))));
+  return result;
+}
+
 JSValue JsAsOriginal(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 1) {
     return JS_ThrowTypeError(ctx, "asOriginal expects a manifold");
@@ -1418,6 +1970,24 @@ JSValue JsSmoothOut(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) 
   return WrapManifold(ctx, std::move(manifold));
 }
 
+// smooth(manifold, tolerance?) — SmoothOut + RefineToTolerance in one call
+JSValue JsSmooth(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "smooth expects (manifold, tolerance?)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  double tolerance = 0.5;
+  if (argc >= 2 && !JS_IsUndefined(argv[1])) {
+    if (JS_ToFloat64(ctx, &tolerance, argv[1]) < 0) return JS_EXCEPTION;
+  }
+  if (tolerance <= 0.0)
+    return JS_ThrowRangeError(ctx, "smooth tolerance must be > 0");
+  auto smoothed = target->handle->SmoothOut();
+  auto refined = std::make_shared<manifold::Manifold>(smoothed.RefineToTolerance(tolerance));
+  return WrapManifold(ctx, std::move(refined));
+}
+
 JSValue JsMinGap(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 3) {
     return JS_ThrowTypeError(ctx, "minGap expects (manifoldA, manifoldB, searchLength)");
@@ -1429,6 +1999,52 @@ JSValue JsMinGap(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   double searchLength = 0.0;
   if (JS_ToFloat64(ctx, &searchLength, argv[2]) < 0) return JS_EXCEPTION;
   return JS_NewFloat64(ctx, a->handle->MinGap(*b->handle, searchLength));
+}
+
+// linearPattern(geometry, count, [dx, dy, dz]) — union of count copies offset by [dx,dy,dz]
+JSValue JsLinearPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 3) {
+    return JS_ThrowTypeError(ctx, "linearPattern expects (manifold, count, [dx,dy,dz])");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  int32_t count = 1;
+  if (JS_ToInt32(ctx, &count, argv[1]) < 0) return JS_EXCEPTION;
+  if (count < 1) return JS_ThrowRangeError(ctx, "count must be >= 1");
+  std::array<double, 3> offset{};
+  if (!GetVec3(ctx, argv[2], offset)) return JS_EXCEPTION;
+
+  std::vector<manifold::Manifold> parts;
+  parts.reserve(count);
+  for (int32_t i = 0; i < count; ++i) {
+    parts.push_back(target->handle->Translate(
+      {offset[0] * i, offset[1] * i, offset[2] * i}));
+  }
+  auto result = std::make_shared<manifold::Manifold>(
+    manifold::Manifold::BatchBoolean(parts, manifold::OpType::Add));
+  return WrapManifold(ctx, std::move(result));
+}
+
+// circularPattern(geometry, count) — count copies rotated around Z axis (height)
+JSValue JsCircularPattern(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "circularPattern expects (manifold, count)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+  int32_t count = 1;
+  if (JS_ToInt32(ctx, &count, argv[1]) < 0) return JS_EXCEPTION;
+  if (count < 1) return JS_ThrowRangeError(ctx, "count must be >= 1");
+
+  std::vector<manifold::Manifold> parts;
+  parts.reserve(count);
+  double angleStep = 360.0 / count;
+  for (int32_t i = 0; i < count; ++i) {
+    parts.push_back(target->handle->Rotate(0.0, 0.0, angleStep * i));
+  }
+  auto result = std::make_shared<manifold::Manifold>(
+    manifold::Manifold::BatchBoolean(parts, manifold::OpType::Add));
+  return WrapManifold(ctx, std::move(result));
 }
 
 JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
@@ -1454,13 +2070,99 @@ JSValue JsWithColor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) 
   return obj;
 }
 
+JSValue JsWithPBR(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2 || !JS_IsObject(argv[1])) {
+    return JS_ThrowTypeError(ctx, "withPBR expects (manifold, {roughness?, metallic?, color?})");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+
+  JSValue obj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, obj, "geometry", JS_DupValue(ctx, argv[0]));
+
+  JSValue opts = argv[1];
+  JSValue roughnessVal = JS_GetPropertyStr(ctx, opts, "roughness");
+  if (!JS_IsUndefined(roughnessVal)) {
+    JS_SetPropertyStr(ctx, obj, "roughness", JS_DupValue(ctx, roughnessVal));
+  }
+  JS_FreeValue(ctx, roughnessVal);
+
+  JSValue metallicVal = JS_GetPropertyStr(ctx, opts, "metallic");
+  if (!JS_IsUndefined(metallicVal)) {
+    JS_SetPropertyStr(ctx, obj, "metallic", JS_DupValue(ctx, metallicVal));
+  }
+  JS_FreeValue(ctx, metallicVal);
+
+  JSValue colorVal = JS_GetPropertyStr(ctx, opts, "color");
+  if (!JS_IsUndefined(colorVal) && JS_IsArray(colorVal)) {
+    JS_SetPropertyStr(ctx, obj, "color", JS_DupValue(ctx, colorVal));
+  }
+  JS_FreeValue(ctx, colorVal);
+
+  return obj;
+}
+
+JSValue JsWithMaterial(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "withMaterial expects (manifold, materialId)");
+  }
+  JsManifold *target = GetJsManifold(ctx, argv[0]);
+  if (!target) return JS_EXCEPTION;
+
+  const char *matId = JS_ToCString(ctx, argv[1]);
+  if (!matId) return JS_EXCEPTION;
+
+  JSValue obj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, obj, "geometry", JS_DupValue(ctx, argv[0]));
+  JS_SetPropertyStr(ctx, obj, "material", JS_NewString(ctx, matId));
+  JS_FreeCString(ctx, matId);
+
+  return obj;
+}
+
+std::string FormatConsoleArgs(JSContext *ctx, int argc, JSValueConst *argv) {
+  std::string msg;
+  for (int i = 0; i < argc; ++i) {
+    if (i > 0) msg += ' ';
+    const char *str = JS_ToCString(ctx, argv[i]);
+    if (str) { msg += str; JS_FreeCString(ctx, str); }
+  }
+  return msg;
+}
+
+JSValue JsConsoleLog(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  std::fprintf(stderr, "[JS] %s\n", FormatConsoleArgs(ctx, argc, argv).c_str());
+  return JS_UNDEFINED;
+}
+
+JSValue JsConsoleWarn(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  std::fprintf(stderr, "[JS WARN] %s\n", FormatConsoleArgs(ctx, argc, argv).c_str());
+  return JS_UNDEFINED;
+}
+
+JSValue JsConsoleError(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  std::fprintf(stderr, "[JS ERROR] %s\n", FormatConsoleArgs(ctx, argc, argv).c_str());
+  return JS_UNDEFINED;
+}
+
 void RegisterBindingsInternal(JSContext *ctx) {
   JSValue global = JS_GetGlobalObject(ctx);
+
+  // console.log/warn/error
+  JSValue console = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, console, "log", JS_NewCFunction(ctx, JsConsoleLog, "log", 1));
+  JS_SetPropertyStr(ctx, console, "warn", JS_NewCFunction(ctx, JsConsoleWarn, "warn", 1));
+  JS_SetPropertyStr(ctx, console, "error", JS_NewCFunction(ctx, JsConsoleError, "error", 1));
+  JS_SetPropertyStr(ctx, global, "console", console);
   JS_SetPropertyStr(ctx, global, "cube", JS_NewCFunction(ctx, JsCube, "cube", 1));
   JS_SetPropertyStr(ctx, global, "sphere", JS_NewCFunction(ctx, JsSphere, "sphere", 1));
   JS_SetPropertyStr(ctx, global, "cylinder", JS_NewCFunction(ctx, JsCylinder, "cylinder", 1));
   JS_SetPropertyStr(ctx, global, "Wall", JS_NewCFunction(ctx, JsWall, "Wall", 1));
   JS_SetPropertyStr(ctx, global, "withColor", JS_NewCFunction(ctx, JsWithColor, "withColor", 2));
+  JS_SetPropertyStr(ctx, global, "withPBR", JS_NewCFunction(ctx, JsWithPBR, "withPBR", 2));
+  JS_SetPropertyStr(ctx, global, "withMaterial", JS_NewCFunction(ctx, JsWithMaterial, "withMaterial", 2));
+  JS_SetPropertyStr(ctx, global, "linearPattern", JS_NewCFunction(ctx, JsLinearPattern, "linearPattern", 3));
+  JS_SetPropertyStr(ctx, global, "circularPattern", JS_NewCFunction(ctx, JsCircularPattern, "circularPattern", 2));
   JS_SetPropertyStr(ctx, global, "union", JS_NewCFunction(ctx, JsUnion, "union", 1));
   JS_SetPropertyStr(ctx, global, "difference", JS_NewCFunction(ctx, JsDifference, "difference", 1));
   JS_SetPropertyStr(ctx, global, "intersection", JS_NewCFunction(ctx, JsIntersection, "intersection", 1));
@@ -1521,6 +2223,24 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsExtrude, "extrude", 2));
   JS_SetPropertyStr(ctx, global, "revolve",
                     JS_NewCFunction(ctx, JsRevolve, "revolve", 2));
+  JS_SetPropertyStr(ctx, global, "offset2D",
+                    JS_NewCFunction(ctx, JsOffset2D, "offset2D", 2));
+  JS_SetPropertyStr(ctx, global, "circle2D",
+                    JS_NewCFunction(ctx, JsCircle2D, "circle2D", 2));
+  JS_SetPropertyStr(ctx, global, "rect2D",
+                    JS_NewCFunction(ctx, JsRect2D, "rect2D", 3));
+  JS_SetPropertyStr(ctx, global, "hull2D",
+                    JS_NewCFunction(ctx, JsHull2D, "hull2D", 1));
+  JS_SetPropertyStr(ctx, global, "star2D",
+                    JS_NewCFunction(ctx, JsStar2D, "star2D", 3));
+  JS_SetPropertyStr(ctx, global, "ellipse2D",
+                    JS_NewCFunction(ctx, JsEllipse2D, "ellipse2D", 3));
+  JS_SetPropertyStr(ctx, global, "slot2D",
+                    JS_NewCFunction(ctx, JsSlot2D, "slot2D", 3));
+  JS_SetPropertyStr(ctx, global, "arc2D",
+                    JS_NewCFunction(ctx, JsArc2D, "arc2D", 5));
+  JS_SetPropertyStr(ctx, global, "torus",
+                    JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",
                     JS_NewCFunction(ctx, JsBooleanOp, "boolean", 3));
   JS_SetPropertyStr(ctx, global, "batchBoolean",
@@ -1551,8 +2271,16 @@ void RegisterBindingsInternal(JSContext *ctx) {
                                      "smoothByNormals", 2));
   JS_SetPropertyStr(ctx, global, "smoothOut",
                     JS_NewCFunction(ctx, JsSmoothOut, "smoothOut", 3));
+  JS_SetPropertyStr(ctx, global, "smooth",
+                    JS_NewCFunction(ctx, JsSmooth, "smooth", 2));
   JS_SetPropertyStr(ctx, global, "minGap",
                     JS_NewCFunction(ctx, JsMinGap, "minGap", 3));
+  JS_SetPropertyStr(ctx, global, "warp",
+                    JS_NewCFunction(ctx, JsWarp, "warp", 2));
+  JS_SetPropertyStr(ctx, global, "splitByPlane",
+                    JS_NewCFunction(ctx, JsSplitByPlane, "splitByPlane", 3));
+  JS_SetPropertyStr(ctx, global, "split",
+                    JS_NewCFunction(ctx, JsSplit, "split", 2));
   JS_FreeValue(ctx, global);
 }
 

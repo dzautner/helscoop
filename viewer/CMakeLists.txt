@@ -46,5 +46,6 @@ target_link_libraries(dingcad_viewer
 # Link OpenGL framework on macOS for direct GL function access
 if(APPLE)
   target_link_libraries(dingcad_viewer PRIVATE "-framework OpenGL")
+  target_link_libraries(dingcad_viewer PRIVATE "-framework ApplicationServices")
   target_compile_definitions(dingcad_viewer PRIVATE GL_SILENCE_DEPRECATION)
 endif()

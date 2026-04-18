@@ -465,7 +465,6 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
                          UIState& state,
                          const Font& uiFont,
                          int screenWidth, int screenHeight,
-                         bool loadingInBackground,
                          const std::filesystem::path& scriptPath) {
   if (parameters.empty()) return false;
 
@@ -613,7 +612,7 @@ bool DrawParametersPanel(std::vector<SceneParameter>& parameters,
   bool paramWritten = false;
   if (state.draggingParamIndex >= 0 && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
     auto& param = parameters[state.draggingParamIndex];
-    if (param.value != state.draggingStartValue && !loadingInBackground) {
+    if (param.value != state.draggingStartValue) {
       if (WriteParameterToFile(scriptPath, param)) {
         paramWritten = true;
       }
@@ -1771,7 +1770,8 @@ bool DrawLightingPanel(UIState& uiState,
 bool DrawToolbar(UIState& uiState,
                  const Font& uiFont,
                  int screenWidth,
-                 const std::string& statusMessage) {
+                 const std::string& statusMessage,
+                 float brandWidth) {
   bool anyToggled = false;
 
   const float toolbarHeight = kToolbarHeight;
@@ -1783,7 +1783,7 @@ bool DrawToolbar(UIState& uiState,
   // Dark toolbar background
   DrawRectangle(0, 0, screenWidth, static_cast<int>(toolbarHeight), Color{20, 20, 25, 255});
 
-  float x = 160.0f;  // After HELSCOOP branding
+  float x = brandWidth + 20.0f;
   float y = (toolbarHeight - btnH) / 2.0f;
 
   // Simple toggle button
