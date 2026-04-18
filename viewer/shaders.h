@@ -787,8 +787,8 @@ void main() {
     // Shadow map
     float shadow = calculateShadow(fragPosLightSpace, N, L);
 
-    // Primary direct lighting with shadow
-    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
+    // Primary direct lighting with shadow — retain 15% light in shadow for softer look
+    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow * 0.85);
 
     // Secondary fill light (unshadowed)
     vec3 L2 = normalize(lightDir2);
@@ -987,8 +987,8 @@ void main() {
 
     // Diffuse lighting with shadow
     float NdotL = max(dot(N, lightDir), 0.0);
-    vec3 ambient = vec3(0.50) * (1.0 - shadow * 0.25);
-    vec3 diffuse = lightColor * NdotL * 0.50 * (1.0 - shadow * 0.85);
+    vec3 ambient = vec3(0.50) * (1.0 - shadow * 0.20);
+    vec3 diffuse = lightColor * NdotL * 0.50 * (1.0 - shadow * 0.75);
     vec3 lighting = ambient + diffuse;
 
     // Subtle procedural variation for natural ground texture
