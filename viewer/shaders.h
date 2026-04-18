@@ -780,13 +780,16 @@ float calculateShadow(vec4 fragPosLS, vec3 normal, vec3 lightDir) {
 
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    float spread = 1.5;
+    float spread = 3.0;
 
     for (int i = 0; i < 12; i++) {
         float pcfDepth = unpackDepth(texture(shadowMap, projCoords.xy + poissonDisk[i] * texelSize * spread));
         shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
     }
     shadow /= 12.0;
+
+    // Soften shadow edges (fade penumbra for more natural look)
+    shadow = smoothstep(0.0, 1.0, shadow);
 
     return shadow;
 }
