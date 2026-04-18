@@ -971,11 +971,13 @@ int main(int argc, char *argv[]) {
   // Background loading state
   std::future<BackgroundLoadResult> backgroundLoadFuture;
   bool loadingInBackground = false;
+  bool reloadPending = false;
   auto backgroundLoadStartTime = std::chrono::high_resolution_clock::now();
 
   auto startBackgroundLoad = [&]() {
     if (loadingInBackground) {
-      TraceLog(LOG_INFO, "Background load already in progress, skipping");
+      reloadPending = true;
+      TraceLog(LOG_INFO, "Background load in progress, queuing reload");
       return;
     }
     loadingInBackground = true;
@@ -1033,6 +1035,11 @@ int main(int argc, char *argv[]) {
     if (!result.dependencies.empty()) {
       setWatchedFiles(result.dependencies);
     }
+
+    if (reloadPending) {
+      reloadPending = false;
+      startBackgroundLoad();
+    }
   };
 
   // Main loop
@@ -1043,26 +1050,28 @@ int main(int argc, char *argv[]) {
     checkBackgroundLoad();
 
     // File watching with debounce to avoid rapid reloads during auto-save
-    if (!scriptPath.empty() && !loadingInBackground) {
+    if (!scriptPath.empty()) {
       bool changed = false;
-      for (const auto &entry : watchedFiles) {
-        std::error_code ec;
-        auto currentTs = std::filesystem::last_write_time(entry.first, ec);
-        if (ec) {
-          if (entry.second.timestamp.has_value()) {
+      if (!loadingInBackground) {
+        for (const auto &entry : watchedFiles) {
+          std::error_code ec;
+          auto currentTs = std::filesystem::last_write_time(entry.first, ec);
+          if (ec) {
+            if (entry.second.timestamp.has_value()) {
+              changed = true;
+              break;
+            }
+          } else if (!entry.second.timestamp.has_value() || currentTs != *entry.second.timestamp) {
             changed = true;
             break;
           }
-        } else if (!entry.second.timestamp.has_value() || currentTs != *entry.second.timestamp) {
-          changed = true;
-          break;
         }
       }
       if (changed) {
         fileChangeDetectedTime = std::chrono::steady_clock::now();
         fileChangePending = true;
       }
-      if (fileChangePending) {
+      if (fileChangePending && !loadingInBackground) {
         auto elapsed = std::chrono::steady_clock::now() - fileChangeDetectedTime;
         if (elapsed >= std::chrono::milliseconds(150)) {
           fileChangePending = false;
@@ -2144,7 +2153,9 @@ int main(int argc, char *argv[]) {
       if (uiState.showParametersPanel) {
         bool paramWritten = DrawParametersPanel(sceneParameters, uiState, uiFont,
                                                 screenWidth, screenHeight, scriptPath);
-        (void)paramWritten;  // File watcher handles reload
+        if (paramWritten && uiState.liveUpdatesEnabled) {
+          startBackgroundLoad();
+        }
       }
 
       // Thermal view UI
