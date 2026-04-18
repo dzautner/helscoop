@@ -75,6 +75,29 @@ router.delete("/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+router.put("/:id/bom", async (req, res) => {
+  const { items } = req.body;
+  if (!Array.isArray(items))
+    return res.status(400).json({ error: "items must be an array" });
+
+  const proj = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2",
+    [req.params.id, req.user!.id]
+  );
+  if (proj.rows.length === 0)
+    return res.status(404).json({ error: "Project not found" });
+
+  await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
+  for (const item of items) {
+    await query(
+      `INSERT INTO project_bom (project_id, material_id, quantity, unit)
+       VALUES ($1, $2, $3, $4)`,
+      [req.params.id, item.material_id, item.quantity, item.unit || "kpl"]
+    );
+  }
+  res.json({ ok: true, count: items.length });
+});
+
 router.post("/:id/duplicate", async (req, res) => {
   const src = await query(
     "SELECT * FROM projects WHERE id=$1 AND user_id=$2",

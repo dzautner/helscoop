@@ -223,13 +223,33 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   );
 }
 
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  estimated_cost: number;
+  scene_js: string;
+  bom: { material_id: string; quantity: number; unit: string }[];
+}
+
+const TEMPLATE_ICONS: Record<string, string> = {
+  sauna: "M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M5 21V5l7-3 7 3v16",
+  garage: "M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6",
+  shed: "M3 21V10l4-3h10l4 3v11M3 21h18M10 21v-4h4v4",
+  pergola: "M4 22V12M20 22V12M2 12h20M6 12v-2M10 12v-2M14 12v-2M18 12v-2",
+};
+
 function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
     api.getProjects().then(setProjects).catch(console.error);
+    api.getTemplates().then(setTemplates).catch(console.error);
   }, []);
 
   async function createProject() {
@@ -238,6 +258,21 @@ function ProjectList() {
     const p = await api.createProject({ name: newName });
     setProjects([p, ...projects]);
     setNewName("");
+    setCreating(false);
+  }
+
+  async function createFromTemplate(t: Template) {
+    setCreating(true);
+    const p = await api.createProject({
+      name: t.name,
+      description: t.description,
+      scene_js: t.scene_js,
+    });
+    if (t.bom.length > 0) {
+      await api.saveBOM(p.id, t.bom);
+    }
+    setProjects([{ ...p, estimated_cost: t.estimated_cost }, ...projects]);
+    setShowTemplates(false);
     setCreating(false);
   }
 

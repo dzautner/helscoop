@@ -69,7 +69,13 @@ export const api = {
   getStalePrices: () => apiFetch("/pricing/stale"),
 
   getCategories: () => apiFetch("/categories"),
+  getTemplates: () => apiFetch("/templates"),
   exportBOM: (projectId: string) => apiFetch(`/bom/export/${projectId}`),
+  saveBOM: (projectId: string, items: { material_id: string; quantity: number; unit: string }[]) =>
+    apiFetch(`/projects/${projectId}/bom`, {
+      method: "PUT",
+      body: JSON.stringify({ items }),
+    }),
 
   chat: (messages: { role: string; content: string }[], currentScene: string) =>
     apiFetch("/chat", {
