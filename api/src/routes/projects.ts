@@ -9,7 +9,7 @@ router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   const result = await query(
-    `SELECT id, name, description, is_public, created_at, updated_at,
+    `SELECT id, name, description, is_public, created_at, updated_at, thumbnail_url,
       (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
@@ -114,6 +114,25 @@ router.put("/:id/bom", async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: "Failed to save BOM", detail: err.message });
   }
+});
+
+router.put("/:id/thumbnail", async (req, res) => {
+  const { thumbnail } = req.body;
+  if (!thumbnail || typeof thumbnail !== "string") {
+    return res.status(400).json({ error: "thumbnail (base64 data URL) is required" });
+  }
+  // Limit thumbnail size to 200KB of base64 data
+  if (thumbnail.length > 200 * 1024) {
+    return res.status(400).json({ error: "Thumbnail too large (max 200KB)" });
+  }
+  const result = await query(
+    "UPDATE projects SET thumbnail_url = $1, updated_at = now() WHERE id = $2 AND user_id = $3 RETURNING id",
+    [thumbnail, req.params.id, req.user!.id]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+  res.json({ ok: true });
 });
 
 router.post("/:id/duplicate", async (req, res) => {

@@ -11,6 +11,7 @@ interface Viewport3DProps {
   wireframe?: boolean;
   onObjectCount?: (count: number) => void;
   onError?: (error: string | null) => void;
+  captureRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
 interface CameraPreset {
@@ -222,6 +223,7 @@ export default function Viewport3D({
   wireframe = false,
   onObjectCount,
   onError,
+  captureRef,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -440,6 +442,32 @@ export default function Viewport3D({
         }
       };
   }, []);
+
+  // Expose thumbnail capture function via captureRef
+  useEffect(() => {
+    if (!captureRef) return;
+    captureRef.current = () => {
+      const renderer = rendererRef.current;
+      const scene = sceneRef.current;
+      const camera = cameraRef.current;
+      if (!renderer || !scene || !camera) return null;
+      renderer.render(scene, camera);
+      const canvas = renderer.domElement;
+      // Create a small thumbnail (320x180) to keep payload under 200KB
+      const thumbW = 320;
+      const thumbH = 180;
+      const offscreen = document.createElement("canvas");
+      offscreen.width = thumbW;
+      offscreen.height = thumbH;
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(canvas, 0, 0, thumbW, thumbH);
+      return offscreen.toDataURL("image/webp", 0.7);
+    };
+    return () => {
+      captureRef.current = null;
+    };
+  }, [captureRef]);
 
   return (
     <div
