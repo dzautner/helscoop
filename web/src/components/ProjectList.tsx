@@ -6,6 +6,7 @@ import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
@@ -160,6 +161,7 @@ export default function ProjectList() {
             <span className="label-mono">{t('nav.projects')}</span>
           </div>
           <div className="nav-links">
+            <ThemeToggle />
             <LanguageSwitcher />
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => (window.location.href = "/admin")}>
               {t('nav.admin')}
@@ -183,7 +185,8 @@ export default function ProjectList() {
           </button>
         </div>
         <div className={`nav-mobile-menu ${mobileMenuOpen ? "open" : ""}`}>
-          <LanguageSwitcher />
+          <ThemeToggle />
+            <LanguageSwitcher />
           <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={() => (window.location.href = "/admin")}>
             {t('nav.admin')}
           </button>

@@ -8,6 +8,7 @@ import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectEditor } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -415,7 +416,8 @@ export default function ProjectPage() {
             </svg>
             {t('editor.assistant')}
           </button>
-          <LanguageSwitcher />
+          <ThemeToggle />
+            <LanguageSwitcher />
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { api, setToken, getToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface UserProfile {
@@ -154,6 +155,7 @@ export default function SettingsPage() {
             <span className="label-mono">{t("nav.settings")}</span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <ThemeToggle />
             <LanguageSwitcher />
             <button
               className="btn btn-ghost"
