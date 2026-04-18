@@ -149,6 +149,7 @@ const translations = {
       bomRowCount: '{{count}} rivi{{suffix}}',
       estimatedTotal: 'ARVIOITU KOKONAISHINTA',
       inclVat: 'sis. ALV 25.5%',
+      costBreakdown: 'KUSTANNUSERITTELY',
     },
     settings: {
       title: 'Asetukset',
@@ -377,6 +378,7 @@ const translations = {
       bomRowCount: '{{count}} row{{suffix}}',
       estimatedTotal: 'ESTIMATED TOTAL',
       inclVat: 'incl. VAT 25.5%',
+      costBreakdown: 'COST BREAKDOWN',
     },
     settings: {
       title: 'Settings',
