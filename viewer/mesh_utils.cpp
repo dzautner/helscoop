@@ -39,59 +39,119 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
     positions[v] = {cadX, cadZ, -cadY};  // Z-up to Y-up conversion
   }
 
-  std::vector<Vector3> accum(vertexCount, {0.0f, 0.0f, 0.0f});
+  // Auto-smooth: split normals at edges where face angle exceeds threshold
+  const float kAutoSmoothAngle = 60.0f * 3.14159265359f / 180.0f;
+  const float cosThreshold = std::cos(kAutoSmoothAngle);
+
+  // Compute face normals (normalized for angle comparison, unnormalized for area weighting)
+  std::vector<Vector3> faceNormalsNorm(triangleCount);
+  std::vector<Vector3> faceNormalsArea(triangleCount);
   for (int tri = 0; tri < triangleCount; ++tri) {
     const int i0 = meshGL.triVerts[tri * 3 + 0];
     const int i1 = meshGL.triVerts[tri * 3 + 1];
     const int i2 = meshGL.triVerts[tri * 3 + 2];
-
-    const Vector3 p0 = positions[i0];
-    const Vector3 p1 = positions[i1];
-    const Vector3 p2 = positions[i2];
-
-    const Vector3 u = {p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
-    const Vector3 v = {p2.x - p0.x, p2.y - p0.y, p2.z - p0.z};
-    const Vector3 n = {u.y * v.z - u.z * v.y, u.z * v.x - u.x * v.z, u.x * v.y - u.y * v.x};
-
-    accum[i0].x += n.x; accum[i0].y += n.y; accum[i0].z += n.z;
-    accum[i1].x += n.x; accum[i1].y += n.y; accum[i1].z += n.z;
-    accum[i2].x += n.x; accum[i2].y += n.y; accum[i2].z += n.z;
+    const Vector3& p0 = positions[i0];
+    const Vector3& p1 = positions[i1];
+    const Vector3& p2 = positions[i2];
+    const Vector3 e1 = {p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
+    const Vector3 e2 = {p2.x - p0.x, p2.y - p0.y, p2.z - p0.z};
+    const Vector3 fn = {e1.y*e2.z - e1.z*e2.y, e1.z*e2.x - e1.x*e2.z, e1.x*e2.y - e1.y*e2.x};
+    faceNormalsArea[tri] = fn;
+    const float len = std::sqrt(fn.x*fn.x + fn.y*fn.y + fn.z*fn.z);
+    if (len > 0.0f) {
+      faceNormalsNorm[tri] = {fn.x/len, fn.y/len, fn.z/len};
+    } else {
+      faceNormalsNorm[tri] = {0.0f, 1.0f, 0.0f};
+    }
   }
 
-  std::vector<Vector3> normals(vertexCount);
-  std::vector<Vector2> texcoords(vertexCount);
+  // Build vertex→face adjacency
+  std::vector<std::vector<int>> vertFaces(vertexCount);
+  for (int tri = 0; tri < triangleCount; ++tri) {
+    for (int j = 0; j < 3; ++j) {
+      vertFaces[meshGL.triVerts[tri * 3 + j]].push_back(tri);
+    }
+  }
+
+  // For each corner, compute smooth normal and deduplicate split vertices
+  struct SplitVertex {
+    Vector3 position;
+    Vector3 normal;
+    Vector2 texcoord;
+  };
+  std::vector<SplitVertex> splitVerts;
+  splitVerts.reserve(vertexCount * 2);
+
+  std::vector<int> cornerToSplit(triangleCount * 3);
+  std::vector<std::vector<std::pair<Vector3, int>>> vertSplits(vertexCount);
+
   const float textureScale = 1.0f;
 
-  for (int v = 0; v < vertexCount; ++v) {
-    const Vector3 n = accum[v];
-    const float length = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+  for (int tri = 0; tri < triangleCount; ++tri) {
+    for (int j = 0; j < 3; ++j) {
+      const int origVert = meshGL.triVerts[tri * 3 + j];
+      const int cornerIdx = tri * 3 + j;
 
-    Vector3 normal = {0.0f, 1.0f, 0.0f};
-    if (length > 0.0f) {
-      normal = {n.x / length, n.y / length, n.z / length};
+      // Area-weighted average of adjacent faces within angle threshold
+      const Vector3& thisFN = faceNormalsNorm[tri];
+      Vector3 n = {0.0f, 0.0f, 0.0f};
+      for (int adjTri : vertFaces[origVert]) {
+        const float d = thisFN.x * faceNormalsNorm[adjTri].x +
+                        thisFN.y * faceNormalsNorm[adjTri].y +
+                        thisFN.z * faceNormalsNorm[adjTri].z;
+        if (d >= cosThreshold) {
+          n.x += faceNormalsArea[adjTri].x;
+          n.y += faceNormalsArea[adjTri].y;
+          n.z += faceNormalsArea[adjTri].z;
+        }
+      }
+      const float len = std::sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
+      Vector3 smoothNormal;
+      if (len > 0.0f) {
+        smoothNormal = {n.x/len, n.y/len, n.z/len};
+      } else {
+        smoothNormal = faceNormalsNorm[tri];
+      }
+
+      // Deduplicate: reuse existing split vertex with matching normal
+      int splitIdx = -1;
+      for (const auto& [existingN, idx] : vertSplits[origVert]) {
+        const float d = smoothNormal.x*existingN.x + smoothNormal.y*existingN.y + smoothNormal.z*existingN.z;
+        if (d > 0.999f) {
+          splitIdx = idx;
+          break;
+        }
+      }
+
+      if (splitIdx < 0) {
+        SplitVertex sv;
+        sv.position = positions[origVert];
+        sv.normal = smoothNormal;
+        const Vector3& pos = positions[origVert];
+        const float absX = std::fabs(smoothNormal.x);
+        const float absY = std::fabs(smoothNormal.y);
+        const float absZ = std::fabs(smoothNormal.z);
+        if (absX >= absY && absX >= absZ) {
+          sv.texcoord = {pos.z * textureScale, pos.y * textureScale};
+        } else if (absY >= absX && absY >= absZ) {
+          sv.texcoord = {pos.x * textureScale, pos.z * textureScale};
+        } else {
+          sv.texcoord = {pos.x * textureScale, pos.y * textureScale};
+        }
+        splitIdx = static_cast<int>(splitVerts.size());
+        splitVerts.push_back(sv);
+        vertSplits[origVert].push_back({smoothNormal, splitIdx});
+      }
+
+      cornerToSplit[cornerIdx] = splitIdx;
     }
-    normals[v] = normal;
-
-    // Triplanar UV mapping based on dominant normal axis
-    const Vector3& pos = positions[v];
-    const float absX = std::fabs(normal.x);
-    const float absY = std::fabs(normal.y);
-    const float absZ = std::fabs(normal.z);
-
-    Vector2 uv;
-    if (absX >= absY && absX >= absZ) {
-      uv = {pos.z * textureScale, pos.y * textureScale};
-    } else if (absY >= absX && absY >= absZ) {
-      uv = {pos.x * textureScale, pos.z * textureScale};
-    } else {
-      uv = {pos.x * textureScale, pos.y * textureScale};
-    }
-    texcoords[v] = uv;
   }
 
+  const int splitVertexCount = static_cast<int>(splitVerts.size());
+
   constexpr int kMaxVerticesPerMesh = std::numeric_limits<unsigned short>::max();
-  std::vector<int> remap(vertexCount, 0);
-  std::vector<int> remapMarker(vertexCount, 0);
+  std::vector<int> remap(splitVertexCount, 0);
+  std::vector<int> remapMarker(splitVertexCount, 0);
   int chunkToken = 1;
 
   std::vector<Mesh> meshes;
@@ -106,16 +166,16 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
     std::vector<Vector2> chunkTexcoords;
     std::vector<unsigned short> chunkIndices;
 
-    chunkPositions.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
-    chunkNormals.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
-    chunkTexcoords.reserve(std::min(kMaxVerticesPerMesh, vertexCount));
-    chunkIndices.reserve(std::min(kMaxVerticesPerMesh, vertexCount) * 3);
+    chunkPositions.reserve(std::min(kMaxVerticesPerMesh, splitVertexCount));
+    chunkNormals.reserve(std::min(kMaxVerticesPerMesh, splitVertexCount));
+    chunkTexcoords.reserve(std::min(kMaxVerticesPerMesh, splitVertexCount));
+    chunkIndices.reserve(std::min(kMaxVerticesPerMesh, splitVertexCount) * 3);
 
     while (triIndex < triangleCount) {
       const int indices[3] = {
-        static_cast<int>(meshGL.triVerts[triIndex * 3 + 0]),
-        static_cast<int>(meshGL.triVerts[triIndex * 3 + 1]),
-        static_cast<int>(meshGL.triVerts[triIndex * 3 + 2])
+        cornerToSplit[triIndex * 3 + 0],
+        cornerToSplit[triIndex * 3 + 1],
+        cornerToSplit[triIndex * 3 + 2]
       };
 
       int needed = 0;
@@ -130,15 +190,15 @@ Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor) {
       }
 
       for (int j = 0; j < 3; ++j) {
-        const int original = indices[j];
-        if (remapMarker[original] != currentToken) {
-          remapMarker[original] = currentToken;
-          remap[original] = chunkVertexCount++;
-          chunkPositions.push_back(positions[original]);
-          chunkNormals.push_back(normals[original]);
-          chunkTexcoords.push_back(texcoords[original]);
+        const int sv = indices[j];
+        if (remapMarker[sv] != currentToken) {
+          remapMarker[sv] = currentToken;
+          remap[sv] = chunkVertexCount++;
+          chunkPositions.push_back(splitVerts[sv].position);
+          chunkNormals.push_back(splitVerts[sv].normal);
+          chunkTexcoords.push_back(splitVerts[sv].texcoord);
         }
-        chunkIndices.push_back(static_cast<unsigned short>(remap[original]));
+        chunkIndices.push_back(static_cast<unsigned short>(remap[sv]));
       }
       ++triIndex;
     }
