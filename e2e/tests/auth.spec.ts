@@ -51,7 +51,7 @@ test.describe("Authentication", () => {
   test("logs in with valid credentials", async ({ page }) => {
     const email = `e2e-login-${Date.now()}@test.com`;
     await page.request.post(`${API_URL}/auth/register`, {
-      data: { email, password: testPassword, name: "Login Test" },
+      data: { email, password: testPassword, name: "Login Test", acceptedTerms: true },
     });
 
     await page.goto("/");
@@ -97,7 +97,7 @@ test.describe("Authentication", () => {
   test("persists login across page reload", async ({ page }) => {
     const email = `e2e-persist-${Date.now()}@test.com`;
     const res = await page.request.post(`${API_URL}/auth/register`, {
-      data: { email, password: testPassword, name: "Persist Test" },
+      data: { email, password: testPassword, name: "Persist Test", acceptedTerms: true },
     });
     const { token } = await res.json();
 

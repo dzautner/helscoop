@@ -21,7 +21,7 @@ export async function registerUser(
   };
 
   const res = await page.request.post(`${API_URL}/auth/register`, {
-    data: { email: user.email, password: user.password, name: user.name },
+    data: { email: user.email, password: user.password, name: user.name, acceptedTerms: true },
   });
   const body = await res.json();
   user.token = body.token;

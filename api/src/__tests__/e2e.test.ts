@@ -28,7 +28,7 @@ describe.skipIf(!process.env.E2E)("E2E Integration Tests", () => {
   it("registers a new user", async () => {
     const { status, body } = await apiFetch("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email: testEmail, password: "testpass123", name: "E2E Test" }),
+      body: JSON.stringify({ email: testEmail, password: "testpass123", name: "E2E Test", acceptedTerms: true }),
     });
     expect(status).toBe(201);
     expect(body.token).toBeTruthy();
@@ -39,7 +39,7 @@ describe.skipIf(!process.env.E2E)("E2E Integration Tests", () => {
   it("rejects duplicate registration", async () => {
     const { status } = await apiFetch("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email: testEmail, password: "testpass123", name: "Dup" }),
+      body: JSON.stringify({ email: testEmail, password: "testpass123", name: "Dup", acceptedTerms: true }),
     });
     expect(status).toBe(409);
   });

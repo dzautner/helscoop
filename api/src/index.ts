@@ -182,7 +182,7 @@ app.post("/auth/login", authLimiter, async (req, res) => {
 });
 
 app.post("/auth/register", authLimiter, async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, acceptedTerms } = req.body;
   if (!email || !password || !name) {
     return res.status(400).json({ error: "Email, password, and name are required" });
   }
@@ -195,9 +195,12 @@ app.post("/auth/register", authLimiter, async (req, res) => {
   if (name.length > 200) {
     return res.status(400).json({ error: "Name must be 200 characters or fewer" });
   }
+  if (!acceptedTerms) {
+    return res.status(400).json({ error: "You must accept the Terms of Service and Privacy Policy" });
+  }
   const sanitizedName = sanitize(name);
   try {
-    const user = await register(email, password, sanitizedName);
+    const user = await register(email, password, sanitizedName, true);
     res.status(201).json({ token: signToken(user), user });
   } catch (e: unknown) {
     console.error("Registration error:", e);

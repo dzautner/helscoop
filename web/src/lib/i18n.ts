@@ -27,6 +27,11 @@ const translations = {
       hasAccount: 'Onko jo tili? Kirjaudu',
       loading: 'Ladataan...',
       loginFailed: 'Kirjautuminen ei onnistunut',
+      acceptTerms: 'Hyvaksyn',
+      termsOfService: 'kayttoehtojen',
+      and: 'ja',
+      privacyPolicy: 'tietosuojaselosteen',
+      acceptTermsRequired: 'Sinun on hyvaksyttava kayttoehdot ja tietosuojaseloste',
     },
     brand: {
       tagline: 'N\u00c4E TALOSI \u00b7 MUUTA \u00b7 RAKENNA',
@@ -272,6 +277,14 @@ const translations = {
       restartTourDesc: 'Nayta Helscoopin esittelykierros uudelleen',
       tourRestarted: 'Kierros nollattu — naet sen seuraavalla sivulatauksella',
     },
+    legal: {
+      privacyTitle: 'Tietosuojaseloste',
+      termsTitle: 'Kayttoehdot',
+      lastUpdated: 'Viimeksi paivitetty: {{date}}',
+      backToHome: 'Takaisin etusivulle',
+      privacyPolicy: 'Tietosuojaseloste',
+      termsOfService: 'Kayttoehdot',
+    },
   },
   en: {
     nav: {
@@ -299,6 +312,11 @@ const translations = {
       hasAccount: 'Already have an account? Sign in',
       loading: 'Loading...',
       loginFailed: 'Login failed',
+      acceptTerms: 'I agree to the',
+      termsOfService: 'Terms of Service',
+      and: 'and',
+      privacyPolicy: 'Privacy Policy',
+      acceptTermsRequired: 'You must accept the Terms of Service and Privacy Policy',
     },
     brand: {
       tagline: 'SEE YOUR HOUSE \u00b7 CHANGE IT \u00b7 BUILD',
@@ -543,6 +561,14 @@ const translations = {
       restartTour: 'Restart tour',
       restartTourDesc: 'Show the Helscoop introduction tour again',
       tourRestarted: 'Tour reset — you will see it on next page load',
+    },
+    legal: {
+      privacyTitle: 'Privacy Policy',
+      termsTitle: 'Terms of Service',
+      lastUpdated: 'Last updated: {{date}}',
+      backToHome: 'Back to home',
+      privacyPolicy: 'Privacy Policy',
+      termsOfService: 'Terms of Service',
     },
   },
 } as const;

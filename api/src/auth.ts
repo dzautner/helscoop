@@ -61,7 +61,8 @@ export async function login(email: string, password: string) {
 export async function register(
   email: string,
   password: string,
-  name: string
+  name: string,
+  acceptedTerms?: boolean
 ) {
   const hash = await bcrypt.hash(password, 10);
 
@@ -70,10 +71,10 @@ export async function register(
   const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
   const result = await query(
-    `INSERT INTO users (email, name, password_hash, email_verified, verification_token, verification_token_expires)
-     VALUES ($1, $2, $3, false, $4, $5)
+    `INSERT INTO users (email, name, password_hash, email_verified, verification_token, verification_token_expires, accepted_terms_at)
+     VALUES ($1, $2, $3, false, $4, $5, $6)
      RETURNING id, email, name, role`,
-    [email, name, hash, verificationToken, verificationExpires.toISOString()]
+    [email, name, hash, verificationToken, verificationExpires.toISOString(), acceptedTerms ? new Date().toISOString() : null]
   );
 
   // Send verification email (fire-and-forget — don't block registration)

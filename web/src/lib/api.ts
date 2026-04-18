@@ -72,10 +72,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
-  register: (email: string, password: string, name: string) =>
+  register: (email: string, password: string, name: string, acceptedTerms?: boolean) =>
     apiFetch("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, acceptedTerms }),
     }),
   me: () => apiFetch("/auth/me"),
   updateProfile: (data: { name?: string; email?: string }) =>

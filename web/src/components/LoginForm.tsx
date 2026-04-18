@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -12,6 +13,7 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [isRegister, setIsRegister] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
@@ -19,10 +21,14 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (isRegister && !acceptedTerms) {
+      setError(t('auth.acceptTermsRequired'));
+      return;
+    }
     setLoading(true);
     try {
       const result = isRegister
-        ? await api.register(email, password, name)
+        ? await api.register(email, password, name, acceptedTerms)
         : await api.login(email, password);
       setToken(result.token);
       onLogin();
@@ -160,6 +166,22 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
               )}
             </div>
 
+            {isRegister && (
+              <label className="terms-checkbox">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                />
+                <span className="terms-checkbox-label">
+                  {t('auth.acceptTerms')}{' '}
+                  <Link href="/terms" target="_blank">{t('auth.termsOfService')}</Link>
+                  {' '}{t('auth.and')}{' '}
+                  <Link href="/privacy" target="_blank">{t('auth.privacyPolicy')}</Link>
+                </span>
+              </label>
+            )}
+
             {error && (
               <div style={{
                 padding: "10px 14px",
@@ -187,7 +209,7 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
 
           <div style={{ textAlign: "center" }}>
             <button
-              onClick={() => { setIsRegister(!isRegister); setError(""); }}
+              onClick={() => { setIsRegister(!isRegister); setError(""); setAcceptedTerms(false); }}
               style={{
                 background: "none",
                 border: "none",
@@ -199,6 +221,38 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
             >
               {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}
             </button>
+          </div>
+
+          {/* Footer links to legal pages */}
+          <div style={{
+            marginTop: 24,
+            textAlign: "center",
+            display: "flex",
+            justifyContent: "center",
+            gap: 16,
+          }}>
+            <Link
+              href="/privacy"
+              style={{
+                color: "var(--text-muted)",
+                fontSize: 12,
+                textDecoration: "none",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              {t('legal.privacyPolicy')}
+            </Link>
+            <Link
+              href="/terms"
+              style={{
+                color: "var(--text-muted)",
+                fontSize: 12,
+                textDecoration: "none",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              {t('legal.termsOfService')}
+            </Link>
           </div>
         </div>
       </div>
