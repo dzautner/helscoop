@@ -8,6 +8,7 @@ interface Material {
   id: string;
   name: string;
   category_name: string;
+  image_url: string | null;
   pricing: { unit_price: number; unit: string; supplier_name: string; is_primary: boolean }[] | null;
 }
 
@@ -15,6 +16,7 @@ interface BomItem {
   id?: string;
   material_id: string;
   material_name?: string;
+  image_url?: string | null;
   quantity: number;
   unit: string;
   unit_price?: number;
@@ -141,8 +143,19 @@ function BomPanel({
                 border: "1px solid var(--border)",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <strong style={{ fontSize: 13, fontWeight: 500 }}>{item.material_name}</strong>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.material_name || ""}
+                      style={{ width: 28, height: 28, borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: 4, background: "var(--bg-elevated)", flexShrink: 0 }} />
+                  )}
+                  <strong style={{ fontSize: 13, fontWeight: 500 }}>{item.material_name}</strong>
+                </div>
                 <button
                   onClick={() => onRemove(item.material_id)}
                   style={{
@@ -533,6 +546,7 @@ export default function ProjectPage() {
         {
           material_id: materialId,
           material_name: mat.name,
+          image_url: mat.image_url,
           quantity,
           unit: pricing?.unit || "kpl",
           unit_price: pricing?.unit_price || 0,

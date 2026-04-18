@@ -10,6 +10,7 @@ interface Material {
   name: string;
   category_name: string;
   waste_factor: number;
+  image_url: string | null;
   pricing: {
     supplier_name: string;
     unit_price: number;
@@ -90,6 +91,7 @@ function MaterialsTab() {
         <table style={tableStyle}>
           <thead>
             <tr>
+              <th style={{ ...thStyle, width: 48 }}></th>
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Category</th>
               <th style={thStyle}>Waste</th>
@@ -112,6 +114,37 @@ function MaterialsTab() {
                   onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >
+                  <td style={{ ...tdStyle, padding: "6px 8px" }}>
+                    {m.image_url ? (
+                      <img
+                        src={m.image_url}
+                        alt={m.name}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 6,
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 6,
+                          background: "var(--bg-elevated)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "var(--text-muted)",
+                          fontSize: 10,
+                        }}
+                      >
+                        -
+                      </div>
+                    )}
+                  </td>
                   <td style={{ ...tdStyle, fontWeight: 500 }}>{m.name}</td>
                   <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{m.category_name}</td>
                   <td style={{ ...tdStyle, fontFamily: "var(--font-mono)", fontSize: 12 }}>
