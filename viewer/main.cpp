@@ -104,6 +104,7 @@ int main(int argc, char *argv[]) {
   std::set<std::string> renderFocusMaterials;
   std::set<std::string> renderFocusObjects;
   std::set<std::string> renderFocusCategories;
+  bool renderWhiteBackground = false;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -185,6 +186,10 @@ int main(int argc, char *argv[]) {
       i += 1;
     } else if (arg == "--toon") {
       // Set toon rendering for headless render (handled after shader init)
+    } else if (arg == "--background" && i + 1 < argc) {
+      std::string bg = argv[i + 1];
+      if (bg == "white" || bg == "clean") renderWhiteBackground = true;
+      i += 1;
     } else if (arg == "--interior-cutaway") {
       renderHiddenCategories.insert("sheathing");
       renderHiddenCategories.insert("roofing");
@@ -1515,10 +1520,10 @@ int main(int argc, char *argv[]) {
 
     // Render to color texture
     BeginTextureMode(rtColor);
-    ClearBackground(RAYWHITE);
+    ClearBackground(renderWhiteBackground ? WHITE : RAYWHITE);
 
     // Render sky gradient background
-    {
+    if (!renderWhiteBackground) {
       Color skyTopC, skyHorizC, skyGroundC;
       if (pbrModeEnabled) {
         skyTopC = {static_cast<unsigned char>(skyTopCol[0] * 255),
@@ -1554,7 +1559,7 @@ int main(int argc, char *argv[]) {
     }
 
     BeginMode3D(camera);
-    if (pbrModeEnabled) {
+    if (pbrModeEnabled && !renderWhiteBackground) {
       // Draw ground plane positioned at cached scene bounds
       float minY = cachedSceneBounds.min.y;
       float centerX = (cachedSceneBounds.min.x + cachedSceneBounds.max.x) * 0.5f;
