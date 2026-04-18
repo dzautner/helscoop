@@ -163,37 +163,66 @@ function generateGenericScene(
   const length = width * ratio;
   const w = Math.round(width * 10) / 10;
   const l = Math.round(length * 10) / 10;
+  const wallThickness = 0.2;
 
-  let lines = `// Generic ${type}, ${floors} floors, ~${area}m2\n`;
-  lines += `const foundation = translate(cube({size: [${l}, 0.3, ${w}], center: true}), [0, 0.15, 0]);\n`;
+  // Colors
+  const foundationColor = "[0.55, 0.55, 0.52]";
+  const wallFrontColor = "[0.76, 0.60, 0.42]";
+  const wallBackColor = "[0.72, 0.56, 0.38]";
+  const wallLeftColor = "[0.68, 0.53, 0.35]";
+  const wallRightColor = "[0.70, 0.55, 0.37]";
+  const slabColor = "[0.60, 0.60, 0.58]";
+  const roofColor = "[0.25, 0.22, 0.20]";
+
+  let lines = `// Generic ${type}, ${floors} floors, ~${area}m2\n\n`;
+
+  // Foundation slab
+  lines += `const foundation = translate(box(${l}, 0.3, ${w}), 0, 0.15, 0);\n`;
+  lines += `scene.add(foundation, {material: "concrete", color: ${foundationColor}});\n\n`;
 
   for (let f = 0; f < floors; f++) {
     const baseY = 0.3 + f * (floorHeight + 0.25);
+    const wallCenterY = (baseY + floorHeight / 2).toFixed(2);
     const prefix = f === 0 ? "gf" : `f${f}`;
-    lines += `const ${prefix}_front = translate(cube({size: [${l}, ${floorHeight}, 0.2], center: true}), [0, ${(baseY + floorHeight / 2).toFixed(2)}, ${(-w / 2 - 0.1).toFixed(2)}]);\n`;
-    lines += `const ${prefix}_back = translate(cube({size: [${l}, ${floorHeight}, 0.2], center: true}), [0, ${(baseY + floorHeight / 2).toFixed(2)}, ${(w / 2 + 0.1).toFixed(2)}]);\n`;
-    lines += `const ${prefix}_left = translate(cube({size: [0.2, ${floorHeight}, ${w}], center: true}), [${(-l / 2 - 0.1).toFixed(2)}, ${(baseY + floorHeight / 2).toFixed(2)}, 0]);\n`;
-    lines += `const ${prefix}_right = translate(cube({size: [0.2, ${floorHeight}, ${w}], center: true}), [${(l / 2 + 0.1).toFixed(2)}, ${(baseY + floorHeight / 2).toFixed(2)}, 0]);\n`;
+    const floorLabel = f === 0 ? "Ground floor" : `Floor ${f + 1}`;
+
+    lines += `// ${floorLabel} walls\n`;
+    lines += `const ${prefix}_front = translate(box(${l}, ${floorHeight}, ${wallThickness}), 0, ${wallCenterY}, ${(-w / 2).toFixed(2)});\n`;
+    lines += `scene.add(${prefix}_front, {material: "wood", color: ${wallFrontColor}});\n`;
+
+    lines += `const ${prefix}_back = translate(box(${l}, ${floorHeight}, ${wallThickness}), 0, ${wallCenterY}, ${(w / 2).toFixed(2)});\n`;
+    lines += `scene.add(${prefix}_back, {material: "wood", color: ${wallBackColor}});\n`;
+
+    lines += `const ${prefix}_left = translate(box(${wallThickness}, ${floorHeight}, ${w}), ${(-l / 2).toFixed(2)}, ${wallCenterY}, 0);\n`;
+    lines += `scene.add(${prefix}_left, {material: "wood", color: ${wallLeftColor}});\n`;
+
+    lines += `const ${prefix}_right = translate(box(${wallThickness}, ${floorHeight}, ${w}), ${(l / 2).toFixed(2)}, ${wallCenterY}, 0);\n`;
+    lines += `scene.add(${prefix}_right, {material: "wood", color: ${wallRightColor}});\n`;
+
+    // Floor slab between stories
     if (f < floors - 1) {
-      lines += `const slab${f} = translate(cube({size: [${l}, 0.25, ${w}], center: true}), [0, ${(baseY + floorHeight + 0.125).toFixed(2)}, 0]);\n`;
+      const slabY = (baseY + floorHeight + 0.125).toFixed(2);
+      lines += `\n// Slab above ${floorLabel.toLowerCase()}\n`;
+      lines += `const slab${f} = translate(box(${l}, 0.25, ${w}), 0, ${slabY}, 0);\n`;
+      lines += `scene.add(slab${f}, {material: "concrete", color: ${slabColor}});\n`;
     }
+
+    lines += `\n`;
   }
 
+  // Pitched roof
   const totalH = 0.3 + floors * floorHeight + (floors - 1) * 0.25;
   const roofPeakH = totalH + w * 0.29; // ~30deg pitch
-  lines += `const roof_l = translate(rotate(cube({size: [${l + 0.6}, 0.08, ${(w / 2 + 0.6).toFixed(1)}], center: true}), [0.52, 0, 0]), [0, ${((totalH + roofPeakH) / 2).toFixed(2)}, ${(-w / 4).toFixed(2)}]);\n`;
-  lines += `const roof_r = translate(rotate(cube({size: [${l + 0.6}, 0.08, ${(w / 2 + 0.6).toFixed(1)}], center: true}), [-0.52, 0, 0]), [0, ${((totalH + roofPeakH) / 2).toFixed(2)}, ${(w / 4).toFixed(2)}]);\n`;
+  const roofCenterY = ((totalH + roofPeakH) / 2).toFixed(2);
+  const roofPanelDepth = (w / 2 + 0.6).toFixed(1);
+  const roofPanelLength = (l + 0.6).toFixed(1);
 
-  // Collect all parts
-  const parts = ["foundation"];
-  for (let f = 0; f < floors; f++) {
-    const prefix = f === 0 ? "gf" : `f${f}`;
-    parts.push(`${prefix}_front`, `${prefix}_back`, `${prefix}_left`, `${prefix}_right`);
-    if (f < floors - 1) parts.push(`slab${f}`);
-  }
-  parts.push("roof_l", "roof_r");
+  lines += `// Pitched roof\n`;
+  lines += `const roof_left = translate(rotate(box(${roofPanelLength}, 0.08, ${roofPanelDepth}), 30, 0, 0), 0, ${roofCenterY}, ${(-w / 4).toFixed(2)});\n`;
+  lines += `scene.add(roof_left, {material: "metal", color: ${roofColor}});\n`;
 
-  lines += `\nscene = union(${parts.join(", ")});`;
+  lines += `const roof_right = translate(rotate(box(${roofPanelLength}, 0.08, ${roofPanelDepth}), -30, 0, 0), 0, ${roofCenterY}, ${(w / 4).toFixed(2)});\n`;
+  lines += `scene.add(roof_right, {material: "metal", color: ${roofColor}});\n`;
 
   return lines;
 }
