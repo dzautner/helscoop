@@ -133,6 +133,8 @@ Yaw and pitch are in degrees. Default camera: 40° yaw, 23° pitch. `--supersamp
 
 Camera presets with `--camera <name>`: `front`, `back`, `left`, `right`, `top`, `bottom`, `iso` (45°/35°), `iso-back`, `three-quarter` (default angles).
 
+Turntable animation: `--turntable 36` renders 36 frames rotating 360° around the model, outputting `name_0000.png` through `name_0035.png`.
+
 Architecture visual doc pipeline:
 
 ```

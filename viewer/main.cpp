@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
   std::set<std::string> renderFocusCategories;
   bool renderWhiteBackground = false;
   int renderSupersample = 1;
+  int turntableFrames = 0;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -193,6 +194,9 @@ int main(int argc, char *argv[]) {
       i += 1;
     } else if (arg == "--supersample" && i + 1 < argc) {
       renderSupersample = std::clamp(std::atoi(argv[i + 1]), 1, 4);
+      i += 1;
+    } else if (arg == "--turntable" && i + 1 < argc) {
+      turntableFrames = std::clamp(std::atoi(argv[i + 1]), 2, 360);
       i += 1;
     } else if (arg == "--camera" && i + 1 < argc) {
       std::string preset = argv[i + 1];
@@ -948,6 +952,8 @@ int main(int argc, char *argv[]) {
 
   int frameCount = 0;
   bool screenshotTaken = false;
+  int turntableIndex = 0;
+  float turntableBaseYaw = camYaw;
 
   // File-watch debounce state
   bool fileChangePending = false;
@@ -2091,19 +2097,46 @@ int main(int argc, char *argv[]) {
 
     // Screenshot for render mode
     if (renderMode && !screenshotTaken && frameCount >= std::max(renderCaptureFrame, 1)) {
-      // Use ExportImage instead of TakeScreenshot to support absolute paths
-      // (TakeScreenshot strips directory components)
       Image screenImage = LoadImageFromScreen();
       if (screenImage.width != renderWidth || screenImage.height != renderHeight) {
         ImageResize(&screenImage, renderWidth, renderHeight);
       }
-      auto absOutputPath = std::filesystem::absolute(renderOutputPath);
-      ExportImage(screenImage, absOutputPath.string().c_str());
-      UnloadImage(screenImage);
-      TraceLog(LOG_INFO, "Rendered to: %s", absOutputPath.string().c_str());
-      std::cout << "Rendered to: " << absOutputPath.string() << std::endl;
-      screenshotTaken = true;
-      break;
+
+      if (turntableFrames > 0) {
+        auto basePath = std::filesystem::absolute(renderOutputPath);
+        auto stem = basePath.stem().string();
+        auto ext = basePath.extension().string();
+        auto dir = basePath.parent_path();
+        char frameName[256];
+        snprintf(frameName, sizeof(frameName), "%s_%04d%s", stem.c_str(), turntableIndex, ext.c_str());
+        auto framePath = dir / frameName;
+        ExportImage(screenImage, framePath.string().c_str());
+        UnloadImage(screenImage);
+
+        turntableIndex++;
+        if (turntableIndex >= turntableFrames) {
+          std::cout << "Turntable complete: " << turntableFrames << " frames in " << dir.string() << std::endl;
+          screenshotTaken = true;
+          break;
+        }
+
+        // Advance yaw for next frame
+        orbitYaw = turntableBaseYaw + (2.0f * PI * turntableIndex / turntableFrames);
+        camera.position = Vector3Add(camera.target, {
+          orbitDistance * cosf(orbitPitch) * sinf(orbitYaw),
+          orbitDistance * sinf(orbitPitch),
+          orbitDistance * cosf(orbitPitch) * cosf(orbitYaw)
+        });
+        frameCount = 0;
+      } else {
+        auto absOutputPath = std::filesystem::absolute(renderOutputPath);
+        ExportImage(screenImage, absOutputPath.string().c_str());
+        UnloadImage(screenImage);
+        TraceLog(LOG_INFO, "Rendered to: %s", absOutputPath.string().c_str());
+        std::cout << "Rendered to: " << absOutputPath.string() << std::endl;
+        screenshotTaken = true;
+        break;
+      }
     }
   }
 
