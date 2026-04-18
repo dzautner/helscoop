@@ -11,6 +11,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { Material, BomItem, Project } from "@/types";
 
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
@@ -66,6 +67,7 @@ export default function ProjectPage() {
   const [wireframe, setWireframe] = useState(false);
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [viewportKey, setViewportKey] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const historyRef = useRef<string[]>([]);
@@ -229,6 +231,13 @@ export default function ProjectPage() {
     },
     [pushHistory]
   );
+
+  const handleViewportReset = useCallback(() => {
+    setSceneJs(DEFAULT_SCENE);
+    pushHistory(DEFAULT_SCENE);
+    setSceneError(null);
+    setViewportKey((k) => k + 1);
+  }, [pushHistory]);
 
   const addBomItem = useCallback(
     (materialId: string, quantity: number) => {
@@ -531,12 +540,108 @@ export default function ProjectPage() {
               paddingBottom: showCode ? 0 : 8,
             }}
           >
-            <Viewport3D
-              sceneJs={sceneJs}
-              wireframe={wireframe}
-              onObjectCount={setObjectCount}
-              onError={setSceneError}
-            />
+            <ErrorBoundary
+              key={viewportKey}
+              onReset={handleViewportReset}
+              fallback={({ error, reset }) => (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#1a1816",
+                    borderRadius: "var(--radius-md)",
+                  }}
+                >
+                  <div style={{ textAlign: "center", padding: 32, maxWidth: 420 }}>
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        margin: "0 auto 16px",
+                        borderRadius: "50%",
+                        background: "rgba(224,108,117,0.12)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e06c75"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </div>
+                    <h3
+                      style={{
+                        color: "var(--text-primary, #e0dcd4)",
+                        fontSize: 16,
+                        fontWeight: 600,
+                        fontFamily: "var(--font-display)",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {t('editor.viewportCrashTitle')}
+                    </h3>
+                    <p
+                      style={{
+                        color: "var(--text-muted, #8a857d)",
+                        fontSize: 13,
+                        lineHeight: 1.5,
+                        marginBottom: 8,
+                      }}
+                    >
+                      {t('editor.viewportCrashMessage')}
+                    </p>
+                    <p
+                      style={{
+                        color: "var(--danger, #e06c75)",
+                        fontSize: 12,
+                        fontFamily: "var(--font-mono)",
+                        marginBottom: 20,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {error.message}
+                    </p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={reset}
+                      style={{
+                        padding: "8px 20px",
+                        background: "linear-gradient(135deg, #c4915c 0%, #a67745 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {t('editor.resetScene')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            >
+              <Viewport3D
+                sceneJs={sceneJs}
+                wireframe={wireframe}
+                onObjectCount={setObjectCount}
+                onError={setSceneError}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Collapsible Code Editor */}

@@ -119,6 +119,9 @@ const translations = {
       backToProjects: 'Takaisin projekteihin',
       loadingProject: 'Ladataan...',
       chatError: 'Jokin meni pieleen. Yrita uudelleen.',
+      viewportCrashTitle: '3D-nakyma kaatui',
+      viewportCrashMessage: 'Kohtauksen komentosarjassa tapahtui virhe. Voit nollata kohtauksen ja aloittaa alusta.',
+      resetScene: 'Nollaa kohtaus',
     },
     settings: {
       title: 'Asetukset',
@@ -309,6 +312,9 @@ const translations = {
       backToProjects: 'Back to projects',
       loadingProject: 'Loading...',
       chatError: 'Something went wrong. Please try again.',
+      viewportCrashTitle: '3D editor crashed',
+      viewportCrashMessage: 'A runtime error occurred in the scene script. You can reset the scene and start fresh.',
+      resetScene: 'Reset Scene',
     },
     settings: {
       title: 'Settings',
