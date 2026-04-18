@@ -75,6 +75,7 @@ export default function ProjectPage() {
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
@@ -214,6 +215,16 @@ export default function ProjectPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [saveStatus]);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-tour="export-btn"]')) setShowExportMenu(false);
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [showExportMenu]);
 
   const handleSceneChange = useCallback(
     (code: string) => {
@@ -408,45 +419,99 @@ export default function ProjectPage() {
             </svg>
           </button>
           <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
-          <button className="btn btn-ghost" data-tour="export-btn" title={t('editor.export')} onClick={async () => {
-            try {
-              const res = await api.exportBOM(projectId);
-              const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `bom_${projectId}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-              toast(t('toast.bomExported'), "success");
-            } catch (err) {
-              toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-            }
-          }} style={{ padding: "5px 7px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          </button>
-          <button className="btn btn-ghost" title={t('editor.exportPdf')} onClick={async () => {
-            try {
-              generateQuotePdf({
-                projectName,
-                projectDescription: projectDesc,
-                bom,
-                locale,
-              });
-              toast(t('toast.bomExported'), "success");
-            } catch (err) {
-              toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-            }
-          }} style={{ padding: "5px 7px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          </button>
+          <div style={{ position: "relative" }} data-tour="export-btn">
+            <button className="btn btn-ghost" title={t('editor.export')} onClick={() => setShowExportMenu(v => !v)} style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {showExportMenu && (
+              <div style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-lg)",
+                padding: 4,
+                minWidth: 160,
+                zIndex: 100,
+              }}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    try {
+                      generateQuotePdf({ projectName, projectDescription: projectDesc, bom, locale });
+                      toast(t('toast.bomExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    }
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  PDF
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    try {
+                      await api.exportBOMCsv(projectId, projectName);
+                      toast(t('toast.bomExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    }
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="3" y1="15" x2="21" y2="15" />
+                    <line x1="9" y1="3" x2="9" y2="21" />
+                  </svg>
+                  CSV
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={async () => {
+                    setShowExportMenu(false);
+                    try {
+                      const res = await api.exportBOM(projectId);
+                      const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `bom_${projectId}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast(t('toast.bomExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    }
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z" />
+                    <polyline points="16 3 16 8 21 8" />
+                  </svg>
+                  JSON
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
