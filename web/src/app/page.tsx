@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api, setToken, getToken } from "@/lib/api";
 
 interface Project {
@@ -11,7 +11,184 @@ interface Project {
   updated_at: string;
 }
 
-function LoginForm({ onLogin }: { onLogin: () => void }) {
+interface BuildingResult {
+  address: string;
+  coordinates: { lat: number; lon: number };
+  building_info: {
+    type: string;
+    year_built: number;
+    material: string;
+    floors: number;
+    area_m2: number;
+    heating: string;
+    roof_type?: string;
+    roof_material?: string;
+    units?: number;
+  };
+  scene_js: string;
+  bom_suggestion: { material_id: string; quantity: number; unit: string }[];
+}
+
+const BUILDING_TYPE_LABELS: Record<string, string> = {
+  omakotitalo: "Omakotitalo",
+  rivitalo: "Rivitalo",
+  kerrostalo: "Kerrostalo",
+  paritalo: "Paritalo",
+};
+
+const MATERIAL_LABELS: Record<string, string> = {
+  puu: "Puu",
+  tiili: "Tiili",
+  betoni: "Betoni",
+  hirsi: "Hirsi",
+};
+
+const HEATING_LABELS: Record<string, string> = {
+  kaukolampo: "Kaukolampo",
+  sahko: "Sahko",
+  maalampopumppu: "Maalampopumppu",
+  oljy: "Oljy",
+};
+
+function AddressSearch({ onCreateProject }: { onCreateProject: (building: BuildingResult) => void }) {
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<BuildingResult | null>(null);
+  const [searched, setSearched] = useState(false);
+
+  const search = useCallback(async () => {
+    if (!query.trim() || query.trim().length < 3) return;
+    setLoading(true);
+    setSearched(true);
+    try {
+      const data = await api.getBuilding(query.trim());
+      setResult(data);
+    } catch {
+      setResult(null);
+    }
+    setLoading(false);
+  }, [query]);
+
+  return (
+    <div style={{
+      width: "100%",
+      padding: "48px 24px 40px",
+      background: "linear-gradient(180deg, rgba(196,145,92,0.06) 0%, transparent 100%)",
+      borderBottom: "1px solid var(--border)",
+    }}>
+      <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
+        <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 12, letterSpacing: "0.12em" }}>
+          TALOHAUN DEMO
+        </div>
+        <h2 className="heading-display" style={{ fontSize: 28, marginBottom: 8 }}>
+          Miltae talosi nayttaa 3D:ssa?
+        </h2>
+        <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 24 }}>
+          Syota osoitteesi ja nae talosi kolmiulotteisena mallina.
+        </p>
+
+        <div style={{ display: "flex", gap: 8, maxWidth: 520, margin: "0 auto" }}>
+          <input
+            className="input"
+            placeholder="Syota osoitteesi, esim. Ribbingintie 109..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (searched) { setResult(null); setSearched(false); }
+            }}
+            onKeyDown={(e) => e.key === "Enter" && search()}
+            style={{ flex: 1, padding: "14px 16px", fontSize: 15 }}
+          />
+          <button
+            className={`btn ${query.trim().length >= 3 ? "btn-primary" : "btn-ghost"}`}
+            onClick={search}
+            disabled={loading || query.trim().length < 3}
+            style={{ padding: "14px 28px", fontSize: 14 }}
+          >
+            {loading ? "Haetaan..." : "Hae"}
+          </button>
+        </div>
+
+        {result && (
+          <div className="card anim-up" style={{
+            marginTop: 24,
+            padding: "24px 28px",
+            textAlign: "left",
+            maxWidth: 520,
+            marginLeft: "auto",
+            marginRight: "auto",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <h3 className="heading-display" style={{ fontSize: 18, marginBottom: 4 }}>
+                  {result.address}
+                </h3>
+                <span className="badge badge-amber">
+                  {BUILDING_TYPE_LABELS[result.building_info.type] || result.building_info.type}
+                </span>
+              </div>
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--text-muted)",
+                textAlign: "right",
+              }}>
+                {result.coordinates.lat.toFixed(4)}, {result.coordinates.lon.toFixed(4)}
+              </div>
+            </div>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 12,
+              marginBottom: 20,
+            }}>
+              {[
+                { label: "Rakennettu", value: String(result.building_info.year_built) },
+                { label: "Pinta-ala", value: `${result.building_info.area_m2} m\u00B2` },
+                { label: "Kerroksia", value: String(result.building_info.floors) },
+                { label: "Materiaali", value: MATERIAL_LABELS[result.building_info.material] || result.building_info.material },
+                { label: "Lammitys", value: HEATING_LABELS[result.building_info.heating] || result.building_info.heating },
+                { label: "BOM-rivit", value: `${result.bom_suggestion.length} kpl` },
+              ].map((item, i) => (
+                <div key={i} style={{
+                  padding: "10px 12px",
+                  background: "var(--bg-tertiary)",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
+                }}>
+                  <div className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={() => onCreateProject(result)}
+              style={{ width: "100%", padding: "13px 16px", fontSize: 14 }}
+            >
+              Luo projekti tasta talosta
+            </button>
+          </div>
+        )}
+
+        {searched && !loading && !result && (
+          <div className="anim-fade" style={{
+            marginTop: 20,
+            padding: "16px",
+            color: "var(--text-muted)",
+            fontSize: 13,
+          }}>
+            Osoitetta ei loytynyt. Kokeile esim. &quot;Ribbingintie 109&quot; tai &quot;Uunimaentie 1&quot;.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingBuilding: BuildingResult | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -136,9 +313,11 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
               {isRegister ? "Luo tili" : "Kirjaudu sisaan"}
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
-              {isRegister
-                ? "Aloita rakennusprojektien suunnittelu"
-                : "Jatka siita mihin jait"}
+              {pendingBuilding
+                ? "Kirjaudu luodaksesi projekti osoitteesta: " + pendingBuilding.address
+                : isRegister
+                  ? "Aloita rakennusprojektien suunnittelu"
+                  : "Jatka siita mihin jait"}
             </p>
           </div>
 
@@ -452,6 +631,7 @@ function ProjectList() {
 
 export default function Home() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [pendingBuilding, setPendingBuilding] = useState<BuildingResult | null>(null);
 
   useEffect(() => {
     if (getToken()) {
@@ -459,6 +639,53 @@ export default function Home() {
     }
   }, []);
 
-  if (!loggedIn) return <LoginForm onLogin={() => setLoggedIn(true)} />;
-  return <ProjectList />;
+  async function handleCreateFromBuilding(building: BuildingResult) {
+    if (!loggedIn) {
+      // Store the building and prompt login
+      setPendingBuilding(building);
+      return;
+    }
+    await createProjectFromBuilding(building);
+  }
+
+  async function createProjectFromBuilding(building: BuildingResult) {
+    try {
+      const project = await api.createProject({
+        name: building.address,
+        description: `${BUILDING_TYPE_LABELS[building.building_info.type] || building.building_info.type}, ${building.building_info.year_built}, ${building.building_info.area_m2} m\u00B2`,
+        scene_js: building.scene_js,
+      });
+      if (building.bom_suggestion.length > 0) {
+        await api.saveBOM(project.id, building.bom_suggestion);
+      }
+      window.location.href = `/project/${project.id}`;
+    } catch (err) {
+      console.error("Failed to create project from building:", err);
+    }
+  }
+
+  async function handleLogin() {
+    setLoggedIn(true);
+    // If there was a pending building lookup, create the project now
+    if (pendingBuilding) {
+      await createProjectFromBuilding(pendingBuilding);
+      setPendingBuilding(null);
+    }
+  }
+
+  if (!loggedIn) {
+    return (
+      <div>
+        <AddressSearch onCreateProject={handleCreateFromBuilding} />
+        <LoginForm onLogin={handleLogin} pendingBuilding={pendingBuilding} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <AddressSearch onCreateProject={handleCreateFromBuilding} />
+      <ProjectList />
+    </div>
+  );
 }

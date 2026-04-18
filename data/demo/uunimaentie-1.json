@@ -1,0 +1,28 @@
+{
+  "address": "Uunimaentie 1, 01200 Vantaa",
+  "coordinates": { "lat": 60.2924, "lon": 25.0462 },
+  "building_info": {
+    "type": "rivitalo",
+    "year_built": 1978,
+    "material": "tiili",
+    "floors": 2,
+    "area_m2": 220,
+    "heating": "kaukolampo",
+    "roof_type": "harjakatto",
+    "roof_material": "tiili",
+    "units": 4
+  },
+  "scene_js": "// Uunimaentie 1, Vantaa — 1970s rivitalo (row house), 4 units\n// Long rectangular footprint ~28x8m, 2 stories, brick facade, tile roof\n\n// Foundation\nconst foundation = translate(cube({size: [28, 0.35, 8], center: true}), [0, 0.175, 0]);\n\n// Ground floor walls\nconst gf_front = translate(cube({size: [28, 2.7, 0.25], center: true}), [0, 1.7, -3.875]);\nconst gf_back = translate(cube({size: [28, 2.7, 0.25], center: true}), [0, 1.7, 3.875]);\nconst gf_left = translate(cube({size: [0.25, 2.7, 8], center: true}), [-13.875, 1.7, 0]);\nconst gf_right = translate(cube({size: [0.25, 2.7, 8], center: true}), [13.875, 1.7, 0]);\n\n// Unit dividing walls (3 dividers for 4 units, each ~7m wide)\nconst div1 = translate(cube({size: [0.2, 2.7, 8], center: true}), [-7, 1.7, 0]);\nconst div2 = translate(cube({size: [0.2, 2.7, 8], center: true}), [0, 1.7, 0]);\nconst div3 = translate(cube({size: [0.2, 2.7, 8], center: true}), [7, 1.7, 0]);\n\n// Front doors (one per unit)\nconst door1 = translate(cube({size: [1.0, 2.1, 0.35], center: true}), [-10.5, 1.4, -3.875]);\nconst door2 = translate(cube({size: [1.0, 2.1, 0.35], center: true}), [-3.5, 1.4, -3.875]);\nconst door3 = translate(cube({size: [1.0, 2.1, 0.35], center: true}), [3.5, 1.4, -3.875]);\nconst door4 = translate(cube({size: [1.0, 2.1, 0.35], center: true}), [10.5, 1.4, -3.875]);\nconst gf_front_cut = difference(difference(difference(difference(gf_front, door1), door2), door3), door4);\n\n// Front windows (two per unit)\nconst fw = [];\nconst fwPositions = [-12.5, -8.5, -5.5, -1.5, 1.5, 5.5, 8.5, 12.5];\nlet gf_front_final = gf_front_cut;\nfor (let i = 0; i < fwPositions.length; i++) {\n  const w = translate(cube({size: [1.2, 1.3, 0.35], center: true}), [fwPositions[i], 1.8, -3.875]);\n  gf_front_final = difference(gf_front_final, w);\n}\n\n// Back windows and terrace doors\nlet gf_back_final = gf_back;\nconst bwPositions = [-11.5, -8.0, -4.5, -1.0, 1.0, 4.5, 8.0, 11.5];\nfor (let i = 0; i < bwPositions.length; i++) {\n  const w = translate(cube({size: [1.4, 1.3, 0.35], center: true}), [bwPositions[i], 1.8, 3.875]);\n  gf_back_final = difference(gf_back_final, w);\n}\n\n// First floor slab\nconst floor1 = translate(cube({size: [28, 0.25, 8], center: true}), [0, 3.175, 0]);\n\n// Upper floor walls\nconst uf_front = translate(cube({size: [28, 2.7, 0.25], center: true}), [0, 4.65, -3.875]);\nconst uf_back = translate(cube({size: [28, 2.7, 0.25], center: true}), [0, 4.65, 3.875]);\nconst uf_left = translate(cube({size: [0.25, 2.7, 8], center: true}), [-13.875, 4.65, 0]);\nconst uf_right = translate(cube({size: [0.25, 2.7, 8], center: true}), [13.875, 4.65, 0]);\n\n// Upper dividers\nconst udiv1 = translate(cube({size: [0.2, 2.7, 8], center: true}), [-7, 4.65, 0]);\nconst udiv2 = translate(cube({size: [0.2, 2.7, 8], center: true}), [0, 4.65, 0]);\nconst udiv3 = translate(cube({size: [0.2, 2.7, 8], center: true}), [7, 4.65, 0]);\n\n// Upper floor windows\nlet uf_front_final = uf_front;\nfor (let i = 0; i < fwPositions.length; i++) {\n  const w = translate(cube({size: [1.1, 1.1, 0.35], center: true}), [fwPositions[i], 4.7, -3.875]);\n  uf_front_final = difference(uf_front_final, w);\n}\n\nlet uf_back_final = uf_back;\nfor (let i = 0; i < bwPositions.length; i++) {\n  const w = translate(cube({size: [1.1, 1.1, 0.35], center: true}), [bwPositions[i], 4.7, 3.875]);\n  uf_back_final = difference(uf_back_final, w);\n}\n\n// Gable roof — 25deg pitch, tile look\nconst roof_left = translate(rotate(cube({size: [28.8, 0.1, 5.2], center: true}), [0.44, 0, 0]), [0, 7.4, -2.2]);\nconst roof_right = translate(rotate(cube({size: [28.8, 0.1, 5.2], center: true}), [-0.44, 0, 0]), [0, 7.4, 2.2]);\n\nscene = union(\n  foundation,\n  gf_front_final, gf_back_final, gf_left, gf_right,\n  div1, div2, div3,\n  floor1,\n  uf_front_final, uf_back_final, uf_left, uf_right,\n  udiv1, udiv2, udiv3,\n  roof_left, roof_right\n);",
+  "bom_suggestion": [
+    { "material_id": "pine_48x148_c24", "quantity": 180, "unit": "jm" },
+    { "material_id": "pine_48x98_c24", "quantity": 120, "unit": "jm" },
+    { "material_id": "osb_11mm", "quantity": 96, "unit": "m2" },
+    { "material_id": "mineral_wool_150", "quantity": 220, "unit": "m2" },
+    { "material_id": "concrete_c25", "quantity": 22, "unit": "m3" },
+    { "material_id": "metal_roof_ruukki", "quantity": 140, "unit": "m2" },
+    { "material_id": "gypsum_board_13mm", "quantity": 380, "unit": "m2" },
+    { "material_id": "vapor_barrier", "quantity": 260, "unit": "m2" },
+    { "material_id": "wind_barrier", "quantity": 260, "unit": "m2" },
+    { "material_id": "wood_screw_5x80", "quantity": 3000, "unit": "kpl" }
+  ]
+}

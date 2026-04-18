@@ -1,0 +1,27 @@
+{
+  "address": "Ribbingintie 109-11, 00890 Helsinki",
+  "coordinates": { "lat": 60.2685, "lon": 25.1955 },
+  "building_info": {
+    "type": "omakotitalo",
+    "year_built": 1985,
+    "material": "puu",
+    "floors": 2,
+    "area_m2": 135,
+    "heating": "kaukolampo",
+    "roof_type": "harjakatto",
+    "roof_material": "pelti"
+  },
+  "scene_js": "// Ribbingintie 109-11, Helsinki — 1980s omakotitalo\n// Rectangular 2-story wood-frame house, gable roof, ~10x12m footprint\n\n// Foundation (visible concrete, 0.3m)\nconst foundation = translate(cube({size: [12, 0.3, 10], center: true}), [0, 0.15, 0]);\n\n// Ground floor walls (2.7m)\nconst gf_wall_front = translate(cube({size: [12, 2.7, 0.2], center: true}), [0, 1.65, -4.9]);\nconst gf_wall_back = translate(cube({size: [12, 2.7, 0.2], center: true}), [0, 1.65, 4.9]);\nconst gf_wall_left = translate(cube({size: [0.2, 2.7, 10], center: true}), [-5.9, 1.65, 0]);\nconst gf_wall_right = translate(cube({size: [0.2, 2.7, 10], center: true}), [5.9, 1.65, 0]);\n\n// Front door opening\nconst front_door = translate(cube({size: [1.0, 2.1, 0.3], center: true}), [0, 1.35, -4.9]);\nconst gf_wall_front_cut = difference(gf_wall_front, front_door);\n\n// Ground floor windows\nconst gf_win1 = translate(cube({size: [1.2, 1.4, 0.3], center: true}), [-3.0, 1.7, -4.9]);\nconst gf_win2 = translate(cube({size: [1.2, 1.4, 0.3], center: true}), [3.0, 1.7, -4.9]);\nconst gf_wall_front_final = difference(difference(gf_wall_front_cut, gf_win1), gf_win2);\n\n// Back wall windows\nconst gf_bwin1 = translate(cube({size: [1.4, 1.4, 0.3], center: true}), [-3.0, 1.7, 4.9]);\nconst gf_bwin2 = translate(cube({size: [1.4, 1.4, 0.3], center: true}), [2.0, 1.7, 4.9]);\nconst gf_wall_back_final = difference(difference(gf_wall_back, gf_bwin1), gf_bwin2);\n\n// First floor slab\nconst floor1 = translate(cube({size: [12, 0.25, 10], center: true}), [0, 3.125, 0]);\n\n// Upper floor walls (2.7m)\nconst uf_wall_front = translate(cube({size: [12, 2.7, 0.2], center: true}), [0, 4.6, -4.9]);\nconst uf_wall_back = translate(cube({size: [12, 2.7, 0.2], center: true}), [0, 4.6, 4.9]);\nconst uf_wall_left = translate(cube({size: [0.2, 2.7, 10], center: true}), [-5.9, 4.6, 0]);\nconst uf_wall_right = translate(cube({size: [0.2, 2.7, 10], center: true}), [5.9, 4.6, 0]);\n\n// Upper floor windows\nconst uf_win1 = translate(cube({size: [1.2, 1.2, 0.3], center: true}), [-3.0, 4.6, -4.9]);\nconst uf_win2 = translate(cube({size: [1.2, 1.2, 0.3], center: true}), [1.0, 4.6, -4.9]);\nconst uf_win3 = translate(cube({size: [1.2, 1.2, 0.3], center: true}), [4.0, 4.6, -4.9]);\nconst uf_wall_front_final = difference(difference(difference(uf_wall_front, uf_win1), uf_win2), uf_win3);\n\nconst uf_bwin1 = translate(cube({size: [1.2, 1.2, 0.3], center: true}), [-2.0, 4.6, 4.9]);\nconst uf_bwin2 = translate(cube({size: [1.2, 1.2, 0.3], center: true}), [2.5, 4.6, 4.9]);\nconst uf_wall_back_final = difference(difference(uf_wall_back, uf_bwin1), uf_bwin2);\n\n// Gable roof — two sloped panels, 30deg pitch\nconst roof_left = translate(rotate(cube({size: [12.6, 0.08, 6.2], center: true}), [0.52, 0, 0]), [0, 7.5, -2.5]);\nconst roof_right = translate(rotate(cube({size: [12.6, 0.08, 6.2], center: true}), [-0.52, 0, 0]), [0, 7.5, 2.5]);\n\n// Front porch roof and posts\nconst porch_post_l = translate(cube({size: [0.12, 2.5, 0.12], center: true}), [-1.0, 1.55, -5.8]);\nconst porch_post_r = translate(cube({size: [0.12, 2.5, 0.12], center: true}), [1.0, 1.55, -5.8]);\nconst porch_roof = translate(rotate(cube({size: [2.8, 0.06, 1.4], center: true}), [0.15, 0, 0]), [0, 2.9, -5.5]);\nconst porch_floor = translate(cube({size: [2.4, 0.12, 1.2], center: true}), [0, 0.36, -5.5]);\n\nscene = union(\n  foundation,\n  gf_wall_front_final, gf_wall_back_final, gf_wall_left, gf_wall_right,\n  floor1,\n  uf_wall_front_final, uf_wall_back_final, uf_wall_left, uf_wall_right,\n  roof_left, roof_right,\n  porch_post_l, porch_post_r, porch_roof, porch_floor\n);",
+  "bom_suggestion": [
+    { "material_id": "pine_48x148_c24", "quantity": 85, "unit": "jm" },
+    { "material_id": "pine_48x98_c24", "quantity": 60, "unit": "jm" },
+    { "material_id": "osb_11mm", "quantity": 48, "unit": "m2" },
+    { "material_id": "mineral_wool_150", "quantity": 96, "unit": "m2" },
+    { "material_id": "concrete_c25", "quantity": 8.5, "unit": "m3" },
+    { "material_id": "metal_roof_ruukki", "quantity": 72, "unit": "m2" },
+    { "material_id": "gypsum_board_13mm", "quantity": 180, "unit": "m2" },
+    { "material_id": "vapor_barrier", "quantity": 120, "unit": "m2" },
+    { "material_id": "wind_barrier", "quantity": 120, "unit": "m2" },
+    { "material_id": "wood_screw_5x80", "quantity": 1200, "unit": "kpl" }
+  ]
+}
