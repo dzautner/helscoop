@@ -724,12 +724,14 @@ export default function BomPanel({
   onAdd,
   onRemove,
   onUpdateQty,
+  style,
 }: {
   bom: BomItem[];
   materials: Material[];
   onAdd: (materialId: string, qty: number) => void;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
+  style?: React.CSSProperties;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -855,6 +857,7 @@ export default function BomPanel({
     <div
       className="editor-bom-panel"
       data-tour="bom-panel"
+      style={style}
     >
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

@@ -77,6 +77,13 @@ export default function ProjectPage() {
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [wireframe, setWireframe] = useState(false);
+  const [bomWidth, setBomWidth] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("helscoop_bom_width");
+      if (saved) return Math.max(260, Math.min(600, parseInt(saved, 10)));
+    }
+    return 340;
+  });
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
   const [viewportKey, setViewportKey] = useState(0);
@@ -89,6 +96,7 @@ export default function ProjectPage() {
   const bomChangedRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
   const captureThumbRef = useRef<(() => string | null) | null>(null);
+  const resizingRef = useRef(false);
 
   const pushHistory = useCallback((code: string) => {
     const history = historyRef.current;
@@ -231,6 +239,33 @@ export default function ProjectPage() {
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [showExportMenu]);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = bomWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = startX - ev.clientX;
+      const next = Math.max(260, Math.min(600, startWidth + delta));
+      setBomWidth(next);
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setBomWidth((w) => {
+        localStorage.setItem("helscoop_bom_width", String(w));
+        return w;
+      });
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [bomWidth]);
 
   const handleSceneChange = useCallback(
     (code: string) => {
@@ -702,15 +737,22 @@ export default function ProjectPage() {
           <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
         </div>
 
-        {/* BOM panel */}
+        {/* Resize handle + BOM panel */}
         {showBom && (
-          <BomPanel
-            bom={bom}
-            materials={materials}
-            onAdd={addBomItem}
-            onRemove={removeBomItem}
-            onUpdateQty={updateBomQty}
-          />
+          <>
+            <div
+              className="resize-handle-v"
+              onMouseDown={startResize}
+            />
+            <BomPanel
+              bom={bom}
+              materials={materials}
+              onAdd={addBomItem}
+              onRemove={removeBomItem}
+              onUpdateQty={updateBomQty}
+              style={{ width: bomWidth }}
+            />
+          </>
         )}
       </div>
 

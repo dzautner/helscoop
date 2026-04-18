@@ -560,6 +560,37 @@ body {
   overflow: hidden;
 }
 
+.resize-handle-v {
+  width: 5px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  margin: 0 -2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.resize-handle-v:hover,
+.resize-handle-v:active {
+  background: var(--amber);
+}
+.resize-handle-v::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--border);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.resize-handle-v:hover::after {
+  opacity: 1;
+}
+
 .editor-bom-panel {
   width: 340px;
   border-left: 1px solid var(--border);
