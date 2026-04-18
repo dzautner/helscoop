@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { ChatMessage } from "@/types";
 
 export default function ChatPanel({
@@ -16,8 +17,29 @@ export default function ChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
+  const [skipConfirm, setSkipConfirm] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  function handleApplyClick(code: string) {
+    if (skipConfirm) {
+      onApplyCode(code);
+      return;
+    }
+    setPendingCode(code);
+  }
+
+  function handleConfirmApply() {
+    if (pendingCode) {
+      onApplyCode(pendingCode);
+      setPendingCode(null);
+    }
+  }
+
+  function handleCancelApply() {
+    setPendingCode(null);
+  }
 
   async function send() {
     if (!input.trim() || loading) return;
@@ -125,7 +147,7 @@ export default function ChatPanel({
               {code && (
                 <button
                   className="btn"
-                  onClick={() => onApplyCode(code)}
+                  onClick={() => handleApplyClick(code)}
                   style={{
                     marginTop: 6,
                     padding: "4px 10px",
@@ -179,6 +201,51 @@ export default function ChatPanel({
           </svg>
         </button>
       </div>
+      <ConfirmDialog
+        open={pendingCode !== null}
+        title={t('editor.confirmApplyTitle') || "Apply AI-generated code?"}
+        message={
+          (t('editor.confirmApplyMessage') ||
+            "This will replace your current scene script with the AI-generated code.") +
+          "\n\n" +
+          (t('editor.confirmApplyUndo') || "You can undo with") +
+          ` ${navigator.platform?.includes("Mac") ? "Cmd" : "Ctrl"}+Z`
+        }
+        confirmText={t('editor.applyToScene') || "Apply to scene"}
+        cancelText={t('editor.cancel') || "Cancel"}
+        onConfirm={handleConfirmApply}
+        onCancel={handleCancelApply}
+      />
+      {pendingCode !== null && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 80,
+            right: 24,
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+            fontSize: 12,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            id="skip-confirm"
+            checked={skipConfirm}
+            onChange={(e) => setSkipConfirm(e.target.checked)}
+            style={{ accentColor: "var(--accent)" }}
+          />
+          <label htmlFor="skip-confirm" style={{ cursor: "pointer" }}>
+            {t('editor.dontAskAgain') || "Don't ask again this session"}
+          </label>
+        </div>
+      )}
     </div>
   );
 }

@@ -41,6 +41,23 @@ const TOOLBAR_BTN: React.CSSProperties = {
   transition: "background 0.15s, color 0.15s",
 };
 
+/** Recursively dispose all geometries and materials in an Object3D tree */
+function disposeObject(obj: THREE.Object3D) {
+  while (obj.children.length > 0) {
+    const child = obj.children[0];
+    disposeObject(child);
+    obj.remove(child);
+  }
+  if (obj instanceof THREE.Mesh) {
+    obj.geometry.dispose();
+    if (Array.isArray(obj.material)) {
+      obj.material.forEach((m) => m.dispose());
+    } else if (obj.material) {
+      obj.material.dispose();
+    }
+  }
+}
+
 function createGeometry(obj: SceneObject): THREE.BufferGeometry {
   switch (obj.geometry) {
     case "box":
@@ -409,16 +426,12 @@ export default function Viewport3D({
       const group = objectGroupRef.current;
       if (!group) return;
 
-      // Clear existing objects
+      // Recursively dispose all geometries and materials (including nested groups)
+      // to prevent GPU memory leaks during prolonged editing sessions
       while (group.children.length > 0) {
         const child = group.children[0];
+        disposeObject(child);
         group.remove(child);
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
-          }
-        }
       }
 
       // Interpret and render
