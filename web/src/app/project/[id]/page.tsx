@@ -11,6 +11,7 @@ import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
+import OnboardingTour from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { generateQuotePdf } from "@/lib/pdf";
 import Link from "next/link";
@@ -647,6 +648,8 @@ export default function ProjectPage() {
         onClose={() => setShowShortcutsHelp(false)}
         shortcuts={shortcuts}
       />
+
+      <OnboardingTour />
     </div>
   );
 }

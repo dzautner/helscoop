@@ -106,16 +106,16 @@ function CostBreakdownChart({
       <div
         style={{
           display: "flex",
-          gap: 16,
+          flexDirection: "column",
+          gap: 14,
           alignItems: "center",
-          flexWrap: "wrap",
         }}
       >
         {/* Donut */}
         <div
           style={{
-            width: 130,
-            height: 130,
+            width: 100,
+            height: 100,
             borderRadius: "50%",
             background: gradient,
             position: "relative",
@@ -125,7 +125,7 @@ function CostBreakdownChart({
           <div
             style={{
               position: "absolute",
-              inset: 22,
+              inset: 18,
               borderRadius: "50%",
               background: "var(--bg-tertiary)",
               display: "flex",
@@ -136,16 +136,16 @@ function CostBreakdownChart({
           >
             <span
               className="heading-display"
-              style={{ fontSize: 16, lineHeight: 1.1, color: "var(--text-primary)" }}
+              style={{ fontSize: 14, lineHeight: 1.1, color: "var(--text-primary)" }}
             >
               {total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}
             </span>
-            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>&euro;</span>
+            <span style={{ fontSize: 9, color: "var(--text-muted)" }}>&euro;</span>
           </div>
         </div>
 
         {/* Legend */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, width: "100%" }}>
           {slices.map((s) => (
             <div
               key={s.name}
@@ -167,10 +167,7 @@ function CostBreakdownChart({
               />
               <span
                 style={{
-                  color: "var(--text-muted)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  color: "var(--text-secondary)",
                   fontFamily: "var(--font-sans)",
                 }}
               >
@@ -182,6 +179,7 @@ function CostBreakdownChart({
                   fontFamily: "var(--font-mono)",
                   color: "var(--text-primary)",
                   whiteSpace: "nowrap",
+                  fontSize: 10,
                 }}
               >
                 {s.pct.toFixed(0)}% &middot; {s.total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}&euro;
