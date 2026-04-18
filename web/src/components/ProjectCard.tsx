@@ -18,19 +18,10 @@ export default function ProjectCard({
 
   return (
     <div
-      className="card anim-up project-card-grid"
+      className="card card-interactive anim-up project-card-grid"
       style={{
         animationDelay: `${index * 0.04}s`,
         padding: "22px 28px",
-        cursor: "pointer",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--amber-border)";
-        e.currentTarget.style.boxShadow = "var(--shadow-amber)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "var(--border)";
-        e.currentTarget.style.boxShadow = "none";
       }}
       onClick={() => (window.location.href = `/project/${project.id}`)}
     >

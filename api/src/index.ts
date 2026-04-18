@@ -19,6 +19,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
 const IS_TEST = process.env.NODE_ENV === "test";
 const startedAt = Date.now();
+const IS_DEV = process.env.NODE_ENV === "development";
 
 // Security headers
 app.use(helmet());
@@ -64,7 +65,7 @@ function extractUserId(req: express.Request): string | null {
 // Anonymous/public endpoints: 100 requests per 15 minutes per IP
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: IS_TEST ? 10000 : 100,
+  max: IS_TEST ? 10000 : IS_DEV ? 1000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
@@ -76,7 +77,7 @@ const publicLimiter = rateLimit({
 // routes (they'll be rejected by requireAuth anyway, but still rate-limited).
 const authenticatedLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: IS_TEST ? 10000 : 500,
+  max: IS_TEST ? 10000 : IS_DEV ? 5000 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
@@ -86,10 +87,11 @@ const authenticatedLimiter = rateLimit({
   message: { error: "Too many requests, please try again later" },
 });
 
-// Stricter rate limiter for auth endpoints: 10 requests per 15 minutes per IP
+// Auth endpoints: 30 requests per 15 minutes per IP (generous enough for
+// typos and page refreshes, tight enough to deter brute force)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: IS_TEST ? 10000 : 10,
+  max: IS_TEST ? 10000 : IS_DEV ? 200 : 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many auth attempts, please try again later" },
@@ -98,7 +100,7 @@ const authLimiter = rateLimit({
 // Stricter rate limiter for chat endpoint: 20 requests per 15 minutes per IP
 const chatLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: IS_TEST ? 10000 : 20,
+  max: IS_TEST ? 10000 : IS_DEV ? 200 : 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many chat requests, please try again later" },

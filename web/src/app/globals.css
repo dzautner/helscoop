@@ -947,6 +947,28 @@ body {
 .project-card-actions {
   display: flex;
   gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.project-card-grid:hover .project-card-actions {
+  opacity: 1;
+}
+
+/* Interactive card — hover lift + amber glow */
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  border-color: var(--amber-border);
+  box-shadow: var(--shadow-amber);
+  transform: translateY(-1px);
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+  transition-duration: 0.06s;
 }
 
 /* Template cards grid */
@@ -954,6 +976,16 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 8px;
+}
+
+/* Template card icon glow on hover */
+.card-interactive:hover .template-icon {
+  border-color: var(--amber-border);
+  background: var(--amber-glow);
+}
+
+.card-interactive:hover .template-icon svg {
+  stroke: var(--amber);
 }
 
 /* Building info grid */
@@ -1081,6 +1113,7 @@ body {
 
   .project-card-actions {
     flex-wrap: wrap;
+    opacity: 1;
   }
 
   .template-grid {

@@ -58,7 +58,7 @@ export default function TemplateGrid({
           {templates.map((tmpl, i) => (
             <button
               key={tmpl.id}
-              className="card anim-up"
+              className="card card-interactive anim-up"
               disabled={creating}
               onClick={() => onCreateFromTemplate(tmpl)}
               style={{
@@ -70,17 +70,9 @@ export default function TemplateGrid({
                 font: "inherit",
                 color: "inherit",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--amber-border)";
-                e.currentTarget.style.boxShadow = "var(--shadow-amber)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 10 }}>
-                <div style={{
+                <div className="template-icon" style={{
                   width: 40,
                   height: 40,
                   borderRadius: "var(--radius-sm)",
@@ -90,6 +82,7 @@ export default function TemplateGrid({
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
+                  transition: "background 0.15s ease, border-color 0.15s ease",
                 }}>
                   <svg
                     width="20"
@@ -100,6 +93,7 @@ export default function TemplateGrid({
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    style={{ transition: "stroke 0.15s ease" }}
                   >
                     <path d={TEMPLATE_ICONS[tmpl.icon] || TEMPLATE_ICONS.shed} />
                   </svg>

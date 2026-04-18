@@ -270,31 +270,12 @@ export default function ProjectList({
           </div>
         ) : projects.length === 0 ? (
           <div className="anim-up delay-1" style={{
-            padding: "80px 40px",
+            padding: "32px 28px",
             textAlign: "center",
-            borderRadius: "var(--radius-xl)",
-            border: "1px dashed var(--border-strong)",
-            background: "var(--bg-secondary)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px dashed var(--border)",
           }}>
-            <div style={{
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              background: "var(--bg-tertiary)",
-              border: "1px solid var(--border-strong)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 20,
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M5 21V5l7-3 7 3v16" />
-              </svg>
-            </div>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-              {t('project.noProjects')}
-            </h3>
-            <p style={{ color: "var(--text-muted)", fontSize: 14, maxWidth: 360, margin: "0 auto" }}>
+            <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
               {t('project.noProjectsDesc')}
             </p>
           </div>
