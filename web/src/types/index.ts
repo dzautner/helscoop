@@ -52,6 +52,7 @@ export interface BomItem {
   id?: string;
   material_id: string;
   material_name?: string;
+  category_name?: string;
   image_url?: string | null;
   quantity: number;
   unit: string;

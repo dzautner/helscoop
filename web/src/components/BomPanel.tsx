@@ -1,9 +1,198 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
 import type { BomItem, Material, MaterialPriceData } from "@/types";
+
+/* ── Category color palette ─────────────────────────────────── */
+const CATEGORY_COLORS: Record<string, string> = {
+  "Sahatavara":  "#8B6F47",
+  "Lumber":      "#8B6F47",
+  "Katto":       "#4A5568",
+  "Roofing":     "#4A5568",
+  "Eristys":     "#C49058",
+  "Insulation":  "#C49058",
+  "Perustus":    "#718096",
+  "Foundation":  "#718096",
+  "Kalvo":       "#4A8B7F",
+  "Membrane":    "#4A8B7F",
+  "Kiinnitys":   "#A0AEC0",
+  "Fasteners":   "#A0AEC0",
+  "Sisä":        "#CBD5E0",
+  "Interior":    "#CBD5E0",
+};
+const FALLBACK_COLORS = [
+  "#6B7280", "#9CA3AF", "#78716C", "#7C8A6E", "#8E7B6D", "#7A8B99",
+];
+
+function getCategoryColor(name: string, idx: number): string {
+  for (const [key, color] of Object.entries(CATEGORY_COLORS)) {
+    if (name.toLowerCase().includes(key.toLowerCase())) return color;
+  }
+  return FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+}
+
+/* ── Donut chart sub-component ──────────────────────────────── */
+interface CategorySlice {
+  name: string;
+  total: number;
+  pct: number;
+  color: string;
+}
+
+function CostBreakdownChart({
+  bom,
+  materials,
+  total,
+}: {
+  bom: BomItem[];
+  materials: Material[];
+  total: number;
+}) {
+  const { t } = useTranslation();
+
+  const slices = useMemo<CategorySlice[]>(() => {
+    if (total <= 0) return [];
+
+    const matCategoryMap = new Map<string, string>();
+    for (const m of materials) {
+      matCategoryMap.set(m.id, m.category_name);
+    }
+
+    const groups = new Map<string, number>();
+    for (const item of bom) {
+      const cat = item.category_name || matCategoryMap.get(item.material_id) || "Other";
+      groups.set(cat, (groups.get(cat) || 0) + Number(item.total || 0));
+    }
+
+    const sorted = Array.from(groups.entries()).sort((a, b) => b[1] - a[1]);
+    return sorted.map(([name, catTotal], idx) => ({
+      name,
+      total: catTotal,
+      pct: (catTotal / total) * 100,
+      color: getCategoryColor(name, idx),
+    }));
+  }, [bom, materials, total]);
+
+  if (slices.length === 0) return null;
+
+  let cumDeg = 0;
+  const stops: string[] = [];
+  for (const s of slices) {
+    const deg = (s.pct / 100) * 360;
+    stops.push(`${s.color} ${cumDeg}deg ${cumDeg + deg}deg`);
+    cumDeg += deg;
+  }
+  const gradient = `conic-gradient(${stops.join(", ")})`;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "14px 16px",
+        background: "var(--bg-tertiary)",
+        borderRadius: "var(--radius-md)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <div
+        className="label-mono"
+        style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 12 }}
+      >
+        {t("editor.costBreakdown")}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        {/* Donut */}
+        <div
+          style={{
+            width: 130,
+            height: 130,
+            borderRadius: "50%",
+            background: gradient,
+            position: "relative",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 22,
+              borderRadius: "50%",
+              background: "var(--bg-tertiary)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              className="heading-display"
+              style={{ fontSize: 16, lineHeight: 1.1, color: "var(--text-primary)" }}
+            >
+              {total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>&euro;</span>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, flex: 1 }}>
+          {slices.map((s) => (
+            <div
+              key={s.name}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: s.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  color: "var(--text-muted)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                {s.name}
+              </span>
+              <span
+                style={{
+                  marginLeft: "auto",
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--text-primary)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {s.pct.toFixed(0)}% &middot; {s.total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}&euro;
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PriceComparisonPopup({
   materialId,
@@ -317,6 +506,10 @@ export default function BomPanel({
               -{totalSavings.toFixed(2)} EUR
             </span>
           </div>
+        )}
+        {/* Cost breakdown donut chart */}
+        {bom.length > 0 && total > 0 && (
+          <CostBreakdownChart bom={bom} materials={materials} total={total} />
         )}
       </div>
 
