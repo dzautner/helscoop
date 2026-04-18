@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { getToken } from "@/lib/api";
 
 const STORAGE_KEY = "helscoop_onboarding_completed";
 
@@ -398,7 +399,7 @@ export default function OnboardingTour() {
   );
 
   useEffect(() => {
-    if (isOnboardingCompleted()) {
+    if (!getToken() || isOnboardingCompleted()) {
       setPhase("done");
     } else {
       setPhase("welcome");

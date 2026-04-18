@@ -447,7 +447,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 48px 40px;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-left: 1px solid var(--border);
   position: relative;
 }

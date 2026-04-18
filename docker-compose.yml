@@ -27,6 +27,7 @@ services:
       JWT_SECRET: helscoop-dev-secret-change-in-prod
       PORT: 3001
       NODE_ENV: development
+      CORS_ORIGIN: http://localhost:3000,http://localhost:3002,http://localhost:3052
     depends_on:
       db:
         condition: service_healthy
