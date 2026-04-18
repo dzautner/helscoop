@@ -90,13 +90,28 @@ surfaceArea(geometry)
 boundingBox(geometry)                   // returns {min, max}
 ```
 
-See `examples/` for parametric examples (table, bookshelf, vase, bowl, gear, bolt, gyroid).
+See `examples/` for parametric examples:
+
+| Example | Showcases |
+|---------|-----------|
+| table | Multi-part assembly, oak PBR |
+| bookshelf | linearPattern, three-material walnut/plywood |
+| vase | Twisted extrude, hollow boolean, glazed ceramic PBR |
+| bowl | revolve + smooth, cherry wood PBR |
+| chess | smooth() for organic shapes, ivory PBR |
+| gear | circularPattern, steel metallic PBR |
+| bolt | Hex head + threads, zinc metallic PBR |
+| gyroid | levelSet SDF, lattice structures |
+| lamp | Multi-material: brass metal + cream matte shade |
+| helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode
 
 ```
 ./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720 [--yaw Y --pitch P --dist D]
 ```
+
+Yaw and pitch are in degrees. Default camera: 40° yaw, 23° pitch.
 
 Architecture visual doc pipeline:
 
