@@ -3,16 +3,29 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: dingcad
-      POSTGRES_USER: dingcad
-      POSTGRES_PASSWORD: dingcad_dev
+      POSTGRES_DB: helscoop
+      POSTGRES_USER: helscoop
+      POSTGRES_PASSWORD: helscoop_dev
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dingcad"]
+      test: ["CMD-SHELL", "pg_isready -U helscoop"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -23,13 +36,16 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgres://dingcad:dingcad_dev@db:5432/dingcad
+      DATABASE_URL: postgres://helscoop:helscoop_dev@db:5432/helscoop
       JWT_SECRET: helscoop-dev-secret-change-in-prod
       PORT: 3001
       NODE_ENV: development
       CORS_ORIGIN: http://localhost:3000,http://localhost:3002,http://localhost:3052
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./api/src:/app/src
@@ -50,7 +66,7 @@ services:
   scraper:
     build: ./scraper
     environment:
-      DATABASE_URL: postgres://dingcad:dingcad_dev@db:5432/dingcad
+      DATABASE_URL: postgres://helscoop:helscoop_dev@db:5432/helscoop
     depends_on:
       db:
         condition: service_healthy
@@ -59,3 +75,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:

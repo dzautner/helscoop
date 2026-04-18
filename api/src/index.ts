@@ -18,6 +18,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
 const IS_TEST = process.env.NODE_ENV === "test";
+const startedAt = Date.now();
 
 // Security headers
 app.use(helmet());
@@ -151,7 +152,13 @@ const buildingLimiterAuthenticated = rateLimit({
 });
 
 // Health check — no rate limit
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/health", (_req, res) =>
+  res.json({
+    status: "ok",
+    version: process.env.APP_VERSION || "dev",
+    uptime: Math.floor((Date.now() - startedAt) / 1000),
+  })
+);
 
 // Email validation regex
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
