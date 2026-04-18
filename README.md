@@ -80,7 +80,9 @@ hull(a, b, c)                          // convex hull of geometries
 levelSet({sdf, bounds, edgeLength})     // sdf: ([x,y,z]) => number, bounds: {min, max}
 trimByPlane(geometry, [nx,ny,nz], offset)
 
-// 2D polygon operations
+// 2D polygon primitives & operations
+circle2D(radius, segments?)                // polygon array for a circle (default 32 segments)
+rect2D(width, height, center?)             // polygon array for a rectangle
 offset2D(polygon, delta)                   // offset polygon outward (+) or inward (-)
 offset2D(polygon, {delta, join, segments}) // join: "round"|"square"|"miter"|"bevel"
 

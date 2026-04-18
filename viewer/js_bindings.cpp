@@ -1148,6 +1148,55 @@ JSValue JsRevolve(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return WrapManifold(ctx, std::move(manifold));
 }
 
+// circle2D(radius, segments?) — returns a polygon array for a circle
+JSValue JsCircle2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 1) return JS_ThrowTypeError(ctx, "circle2D expects (radius, segments?)");
+  double radius = 10.0;
+  int32_t segments = 32;
+  if (JS_ToFloat64(ctx, &radius, argv[0]) < 0) return JS_EXCEPTION;
+  if (argc >= 2 && JS_IsNumber(argv[1])) {
+    if (JS_ToInt32(ctx, &segments, argv[1]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 3) segments = 3;
+
+  JSValue poly = JS_NewArray(ctx);
+  for (int i = 0; i < segments; i++) {
+    double angle = 2.0 * M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, radius * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, radius * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// rect2D(width, height, center?) — returns a polygon array for a rectangle
+JSValue JsRect2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "rect2D expects (width, height, center?)");
+  double w = 10.0, h = 10.0;
+  bool center = false;
+  if (JS_ToFloat64(ctx, &w, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &h, argv[1]) < 0) return JS_EXCEPTION;
+  if (argc >= 3) center = JS_ToBool(ctx, argv[2]);
+
+  double x0 = center ? -w / 2.0 : 0.0;
+  double y0 = center ? -h / 2.0 : 0.0;
+
+  JSValue poly = JS_NewArray(ctx);
+  double pts[4][2] = {{x0, y0}, {x0 + w, y0}, {x0 + w, y0 + h}, {x0, y0 + h}};
+  for (int i = 0; i < 4; i++) {
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, pts[i][0]));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, pts[i][1]));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
 // offset2D(polygon, delta) or offset2D(polygon, {delta, join, miterLimit, segments})
 // Returns an offset polygon array (positive delta = outward, negative = inward)
 JSValue JsOffset2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
@@ -1959,6 +2008,10 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsRevolve, "revolve", 2));
   JS_SetPropertyStr(ctx, global, "offset2D",
                     JS_NewCFunction(ctx, JsOffset2D, "offset2D", 2));
+  JS_SetPropertyStr(ctx, global, "circle2D",
+                    JS_NewCFunction(ctx, JsCircle2D, "circle2D", 2));
+  JS_SetPropertyStr(ctx, global, "rect2D",
+                    JS_NewCFunction(ctx, JsRect2D, "rect2D", 3));
   JS_SetPropertyStr(ctx, global, "torus",
                     JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",
