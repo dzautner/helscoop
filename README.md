@@ -120,6 +120,7 @@ See `examples/` for parametric examples:
 | tower | warp() twist deformation, refineToLength |
 | showroom | Multi-object PBR: revolve, warp, boolean, patterns |
 | bracket | circle2D, rect2D, offset2D, rounded corners, bolt holes |
+| badge | hull2D, offset2D, multi-material, boolean cutouts |
 | helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode
