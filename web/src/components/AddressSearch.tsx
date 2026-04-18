@@ -30,6 +30,51 @@ const HEATING_LABELS: Record<string, Record<string, string>> = {
   en: { kaukolampo: "District heating", sahko: "Electric", maalampopumppu: "Ground source heat pump", oljy: "Oil" },
 };
 
+function DataSourcesSection({ label, sources }: { label: string; sources: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          fontSize: 11,
+          fontFamily: "var(--font-mono)",
+          letterSpacing: "0.05em",
+          padding: "4px 0",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        <span style={{
+          display: "inline-block",
+          transition: "transform 0.15s ease",
+          transform: open ? "rotate(90deg)" : "rotate(0deg)",
+          fontSize: 9,
+        }}>&#9654;</span>
+        {label}
+      </button>
+      {open && (
+        <div style={{
+          paddingLeft: 16,
+          paddingTop: 4,
+          fontSize: 12,
+          color: "var(--text-secondary)",
+          lineHeight: 1.6,
+        }}>
+          {sources.map((src, i) => (
+            <div key={i}>{src}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AddressSearch({ onCreateProject }: { onCreateProject: (building: BuildingResult) => Promise<void> | void }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -129,9 +174,25 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
                   <h3 className="heading-display" style={{ fontSize: 20, marginBottom: 6 }}>
                     {result.address}
                   </h3>
-                  <span className="badge badge-amber">
-                    {buildingTypeLabels[result.building_info.type] || result.building_info.type}
-                  </span>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <span className="badge badge-amber">
+                      {buildingTypeLabels[result.building_info.type] || result.building_info.type}
+                    </span>
+                    <span
+                      className="badge"
+                      style={{
+                        background: result.confidence === "verified"
+                          ? "rgba(76,135,80,0.15)"
+                          : "rgba(196,145,92,0.15)",
+                        color: result.confidence === "verified"
+                          ? "var(--forest, #4c8750)"
+                          : "var(--amber)",
+                        border: `1px solid ${result.confidence === "verified" ? "rgba(76,135,80,0.3)" : "rgba(196,145,92,0.3)"}`,
+                      }}
+                    >
+                      {result.confidence === "verified" ? t('search.verified') : t('search.estimated')}
+                    </span>
+                  </div>
                 </div>
                 <div style={{
                   fontFamily: "var(--font-mono)",
@@ -166,6 +227,13 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
                   </div>
                 ))}
               </div>
+
+              {result.data_sources && result.data_sources.length > 0 && (
+                <DataSourcesSection
+                  label={t('search.dataSources')}
+                  sources={result.data_sources}
+                />
+              )}
 
               {createError && (
                 <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "#dc3232", fontSize: 13 }}>

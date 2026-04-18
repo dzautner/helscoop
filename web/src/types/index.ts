@@ -24,6 +24,8 @@ export interface BuildingResult {
     roof_material?: string;
     units?: number;
   };
+  confidence: "verified" | "estimated" | "template";
+  data_sources: string[];
   scene_js: string;
   bom_suggestion: { material_id: string; quantity: number; unit: string }[];
 }
