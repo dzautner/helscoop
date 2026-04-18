@@ -70,6 +70,16 @@ INSERT INTO materials (id, name, category_id, tags, visual_albedo, visual_roughn
   ('trim_21x45', 'Lista 21x45', 'trim', ARRAY['softwood','trim','exterior'], ARRAY[0.88,0.78,0.58], 0.65, 0.0, NULL, 0.12, 21, NULL, NULL, NULL, NULL, NULL, NULL, 21, 1.10),
   ('cedar_post_98x98', 'Kestopuu Tolppa 98x98', 'lumber', ARRAY['structural','treated','exterior','post','run'], ARRAY[0.62,0.70,0.52], 0.75, 0.0, 'textures/wood/pine_albedo.png', NULL, NULL, 'C18', 0, 3000, 0, 18, 9, 98, 1.05);
 
+-- Building demo materials (house import BOM)
+INSERT INTO materials (id, name, category_id, tags, visual_albedo, visual_roughness, visual_metallic, thermal_conductivity, thermal_thickness, dimension_thickness_mm, waste_factor) VALUES
+  ('osb_11mm', 'OSB-levy 11mm', 'sheathing', ARRAY['composite','structural','wall','sheathing'], ARRAY[1.0,1.0,1.0], 0.90, 0.0, 0.13, 11, 11, 1.05),
+  ('mineral_wool_150', 'Mineraalivilla 150mm', 'insulation', ARRAY['thermal','wall','mineral-wool'], ARRAY[0.95,0.92,0.55], 0.95, 0.0, 0.035, 150, 150, 1.05),
+  ('concrete_c25', 'Betoni C25/30', 'foundation', ARRAY['concrete','foundation','structural'], ARRAY[0.55,0.55,0.52], 0.90, 0.0, 1.7, 200, NULL, 1.05),
+  ('metal_roof_ruukki', 'Peltikate Ruukki Classic', 'roofing', ARRAY['metal','exterior','roof','ruukki'], ARRAY[0.35,0.15,0.12], 0.25, 0.98, 50.0, 0.5, NULL, 1.05),
+  ('gypsum_board_13mm', 'Kipsilevy 13mm', 'interior', ARRAY['gypsum','interior','wall','ceiling'], ARRAY[0.92,0.92,0.90], 0.80, 0.0, 0.22, 13, 13, 1.05),
+  ('wind_barrier', 'Tuulensuojalevy', 'membrane', ARRAY['board','exterior','wind-barrier'], ARRAY[0.60,0.55,0.45], 0.85, 0.0, 0.065, 9, 9, 1.05),
+  ('wood_screw_5x80', 'Puuruuvi 5x80mm', 'fasteners', ARRAY['metal','screw','exterior','structural'], ARRAY[0.60,0.58,0.55], 0.45, 0.95, NULL, NULL, NULL, 1.05);
+
 -- Materials without pricing (thermal bridges, preview)
 INSERT INTO materials (id, name, category_id, tags, visual_albedo, visual_roughness, visual_metallic, thermal_conductivity, thermal_thickness) VALUES
   ('door_thermal_bridge', 'Ovi (lämpösilta)', 'opening', ARRAY['thermal-bridge','door','weak-point'], ARRAY[0.42,0.46,0.52], 0.50, 0.0, 0.12, 45),
@@ -126,7 +136,16 @@ INSERT INTO pricing (material_id, supplier_id, unit, unit_price, link, is_primar
   ('exterior_paint_white', 'tikkurila', 'liter', 15.00, 'https://www.tikkurila.fi/ulkomaali', true, now(), now()),
 
   -- Trim
-  ('trim_21x45', 'sarokas', 'jm', 1.20, 'https://www.sarokas.fi/lista-21x45', true, now(), now());
+  ('trim_21x45', 'sarokas', 'jm', 1.20, 'https://www.sarokas.fi/lista-21x45', true, now(), now()),
+
+  -- Building demo materials (house import BOM)
+  ('osb_11mm', 'k-rauta', 'm2', 8.50, 'https://www.k-rauta.fi/tuote/osb-levy-11mm', true, now(), now()),
+  ('mineral_wool_150', 'paroc', 'm2', 12.90, 'https://www.paroc.fi/tuotteet/extra', true, now(), now()),
+  ('concrete_c25', 'lakan-betoni', 'm3', 120.00, 'https://www.lakanbetoni.fi/betoni', true, now(), now()),
+  ('metal_roof_ruukki', 'ruukki', 'm2', 18.50, 'https://www.ruukki.com/fin/katto/peltikate', true, now(), now()),
+  ('gypsum_board_13mm', 'k-rauta', 'm2', 5.80, 'https://www.k-rauta.fi/tuote/kipsilevy-13mm', true, now(), now()),
+  ('wind_barrier', 'k-rauta', 'm2', 4.20, 'https://www.k-rauta.fi/tuote/tuulensuojalevy', true, now(), now()),
+  ('wood_screw_5x80', 'k-rauta', 'kpl', 0.08, 'https://www.k-rauta.fi/tuote/puuruuvi-5x80', true, now(), now());
 
 -- Seed initial pricing history from current prices
 INSERT INTO pricing_history (pricing_id, unit_price, scraped_at, source)
