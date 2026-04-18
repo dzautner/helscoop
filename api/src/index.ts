@@ -1,9 +1,10 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
-import { login, register, signToken, requireAuth, forgotPassword, resetPassword } from "./auth";
+import { login, register, signToken, requireAuth, forgotPassword, resetPassword, AuthUser } from "./auth";
 import { query } from "./db";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
@@ -11,6 +12,8 @@ import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
 import chatRouter from "./routes/chat";
 import buildingRouter from "./routes/building";
+
+const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
@@ -33,15 +36,52 @@ app.use(
 // Request body size limit
 app.use(express.json({ limit: "1mb" }));
 
-// General rate limiter: 100 requests per 15 minutes per IP
-const generalLimiter = rateLimit({
+// ---------------------------------------------------------------------------
+// Rate limiters — per-route instead of a single global limiter
+//
+// Previously a single 100 req/15min global limiter caused 429 errors during
+// normal editing sessions (2s auto-save + BOM recalculations). Now we use:
+//   - publicLimiter:         100 req/15min per IP   — anonymous/public endpoints
+//   - authenticatedLimiter:  500 req/15min per user  — project saves, BOM, etc.
+//   - authLimiter:            10 req/15min per IP   — login/register/reset
+//   - chatLimiter:            20 req/15min per IP   — AI chat endpoint
+// ---------------------------------------------------------------------------
+
+// Try to extract user ID from JWT for rate-limit keying (does NOT enforce auth)
+function extractUserId(req: express.Request): string | null {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return null;
+  try {
+    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as AuthUser;
+    return decoded.id || null;
+  } catch {
+    return null;
+  }
+}
+
+// Anonymous/public endpoints: 100 requests per 15 minutes per IP
+const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
 });
-app.use(generalLimiter);
+
+// Authenticated API endpoints: 500 requests per 15 minutes, keyed by user ID.
+// This covers project saves, BOM updates, and other frequent editor operations.
+// Falls back to IP-based keying for unauthenticated requests that reach these
+// routes (they'll be rejected by requireAuth anyway, but still rate-limited).
+const authenticatedLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return extractUserId(req) || req.ip || "unknown";
+  },
+  message: { error: "Too many requests, please try again later" },
+});
 
 // Stricter rate limiter for auth endpoints: 10 requests per 15 minutes per IP
 const authLimiter = rateLimit({
@@ -61,6 +101,7 @@ const chatLimiter = rateLimit({
   message: { error: "Too many chat requests, please try again later" },
 });
 
+// Health check — no rate limit
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 // Email validation regex
@@ -112,7 +153,7 @@ app.post("/auth/register", authLimiter, async (req, res) => {
   }
 });
 
-app.get("/auth/me", requireAuth, async (req, res) => {
+app.get("/auth/me", authenticatedLimiter, requireAuth, async (req, res) => {
   const result = await query(
     "SELECT id, email, name, role FROM users WHERE id = $1",
     [req.user!.id]
@@ -123,7 +164,7 @@ app.get("/auth/me", requireAuth, async (req, res) => {
   res.json(result.rows[0]);
 });
 
-app.put("/auth/profile", requireAuth, async (req, res) => {
+app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => {
   const { name, email } = req.body;
   if (!name && !email) {
     return res.status(400).json({ error: "Name or email is required" });
@@ -166,7 +207,7 @@ app.put("/auth/profile", requireAuth, async (req, res) => {
   }
 });
 
-app.put("/auth/password", requireAuth, async (req, res) => {
+app.put("/auth/password", authenticatedLimiter, requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: "Current password and new password are required" });
@@ -195,7 +236,7 @@ app.put("/auth/password", requireAuth, async (req, res) => {
   }
 });
 
-app.delete("/auth/account", requireAuth, async (req, res) => {
+app.delete("/auth/account", authenticatedLimiter, requireAuth, async (req, res) => {
   try {
     // Delete all BOM entries for user's projects
     await query(
@@ -255,14 +296,16 @@ app.post("/auth/reset-password", authLimiter, async (req, res) => {
   }
 });
 
-app.use("/materials", materialsRouter);
-app.use("/projects", projectsRouter);
-app.use("/suppliers", suppliersRouter);
-app.use("/pricing", pricingRouter);
+// Authenticated routes get the relaxed rate limiter (500 req/15min per user)
+app.use("/materials", authenticatedLimiter, materialsRouter);
+app.use("/projects", authenticatedLimiter, projectsRouter);
+app.use("/suppliers", authenticatedLimiter, suppliersRouter);
+app.use("/pricing", authenticatedLimiter, pricingRouter);
 app.use("/chat", chatLimiter, chatRouter);
-app.use("/building", buildingRouter);
+app.use("/building", authenticatedLimiter, buildingRouter);
 
-app.get("/materials/export/viewer", async (_req, res) => {
+// Public endpoints get the stricter IP-based limiter
+app.get("/materials/export/viewer", publicLimiter, async (_req, res) => {
   const { query: dbQuery } = await import("./db");
   const mats = await dbQuery(`
     SELECT m.*, c.id AS cat_id, c.display_name AS category_name
@@ -352,7 +395,7 @@ app.get("/materials/export/viewer", async (_req, res) => {
   res.json({ version: 1, materials, categories, suppliers });
 });
 
-app.get("/templates", (_req, res) => {
+app.get("/templates", publicLimiter, (_req, res) => {
   res.json([
     {
       id: "pihasauna",
@@ -480,7 +523,7 @@ scene.add(roof, { material: "roofing", color: [0.4, 0.38, 0.35] });`,
   ]);
 });
 
-app.get("/categories", async (_req, res) => {
+app.get("/categories", publicLimiter, async (_req, res) => {
   const { query: dbQuery } = await import("./db");
   const result = await dbQuery(
     "SELECT * FROM categories WHERE hidden = false ORDER BY sort_order"
@@ -488,7 +531,7 @@ app.get("/categories", async (_req, res) => {
   res.json(result.rows);
 });
 
-app.get("/bom/export/:projectId", requireAuth, async (req, res) => {
+app.get("/bom/export/:projectId", authenticatedLimiter, requireAuth, async (req, res) => {
   const { query: dbQuery } = await import("./db");
   const result = await dbQuery(
     `SELECT m.name, c.display_name AS category, pb.quantity, pb.unit,
