@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, setToken, getToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
-import { SkeletonProjectCard } from "@/components/Skeleton";
+import { SkeletonProjectCard, SkeletonBlock } from "@/components/Skeleton";
 
 interface Project {
   id: string;
@@ -573,6 +573,115 @@ function ProjectList() {
             >
               {creating ? "..." : "Luo"}
             </button>
+          </div>
+
+          {/* Template picker */}
+          <div style={{ marginTop: 28 }}>
+            <div className="label-mono" style={{ marginBottom: 14, letterSpacing: "0.1em" }}>
+              Tai aloita mallista
+            </div>
+            {loading ? (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: 12,
+              }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="card"
+                    style={{
+                      padding: "24px 20px",
+                      animation: `fadeIn 0.3s ease ${i * 0.08}s both`,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 14 }}>
+                      <SkeletonBlock width={48} height={48} radius="var(--radius-sm)" />
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, paddingTop: 4 }}>
+                        <SkeletonBlock width="70%" height={16} />
+                        <SkeletonBlock width={60} height={20} radius={100} />
+                      </div>
+                    </div>
+                    <SkeletonBlock width="90%" height={12} />
+                    <SkeletonBlock width="60%" height={12} style={{ marginTop: 6 }} />
+                  </div>
+                ))}
+              </div>
+            ) : templates.length > 0 ? (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: 12,
+              }}>
+                {templates.map((t, i) => (
+                  <button
+                    key={t.id}
+                    className="card anim-up"
+                    disabled={creating}
+                    onClick={() => createFromTemplate(t)}
+                    style={{
+                      animationDelay: `${i * 0.06}s`,
+                      padding: "24px 20px",
+                      cursor: creating ? "wait" : "pointer",
+                      textAlign: "left",
+                      width: "100%",
+                      font: "inherit",
+                      color: "inherit",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "var(--amber-border)";
+                      e.currentTarget.style.boxShadow = "var(--shadow-amber)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "var(--border)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 10 }}>
+                      <div style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "var(--radius-sm)",
+                        background: "var(--amber-glow)",
+                        border: "1px solid var(--amber-border)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--amber)"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d={TEMPLATE_ICONS[t.icon] || TEMPLATE_ICONS.shed} />
+                        </svg>
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="heading-display" style={{ fontSize: 15, marginBottom: 4 }}>
+                          {t.name}
+                        </div>
+                        <span className="badge badge-amber">
+                          ~{Number(t.estimated_cost).toLocaleString("fi-FI")} &euro;
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{
+                      color: "var(--text-muted)",
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                    }}>
+                      {t.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
