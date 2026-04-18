@@ -88,6 +88,14 @@ export interface MaterialPriceData {
   savings_per_unit: number;
 }
 
+export interface Category {
+  id: string;
+  display_name: string;
+  display_name_fi: string | null;
+  sort_order: number;
+  hidden: boolean;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
