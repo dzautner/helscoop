@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { resetOnboarding } from "@/components/OnboardingTour";
+import Link from "next/link";
 
 interface UserProfile {
   id: string;
@@ -158,13 +159,16 @@ export default function SettingsPage() {
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <ThemeToggle />
             <LanguageSwitcher />
-            <button
+            <Link
+              href="/"
               className="btn btn-ghost"
-              style={{ fontSize: 12 }}
-              onClick={() => (window.location.href = "/")}
+              style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
             >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
               {t("settings.backToProjects")}
-            </button>
+            </Link>
           </div>
         </div>
       </div>

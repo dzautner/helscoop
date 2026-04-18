@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
+import Link from "next/link";
 
 function UserAvatar({ name, onClick }: { name: string; onClick?: () => void }) {
   const initials = name
@@ -77,21 +78,21 @@ export default function UserMenu({ userName }: { userName: string }) {
             >
               {userName}
             </div>
-            <button
-              onClick={() => {
-                window.location.href = "/settings";
-              }}
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
               style={{
+                display: "block",
                 width: "100%",
                 padding: "8px 12px",
                 background: "none",
-                border: "none",
                 color: "var(--text-primary)",
                 fontSize: 13,
                 cursor: "pointer",
                 textAlign: "left",
                 borderRadius: "var(--radius-sm)",
                 fontFamily: "inherit",
+                textDecoration: "none",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "var(--bg-tertiary)";
@@ -101,7 +102,7 @@ export default function UserMenu({ userName }: { userName: string }) {
               }}
             >
               {t("nav.settings")}
-            </button>
+            </Link>
             <button
               onClick={() => {
                 setToken(null);
