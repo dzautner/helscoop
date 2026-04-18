@@ -108,6 +108,7 @@ export const api = {
 
   getMaterials: () => apiFetch("/materials"),
   getMaterial: (id: string) => apiFetch(`/materials/${id}`),
+  getMaterialPrices: (id: string) => apiFetch(`/materials/${id}/prices`),
 
   getSuppliers: () => apiFetch("/suppliers"),
   getSupplier: (id: string) => apiFetch(`/suppliers/${id}`),

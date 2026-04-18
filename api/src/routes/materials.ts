@@ -58,6 +58,43 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+router.get("/:id/prices", async (req, res) => {
+  const material = await query(
+    "SELECT id, name FROM materials WHERE id = $1",
+    [req.params.id]
+  );
+  if (material.rows.length === 0)
+    return res.status(404).json({ error: "Material not found" });
+
+  const result = await query(
+    `SELECT p.id, p.material_id, p.supplier_id, p.unit, p.unit_price, p.currency,
+      p.sku, p.ean, p.link, p.is_primary, p.last_scraped_at, p.last_verified_at,
+      s.name AS supplier_name, s.url AS supplier_url, s.logo_url AS supplier_logo
+     FROM pricing p
+     JOIN suppliers s ON p.supplier_id = s.id
+     WHERE p.material_id = $1
+     ORDER BY p.unit_price ASC`,
+    [req.params.id]
+  );
+
+  const prices = result.rows;
+  const cheapest = prices.length > 0 ? parseFloat(prices[0].unit_price) : null;
+  const primaryRow = prices.find((p) => p.is_primary);
+  const primaryPrice = primaryRow ? parseFloat(primaryRow.unit_price) : null;
+  const savings = cheapest !== null && primaryPrice !== null && primaryPrice > cheapest
+    ? primaryPrice - cheapest
+    : 0;
+
+  res.json({
+    material_id: req.params.id,
+    material_name: material.rows[0].name,
+    prices,
+    cheapest_price: cheapest,
+    primary_price: primaryPrice,
+    savings_per_unit: savings,
+  });
+});
+
 router.post("/", requireAuth, requireAdmin, async (req, res) => {
   const {
     id, name, category_id, tags, description,

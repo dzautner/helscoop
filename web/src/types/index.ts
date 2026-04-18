@@ -57,6 +57,33 @@ export interface BomItem {
   supplier?: string;
 }
 
+export interface PriceRow {
+  id: string;
+  material_id: string;
+  supplier_id: string;
+  unit: string;
+  unit_price: string;
+  currency: string;
+  sku: string | null;
+  ean: string | null;
+  link: string | null;
+  is_primary: boolean;
+  last_scraped_at: string | null;
+  last_verified_at: string | null;
+  supplier_name: string;
+  supplier_url: string;
+  supplier_logo: string | null;
+}
+
+export interface MaterialPriceData {
+  material_id: string;
+  material_name: string;
+  prices: PriceRow[];
+  cheapest_price: number | null;
+  primary_price: number | null;
+  savings_per_unit: number;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
