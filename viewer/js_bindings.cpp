@@ -169,19 +169,35 @@ bool JsValueToPolygons(JSContext *ctx, JSValueConst value,
     return false;
   }
   JSValue lengthVal = JS_GetPropertyStr(ctx, value, "length");
-  uint32_t numLoops = 0;
-  if (JS_ToUint32(ctx, &numLoops, lengthVal) < 0) {
+  uint32_t numItems = 0;
+  if (JS_ToUint32(ctx, &numItems, lengthVal) < 0) {
     JS_FreeValue(ctx, lengthVal);
     return false;
   }
   JS_FreeValue(ctx, lengthVal);
-  manifold::Polygons result;
-  result.reserve(numLoops);
-  for (uint32_t i = 0; i < numLoops; ++i) {
-    JSValue loopVal = JS_GetPropertyUint32(ctx, value, i);
-    if (JS_IsException(loopVal)) return false;
+  if (numItems == 0) {
+    JS_ThrowTypeError(ctx, "polygons array is empty");
+    return false;
+  }
+
+  // Auto-detect: flat polygon [[x,y], ...] vs nested [[[x,y], ...], ...]
+  // Check if first element is a 2-number array (flat) or array of arrays (nested)
+  bool isFlatPolygon = false;
+  JSValue first = JS_GetPropertyUint32(ctx, value, 0);
+  if (JS_IsArray(first)) {
+    JSValue firstLenVal = JS_GetPropertyStr(ctx, first, "length");
+    uint32_t firstLen = 0;
+    if (JS_ToUint32(ctx, &firstLen, firstLenVal) == 0 && firstLen == 2) {
+      JSValue elem0 = JS_GetPropertyUint32(ctx, first, 0);
+      isFlatPolygon = JS_IsNumber(elem0);
+      JS_FreeValue(ctx, elem0);
+    }
+    JS_FreeValue(ctx, firstLenVal);
+  }
+  JS_FreeValue(ctx, first);
+
+  auto parseLoop = [&](JSValueConst loopVal, manifold::SimplePolygon &loop) -> bool {
     if (!JS_IsArray(loopVal)) {
-      JS_FreeValue(ctx, loopVal);
       JS_ThrowTypeError(ctx, "each loop must be an array of [x,y] points");
       return false;
     }
@@ -189,30 +205,40 @@ bool JsValueToPolygons(JSContext *ctx, JSValueConst value,
     uint32_t loopLen = 0;
     if (JS_ToUint32(ctx, &loopLen, loopLenVal) < 0) {
       JS_FreeValue(ctx, loopLenVal);
-      JS_FreeValue(ctx, loopVal);
       return false;
     }
     JS_FreeValue(ctx, loopLenVal);
-    manifold::SimplePolygon loop;
     loop.reserve(loopLen);
     for (uint32_t j = 0; j < loopLen; ++j) {
       JSValue pointVal = JS_GetPropertyUint32(ctx, loopVal, j);
-      if (JS_IsException(pointVal)) {
-        JS_FreeValue(ctx, loopVal);
-        return false;
-      }
+      if (JS_IsException(pointVal)) return false;
       std::array<double, 2> point{};
       bool ok = GetVec2(ctx, pointVal, point);
       JS_FreeValue(ctx, pointVal);
-      if (!ok) {
+      if (!ok) return false;
+      loop.push_back({point[0], point[1]});
+    }
+    return true;
+  };
+
+  manifold::Polygons result;
+  if (isFlatPolygon) {
+    manifold::SimplePolygon loop;
+    if (!parseLoop(value, loop)) return false;
+    result.push_back(std::move(loop));
+  } else {
+    result.reserve(numItems);
+    for (uint32_t i = 0; i < numItems; ++i) {
+      JSValue loopVal = JS_GetPropertyUint32(ctx, value, i);
+      if (JS_IsException(loopVal)) return false;
+      manifold::SimplePolygon loop;
+      if (!parseLoop(loopVal, loop)) {
         JS_FreeValue(ctx, loopVal);
         return false;
       }
-      manifold::vec2 pt{point[0], point[1]};
-      loop.push_back(pt);
+      JS_FreeValue(ctx, loopVal);
+      result.push_back(std::move(loop));
     }
-    JS_FreeValue(ctx, loopVal);
-    result.push_back(loop);
   }
   out = std::move(result);
   return true;
@@ -1082,24 +1108,28 @@ JSValue JsRevolve(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (!JsValueToPolygons(ctx, argv[0], polys)) return JS_EXCEPTION;
   int32_t segments = 0;
   double degrees = 360.0;
-  if (argc >= 2 && JS_IsObject(argv[1])) {
-    JSValue opts = argv[1];
-    JSValue segVal = JS_GetPropertyStr(ctx, opts, "segments");
-    if (!JS_IsUndefined(segVal)) {
-      if (JS_ToInt32(ctx, &segments, segVal) < 0) {
-        JS_FreeValue(ctx, segVal);
-        return JS_EXCEPTION;
+  if (argc >= 2) {
+    if (JS_IsNumber(argv[1])) {
+      if (JS_ToInt32(ctx, &segments, argv[1]) < 0) return JS_EXCEPTION;
+    } else if (JS_IsObject(argv[1])) {
+      JSValue opts = argv[1];
+      JSValue segVal = JS_GetPropertyStr(ctx, opts, "segments");
+      if (!JS_IsUndefined(segVal)) {
+        if (JS_ToInt32(ctx, &segments, segVal) < 0) {
+          JS_FreeValue(ctx, segVal);
+          return JS_EXCEPTION;
+        }
       }
-    }
-    JS_FreeValue(ctx, segVal);
-    JSValue degVal = JS_GetPropertyStr(ctx, opts, "degrees");
-    if (!JS_IsUndefined(degVal)) {
-      if (JS_ToFloat64(ctx, &degrees, degVal) < 0) {
-        JS_FreeValue(ctx, degVal);
-        return JS_EXCEPTION;
+      JS_FreeValue(ctx, segVal);
+      JSValue degVal = JS_GetPropertyStr(ctx, opts, "degrees");
+      if (!JS_IsUndefined(degVal)) {
+        if (JS_ToFloat64(ctx, &degrees, degVal) < 0) {
+          JS_FreeValue(ctx, degVal);
+          return JS_EXCEPTION;
+        }
       }
+      JS_FreeValue(ctx, degVal);
     }
-    JS_FreeValue(ctx, degVal);
   }
   if (segments < 0)
     return JS_ThrowRangeError(ctx, "revolve segments must be >= 0");
