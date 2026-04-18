@@ -5,6 +5,7 @@ import { api, setToken, getToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface UserProfile {
   id: string;
@@ -373,43 +374,29 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {!showDeleteConfirm ? (
-            <button
-              className="btn btn-danger"
-              onClick={() => setShowDeleteConfirm(true)}
-              style={{ padding: "11px 24px" }}
-            >
-              {t("settings.deleteAccount")}
-            </button>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <button
-                className="btn btn-danger"
-                onClick={handleDeleteAccount}
-                disabled={deletingAccount}
-                style={{ padding: "11px 24px" }}
-              >
-                {deletingAccount
-                  ? t("auth.loading")
-                  : t("settings.deleteAccountConfirm")}
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowDeleteConfirm(false)}
-                style={{ padding: "11px 24px" }}
-              >
-                {t("nav.back")}
-              </button>
-            </div>
-          )}
+          <button
+            className="btn btn-danger"
+            onClick={() => setShowDeleteConfirm(true)}
+            style={{ padding: "11px 24px" }}
+          >
+            {t("settings.deleteAccount")}
+          </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title={t("dialog.deleteAccountTitle")}
+        message={t("dialog.deleteAccountMessage")}
+        confirmText={t("settings.deleteAccount")}
+        cancelText={t("dialog.cancel")}
+        variant="danger"
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          handleDeleteAccount();
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

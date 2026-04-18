@@ -190,6 +190,14 @@ const translations = {
       viewProduct: 'Katso tuote',
       searchMaterials: 'Hae materiaalia...',
     },
+    dialog: {
+      confirm: 'Vahvista',
+      cancel: 'Peruuta',
+      deleteProjectTitle: 'Poista projekti',
+      deleteProjectMessage: 'Haluatko varmasti poistaa taman projektin? Tata toimintoa ei voi kumota.',
+      deleteAccountTitle: 'Poista tili',
+      deleteAccountMessage: 'Haluatko varmasti poistaa tilisi? Kaikki projektisi ja tietosi poistetaan pysyvasti. Tata toimintoa ei voi kumota.',
+    },
     admin: {
       adminPanel: 'Hallintapaneeli',
       adminDesc: 'Materiaalit, toimittajat ja hinnoittelu',
@@ -404,6 +412,14 @@ const translations = {
       lastChecked: 'Checked',
       viewProduct: 'View product',
       searchMaterials: 'Search materials...',
+    },
+    dialog: {
+      confirm: 'Confirm',
+      cancel: 'Cancel',
+      deleteProjectTitle: 'Delete project',
+      deleteProjectMessage: 'Are you sure you want to delete this project? This action cannot be undone.',
+      deleteAccountTitle: 'Delete account',
+      deleteAccountMessage: 'Are you sure you want to delete your account? All your projects and data will be permanently deleted. This cannot be undone.',
     },
     admin: {
       adminPanel: 'Admin panel',
