@@ -22,10 +22,16 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const { name, description, scene_js } = req.body;
+  if (!name || typeof name !== "string") {
+    return res.status(400).json({ error: "Project name is required" });
+  }
+  if (name.length > 200) {
+    return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
+  }
   const result = await query(
     `INSERT INTO projects (user_id, name, description, scene_js)
      VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.user!.id, name, description, scene_js]
+    [req.user!.id, name.trim(), description, scene_js]
   );
   res.status(201).json(result.rows[0]);
 });
@@ -57,10 +63,13 @@ router.get("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   const { name, description, scene_js } = req.body;
+  if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
+    return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
+  }
   const result = await query(
     `UPDATE projects SET name=$1, description=$2, scene_js=$3, updated_at=now()
      WHERE id=$4 AND user_id=$5 RETURNING *`,
-    [name, description, scene_js, req.params.id, req.user!.id]
+    [name?.trim(), description, scene_js, req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
