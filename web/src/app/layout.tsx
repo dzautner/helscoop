@@ -3,8 +3,19 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 
 export const metadata: Metadata = {
-  title: "Helscoop - Rakennusprojektien suunnittelu",
-  description: "Suunnittele ja laske rakennusprojektisi reaaliaikaisilla hinnoilla",
+  title: "Helscoop — Näe talosi. Muuta. Rakenna.",
+  description:
+    "3D-mallinna talosi ja suunnittele remontti reaaliaikaisilla hinnoilla",
+  icons: {
+    icon: { url: "/icon.svg", type: "image/svg+xml" },
+    apple: "/icon.svg",
+  },
+  manifest: "/manifest.json",
+  openGraph: {
+    title: "Helscoop",
+    description: "Näe talosi 3D:nä, suunnittele remontti suomeksi",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -14,6 +25,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fi">
+      <head>
+        <style
+          dangerouslySetInnerHTML={{ __html: "html{background:#12110f}" }}
+        />
+      </head>
       <body className="grain">
         <ToastProvider>{children}</ToastProvider>
       </body>
