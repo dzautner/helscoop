@@ -1,4 +1,4 @@
-// Gyroid Sculpture - DingCAD levelSet example
+// Gyroid Sculpture - Helscoop levelSet example
 // Demonstrates procedural SDF geometry with boolean operations
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 

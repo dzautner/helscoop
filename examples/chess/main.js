@@ -1,4 +1,4 @@
-// Chess Pawn - DingCAD smooth() and hull() showcase
+// Chess Pawn - Helscoop smooth() and hull() showcase
 // Demonstrates organic shapes via smoothing low-poly primitives
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 

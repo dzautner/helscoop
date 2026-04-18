@@ -3,7 +3,7 @@
 # Usage: ./render_screenshots.sh [output_dir]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VIEWER="$SCRIPT_DIR/../../build/viewer/dingcad_viewer"
+VIEWER="$SCRIPT_DIR/../../build/viewer/helscoop_viewer"
 SCENE="$SCRIPT_DIR/scene.js"
 OUTPUT_DIR="${1:-$SCRIPT_DIR/screenshots}"
 

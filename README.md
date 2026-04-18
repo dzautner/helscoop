@@ -1,14 +1,16 @@
-## Dingcad
+## Helscoop
 
-Dingcad is a live reloading program that is a replacement for openscad. Becuase openscad kind of really sucks. Try ./run.sh and then updating scene.js
+*Nae talosi. Muuta. Rakenna.* (See your house. Change it. Build.)
 
-This is dingcad. Dependencies: raylib, manifoldcad, and quickjs. Ask an LLM how to set up raylib on your system. For the quickjs and manifoldcad; you can 
+Helscoop is a live reloading 3D CAD viewer, a replacement for openscad. Try `./run.sh` and then updating `scene.js`.
+
+Dependencies: raylib, manifoldcad, and quickjs. Ask an LLM how to set up raylib on your system. For quickjs and manifoldcad:
 
 ```
 git submodule update --init --recursive
 ```
 
-This repository is mostly autonomously written by an LLM that I've lazily prompted while watching youtube and hanging out with my family.
+This repository is mostly autonomously written by an LLM.
 
 ### Keyboard Shortcuts
 
@@ -132,8 +134,8 @@ See `examples/` for parametric examples:
 ### Render Mode
 
 ```
-./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720
-./build/viewer/dingcad_viewer --help
+./build/viewer/helscoop_viewer --render scene.js output.png --size 1280 720
+./build/viewer/helscoop_viewer --help
 ```
 
 Background modes: `--background white` (clean studio), `--background transparent` (alpha channel for compositing).

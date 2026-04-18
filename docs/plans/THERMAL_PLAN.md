@@ -1,4 +1,4 @@
-# Thermal Simulation Plan for DingCAD
+# Thermal Simulation Plan for Helscoop
 
 ## Goal
 Implement a thermal insulation visualization system that shows heat flow through the building envelope. Users can set outside temperature (e.g., -25°C) and inside temperature (e.g., +20°C) to see:
@@ -99,7 +99,7 @@ struct PBRMaterial {
 #include "types.h"
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 struct ThermalSettings {
   float insideTemp = 20.0f;   // °C
@@ -134,7 +134,7 @@ ThermalAnalysisResult CalculateThermalLoss(
 // Map heat flux to color (blue = low loss, red = high loss)
 Color HeatFluxToColor(float heatFlux, float minFlux, float maxFlux);
 
-}  // namespace dingcad
+}  // namespace helscoop
 ```
 
 **Key functions in `viewer/thermal.cpp`:**

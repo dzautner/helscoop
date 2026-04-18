@@ -7,7 +7,7 @@
 #include <iostream>
 #include <unordered_set>
 
-namespace dingcad {
+namespace helscoop {
 
 // Days per month (non-leap year)
 static const int kDaysPerMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -268,4 +268,4 @@ void CalculateAnnualThermal(
   result.hasAnnualData = true;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

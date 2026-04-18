@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VIEWER_BIN="$ROOT_DIR/build/viewer/dingcad_viewer"
+VIEWER_BIN="$ROOT_DIR/build/viewer/helscoop_viewer"
 
 SCENE_INPUT="${1:-$ROOT_DIR/scene.js}"
 OUT_DIR_INPUT="${2:-$ROOT_DIR/renders/architecture_doc_$(date +%Y%m%d_%H%M%S)}"
@@ -41,9 +41,9 @@ if [[ ! -f "$SHOT_FILE" ]]; then
 fi
 
 if [[ ! -x "$VIEWER_BIN" ]]; then
-  echo "Building dingcad_viewer..."
+  echo "Building helscoop_viewer..."
   cmake -S "$ROOT_DIR" -B "$ROOT_DIR/build"
-  cmake --build "$ROOT_DIR/build" --target dingcad_viewer
+  cmake --build "$ROOT_DIR/build" --target helscoop_viewer
 fi
 
 run_with_timeout() {
@@ -67,7 +67,7 @@ print_render_failure_help() {
   echo "Try:"
   echo "  1) Run from a logged-in desktop session (not CI/headless shell)."
   echo "  2) If on macOS, run from Terminal.app while the GUI session is active."
-  echo "  3) Validate with: ./build/viewer/dingcad_viewer --render scene.js /tmp/probe.png --frames 1 --hide-ui"
+  echo "  3) Validate with: ./build/viewer/helscoop_viewer --render scene.js /tmp/probe.png --frames 1 --hide-ui"
   if [[ -f "$PRECHECK_LOG" ]]; then
     echo
     echo "Preflight log: $PRECHECK_LOG"

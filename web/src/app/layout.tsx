@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DingCAD - Rakennusprojektien suunnittelu",
+  title: "Helscoop - Rakennusprojektien suunnittelu",
   description: "Suunnittele ja laske rakennusprojektisi reaaliaikaisilla hinnoilla",
 };
 

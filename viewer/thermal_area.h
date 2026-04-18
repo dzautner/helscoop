@@ -3,7 +3,7 @@
 #include "manifold/manifold.h"
 #include <cmath>
 
-namespace dingcad {
+namespace helscoop {
 
 /**
  * Calculate the thermal envelope area for a geometry.
@@ -129,4 +129,4 @@ inline double CalculateThermalEnvelopeAreaFromMesh(const manifold::Manifold& geo
   }
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

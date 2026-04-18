@@ -1,6 +1,6 @@
-# dingcad Architecture-as-Code Development TODO
+# helscoop Architecture-as-Code Development TODO
 
-**Project Goal:** Transform dingcad into a professional architecture-as-code tool
+**Project Goal:** Transform helscoop into a professional architecture-as-code tool
 **Strategy:** Inside-out development with automated testing at each step
 
 ---
@@ -9,7 +9,7 @@
 
 ### 0.1 Offscreen Rendering for Automated Tests
 **Why:** Need to verify geometry renders correctly without manual inspection
-**Goal:** `./dingcad_viewer --render scene.js output.png`
+**Goal:** `./helscoop_viewer --render scene.js output.png`
 
 - [x] Research raylib `RenderTexture` API for offscreen rendering
 - [x] Add command-line argument parsing to main.cpp
@@ -93,7 +93,7 @@
   - [x] Color it: `const coloredWall = withColor(w, [0.7, 0.6, 0.4]);`
   - [x] Export scene: `export const scene = [coloredWall];`
 - [x] Render test scene
-  - [x] `./build/viewer/dingcad_viewer --render demo_simple_room.js demo_room.png`
+  - [x] `./build/viewer/helscoop_viewer --render demo_simple_room.js demo_room.png`
   - [x] Open `demo_room.png` and verify:
     - [x] Wall is visible
     - [x] Wall is 4000mm long
@@ -623,7 +623,7 @@
 ### 7.4 Property Sets
 
 #### 7.4.1 Export Metadata as IFC Properties
-- [ ] Map dingcad metadata to IFC `IfcPropertySet`
+- [ ] Map helscoop metadata to IFC `IfcPropertySet`
 - [ ] Common property sets:
   - `Pset_WallCommon`
   - `Pset_SlabCommon`
@@ -650,7 +650,7 @@
   - [ ] `CreateWall()` returns valid manifold
   - [ ] `CreateFloor()` with different parameters
   - [ ] Wall + Door cutout produces hole
-- [ ] Run: `./build/tests/dingcad_tests`
+- [ ] Run: `./build/tests/helscoop_tests`
 
 #### Integration Tests (JavaScript + Rendering)
 - [ ] For each primitive, create test scene
@@ -743,7 +743,7 @@
 ```bash
 # Check if build is running
 # Implement --render flag
-# Test: ./build/viewer/dingcad_viewer --render coop.js output.png
+# Test: ./build/viewer/helscoop_viewer --render coop.js output.png
 ```
 
 Let's build the future of architecture! 🏗️

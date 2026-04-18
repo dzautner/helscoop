@@ -134,4 +134,4 @@ SELECT id, unit_price, now(), 'import' FROM pricing;
 
 -- Create a default admin user (password: admin123 — change immediately)
 INSERT INTO users (email, name, password_hash, role) VALUES
-  ('admin@dingcad.local', 'Admin', crypt('admin123', gen_salt('bf')), 'admin');
+  ('admin@helscoop.local', 'Admin', crypt('admin123', gen_salt('bf')), 'admin');

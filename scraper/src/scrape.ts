@@ -31,7 +31,7 @@ async function fetchPage(url: string): Promise<string | null> {
       signal: controller.signal,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; DingCAD PriceBot/1.0; +https://github.com/dzautner/dingcad)",
+          "Mozilla/5.0 (compatible; Helscoop PriceBot/1.0; +https://github.com/dzautner/helscoop)",
         Accept: "text/html,application/xhtml+xml",
         "Accept-Language": "fi-FI,fi;q=0.9,en;q=0.8",
       },
@@ -153,7 +153,7 @@ async function main() {
     ? args[args.indexOf("--supplier") + 1]
     : null;
 
-  console.log("=== DingCAD Price Scraper ===\n");
+  console.log("=== Helscoop Price Scraper ===\n");
 
   const suppliersResult = supplierFilter
     ? await pool.query(

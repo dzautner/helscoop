@@ -5,7 +5,7 @@
 #include <map>
 #include <set>
 
-namespace dingcad {
+namespace helscoop {
 
 const char* GetSeverityString(StructuralSeverity severity) {
   switch (severity) {
@@ -429,4 +429,4 @@ std::string FindSuitableMaterial(
   return "Upgrade to: " + bestMaterial;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

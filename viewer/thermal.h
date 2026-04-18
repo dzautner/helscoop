@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Thermal simulation settings
 struct ThermalSettings {
@@ -94,4 +94,4 @@ Color HeatFluxToColor(float heatFlux, float minFlux, float maxFlux);
 // Get description for heat loss level
 const char* GetHeatLossDescription(float heatFlux_W_per_m2);
 
-}  // namespace dingcad
+}  // namespace helscoop

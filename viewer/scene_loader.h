@@ -9,7 +9,7 @@ extern "C" {
 
 #include <filesystem>
 
-namespace dingcad {
+namespace helscoop {
 
 // Global module loader data (used by main thread)
 extern ModuleLoaderData g_moduleLoaderData;
@@ -25,4 +25,4 @@ LoadResult LoadSceneFromFile(JSRuntime* runtime,
 // Load scene and tessellate in background (creates own JSRuntime, thread-safe)
 BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path);
 
-}  // namespace dingcad
+}  // namespace helscoop

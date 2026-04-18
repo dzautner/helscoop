@@ -1,4 +1,4 @@
-// Parametric Bookshelf - DingCAD pattern & boolean example
+// Parametric Bookshelf - Helscoop pattern & boolean example
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 
 // @param width "Shelf" Width (400-1600)

@@ -1,4 +1,4 @@
-// Desk Lamp - DingCAD multi-material PBR showcase
+// Desk Lamp - Helscoop multi-material PBR showcase
 // Demonstrates cylinders, booleans, smooth(), and multiple PBR materials
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 

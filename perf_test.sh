@@ -1,13 +1,13 @@
 #!/bin/bash
 # Performance test: measures reload time when changing coopLength parameter
 
-LOG_FILE="/tmp/dingcad_perf_test.log"
+LOG_FILE="/tmp/helscoop_perf_test.log"
 
-echo "=== DingCAD Performance Test ==="
+echo "=== Helscoop Performance Test ==="
 echo ""
 
 # Kill any existing viewer
-pkill -f dingcad_viewer 2>/dev/null
+pkill -f helscoop_viewer 2>/dev/null
 sleep 0.3
 
 # 1. Copy coop.js to scene.js with initial value
@@ -16,7 +16,7 @@ echo "[1/5] Copied coop.js to scene.js"
 
 # 2. Start viewer in background, redirect all output to file
 rm -f "$LOG_FILE"
-./build/viewer/dingcad_viewer >"$LOG_FILE" 2>&1 &
+./build/viewer/helscoop_viewer >"$LOG_FILE" 2>&1 &
 VIEWER_PID=$!
 echo "[2/5] Started viewer (PID: $VIEWER_PID)"
 

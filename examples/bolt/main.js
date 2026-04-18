@@ -1,4 +1,4 @@
-// Hex Bolt - DingCAD cylinder segments example
+// Hex Bolt - Helscoop cylinder segments example
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 
 // @param head_width "Bolt" Head Width AF (8-30)

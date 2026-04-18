@@ -1,4 +1,4 @@
--- DingCAD database schema
+-- Helscoop database schema
 -- Normalized design for materials, pricing, projects, and users
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

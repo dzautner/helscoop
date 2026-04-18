@@ -1,4 +1,4 @@
-// Parametric Spur Gear - DingCAD polygon extrusion example
+// Parametric Spur Gear - Helscoop polygon extrusion example
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 
 // @param num_teeth "Gear" Number of Teeth (8-40)

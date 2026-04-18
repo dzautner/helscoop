@@ -24,7 +24,7 @@ services:
       - "3001:3001"
     environment:
       DATABASE_URL: postgres://dingcad:dingcad_dev@db:5432/dingcad
-      JWT_SECRET: dingcad-dev-secret-change-in-prod
+      JWT_SECRET: helscoop-dev-secret-change-in-prod
       PORT: 3001
       NODE_ENV: development
     depends_on:

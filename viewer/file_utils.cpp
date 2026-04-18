@@ -9,7 +9,7 @@
 #include <regex>
 #include <sstream>
 
-namespace dingcad {
+namespace helscoop {
 
 std::optional<std::string> ReadTextFile(const std::filesystem::path& path) {
   std::ifstream file(path);
@@ -77,7 +77,7 @@ bool WriteMeshAsBinaryStl(const manifold::MeshGL& mesh,
   }
 
   std::array<char, 80> header{};
-  constexpr const char kHeader[] = "dingcad export";
+  constexpr const char kHeader[] = "helscoop export";
   std::memcpy(header.data(), kHeader, std::min(header.size(), std::strlen(kHeader)));
   out.write(header.data(), header.size());
   out.write(reinterpret_cast<const char*>(&triCount), sizeof(uint32_t));
@@ -124,7 +124,7 @@ bool WriteMeshAsObj(const manifold::MeshGL& mesh,
     return false;
   }
 
-  out << "# dingcad OBJ export\n";
+  out << "# helscoop OBJ export\n";
   out << "# Vertices: " << mesh.NumVert() << " Triangles: " << triCount << "\n\n";
 
   const uint32_t numVerts = static_cast<uint32_t>(mesh.NumVert());
@@ -362,4 +362,4 @@ bool WriteParameterToFile(const std::filesystem::path& path, const SceneParamete
   return true;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

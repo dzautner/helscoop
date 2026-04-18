@@ -1,4 +1,4 @@
-// Turned Wooden Bowl - DingCAD revolve example
+// Turned Wooden Bowl - Helscoop revolve example
 // Coordinate convention: X=width, Y=depth, Z=height (up)
 // Revolve spins a 2D profile around the Y axis, then we rotate to Z-up
 

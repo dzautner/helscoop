@@ -1,11 +1,11 @@
 #!/bin/bash
-# Automated render tests for dingcad
+# Automated render tests for helscoop
 # Renders all examples and test scenes, reports any failures
 
 set -e
 
-VIEWER="./build/viewer/dingcad_viewer"
-OUT_DIR="/tmp/dingcad_tests"
+VIEWER="./build/viewer/helscoop_viewer"
+OUT_DIR="/tmp/helscoop_tests"
 PASS=0
 FAIL=0
 ERRORS=""
@@ -46,7 +46,7 @@ render_test() {
   fi
 }
 
-echo "=== DingCAD Render Tests ==="
+echo "=== Helscoop Render Tests ==="
 echo ""
 
 # Test all examples

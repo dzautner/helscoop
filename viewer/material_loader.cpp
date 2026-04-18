@@ -6,7 +6,7 @@
 #include <iostream>
 #include <set>
 
-namespace dingcad {
+namespace helscoop {
 
 // Global material library instance
 MaterialLibrary g_materialLibrary;
@@ -317,4 +317,4 @@ void UnloadMaterialTextures() {
   g_materialLibrary.loadedTextures.clear();
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

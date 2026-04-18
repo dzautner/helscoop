@@ -11,7 +11,7 @@
 #include <limits>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 void DestroyModel(Model& model) {
   if (model.meshes != nullptr || model.materials != nullptr) {
@@ -402,4 +402,4 @@ PickResult PickModelAtRay(const Ray& ray, const std::vector<ModelWithColor>& mod
   return result;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

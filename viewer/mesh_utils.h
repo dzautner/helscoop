@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Convert manifold mesh to raylib Model
 Model CreateRaylibModelFrom(const manifold::MeshGL& meshGL, Color baseColor = kBaseColor);
@@ -40,4 +40,4 @@ struct PickResult {
 // Pick the closest model hit by a ray (uses mesh collision)
 PickResult PickModelAtRay(const Ray& ray, const std::vector<ModelWithColor>& models);
 
-}  // namespace dingcad
+}  // namespace helscoop

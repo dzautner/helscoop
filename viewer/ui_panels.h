@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Panel position for draggable panels
 struct PanelPos {
@@ -142,4 +142,4 @@ bool DrawToolbar(UIState& uiState,
 // Toolbar height constant for panel positioning
 inline constexpr float kToolbarHeight = 42.0f;
 
-}  // namespace dingcad
+}  // namespace helscoop

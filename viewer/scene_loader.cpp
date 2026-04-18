@@ -11,7 +11,7 @@
 #include <future>
 #include <iostream>
 
-namespace dingcad {
+namespace helscoop {
 
 // Replace home directory with ~ for privacy in displayed paths
 static std::string shortenHomePath(const std::string& path) {
@@ -829,4 +829,4 @@ BackgroundLoadResult LoadAndTessellate(const std::filesystem::path& path) {
   return result;
 }
 
-}  // namespace dingcad
+}  // namespace helscoop

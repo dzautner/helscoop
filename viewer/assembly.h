@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace dingcad {
+namespace helscoop {
 
 // Forward declarations
 struct SceneData;
@@ -94,4 +94,4 @@ AssemblyInstructions ParseAssemblyFromScene(const SceneData& sceneData);
 // Call this after loading scene to populate objectIndices/newObjectIndices from showMaterials
 void ResolveAssemblyMaterials(AssemblyInstructions& assembly, const SceneData& sceneData);
 
-}  // namespace dingcad
+}  // namespace helscoop

@@ -1,5 +1,5 @@
 // coop.js
-// Parametric Nordic Chicken Coop - Ported to DingCAD/Manifold
+// Parametric Nordic Chicken Coop - Ported to Helscoop/Manifold
 // Units: millimeters
 
 // ============================================================================

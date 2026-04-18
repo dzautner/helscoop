@@ -69,11 +69,11 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
         <div style={{ position: "relative", zIndex: 1 }}>
           <div className="anim-up" style={{ marginBottom: 48 }}>
             <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.12em" }}>
-              SUUNNITTELE &middot; LASKE &middot; RAKENNA
+              N&Auml;E TALOSI &middot; MUUTA &middot; RAKENNA
             </div>
             <h1 className="heading-display" style={{ fontSize: 56, lineHeight: 1.05, marginBottom: 20 }}>
-              <span style={{ color: "var(--text-primary)" }}>Ding</span>
-              <span style={{ color: "var(--amber)" }}>CAD</span>
+              <span style={{ color: "var(--text-primary)" }}>Hel</span>
+              <span style={{ color: "var(--amber)" }}>scoop</span>
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.7, color: "var(--text-secondary)", maxWidth: 420 }}>
               Parametrinen suunnittelutyokalu rakennusprojekteille.
@@ -308,8 +308,8 @@ function ProjectList() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
-              <span style={{ color: "var(--text-primary)" }}>Ding</span>
-              <span style={{ color: "var(--amber)" }}>CAD</span>
+              <span style={{ color: "var(--text-primary)" }}>Hel</span>
+              <span style={{ color: "var(--amber)" }}>scoop</span>
             </span>
             <div style={{ width: 1, height: 20, background: "var(--border-strong)", margin: "0 4px" }} />
             <span className="label-mono">Projektit</span>
