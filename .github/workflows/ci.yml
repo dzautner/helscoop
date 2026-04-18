@@ -35,15 +35,13 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
 
-      - name: Run migrations
-        run: |
-          for f in db/migrations/*.sql; do
-            psql "$DATABASE_URL" -f "$f"
-          done
-
       - name: Install API dependencies
         working-directory: api
         run: npm ci
+
+      - name: Run migrations
+        working-directory: api
+        run: npm run db:migrate
 
       - name: Run unit tests
         working-directory: api
