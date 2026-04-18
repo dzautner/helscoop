@@ -1480,12 +1480,19 @@ int main(int argc, char *argv[]) {
       Matrix lightProjMat = rlGetMatrixProjection();
       lightSpaceMatrix = MatrixMultiply(lightViewMat, lightProjMat);
 
+      // Cull front faces during shadow pass — back-face depth avoids self-shadow acne
+      rlEnableBackfaceCulling();
+      glCullFace(GL_FRONT);
+
       for (const auto &modelWithColor : models) {
         if (shouldSkipObject(modelWithColor)) continue;
         for (int i = 0; i < modelWithColor.model.meshCount; ++i) {
           DrawMesh(modelWithColor.model.meshes[i], shadowDepthMat, modelWithColor.model.transform);
         }
       }
+
+      // Restore normal back-face culling
+      glCullFace(GL_BACK);
 
       EndMode3D();
       EndTextureMode();
