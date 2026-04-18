@@ -208,13 +208,21 @@ router.get("/", (req: Request, res: Response) => {
   // Try to match against demo buildings
   for (const building of demoBuildings) {
     if (matchesDemoAddress(address, building.address)) {
-      return res.json(building);
+      return res.json({
+        ...building,
+        confidence: "verified" as const,
+        data_sources: ["Helsinki CityGML", "K-Rauta hinnat 04/2026"],
+      });
     }
   }
 
   // Fallback: generate generic building
   const generic = generateGenericBuilding(address);
-  return res.json(generic);
+  return res.json({
+    ...generic,
+    confidence: "estimated" as const,
+    data_sources: ["Yleinen kerrostalomalli"],
+  });
 });
 
 export default router;

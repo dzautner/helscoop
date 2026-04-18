@@ -55,6 +55,9 @@ const translations = {
       material: 'Materiaali',
       heating: 'Lammitys',
       bomRows: 'BOM-rivit',
+      verified: 'Tarkistettu',
+      estimated: 'Arvioitu',
+      dataSources: 'Tietolahteet',
     },
     project: {
       myProjects: 'Omat projektit',
@@ -267,6 +270,9 @@ const translations = {
       material: 'Material',
       heating: 'Heating',
       bomRows: 'BOM rows',
+      verified: 'Verified',
+      estimated: 'Estimated',
+      dataSources: 'Data sources',
     },
     project: {
       myProjects: 'My projects',
