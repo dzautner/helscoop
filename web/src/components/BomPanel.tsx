@@ -218,7 +218,7 @@ export default function BomPanel({
   const [totalSavings, setTotalSavings] = useState(0);
   const { t, locale } = useTranslation();
 
-  const total = bom.reduce((sum, item) => sum + (item.total || 0), 0);
+  const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
   // Calculate potential savings across all BOM items
   useEffect(() => {
@@ -398,10 +398,10 @@ export default function BomPanel({
                   }}
                 />
                 <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                  {item.unit} x {(item.unit_price || 0).toFixed(2)}
+                  {item.unit} x {Number(item.unit_price || 0).toFixed(2)}
                 </span>
                 <span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--success)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
-                  {(item.total || 0).toFixed(2)}
+                  {Number(item.total || 0).toFixed(2)}
                 </span>
               </div>
               {item.supplier && (
