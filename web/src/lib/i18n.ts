@@ -151,6 +151,11 @@ const translations = {
       estimatedTotal: 'ARVIOITU KOKONAISHINTA',
       inclVat: 'sis. ALV 25.5%',
       costBreakdown: 'KUSTANNUSERITTELY',
+      confirmApplyTitle: 'Aseta AI:n generoima koodi?',
+      confirmApplyMessage: 'Tama korvaa nykyisen kohtauskomentosarjasi AI:n generoimalla koodilla.',
+      confirmApplyUndo: 'Voit kumota toiminnon nappaimilla',
+      cancel: 'Peruuta',
+      dontAskAgain: 'Ala kysy uudelleen taman istunnon aikana',
     },
     shortcuts: {
       title: 'Pikanappaimet',
@@ -414,6 +419,11 @@ const translations = {
       estimatedTotal: 'ESTIMATED TOTAL',
       inclVat: 'incl. VAT 25.5%',
       costBreakdown: 'COST BREAKDOWN',
+      confirmApplyTitle: 'Apply AI-generated code?',
+      confirmApplyMessage: 'This will replace your current scene script with the AI-generated code.',
+      confirmApplyUndo: 'You can undo with',
+      cancel: 'Cancel',
+      dontAskAgain: "Don't ask again this session",
     },
     shortcuts: {
       title: 'Keyboard shortcuts',
