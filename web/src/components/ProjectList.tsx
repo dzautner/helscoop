@@ -16,6 +16,7 @@ export default function ProjectList() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
 
@@ -102,22 +103,8 @@ export default function ProjectList() {
   return (
     <div style={{ minHeight: "100vh" }}>
       {/* Top bar */}
-      <div style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        background: "rgba(18,17,15,0.85)",
-        backdropFilter: "blur(16px) saturate(1.2)",
-        borderBottom: "1px solid var(--border)",
-      }}>
-        <div style={{
-          maxWidth: 1080,
-          margin: "0 auto",
-          padding: "12px 24px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}>
+      <div className="nav-bar">
+        <div className="nav-inner" style={{ maxWidth: 1080 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
               <span style={{ color: "var(--text-primary)" }}>Hel</span>
@@ -126,7 +113,7 @@ export default function ProjectList() {
             <div style={{ width: 1, height: 20, background: "var(--border-strong)", margin: "0 4px" }} />
             <span className="label-mono">{t('nav.projects')}</span>
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div className="nav-links">
             <LanguageSwitcher />
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => (window.location.href = "/admin")}>
               {t('nav.admin')}
@@ -135,6 +122,28 @@ export default function ProjectList() {
               {t('nav.logout')}
             </button>
           </div>
+          <button
+            className="nav-hamburger"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {mobileMenuOpen ? (
+                <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
+              ) : (
+                <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>
+              )}
+            </svg>
+          </button>
+        </div>
+        <div className={`nav-mobile-menu ${mobileMenuOpen ? "open" : ""}`}>
+          <LanguageSwitcher />
+          <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={() => (window.location.href = "/admin")}>
+            {t('nav.admin')}
+          </button>
+          <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={() => { setToken(null); window.location.reload(); }}>
+            {t('nav.logout')}
+          </button>
         </div>
       </div>
 

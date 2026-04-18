@@ -260,13 +260,7 @@ export default function BomPanel({
 
   return (
     <div
-      style={{
-        width: 360,
-        borderLeft: "1px solid var(--border)",
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--bg-secondary)",
-      }}
+      className="editor-bom-panel"
     >
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

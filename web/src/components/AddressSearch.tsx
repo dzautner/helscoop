@@ -77,7 +77,7 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
           </>
         )}
 
-        <div style={{ display: "flex", gap: 8, maxWidth: 520, margin: "0 auto" }}>
+        <div className="address-search-bar">
           <input
             className="input"
             placeholder={t('search.placeholder')}
@@ -100,11 +100,8 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
         </div>
 
         {result && (
-          <div className="anim-up" style={{
+          <div className="anim-up building-result-grid" style={{
             marginTop: 28,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 24,
             textAlign: "left",
           }}>
             {/* 3D Preview */}
@@ -144,10 +141,7 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
                 </div>
               </div>
 
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gap: 10,
+              <div className="building-info-grid" style={{
                 marginBottom: 16,
                 flex: 1,
               }}>

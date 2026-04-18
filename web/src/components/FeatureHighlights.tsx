@@ -19,12 +19,9 @@ export default function FeatureHighlights() {
       padding: "56px 24px",
       borderBottom: "1px solid var(--border)",
     }}>
-      <div style={{
+      <div className="feature-grid" style={{
         maxWidth: 960,
         margin: "0 auto",
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 32,
       }}>
         {features.map((f, i) => (
           <div key={i} className="anim-up" style={{ animationDelay: `${i * 0.1}s`, textAlign: "center" }}>

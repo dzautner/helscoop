@@ -32,22 +32,9 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      position: "relative",
-    }}>
+    <div className="login-grid">
       {/* Left: Brand panel */}
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        padding: "60px 80px",
-        position: "relative",
-        overflow: "hidden",
-        background: "linear-gradient(160deg, #1a1510 0%, #12110f 100%)",
-      }}>
+      <div className="login-brand">
         {/* Decorative diagonal lines */}
         <div style={{
           position: "absolute",
@@ -117,15 +104,7 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
       </div>
 
       {/* Right: Login form */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "60px 40px",
-        background: "var(--bg-secondary)",
-        borderLeft: "1px solid var(--border)",
-        position: "relative",
-      }}>
+      <div className="login-form-panel">
         <div style={{ position: "absolute", top: 16, right: 16 }}>
           <LanguageSwitcher />
         </div>

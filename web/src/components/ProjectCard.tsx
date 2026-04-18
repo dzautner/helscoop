@@ -18,14 +18,10 @@ export default function ProjectCard({
 
   return (
     <div
-      className="card anim-up"
+      className="card anim-up project-card-grid"
       style={{
         animationDelay: `${index * 0.04}s`,
         padding: "22px 28px",
-        display: "grid",
-        gridTemplateColumns: "1fr auto",
-        gap: 16,
-        alignItems: "center",
         cursor: "pointer",
       }}
       onMouseEnter={(e) => {
@@ -55,7 +51,7 @@ export default function ProjectCard({
           </span>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+      <div className="project-card-actions" onClick={(e) => e.stopPropagation()}>
         <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => (window.location.href = `/project/${project.id}`)}>
           {t('project.open')}
         </button>
