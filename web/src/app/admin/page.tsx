@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { api, getToken, setToken } from "@/lib/api";
+import { useToast } from "@/components/ToastProvider";
+import { SkeletonTableRow } from "@/components/Skeleton";
 
 type Tab = "materials" | "suppliers" | "pricing";
 
@@ -62,10 +64,20 @@ const tdStyle = {
 function MaterialsTab() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    api.getMaterials().then(setMaterials).catch(console.error);
-  }, []);
+    api.getMaterials()
+      .then((mats) => {
+        setMaterials(mats);
+        setLoading(false);
+      })
+      .catch((err) => {
+        toast(err instanceof Error ? err.message : "Materiaalien lataus epaonnistui / Failed to load materials", "error");
+        setLoading(false);
+      });
+  }, [toast]);
 
   const filtered = materials.filter(
     (m) =>
@@ -101,77 +113,83 @@ function MaterialsTab() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((m, i) => {
-              const primary = m.pricing?.find((p) => p.is_primary);
-              const altCount = (m.pricing?.length || 0) - (primary ? 1 : 0);
-              return (
-                <tr
-                  key={m.id}
-                  style={{
-                    animation: `fadeIn 0.2s ease-out ${i * 0.02}s both`,
-                    transition: "background 0.1s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                >
-                  <td style={{ ...tdStyle, padding: "6px 8px" }}>
-                    {m.image_url ? (
-                      <img
-                        src={m.image_url}
-                        alt={m.name}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 6,
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 6,
-                          background: "var(--bg-elevated)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "var(--text-muted)",
-                          fontSize: 10,
-                        }}
-                      >
-                        -
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, fontWeight: 500 }}>{m.name}</td>
-                  <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{m.category_name}</td>
-                  <td style={{ ...tdStyle, fontFamily: "var(--font-mono)", fontSize: 12 }}>
-                    {((m.waste_factor - 1) * 100).toFixed(0)}%
-                  </td>
-                  <td style={tdStyle}>
-                    {primary ? (
-                      <span style={{ color: "var(--success)", fontFamily: "var(--font-mono)", fontWeight: 500, fontSize: 12 }}>
-                        {primary.unit_price.toFixed(2)} {primary.currency}/{primary.unit}
-                      </span>
-                    ) : (
-                      <span className="badge badge-danger">Ei hintaa</span>
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, color: "var(--text-muted)" }}>
-                    {primary?.supplier_name || "-"}
-                  </td>
-                  <td style={tdStyle}>
-                    {altCount > 0 ? (
-                      <span className="badge badge-amber">+{altCount}</span>
-                    ) : (
-                      <span style={{ color: "var(--text-muted)" }}>-</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonTableRow key={i} columns={7} delay={i * 0.05} />
+              ))
+            ) : (
+              filtered.map((m, i) => {
+                const primary = m.pricing?.find((p) => p.is_primary);
+                const altCount = (m.pricing?.length || 0) - (primary ? 1 : 0);
+                return (
+                  <tr
+                    key={m.id}
+                    style={{
+                      animation: `fadeIn 0.2s ease-out ${i * 0.02}s both`,
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <td style={{ ...tdStyle, padding: "6px 8px" }}>
+                      {m.image_url ? (
+                        <img
+                          src={m.image_url}
+                          alt={m.name}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 6,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 6,
+                            background: "var(--bg-elevated)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--text-muted)",
+                            fontSize: 10,
+                          }}
+                        >
+                          -
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 500 }}>{m.name}</td>
+                    <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{m.category_name}</td>
+                    <td style={{ ...tdStyle, fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                      {((m.waste_factor - 1) * 100).toFixed(0)}%
+                    </td>
+                    <td style={tdStyle}>
+                      {primary ? (
+                        <span style={{ color: "var(--success)", fontFamily: "var(--font-mono)", fontWeight: 500, fontSize: 12 }}>
+                          {primary.unit_price.toFixed(2)} {primary.currency}/{primary.unit}
+                        </span>
+                      ) : (
+                        <span className="badge badge-danger">Ei hintaa</span>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, color: "var(--text-muted)" }}>
+                      {primary?.supplier_name || "-"}
+                    </td>
+                    <td style={tdStyle}>
+                      {altCount > 0 ? (
+                        <span className="badge badge-amber">+{altCount}</span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>-</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -181,10 +199,20 @@ function MaterialsTab() {
 
 function SuppliersTab() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    api.getSuppliers().then(setSuppliers).catch(console.error);
-  }, []);
+    api.getSuppliers()
+      .then((sups) => {
+        setSuppliers(sups);
+        setLoading(false);
+      })
+      .catch((err) => {
+        toast(err instanceof Error ? err.message : "Toimittajien lataus epaonnistui / Failed to load suppliers", "error");
+        setLoading(false);
+      });
+  }, [toast]);
 
   return (
     <div>
@@ -198,36 +226,42 @@ function SuppliersTab() {
           </tr>
         </thead>
         <tbody>
-          {suppliers.map((s, i) => (
-            <tr
-              key={s.id}
-              style={{ animation: `fadeIn 0.2s ease-out ${i * 0.04}s both`, transition: "background 0.1s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-            >
-              <td style={{ ...tdStyle, fontWeight: 500 }}>{s.name}</td>
-              <td style={tdStyle}>
-                {s.website ? (
-                  <a
-                    href={s.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--accent)", textDecoration: "none" }}
-                  >
-                    {new URL(s.website).hostname}
-                  </a>
-                ) : (
-                  <span style={{ color: "var(--text-muted)" }}>-</span>
-                )}
-              </td>
-              <td style={tdStyle}>
-                <span className="badge badge-amber">{s.product_count}</span>
-              </td>
-              <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
-                {s.oldest_price ? new Date(s.oldest_price).toLocaleDateString() : "-"}
-              </td>
-            </tr>
-          ))}
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonTableRow key={i} columns={4} delay={i * 0.05} />
+            ))
+          ) : (
+            suppliers.map((s, i) => (
+              <tr
+                key={s.id}
+                style={{ animation: `fadeIn 0.2s ease-out ${i * 0.04}s both`, transition: "background 0.1s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <td style={{ ...tdStyle, fontWeight: 500 }}>{s.name}</td>
+                <td style={tdStyle}>
+                  {s.website ? (
+                    <a
+                      href={s.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "var(--accent)", textDecoration: "none" }}
+                    >
+                      {new URL(s.website).hostname}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>-</span>
+                  )}
+                </td>
+                <td style={tdStyle}>
+                  <span className="badge badge-amber">{s.product_count}</span>
+                </td>
+                <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                  {s.oldest_price ? new Date(s.oldest_price).toLocaleDateString() : "-"}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
@@ -236,10 +270,20 @@ function SuppliersTab() {
 
 function PricingTab() {
   const [stale, setStale] = useState<StalePrice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    api.getStalePrices().then(setStale).catch(console.error);
-  }, []);
+    api.getStalePrices()
+      .then((prices) => {
+        setStale(prices);
+        setLoading(false);
+      })
+      .catch((err) => {
+        toast(err instanceof Error ? err.message : "Hintatietojen lataus epaonnistui / Failed to load pricing", "error");
+        setLoading(false);
+      });
+  }, [toast]);
 
   return (
     <div>
@@ -247,7 +291,24 @@ function PricingTab() {
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Vanhentuneet hinnat</h3>
         <span className="badge badge-amber">&gt;30 paivaa</span>
       </div>
-      {stale.length === 0 ? (
+      {loading ? (
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Materiaali</th>
+              <th style={thStyle}>Toimittaja</th>
+              <th style={thStyle}>Hinta</th>
+              <th style={thStyle}>Viimeksi paivitetty</th>
+              <th style={thStyle}>Ika</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonTableRow key={i} columns={5} delay={i * 0.05} />
+            ))}
+          </tbody>
+        </table>
+      ) : stale.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px" }}>
           <span className="badge badge-forest" style={{ padding: "6px 16px", fontSize: 13 }}>
             Kaikki hinnat ajan tasalla

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { api, setToken, getToken } from "@/lib/api";
+import { useToast } from "@/components/ToastProvider";
+import { SkeletonProjectCard } from "@/components/Skeleton";
 
 interface Project {
   id: string;
@@ -246,45 +248,81 @@ function ProjectList() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    api.getProjects().then(setProjects).catch(console.error);
-    api.getTemplates().then(setTemplates).catch(console.error);
-  }, []);
+    let mounted = true;
+    Promise.all([api.getProjects(), api.getTemplates()])
+      .then(([projs, tmpls]) => {
+        if (mounted) {
+          setProjects(projs);
+          setTemplates(tmpls);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          toast(err instanceof Error ? err.message : "Projektien lataus epaonnistui / Failed to load projects", "error");
+          setLoading(false);
+        }
+      });
+    return () => { mounted = false; };
+  }, [toast]);
 
   async function createProject() {
     if (!newName.trim()) return;
     setCreating(true);
-    const p = await api.createProject({ name: newName });
-    setProjects([p, ...projects]);
-    setNewName("");
+    try {
+      const p = await api.createProject({ name: newName });
+      setProjects([p, ...projects]);
+      setNewName("");
+      toast("Projekti luotu / Project created", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Projektin luonti epaonnistui / Failed to create project", "error");
+    }
     setCreating(false);
   }
 
   async function createFromTemplate(t: Template) {
     setCreating(true);
-    const p = await api.createProject({
-      name: t.name,
-      description: t.description,
-      scene_js: t.scene_js,
-    });
-    if (t.bom.length > 0) {
-      await api.saveBOM(p.id, t.bom);
+    try {
+      const p = await api.createProject({
+        name: t.name,
+        description: t.description,
+        scene_js: t.scene_js,
+      });
+      if (t.bom.length > 0) {
+        await api.saveBOM(p.id, t.bom);
+      }
+      setProjects([{ ...p, estimated_cost: t.estimated_cost }, ...projects]);
+      setShowTemplates(false);
+      toast(`Projekti "${t.name}" luotu mallista / Created from template`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Mallin luonti epaonnistui / Template creation failed", "error");
     }
-    setProjects([{ ...p, estimated_cost: t.estimated_cost }, ...projects]);
-    setShowTemplates(false);
     setCreating(false);
   }
 
   async function deleteProject(id: string) {
     if (!confirm("Haluatko varmasti poistaa taman projektin?")) return;
-    await api.deleteProject(id);
-    setProjects(projects.filter((p) => p.id !== id));
+    try {
+      await api.deleteProject(id);
+      setProjects(projects.filter((p) => p.id !== id));
+      toast("Projekti poistettu / Project deleted", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Poistaminen epaonnistui / Delete failed", "error");
+    }
   }
 
   async function duplicateProject(id: string) {
-    const p = await api.duplicateProject(id);
-    setProjects([p, ...projects]);
+    try {
+      const p = await api.duplicateProject(id);
+      setProjects([p, ...projects]);
+      toast("Projekti kopioitu / Project duplicated", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Kopiointi epaonnistui / Duplicate failed", "error");
+    }
   }
 
   return (
@@ -332,9 +370,11 @@ function ProjectList() {
             Omat projektit
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: 15, marginBottom: 24 }}>
-            {projects.length > 0
-              ? `${projects.length} projekti${projects.length !== 1 ? "a" : ""}`
-              : "Aloita ensimmainen projektisi"}
+            {loading
+              ? "Ladataan projekteja..."
+              : projects.length > 0
+                ? `${projects.length} projekti${projects.length !== 1 ? "a" : ""}`
+                : "Aloita ensimmainen projektisi"}
           </p>
 
           <div style={{ display: "flex", gap: 8, maxWidth: 560 }}>
@@ -357,7 +397,13 @@ function ProjectList() {
           </div>
         </div>
 
-        {projects.length === 0 ? (
+        {loading ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {[0, 1, 2].map((i) => (
+              <SkeletonProjectCard key={i} delay={i * 0.08} />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
           <div className="anim-up delay-1" style={{
             padding: "80px 40px",
             textAlign: "center",
