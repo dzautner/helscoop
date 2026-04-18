@@ -72,7 +72,6 @@ export default function ProjectPage() {
   const [loadError, setLoadError] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
-  const [showChat, setShowChat] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
@@ -133,7 +132,10 @@ export default function ProjectPage() {
         historyRef.current = [initialScene];
         historyIndexRef.current = 0;
         setMaterials(mats);
-        if (proj.bom) setBom(proj.bom);
+        if (proj.bom) setBom(proj.bom.map((b: BomItem & { line_cost?: number }) => ({
+          ...b,
+          total: b.total ?? b.line_cost ?? ((b.unit_price || 0) * b.quantity),
+        })));
         setTimeout(() => {
           initialLoadDoneRef.current = true;
         }, 0);
@@ -231,7 +233,6 @@ export default function ProjectPage() {
 
   /* ── Keyboard shortcuts ──────────────────────────────────────── */
   const closeAllPanels = useCallback(() => {
-    setShowChat(false);
     setShowCode(false);
     setShowShortcutsHelp(false);
   }, []);
@@ -472,52 +473,8 @@ export default function ProjectPage() {
             </svg>
             {t('editor.exportPdf')}
           </button>
-          <button
-            className="btn"
-            data-tour="chat-toggle"
-            onClick={() => setShowChat(!showChat)}
-            style={{
-              padding: "6px 12px",
-              background: showChat ? "var(--amber)" : "var(--amber-glow)",
-              color: showChat ? "#09090b" : "var(--amber)",
-              border: showChat ? "none" : "1px solid var(--amber-border)",
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            {t('editor.assistant')}
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowShortcutsHelp((v) => !v)}
-            title={t('shortcuts.showShortcuts')}
-            style={{ padding: "6px 8px" }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
-              <line x1="6" y1="8" x2="6" y2="8" />
-              <line x1="10" y1="8" x2="10" y2="8" />
-              <line x1="14" y1="8" x2="14" y2="8" />
-              <line x1="18" y1="8" x2="18" y2="8" />
-              <line x1="6" y1="12" x2="6" y2="12" />
-              <line x1="18" y1="12" x2="18" y2="12" />
-              <line x1="8" y1="16" x2="16" y2="16" />
-            </svg>
-          </button>
-          <Link
-            href="/settings"
-            className="btn btn-ghost"
-            title={t('nav.settings')}
-            style={{ padding: "6px 8px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </Link>
           <ThemeToggle />
-            <LanguageSwitcher />
+          <LanguageSwitcher />
         </div>
       </div>
 
@@ -733,14 +690,10 @@ export default function ProjectPage() {
               <SceneEditor sceneJs={sceneJs} onChange={handleSceneChange} />
             </div>
           )}
-        </div>
 
-        {/* Chat panel */}
-        {showChat && (
-          <div className="editor-chat-panel">
-            <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
-          </div>
-        )}
+          {/* Embedded AI assistant */}
+          <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
+        </div>
 
         {/* BOM panel */}
         {showBom && (

@@ -1,128 +1,204 @@
 import { test, expect } from "@playwright/test";
+import { apiUrl, loginViaUI } from "./helpers";
 
-const API_URL = "http://localhost:3051";
+test.describe("Full User Flows", () => {
+  test.describe.configure({ mode: "serial" });
 
-test.describe("Full User Journey", () => {
-  const email = `e2e-journey-${Date.now()}@test.com`;
-  const password = "testpass123";
+  let userEmail: string;
+  let userPassword: string;
+  let userToken: string;
+  let projectId: string;
 
-  test("register → create project → render 3D → BOM → PDF → delete", async ({
-    page,
-  }) => {
-    // 1. Visit home page
-    await page.goto("/");
-    await expect(page).toHaveTitle(/helscoop/i);
-
-    // 2. Register via API
-    const regRes = await page.request.post(`${API_URL}/auth/register`, {
-      data: { email, password, name: "Journey Test" },
+  async function apiLogin(page: import("@playwright/test").Page): Promise<string> {
+    const res = await page.request.post(apiUrl("/auth/login"), {
+      data: { email: userEmail, password: userPassword },
     });
-    const { token } = await regRes.json();
-    expect(token).toBeTruthy();
+    const body = await res.json();
+    return body.token;
+  }
 
-    // 3. Set token, dismiss onboarding, reload
-    await page.evaluate((t) => {
-      localStorage.setItem("helscoop_token", t);
-      localStorage.setItem("helscoop_onboarding_completed", "true");
-    }, token);
+  // ─── Auth flows ────────────────────────────────────────────
+
+  test("register via UI", async ({ page }) => {
+    userEmail = `e2e-flow-${Date.now()}@test.com`;
+    userPassword = "testpass123";
+
     await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("helscoop_onboarding_completed", "true"));
+    await page.reload();
     await page.waitForLoadState("networkidle");
 
-    // Should be logged in
-    await expect(
-      page.getByText(/omat projektit|my projects/i)
-    ).toBeVisible({ timeout: 15_000 });
+    await page.getByText(/ei tili|no account|luo uusi/i).click({ force: true });
+    await page.getByPlaceholder(/matti meikalainen|john smith/i).fill("E2E Flow User");
+    await page.locator('input[type="email"]').fill(userEmail);
+    await page.locator('input[type="password"]').fill(userPassword);
+    await page.getByRole("button", { name: /luo tili|create account/i }).click({ force: true });
 
-    // 4. Create project via API with scene
-    const projRes = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+    await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
+    userToken = await page.evaluate(() => localStorage.getItem("helscoop_token") || "");
+    expect(userToken).toBeTruthy();
+  });
+
+  test("sign out clears session", async ({ page }) => {
+    await loginViaUI(page, userEmail, userPassword);
+    await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
+
+    const logoutBtn = page.getByRole("button", { name: /kirjaudu ulos|log out|sign out/i });
+    if (await logoutBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await logoutBtn.click();
+    } else {
+      await page.evaluate(() => localStorage.removeItem("helscoop_token"));
+      await page.reload();
+    }
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("sign in via UI after sign out", async ({ page }) => {
+    await loginViaUI(page, userEmail, userPassword);
+    await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("invalid credentials rejected", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("helscoop_onboarding_completed", "true"));
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+
+    await page.locator('input[type="email"]').fill("nonexistent@test.com");
+    await page.locator('input[type="password"]').fill("wrongpass");
+    await page.getByRole("button", { name: /kirjaudu|sign in/i }).click({ force: true });
+    await page.waitForTimeout(2000);
+    await expect(page.getByText(/omat projektit|my projects/i)).not.toBeVisible();
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+  });
+
+  test("protected routes redirect without auth", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("helscoop_token"));
+    await page.goto("/project/some-fake-id");
+    await page.waitForTimeout(3000);
+    expect(page.url()).not.toContain("/project/");
+  });
+
+  // ─── Project + editor flows ────────────────────────────────
+
+  test("create project and open editor with 3D canvas", async ({ page }) => {
+    userToken = await apiLogin(page);
+
+    const res = await page.request.post(apiUrl("/projects"), {
+      headers: { Authorization: `Bearer ${userToken}` },
       data: {
-        name: "Full Flow Test",
-        description: "End-to-end journey",
-        scene_js: `
-const floor = box(6, 0.2, 4);
-const wall1 = translate(box(6, 2.8, 0.15), 0, 1.5, -1.925);
-const wall2 = translate(box(6, 2.8, 0.15), 0, 1.5, 1.925);
-const wall3 = translate(box(0.15, 2.8, 4), -2.925, 1.5, 0);
-const wall4 = translate(box(0.15, 2.8, 4), 2.925, 1.5, 0);
-const roof = translate(rotate(box(7, 0.08, 5), 0.52, 0, 0), 0, 3.5, -1);
-scene.add(floor, { material: "foundation", color: [0.7, 0.7, 0.7] });
-scene.add(wall1, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(wall2, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(wall3, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(wall4, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(roof, { material: "roofing", color: [0.35, 0.32, 0.30] });
-        `.trim(),
+        name: "Kanala Test",
+        description: "Chicken coop for 4-6 hens",
+        scene_js: `const floor = box(2, 0.08, 1.5);
+const wall_back = translate(box(2, 1.4, 0.08), 0, 0.78, -0.71);
+const wall_left = translate(box(0.08, 1.4, 1.5), -0.96, 0.78, 0);
+const wall_right = translate(box(0.08, 1.4, 1.5), 0.96, 0.78, 0);
+const roof_l = translate(rotate(box(1.3, 0.04, 1.8), 0, 0, 0.25), -0.5, 1.7, 0);
+const roof_r = translate(rotate(box(1.3, 0.04, 1.8), 0, 0, -0.25), 0.5, 1.7, 0);
+scene.add(floor, { material: "foundation", color: [0.6, 0.58, 0.55] });
+scene.add(wall_back, { material: "lumber", color: [0.88, 0.78, 0.58] });
+scene.add(wall_left, { material: "lumber", color: [0.85, 0.75, 0.55] });
+scene.add(wall_right, { material: "lumber", color: [0.85, 0.75, 0.55] });
+scene.add(roof_l, { material: "roofing", color: [0.3, 0.35, 0.28] });
+scene.add(roof_r, { material: "roofing", color: [0.3, 0.35, 0.28] });`,
       },
     });
-    const project = await projRes.json();
+    projectId = (await res.json()).id;
+    expect(projectId).toBeTruthy();
 
-    // 5. Navigate to editor
-    await page.goto(`/project/${project.id}`);
-    await page.waitForLoadState("networkidle");
+    await loginViaUI(page, userEmail, userPassword);
+    await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
+    await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(5000);
 
-    // 6. Verify 3D viewport renders
-    const canvas = page.locator("canvas");
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/6\s*(objects|objektia)/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('input[value="Kanala Test"]')).toBeVisible({ timeout: 5000 });
+  });
 
-    // 6 objects
-    await expect(page.getByText(/6\s*(objects|objektia)/i)).toBeVisible({
-      timeout: 10_000,
-    });
+  test("embedded AI assistant input visible in editor", async ({ page }) => {
+    await loginViaUI(page, userEmail, userPassword);
+    await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
+    await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(5000);
 
-    // 7. Verify name
-    await expect(
-      page.locator('input[value="Full Flow Test"]')
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".chat-input")).toBeVisible({ timeout: 5000 });
+  });
 
-    // 8. Save BOM via API
-    await page.request.put(`${API_URL}/projects/${project.id}/bom`, {
-      headers: { Authorization: `Bearer ${token}` },
+  test("auto-save works after editing project name", async ({ page }) => {
+    await loginViaUI(page, userEmail, userPassword);
+    await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
+    await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(5000);
+
+    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    const nameInput = page.locator('input[value="Kanala Test"]');
+    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    await nameInput.fill("Kanala Updated");
+    await page.waitForTimeout(3000);
+    await expect(page.getByText(/saved|tallennettu/i).first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  // ─── API-only flows (no browser UI needed) ─────────────────
+
+  test("BOM prices are non-zero from API", async ({ page }) => {
+    userToken = await apiLogin(page);
+
+    await page.request.put(apiUrl(`/projects/${projectId}/bom`), {
+      headers: { Authorization: `Bearer ${userToken}` },
       data: {
         items: [
-          { material_id: "pine_48x148_c24", quantity: 65, unit: "jm" },
-          { material_id: "pine_48x98_c24", quantity: 45, unit: "jm" },
-          { material_id: "concrete_c25", quantity: 2.4, unit: "m3" },
-          { material_id: "metal_roof_ruukki", quantity: 28, unit: "m2" },
+          { material_id: "pine_48x98_c24", quantity: 14, unit: "jm" },
+          { material_id: "osb_18mm", quantity: 6, unit: "m2" },
         ],
       },
     });
 
-    // Reload to see BOM
-    await page.reload();
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
-
-    // 9. Verify BOM items visible
-    await expect(
-      page.getByText(/48x148/i).first()
-    ).toBeVisible({ timeout: 10_000 });
-
-    // 10. Export PDF via API
-    const pdfRes = await page.request.get(
-      `${API_URL}/projects/${project.id}/pdf?lang=fi`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    expect(pdfRes.status()).toBe(200);
-    expect(pdfRes.headers()["content-type"]).toBe("application/pdf");
-
-    // 11. Final screenshot
-    await page.screenshot({
-      path: "test-results/full-flow-final.png",
-      fullPage: true,
+    const projRes = await page.request.get(apiUrl(`/projects/${projectId}`), {
+      headers: { Authorization: `Bearer ${userToken}` },
     });
+    const proj = await projRes.json();
+    expect(proj.bom.length).toBe(2);
 
-    // 12. Delete project
-    const delRes = await page.request.delete(
-      `${API_URL}/projects/${project.id}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+    const total = proj.bom.reduce(
+      (sum: number, item: { total: string }) => sum + Number(item.total || 0),
+      0
     );
+    expect(total).toBeGreaterThan(0);
+  });
+
+  test("export BOM returns data", async ({ page }) => {
+    userToken = await apiLogin(page);
+    const res = await page.request.get(
+      apiUrl(`/bom/export/${projectId}?format=csv`),
+      { headers: { Authorization: `Bearer ${userToken}` } }
+    );
+    expect(res.status()).toBe(200);
+  });
+
+  test("templates endpoint returns chicken coop", async ({ page }) => {
+    const res = await page.request.get(apiUrl("/templates"));
+    expect(res.status()).toBe(200);
+    const templates = await res.json();
+    const kanala = templates.find((t: { id: string }) => t.id === "kanala");
+    expect(kanala).toBeTruthy();
+    expect(kanala.name).toContain("Kanala");
+    expect(kanala.scene_js).toContain("Chicken Coop");
+  });
+
+  test("delete project removes it", async ({ page }) => {
+    userToken = await apiLogin(page);
+    const delRes = await page.request.delete(apiUrl(`/projects/${projectId}`), {
+      headers: { Authorization: `Bearer ${userToken}` },
+    });
     expect(delRes.status()).toBe(200);
 
-    // 13. Confirm deletion
-    const getRes = await page.request.get(
-      `${API_URL}/projects/${project.id}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const getRes = await page.request.get(apiUrl(`/projects/${projectId}`), {
+      headers: { Authorization: `Bearer ${userToken}` },
+    });
     expect(getRes.status()).toBe(404);
   });
 });

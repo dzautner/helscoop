@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -19,8 +19,23 @@ export default function ChatPanel({
   const [loading, setLoading] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [skipConfirm, setSkipConfirm] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (messages.length > 0 && !expanded) {
+      setExpanded(true);
+    }
+  }, [messages, expanded]);
 
   function handleApplyClick(code: string) {
     if (skipConfirm) {
@@ -35,10 +50,6 @@ export default function ChatPanel({
       onApplyCode(pendingCode);
       setPendingCode(null);
     }
-  }
-
-  function handleCancelApply() {
-    setPendingCode(null);
   }
 
   async function send() {
@@ -68,132 +79,103 @@ export default function ChatPanel({
   }
 
   return (
-    <div
-      className="animate-slide"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        background: "var(--bg-secondary)",
-      }}
-    >
-      <div
-        style={{
-          padding: "14px 16px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 13,
-          fontWeight: 600,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-        {t('editor.aiAssistant')}
-      </div>
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: 12,
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
-        {messages.length === 0 && (
-          <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "24px 12px", textAlign: "center", lineHeight: 2 }}>
-            {t('editor.describePrompt')}
-            <br />
-            <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>
-              &ldquo;{t('editor.exampleRoof')}&rdquo;
-            </span>
-            <br />
-            <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>
-              &ldquo;{t('editor.exampleWindow')}&rdquo;
-            </span>
-          </div>
-        )}
-        {messages.map((msg, i) => {
-          const code = msg.role === "assistant" ? extractCode(msg.content) : null;
-          const textContent = msg.content
-            .replace(/```(?:javascript|js)?\n[\s\S]*?```/g, "[code block]")
-            .trim();
+    <div className="chat-embedded">
+      {/* Messages area - expands when there are messages */}
+      {expanded && messages.length > 0 && (
+        <div className="chat-messages-area">
+          <button
+            className="chat-collapse-btn"
+            onClick={() => setExpanded(false)}
+            title="Minimize"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div className="chat-messages-scroll">
+            {messages.map((msg, i) => {
+              const code = msg.role === "assistant" ? extractCode(msg.content) : null;
+              const textContent = msg.content
+                .replace(/```(?:javascript|js)?\n[\s\S]*?```/g, "")
+                .trim();
 
-          return (
-            <div
-              key={i}
-              className="animate-in"
-              style={{
-                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "88%",
-              }}
-            >
-              <div
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                  background: msg.role === "user" ? "var(--accent)" : "var(--bg-elevated)",
-                  color: msg.role === "user" ? "#fff" : "var(--text-primary)",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {textContent}
-              </div>
-              {code && (
-                <button
-                  className="btn"
-                  onClick={() => handleApplyClick(code)}
-                  style={{
-                    marginTop: 6,
-                    padding: "4px 10px",
-                    background: "var(--success-muted)",
-                    color: "var(--success)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                  }}
+              return (
+                <div
+                  key={i}
+                  className={`chat-msg ${msg.role === "user" ? "chat-msg-user" : "chat-msg-ai"}`}
                 >
-                  {t('editor.applyToScene')}
-                </button>
-              )}
-            </div>
-          );
-        })}
-        {loading && (
-          <div style={{ color: "var(--text-muted)", fontSize: 13, padding: 8 }}>
-            <span style={{ animation: "breathe 1.5s infinite" }}>{t('editor.thinking')}</span>
+                  {msg.role === "assistant" && (
+                    <div className="chat-msg-avatar">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="chat-msg-content">
+                    {textContent && <span>{textContent}</span>}
+                    {code && (
+                      <button
+                        className="chat-apply-btn"
+                        onClick={() => handleApplyClick(code)}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        {t('editor.applyToScene')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {loading && (
+              <div className="chat-msg chat-msg-ai">
+                <div className="chat-msg-avatar">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                </div>
+                <div className="chat-msg-content">
+                  <span style={{ animation: "breathe 1.5s infinite" }}>{t('editor.thinking')}</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
-      </div>
-      <div
-        style={{
-          padding: 12,
-          borderTop: "1px solid var(--border)",
-          display: "flex",
-          gap: 6,
-        }}
-      >
+        </div>
+      )}
+
+      {/* Collapsed indicator when there are messages but panel is collapsed */}
+      {!expanded && messages.length > 0 && (
+        <button
+          className="chat-expand-btn"
+          onClick={() => setExpanded(true)}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+          <span>{messages.length} {messages.length === 1 ? "message" : "messages"}</span>
+        </button>
+      )}
+
+      {/* Input bar - always visible */}
+      <div className="chat-input-bar">
+        <svg className="chat-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
         <input
-          className="input"
+          ref={inputRef}
+          className="chat-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-          placeholder={t('editor.describeChange')}
-          style={{ flex: 1, padding: "8px 12px", fontSize: 13 }}
+          placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.describeChange')}
+          disabled={loading}
         />
         <button
-          className="btn btn-primary"
+          className="chat-send-btn"
           onClick={send}
           disabled={loading || !input.trim()}
-          style={{
-            padding: "8px 14px",
-            fontSize: 13,
-            opacity: loading || !input.trim() ? 0.4 : 1,
-          }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />
@@ -201,6 +183,7 @@ export default function ChatPanel({
           </svg>
         </button>
       </div>
+
       <ConfirmDialog
         open={pendingCode !== null}
         title={t('editor.confirmApplyTitle') || "Apply AI-generated code?"}
@@ -214,26 +197,10 @@ export default function ChatPanel({
         confirmText={t('editor.applyToScene') || "Apply to scene"}
         cancelText={t('editor.cancel') || "Cancel"}
         onConfirm={handleConfirmApply}
-        onCancel={handleCancelApply}
+        onCancel={() => setPendingCode(null)}
       />
       {pendingCode !== null && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 80,
-            right: 24,
-            zIndex: 10000,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 12px",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
-            fontSize: 12,
-            color: "var(--text-secondary)",
-          }}
-        >
+        <div className="chat-skip-confirm">
           <input
             type="checkbox"
             id="skip-confirm"

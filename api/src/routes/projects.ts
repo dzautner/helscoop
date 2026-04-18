@@ -48,7 +48,7 @@ router.get("/:id", async (req, res) => {
   const bom = await query(
     `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
       p.unit_price, p.link, s.name AS supplier_name,
-      (pb.quantity * p.unit_price * m.waste_factor) AS line_cost
+      (pb.quantity * p.unit_price * m.waste_factor) AS total
      FROM project_bom pb
      JOIN materials m ON pb.material_id = m.id
      JOIN categories c ON m.category_id = c.id

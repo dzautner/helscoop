@@ -9,6 +9,7 @@ const TEMPLATE_ICONS: Record<string, string> = {
   garage: "M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6",
   shed: "M3 21V10l4-3h10l4 3v11M3 21h18M10 21v-4h4v4",
   pergola: "M4 22V12M20 22V12M2 12h20M6 12v-2M10 12v-2M14 12v-2M18 12v-2",
+  kanala: "M3 21h18M5 21V11l7-4 7 4v10M9 21v-4h6v4M10 11h1M14 11h1M8 15h1",
 };
 
 export default function TemplateGrid({

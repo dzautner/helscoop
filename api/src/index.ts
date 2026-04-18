@@ -522,6 +522,52 @@ scene.add(roof, { material: "roofing", color: [0.4, 0.38, 0.35] });`,
         { material_id: "wood_screw_5x80", quantity: 250, unit: "kpl" },
       ],
     },
+    {
+      id: "kanala",
+      name: "Kanala 2x1.5m",
+      description: "Kompakti kanakoppi 4–6 kanalle, pesälaatikolla ja ulkotarhalla",
+      icon: "shed",
+      estimated_cost: 1800,
+      scene_js: `// Kanala 2x1.5m (Chicken Coop)
+const floor = box(2, 0.08, 1.5);
+const wall_back = translate(box(2, 1.4, 0.08), 0, 0.78, -0.71);
+const wall_left = translate(box(0.08, 1.4, 1.5), -0.96, 0.78, 0);
+const wall_right = translate(box(0.08, 1.4, 1.5), 0.96, 0.78, 0);
+const wall_front_upper = translate(box(2, 0.4, 0.08), 0, 1.28, 0.71);
+const door_frame = translate(box(0.6, 1.0, 0.08), 0.4, 0.58, 0.71);
+const wall_front = subtract(translate(box(2, 1.0, 0.08), 0, 0.58, 0.71), door_frame);
+const nest_box = translate(box(0.6, 0.5, 0.5), -1.16, 0.55, -0.2);
+const nest_lid = translate(rotate(box(0.7, 0.04, 0.55), 0.15, 0, 0), -1.16, 0.82, -0.2);
+const perch = translate(rotate(box(0.06, 0.06, 1.3), 0, 0.3, 0), 0.2, 0.6, 0);
+const roof_l = translate(rotate(box(1.3, 0.04, 1.8), 0, 0, 0.25), -0.5, 1.7, 0);
+const roof_r = translate(rotate(box(1.3, 0.04, 1.8), 0, 0, -0.25), 0.5, 1.7, 0);
+const leg1 = translate(box(0.06, 0.4, 0.06), -0.9, -0.12, -0.65);
+const leg2 = translate(box(0.06, 0.4, 0.06), 0.9, -0.12, -0.65);
+const leg3 = translate(box(0.06, 0.4, 0.06), -0.9, -0.12, 0.65);
+const leg4 = translate(box(0.06, 0.4, 0.06), 0.9, -0.12, 0.65);
+
+scene.add(floor, { material: "foundation", color: [0.6, 0.58, 0.55] });
+scene.add(wall_back, { material: "lumber", color: [0.88, 0.78, 0.58] });
+scene.add(wall_left, { material: "lumber", color: [0.85, 0.75, 0.55] });
+scene.add(wall_right, { material: "lumber", color: [0.85, 0.75, 0.55] });
+scene.add(wall_front_upper, { material: "lumber", color: [0.85, 0.75, 0.55] });
+scene.add(wall_front, { material: "lumber", color: [0.85, 0.75, 0.55] });
+scene.add(nest_box, { material: "lumber", color: [0.7, 0.6, 0.4] });
+scene.add(nest_lid, { material: "lumber", color: [0.72, 0.62, 0.42] });
+scene.add(perch, { material: "lumber", color: [0.65, 0.55, 0.35] });
+scene.add(roof_l, { material: "roofing", color: [0.3, 0.35, 0.28] });
+scene.add(roof_r, { material: "roofing", color: [0.3, 0.35, 0.28] });
+scene.add(leg1, { material: "lumber", color: [0.5, 0.45, 0.35] });
+scene.add(leg2, { material: "lumber", color: [0.5, 0.45, 0.35] });
+scene.add(leg3, { material: "lumber", color: [0.5, 0.45, 0.35] });
+scene.add(leg4, { material: "lumber", color: [0.5, 0.45, 0.35] });`,
+      bom: [
+        { material_id: "pine_48x98_c24", quantity: 14, unit: "jm" },
+        { material_id: "osb_11mm", quantity: 6, unit: "m2" },
+        { material_id: "roofing_felt_yp2200", quantity: 4, unit: "m2" },
+        { material_id: "wood_screw_5x80", quantity: 120, unit: "kpl" },
+      ],
+    },
   ]);
 });
 
