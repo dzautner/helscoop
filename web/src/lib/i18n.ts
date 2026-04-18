@@ -27,6 +27,7 @@ const translations = {
       hasAccount: 'Onko jo tili? Kirjaudu',
       loading: 'Ladataan...',
       loginFailed: 'Kirjautuminen ei onnistunut',
+      forgotPassword: 'Unohditko salasanan?',
     },
     brand: {
       tagline: 'N\u00c4E TALOSI \u00b7 MUUTA \u00b7 RAKENNA',
@@ -39,9 +40,9 @@ const translations = {
       featureAIDesc: 'kuvaile muutos, se toteutuu',
     },
     search: {
-      demoLabel: 'TALOHAUN DEMO',
-      title: 'Miltae talosi nayttaa 3D:ssa?',
-      subtitle: 'Syota osoitteesi ja nae talosi kolmiulotteisena mallina.',
+      sectionLabel: 'HAE OSOITTEELLA',
+      title: 'Suunnittele remontti 3D:ssa',
+      subtitle: 'Syota osoitteesi, nae talosi ja ala suunnitella.',
       placeholder: 'Syota osoitteesi, esim. Ribbingintie 109...',
       searching: 'Haetaan...',
       searchButton: 'Hae',
@@ -299,6 +300,7 @@ const translations = {
       hasAccount: 'Already have an account? Sign in',
       loading: 'Loading...',
       loginFailed: 'Login failed',
+      forgotPassword: 'Forgot password?',
     },
     brand: {
       tagline: 'SEE YOUR HOUSE \u00b7 CHANGE IT \u00b7 BUILD',
@@ -311,9 +313,9 @@ const translations = {
       featureAIDesc: 'describe a change, it happens',
     },
     search: {
-      demoLabel: 'BUILDING LOOKUP DEMO',
-      title: 'What does your house look like in 3D?',
-      subtitle: 'Enter your address and see your house as a 3D model.',
+      sectionLabel: 'SEARCH BY ADDRESS',
+      title: 'Plan your renovation in 3D',
+      subtitle: 'Enter your address, see your house, and start planning.',
       placeholder: 'Enter your address, e.g. Ribbingintie 109...',
       searching: 'Searching...',
       searchButton: 'Search',

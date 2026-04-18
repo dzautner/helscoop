@@ -7,8 +7,6 @@ import { api, getToken, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectEditor } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -362,39 +360,34 @@ export default function ProjectPage() {
 
       {/* Header */}
       <div className="editor-header">
-        <button className="btn btn-ghost" onClick={() => router.push("/")} style={{ padding: "6px 10px" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="btn btn-ghost" onClick={() => router.push("/")} style={{ padding: "6px 10px" }} title={t('nav.back')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <div style={{ width: 1, height: 20, background: "var(--border)" }} />
+        <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
         <input
+          className="editor-header-name"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            fontFamily: "var(--font-display)",
-            border: "none",
-            background: "transparent",
-            outline: "none",
-            color: "var(--text-primary)",
-            flex: 1,
-          }}
         />
-        <input
-          className="editor-header-desc"
-          value={projectDesc}
-          onChange={(e) => setProjectDesc(e.target.value)}
-          placeholder={t('project.descriptionPlaceholder')}
-        />
-        <div style={{ display: "flex", gap: 2 }}>
+        <div className="editor-save-status" style={{
+          color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--text-muted)",
+        }}>
+          <span className="editor-save-dot" data-status={saveStatus} />
+          {saveStatus === "saving"
+            ? t('editor.saving')
+            : saveStatus === "saved"
+              ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
+              : t('editor.unsaved')}
+        </div>
+        <div className="editor-header-actions">
           <button
             className="btn btn-ghost"
             onClick={undo}
             disabled={!canUndo}
             title={t('editor.undoShortcut')}
-            style={{ padding: "6px 8px", opacity: canUndo ? 1 : 0.3 }}
+            style={{ padding: "5px 7px", opacity: canUndo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="1 4 1 10 7 10" />
@@ -406,43 +399,15 @@ export default function ProjectPage() {
             onClick={redo}
             disabled={!canRedo}
             title={t('editor.redoShortcut')}
-            style={{ padding: "6px 8px", opacity: canRedo ? 1 : 0.3 }}
+            style={{ padding: "5px 7px", opacity: canRedo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
             </svg>
           </button>
-        </div>
-        <div className="editor-header-actions">
-          <div style={{ width: 1, height: 20, background: "var(--border)" }} />
-          <span style={{
-            fontSize: 11,
-            color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--success)",
-            fontFamily: "var(--font-mono)",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}>
-            {saveStatus === "saving" && (
-              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", animation: "pulse 1.5s infinite" }} />
-            )}
-            {saveStatus === "saved" && (
-              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />
-            )}
-            {saveStatus === "unsaved" && (
-              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--warning, #e5c07b)" }} />
-            )}
-            {saveStatus === "saving"
-              ? t('editor.saving')
-              : saveStatus === "saved"
-                ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
-                : t('editor.unsaved')}
-          </span>
-          <button className="btn btn-primary" onClick={save} style={{ padding: "6px 16px" }}>
-            {t('editor.save')}
-          </button>
-          <button className="btn btn-ghost" data-tour="export-btn" onClick={async () => {
+          <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
+          <button className="btn btn-ghost" data-tour="export-btn" title={t('editor.export')} onClick={async () => {
             try {
               const res = await api.exportBOM(projectId);
               const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
@@ -456,10 +421,14 @@ export default function ProjectPage() {
             } catch (err) {
               toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
             }
-          }}>
-            {t('editor.export')}
+          }} style={{ padding: "5px 7px" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
           </button>
-          <button className="btn btn-ghost" onClick={() => {
+          <button className="btn btn-ghost" title={t('editor.exportPdf')} onClick={async () => {
             try {
               generateQuotePdf({
                 projectName,
@@ -471,17 +440,12 @@ export default function ProjectPage() {
             } catch (err) {
               toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
             }
-          }}>
+          }} style={{ padding: "5px 7px" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
-              <line x1="12" y1="18" x2="12" y2="12" />
-              <polyline points="9 15 12 18 15 15" />
             </svg>
-            {t('editor.exportPdf')}
           </button>
-          <ThemeToggle />
-          <LanguageSwitcher />
         </div>
       </div>
 
@@ -490,49 +454,24 @@ export default function ProjectPage() {
         {/* Left: Viewport + Code */}
         <div className="editor-viewport-area">
           {/* Toolbar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              background: "var(--bg-tertiary)",
-              borderBottom: "1px solid var(--border)",
-              flexShrink: 0,
-            }}
-          >
+          <div className="viewport-toolbar">
             <button
-              className="btn"
+              className="viewport-toolbar-btn"
+              data-active={showCode}
               onClick={() => setShowCode(!showCode)}
-              style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: showCode ? "var(--bg-hover)" : "transparent",
-                color: showCode ? "var(--text-primary)" : "var(--text-muted)",
-                border: showCode ? "1px solid var(--border-strong)" : "1px solid transparent",
-              }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="16 18 22 12 16 6" />
                 <polyline points="8 6 2 12 8 18" />
               </svg>
               {showCode ? t('editor.hideCode') : t('editor.showCode')}
             </button>
-            <div style={{ width: 1, height: 16, background: "var(--border)" }} />
             <button
-              className="btn"
+              className="viewport-toolbar-btn"
+              data-active={wireframe}
               onClick={() => setWireframe(!wireframe)}
-              style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: wireframe ? "var(--bg-hover)" : "transparent",
-                color: wireframe ? "var(--text-primary)" : "var(--text-muted)",
-                border: wireframe ? "1px solid var(--border-strong)" : "1px solid transparent",
-              }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
@@ -540,7 +479,7 @@ export default function ProjectPage() {
               {t('editor.wireframe')}
             </button>
             <button
-              className="btn"
+              className="viewport-toolbar-btn"
               onClick={() => {
                 const container = viewportRef.current;
                 if (container) {
@@ -548,27 +487,15 @@ export default function ProjectPage() {
                   el?.resetCamera?.();
                 }
               }}
-              style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: "transparent",
-                color: "var(--text-muted)",
-                border: "1px solid transparent",
-              }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M1 4v6h6" />
                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
               </svg>
               {t('editor.resetCamera')}
             </button>
             <div style={{ flex: 1 }} />
-            <span style={{
-              fontSize: 11,
-              color: sceneError ? "var(--danger)" : "var(--text-muted)",
-              fontFamily: "var(--font-mono)",
-            }}>
+            <span className="viewport-status" data-error={!!sceneError}>
               {sceneError
                 ? `${t('editor.sceneErrorPrefix')}: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
                 : t('editor.objectCount', { count: objectCount })}

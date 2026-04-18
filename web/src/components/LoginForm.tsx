@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { BuildingResult } from "@/types";
 
-export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () => void; pendingBuilding: BuildingResult | null }) {
+export default function LoginForm({
+  onLogin,
+  pendingBuilding,
+  addressSearch,
+}: {
+  onLogin: () => void;
+  pendingBuilding: BuildingResult | null;
+  addressSearch?: ReactNode;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -32,76 +40,131 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
     setLoading(false);
   }
 
+  const features = [
+    {
+      icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16",
+      num: "28",
+      label: t('brand.featureMaterials'),
+      desc: t('brand.featureMaterialsDesc'),
+    },
+    {
+      icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6",
+      num: "6",
+      label: t('brand.featureSuppliers'),
+      desc: t('brand.featureSuppliersDesc'),
+    },
+    {
+      icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+      num: "AI",
+      label: t('brand.featureAI'),
+      desc: t('brand.featureAIDesc'),
+    },
+  ];
+
   return (
     <div className="login-grid">
       {/* Left: Brand panel */}
       <div className="login-brand">
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="anim-up" style={{ marginBottom: 40 }}>
-            <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 12, letterSpacing: "0.06em" }}>
-              {t('brand.tagline')}
-            </div>
-            <h1 className="heading-display" style={{ fontSize: 40, lineHeight: 1.1, marginBottom: 16 }}>
+          <div className="anim-up" style={{ marginBottom: 36 }}>
+            <h1 className="heading-display" style={{ fontSize: 44, lineHeight: 1.05, marginBottom: 16 }}>
               <span style={{ color: "var(--text-primary)" }}>Hel</span>
               <span style={{ color: "var(--amber)" }}>scoop</span>
             </h1>
-            <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--text-secondary)", maxWidth: 380 }}>
+            <p style={{ fontSize: 17, lineHeight: 1.65, color: "var(--text-secondary)", maxWidth: 380 }}>
               {t('brand.description')}
             </p>
           </div>
 
-          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {[
-              { num: "28", label: t('brand.featureMaterials'), desc: t('brand.featureMaterialsDesc') },
-              { num: "6", label: t('brand.featureSuppliers'), desc: t('brand.featureSuppliersDesc') },
-              { num: "AI", label: t('brand.featureAI'), desc: t('brand.featureAIDesc') },
-            ].map((item, i) => (
+          {addressSearch && (
+            <div className="anim-up delay-1" style={{ marginBottom: 28 }}>
+              <div className="label-mono" style={{
+                marginBottom: 10,
+                letterSpacing: "0.08em",
+                color: "var(--text-muted)",
+                fontSize: 10,
+              }}>
+                {t('search.sectionLabel')}
+              </div>
+              {addressSearch}
+            </div>
+          )}
+
+          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 36 }}>
+            {features.map((item, i) => (
               <div key={i} style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
-                padding: "12px 0",
+                gap: 14,
+                padding: "14px 0",
                 borderBottom: "1px solid var(--border)",
               }}>
                 <div style={{
-                  width: 36,
-                  height: 36,
+                  width: 40,
+                  height: 40,
                   borderRadius: "var(--radius-sm)",
                   background: "var(--amber-glow)",
                   border: "1px solid var(--amber-border)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontFamily: "var(--font-mono)",
-                  fontWeight: 600,
-                  fontSize: item.num === "AI" ? 11 : 13,
-                  color: "var(--amber)",
                   flexShrink: 0,
                 }}>
-                  {item.num}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={item.icon} />
+                  </svg>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{item.label}</div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{item.desc}</div>
+                  <div style={{ fontWeight: 500, fontSize: 14, color: "var(--text-primary)" }}>
+                    <span style={{
+                      color: "var(--amber)",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      marginRight: 6,
+                      letterSpacing: "0.02em",
+                    }}>
+                      {item.num}
+                    </span>
+                    {item.label}
+                  </div>
+                  <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{item.desc}</div>
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="anim-up delay-3">
+            <div className="label-mono" style={{
+              color: "var(--amber)",
+              letterSpacing: "0.08em",
+              fontSize: 10,
+            }}>
+              {t('brand.tagline')}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Right: Login form */}
       <div className="login-form-panel">
-        <div style={{ position: "absolute", top: 16, right: 16 }}>
+        <div style={{
+          position: "absolute",
+          top: 20,
+          right: 20,
+          display: "flex",
+          gap: 4,
+          alignItems: "center",
+        }}>
           <ThemeToggle />
-            <LanguageSwitcher />
+          <LanguageSwitcher />
         </div>
         <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
-          <div style={{ marginBottom: 28 }}>
-            <h2 className="heading-display" style={{ fontSize: 22, marginBottom: 6 }}>
+          <div style={{ marginBottom: 32 }}>
+            <h2 className="heading-display" style={{ fontSize: 24, marginBottom: 8 }}>
               {isRegister ? t('auth.registerTitle') : t('auth.loginTitle')}
             </h2>
-            <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+            <p style={{ color: "var(--text-muted)", fontSize: 14, lineHeight: 1.5 }}>
               {pendingBuilding
                 ? t('auth.loginSubtitleBuilding') + pendingBuilding.address
                 : isRegister
@@ -110,7 +173,7 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {isRegister && (
               <div>
                 <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.name')}</label>
@@ -119,6 +182,7 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
                   placeholder={t('auth.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
                 />
               </div>
             )}
@@ -131,6 +195,7 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
             <div>
@@ -142,19 +207,23 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete={isRegister ? "new-password" : "current-password"}
               />
               {!isRegister && (
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a
                     href="/forgot-password"
                     style={{
-                      color: "var(--amber)",
-                      fontSize: 13,
+                      color: "var(--text-muted)",
+                      fontSize: 12,
                       textDecoration: "none",
                       fontFamily: "var(--font-body)",
+                      transition: "color 0.12s ease",
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--amber)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
                   >
-                    Unohditko salasanan?
+                    {t('auth.forgotPassword')}
                   </a>
                 </div>
               )}
@@ -163,11 +232,12 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
             {error && (
               <div style={{
                 padding: "10px 14px",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "var(--radius-md)",
                 background: "var(--danger-dim)",
                 color: "var(--danger)",
                 fontSize: 13,
                 border: "1px solid rgba(199,95,95,0.12)",
+                lineHeight: 1.4,
               }}>
                 {error}
               </div>
@@ -177,13 +247,20 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
               className="btn btn-primary"
               type="submit"
               disabled={loading}
-              style={{ width: "100%", padding: "13px 16px", fontSize: 14, marginTop: 4 }}
+              style={{
+                width: "100%",
+                padding: "13px 16px",
+                fontSize: 14,
+                marginTop: 4,
+                fontWeight: 600,
+                letterSpacing: "0.02em",
+              }}
             >
               {loading ? t('auth.loading') : isRegister ? t('auth.register') : t('auth.login')}
             </button>
           </form>
 
-          <div className="divider-amber" style={{ marginTop: 28, marginBottom: 20 }} />
+          <div className="divider-amber" style={{ marginTop: 32, marginBottom: 24 }} />
 
           <div style={{ textAlign: "center" }}>
             <button
@@ -195,7 +272,10 @@ export default function LoginForm({ onLogin, pendingBuilding }: { onLogin: () =>
                 cursor: "pointer",
                 fontSize: 13,
                 fontFamily: "var(--font-body)",
+                transition: "opacity 0.12s ease",
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.8"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
             >
               {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}
             </button>

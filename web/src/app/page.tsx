@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { api, setToken, getToken } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 import AddressSearch from "@/components/AddressSearch";
-import FeatureHighlights from "@/components/FeatureHighlights";
 import ProjectList from "@/components/ProjectList";
 import type { BuildingResult } from "@/types";
 
@@ -54,11 +53,13 @@ export default function Home() {
 
   if (!loggedIn) {
     return (
-      <div>
-        <AddressSearch onCreateProject={handleCreateFromBuilding} />
-        <FeatureHighlights />
-        <LoginForm onLogin={handleLogin} pendingBuilding={pendingBuilding} />
-      </div>
+      <LoginForm
+        onLogin={handleLogin}
+        pendingBuilding={pendingBuilding}
+        addressSearch={
+          <AddressSearch onCreateProject={handleCreateFromBuilding} compact />
+        }
+      />
     );
   }
 

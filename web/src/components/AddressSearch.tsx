@@ -75,7 +75,13 @@ function DataSourcesSection({ label, sources }: { label: string; sources: string
   );
 }
 
-export default function AddressSearch({ onCreateProject }: { onCreateProject: (building: BuildingResult) => Promise<void> | void }) {
+export default function AddressSearch({
+  onCreateProject,
+  compact = false,
+}: {
+  onCreateProject: (building: BuildingResult) => Promise<void> | void;
+  compact?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -101,6 +107,84 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
   const materialLabels = MATERIAL_LABELS[locale] || MATERIAL_LABELS.fi;
   const heatingLabels = HEATING_LABELS[locale] || HEATING_LABELS.fi;
 
+  if (compact) {
+    return (
+      <div>
+        <div className="address-search-bar" style={{ maxWidth: "none" }}>
+          <input
+            className="input"
+            placeholder={t('search.placeholder')}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (searched) { setResult(null); setSearched(false); }
+            }}
+            onKeyDown={(e) => e.key === "Enter" && search()}
+            style={{ flex: 1, padding: "12px 14px", fontSize: 14 }}
+          />
+          <button
+            className={`btn ${query.trim().length >= 3 ? "btn-primary" : "btn-ghost"}`}
+            onClick={search}
+            disabled={loading || query.trim().length < 3}
+            style={{ padding: "12px 20px", fontSize: 13 }}
+          >
+            {loading ? t('search.searching') : t('search.searchButton')}
+          </button>
+        </div>
+
+        {result && (
+          <div className="anim-up" style={{ marginTop: 16 }}>
+            <div className="card" style={{ padding: "16px 18px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div>
+                  <div className="heading-display" style={{ fontSize: 15, marginBottom: 4 }}>
+                    {result.address}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span className="badge badge-amber" style={{ fontSize: 11 }}>
+                      {buildingTypeLabels[result.building_info.type] || result.building_info.type}
+                    </span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                      {result.building_info.year_built} &middot; {result.building_info.area_m2} m&sup2;
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {createError && (
+                <div style={{ padding: "8px 12px", marginBottom: 8, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "#dc3232", fontSize: 12 }}>
+                  {t('search.createError')}
+                </div>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  setCreating(true);
+                  setCreateError(false);
+                  try {
+                    await onCreateProject(result);
+                  } catch {
+                    setCreateError(true);
+                    setCreating(false);
+                  }
+                }}
+                disabled={creating}
+                style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontWeight: 600 }}
+              >
+                {creating ? t('search.creatingProject') : t('search.createFromBuilding')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {searched && !loading && !result && (
+          <div className="anim-fade" style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
+            {t('search.notFound')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{
       width: "100%",
@@ -111,9 +195,6 @@ export default function AddressSearch({ onCreateProject }: { onCreateProject: (b
       <div style={{ maxWidth: result ? 960 : 640, margin: "0 auto", textAlign: "center", transition: "max-width 0.3s ease" }}>
         {!result && (
           <>
-            <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 16, letterSpacing: "0.15em", fontSize: 11 }}>
-              {t('search.demoLabel')}
-            </div>
             <h1 className="heading-display" style={{ fontSize: 36, marginBottom: 10, lineHeight: 1.1 }}>
               {t('search.title')}
             </h1>
