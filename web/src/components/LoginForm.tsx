@@ -22,11 +22,16 @@ export default function LoginForm({
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { t } = useTranslation();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (isRegister && !acceptedTerms) {
+      setError(t('legal.acceptTermsRequired'));
+      return;
+    }
     setLoading(true);
     try {
       const result = isRegister
@@ -229,6 +234,41 @@ export default function LoginForm({
               )}
             </div>
 
+            {isRegister && (
+              <label style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                cursor: "pointer",
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "var(--text-secondary)",
+              }}>
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  style={{
+                    marginTop: 2,
+                    accentColor: "var(--amber)",
+                    width: 16,
+                    height: 16,
+                    flexShrink: 0,
+                  }}
+                />
+                <span>
+                  {t('legal.acceptTerms').split(t('legal.termsOfService'))[0]}
+                  <a href="/terms" target="_blank" style={{ color: "var(--amber)", textDecoration: "none" }}>
+                    {t('legal.termsOfService')}
+                  </a>
+                  {" "}{t('legal.and')}{" "}
+                  <a href="/privacy" target="_blank" style={{ color: "var(--amber)", textDecoration: "none" }}>
+                    {t('legal.privacyPolicy')}
+                  </a>
+                </span>
+              </label>
+            )}
+
             {error && (
               <div style={{
                 padding: "10px 14px",
@@ -279,6 +319,30 @@ export default function LoginForm({
             >
               {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}
             </button>
+          </div>
+
+          <div style={{
+            marginTop: 20,
+            display: "flex",
+            justifyContent: "center",
+            gap: 16,
+          }}>
+            <a
+              href="/privacy"
+              style={{ color: "var(--text-muted)", fontSize: 11, textDecoration: "none" }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--amber)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
+            >
+              {t('legal.privacyPolicy')}
+            </a>
+            <a
+              href="/terms"
+              style={{ color: "var(--text-muted)", fontSize: 11, textDecoration: "none" }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--amber)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
+            >
+              {t('legal.termsOfService')}
+            </a>
           </div>
         </div>
       </div>

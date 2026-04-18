@@ -70,8 +70,8 @@ export async function register(
   const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
   const result = await query(
-    `INSERT INTO users (email, name, password_hash, email_verified, verification_token, verification_token_expires)
-     VALUES ($1, $2, $3, false, $4, $5)
+    `INSERT INTO users (email, name, password_hash, email_verified, verification_token, verification_token_expires, accepted_terms_at)
+     VALUES ($1, $2, $3, false, $4, $5, NOW())
      RETURNING id, email, name, role`,
     [email, name, hash, verificationToken, verificationExpires.toISOString()]
   );
