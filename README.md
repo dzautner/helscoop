@@ -117,6 +117,7 @@ See `examples/` for parametric examples:
 | lamp | Multi-material: brass metal + cream matte shade |
 | tower | warp() twist deformation, refineToLength |
 | showroom | Multi-object PBR: revolve, warp, boolean, patterns |
+| bracket | circle2D, rect2D, offset2D, rounded corners, bolt holes |
 | helscoop | Full architecture: walls, roof, textures, assembly |
 
 ### Render Mode

@@ -790,10 +790,10 @@ int main(int argc, char *argv[]) {
 
   // Override PBR environment for white/clean background (brighter, more neutral)
   if (renderWhiteBackground) {
-    const float whiteSkyTop[3] = {0.82f, 0.84f, 0.86f};
-    const float whiteSkyBottom[3] = {0.88f, 0.88f, 0.87f};
-    const float whiteGround[3] = {0.85f, 0.84f, 0.82f};
-    float whiteExposure = 1.0f;
+    const float whiteSkyTop[3] = {0.75f, 0.77f, 0.80f};
+    const float whiteSkyBottom[3] = {0.82f, 0.82f, 0.81f};
+    const float whiteGround[3] = {0.78f, 0.77f, 0.75f};
+    float whiteExposure = 0.90f;
     SetShaderValue(pbrShader, locPbrSkyTop, whiteSkyTop, SHADER_UNIFORM_VEC3);
     SetShaderValue(pbrShader, locPbrSkyBottom, whiteSkyBottom, SHADER_UNIFORM_VEC3);
     SetShaderValue(pbrShader, locPbrGround, whiteGround, SHADER_UNIFORM_VEC3);
