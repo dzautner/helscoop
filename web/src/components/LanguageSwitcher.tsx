@@ -33,9 +33,9 @@ export function LanguageSwitcher() {
         e.currentTarget.style.color = "var(--text-secondary)";
       }}
     >
-      <span style={{ opacity: locale === "fi" ? 1 : 0.4 }}>FI</span>
+      <span style={{ opacity: locale === "fi" ? 1 : 0.4, transition: "opacity 0.15s ease" }}>FI</span>
       <span style={{ opacity: 0.3 }}>|</span>
-      <span style={{ opacity: locale === "en" ? 1 : 0.4 }}>EN</span>
+      <span style={{ opacity: locale === "en" ? 1 : 0.4, transition: "opacity 0.15s ease" }}>EN</span>
     </button>
   );
 }

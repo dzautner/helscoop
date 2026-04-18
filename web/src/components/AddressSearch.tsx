@@ -9,7 +9,7 @@ import type { BuildingResult } from "@/types";
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
   ssr: false,
   loading: () => (
-    <div style={{ width: "100%", height: "100%", background: "#111113", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+    <div style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
       Ladataan 3D...
     </div>
   ),
@@ -151,7 +151,7 @@ export default function AddressSearch({
                 </div>
               </div>
               {createError && (
-                <div style={{ padding: "8px 12px", marginBottom: 8, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "#dc3232", fontSize: 12 }}>
+                <div style={{ padding: "8px 12px", marginBottom: 8, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "var(--danger)", fontSize: 12 }}>
                   {t('search.createError')}
                 </div>
               )}
@@ -236,7 +236,7 @@ export default function AddressSearch({
               borderRadius: "var(--radius-lg)",
               overflow: "hidden",
               border: "1px solid var(--border)",
-              background: "#111113",
+              background: "var(--bg-secondary)",
               minHeight: 320,
             }}>
               <Viewport3D
@@ -316,7 +316,7 @@ export default function AddressSearch({
               )}
 
               {createError && (
-                <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "#dc3232", fontSize: 13 }}>
+                <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "var(--danger)", fontSize: 13 }}>
                   {t('search.createError')}
                 </div>
               )}

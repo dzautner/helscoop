@@ -270,7 +270,7 @@ export default function LoginForm({
             )}
 
             {error && (
-              <div style={{
+              <div className="anim-up" style={{
                 padding: "10px 14px",
                 borderRadius: "var(--radius-md)",
                 background: "var(--danger-dim)",
@@ -278,6 +278,7 @@ export default function LoginForm({
                 fontSize: 13,
                 border: "1px solid rgba(199,95,95,0.12)",
                 lineHeight: 1.4,
+                animationDuration: "0.2s",
               }}>
                 {error}
               </div>

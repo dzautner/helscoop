@@ -22,7 +22,7 @@ import type { Material, BomItem, Project } from "@/types";
 function Viewport3DLoading() {
   const { t } = useTranslation();
   return (
-    <div style={{ width: "100%", height: "100%", background: "#111113", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+    <div style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
       {t('editor.loading3D')}
     </div>
   );
@@ -631,7 +631,7 @@ export default function ProjectPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "#111113",
+                    background: "var(--bg-secondary)",
                     borderRadius: "var(--radius-md)",
                   }}
                 >
@@ -665,7 +665,7 @@ export default function ProjectPage() {
                     </div>
                     <h3
                       style={{
-                        color: "#fafafa",
+                        color: "var(--text-primary)",
                         fontSize: 16,
                         fontWeight: 600,
                         marginBottom: 8,
@@ -675,7 +675,7 @@ export default function ProjectPage() {
                     </h3>
                     <p
                       style={{
-                        color: "#52525b",
+                        color: "var(--text-muted)",
                         fontSize: 13,
                         lineHeight: 1.5,
                         marginBottom: 8,

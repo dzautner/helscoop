@@ -383,6 +383,18 @@ body {
   color: transparent;
 }
 
+select {
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+select:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+select:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px var(--amber-glow);
+  outline: none;
+}
+
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);

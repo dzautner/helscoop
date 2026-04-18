@@ -25,14 +25,6 @@ export default function ProjectCard({
         cursor: "pointer",
         overflow: "hidden",
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--amber-border)";
-        e.currentTarget.style.boxShadow = "var(--shadow-amber)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "var(--border)";
-        e.currentTarget.style.boxShadow = "none";
-      }}
       onClick={() => (window.location.href = `/project/${project.id}`)}
     >
       {/* Thumbnail or placeholder */}

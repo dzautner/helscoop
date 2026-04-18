@@ -93,6 +93,7 @@ export default function UserMenu({ userName }: { userName: string }) {
                 borderRadius: "var(--radius-sm)",
                 fontFamily: "inherit",
                 textDecoration: "none",
+                transition: "background 0.12s ease",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "var(--bg-tertiary)";
@@ -119,6 +120,7 @@ export default function UserMenu({ userName }: { userName: string }) {
                 textAlign: "left",
                 borderRadius: "var(--radius-sm)",
                 fontFamily: "inherit",
+                transition: "background 0.12s ease",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "var(--bg-tertiary)";
