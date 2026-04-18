@@ -782,6 +782,22 @@ int main(int argc, char *argv[]) {
   SetShaderValue(pbrShadowShader, locPbrShadowExposure, &pbrExposure, SHADER_UNIFORM_FLOAT);
   SetShaderValue(pbrShadowShader, locPbrShadowLightColor, pbrLightColor, SHADER_UNIFORM_VEC3);
 
+  // Override PBR environment for white/clean background (brighter, more neutral)
+  if (renderWhiteBackground) {
+    const float whiteSkyTop[3] = {0.82f, 0.84f, 0.86f};
+    const float whiteSkyBottom[3] = {0.88f, 0.88f, 0.87f};
+    const float whiteGround[3] = {0.85f, 0.84f, 0.82f};
+    float whiteExposure = 1.0f;
+    SetShaderValue(pbrShader, locPbrSkyTop, whiteSkyTop, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShader, locPbrSkyBottom, whiteSkyBottom, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShader, locPbrGround, whiteGround, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShader, locPbrExposure, &whiteExposure, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(pbrShadowShader, locPbrShadowSkyTop, whiteSkyTop, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShadowShader, locPbrShadowSkyBottom, whiteSkyBottom, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShadowShader, locPbrShadowGround, whiteGround, SHADER_UNIFORM_VEC3);
+    SetShaderValue(pbrShadowShader, locPbrShadowExposure, &whiteExposure, SHADER_UNIFORM_FLOAT);
+  }
+
   // Set shadow map sampler to use texture unit 3 (units 0-2 used by post-processing)
   int shadowMapTexUnit = 3;
   SetShaderValue(pbrShadowShader, locPbrShadowShadowMap, &shadowMapTexUnit, SHADER_UNIFORM_INT);
