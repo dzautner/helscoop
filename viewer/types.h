@@ -80,6 +80,17 @@ struct PBRPricing {
   float unitPrice = 0.0f;
   std::string supplier;
   std::string link;
+  std::string sku;
+  std::string ean;
+  std::string lastPriceCheck;
+  std::string currency = "EUR";
+  struct AltSupplier {
+    std::string supplier;
+    float unitPrice = 0.0f;
+    std::string link;
+    std::string sku;
+  };
+  std::vector<AltSupplier> alternativeSuppliers;
 };
 
 // Structural properties for lumber and framing

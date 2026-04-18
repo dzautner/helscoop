@@ -118,6 +118,32 @@ PBRMaterial ParseMaterial(JSContext* ctx, const std::string& id, JSValue matObj)
     mat.pricing.unitPrice = GetFloatProp(ctx, pricingVal, "unitPrice", 0.0f);
     mat.pricing.supplier = GetStringProp(ctx, pricingVal, "supplier");
     mat.pricing.link = GetStringProp(ctx, pricingVal, "link");
+    mat.pricing.sku = GetStringProp(ctx, pricingVal, "sku");
+    mat.pricing.ean = GetStringProp(ctx, pricingVal, "ean");
+    mat.pricing.lastPriceCheck = GetStringProp(ctx, pricingVal, "lastPriceCheck");
+    std::string cur = GetStringProp(ctx, pricingVal, "currency");
+    if (!cur.empty()) mat.pricing.currency = cur;
+
+    JSValue altArr = JS_GetPropertyStr(ctx, pricingVal, "alternativeSuppliers");
+    if (!JS_IsUndefined(altArr) && JS_IsArray(altArr)) {
+      JSValue lenVal = JS_GetPropertyStr(ctx, altArr, "length");
+      uint32_t len = 0;
+      JS_ToUint32(ctx, &len, lenVal);
+      JS_FreeValue(ctx, lenVal);
+      for (uint32_t i = 0; i < len; ++i) {
+        JSValue altObj = JS_GetPropertyUint32(ctx, altArr, i);
+        if (!JS_IsUndefined(altObj) && JS_IsObject(altObj)) {
+          PBRPricing::AltSupplier alt;
+          alt.supplier = GetStringProp(ctx, altObj, "supplier");
+          alt.unitPrice = GetFloatProp(ctx, altObj, "unitPrice", 0.0f);
+          alt.link = GetStringProp(ctx, altObj, "link");
+          alt.sku = GetStringProp(ctx, altObj, "sku");
+          mat.pricing.alternativeSuppliers.push_back(std::move(alt));
+        }
+        JS_FreeValue(ctx, altObj);
+      }
+    }
+    JS_FreeValue(ctx, altArr);
   }
   JS_FreeValue(ctx, pricingVal);
 
