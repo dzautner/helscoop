@@ -4,18 +4,67 @@ import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
 
 export const metadata: Metadata = {
-  title: "Helscoop — Näe talosi. Muuta. Rakenna.",
+  title: {
+    default: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    template: "%s | Helscoop",
+  },
   description:
-    "3D-mallinna talosi ja suunnittele remontti reaaliaikaisilla hinnoilla",
+    "Suunnittele talosi remontti 3D-mallinnuksella. Näe muutokset reaaliajassa, saa automaattinen materiaaliluettelo ja hinnat K-Raudasta. Ilmainen työkalu suomalaisille kodinrakentajille.",
+  keywords: [
+    "remontti",
+    "talosuunnittelu",
+    "3D",
+    "materiaalilista",
+    "K-Rauta",
+    "rakentaminen",
+    "kodinparannus",
+    "talonrakennus",
+    "remonttilaskuri",
+  ],
   icons: {
     icon: { url: "/icon.svg", type: "image/svg+xml" },
     apple: "/icon.svg",
   },
   manifest: "/manifest.json",
+  metadataBase: new URL("https://helscoop.fi"),
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   openGraph: {
-    title: "Helscoop",
-    description: "Näe talosi 3D:nä, suunnittele remontti suomeksi",
+    title: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    description:
+      "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa. Ilmainen työkalu suomalaisille kodinrakentajille.",
     type: "website",
+    locale: "fi_FI",
+    siteName: "Helscoop",
+    url: "https://helscoop.fi",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    description:
+      "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa.",
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Helscoop",
+  description:
+    "Suunnittele talosi remontti 3D-mallinnuksella. Näe muutokset reaaliajassa, saa automaattinen materiaaliluettelo ja hinnat K-Raudasta.",
+  url: "https://helscoop.fi",
+  applicationCategory: "DesignApplication",
+  operatingSystem: "Web",
+  inLanguage: "fi",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "EUR",
   },
 };
 
@@ -27,6 +76,10 @@ export default function RootLayout({
   return (
     <html lang="fi">
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <style
           dangerouslySetInnerHTML={{ __html: "html{background:#12110f}" }}
         />

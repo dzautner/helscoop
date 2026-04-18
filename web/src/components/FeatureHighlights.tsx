@@ -15,10 +15,11 @@ export default function FeatureHighlights() {
   ];
 
   return (
-    <div style={{
+    <section style={{
       padding: "56px 24px",
       borderBottom: "1px solid var(--border)",
     }}>
+      <h2 className="sr-only">{locale === 'fi' ? 'Ominaisuudet' : 'Features'}</h2>
       <div className="feature-grid" style={{
         maxWidth: 960,
         margin: "0 auto",
@@ -36,7 +37,7 @@ export default function FeatureHighlights() {
               justifyContent: "center",
               marginBottom: 18,
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
                 <path d={f.icon} />
               </svg>
             </div>
@@ -45,6 +46,6 @@ export default function FeatureHighlights() {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
