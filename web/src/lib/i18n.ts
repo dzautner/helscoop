@@ -207,6 +207,10 @@ const translations = {
       lastChecked: 'Tarkistettu',
       viewProduct: 'Katso tuote',
       searchMaterials: 'Hae materiaalia...',
+      allCategories: 'Kaikki',
+      noResults: 'Ei tuloksia',
+      browseMaterials: 'SELAA MATERIAALEJA',
+      setQuantity: 'Maara',
     },
     dialog: {
       confirm: 'Vahvista',
@@ -466,6 +470,10 @@ const translations = {
       lastChecked: 'Checked',
       viewProduct: 'View product',
       searchMaterials: 'Search materials...',
+      allCategories: 'All',
+      noResults: 'No results',
+      browseMaterials: 'BROWSE MATERIALS',
+      setQuantity: 'Qty',
     },
     dialog: {
       confirm: 'Confirm',

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
-import type { BomItem, Material, MaterialPriceData } from "@/types";
+import type { BomItem, Material, MaterialPriceData, Category } from "@/types";
 
 /* ── Category color palette ─────────────────────────────────── */
 const CATEGORY_COLORS: Record<string, string> = {
@@ -400,14 +400,23 @@ export default function BomPanel({
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
 }) {
-  const [selectedMat, setSelectedMat] = useState("");
-  const [qty, setQty] = useState(1);
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
   const [totalSavings, setTotalSavings] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
+  const [quickAddId, setQuickAddId] = useState<string | null>(null);
+  const [quickAddQty, setQuickAddQty] = useState(1);
   const { t, locale } = useTranslation();
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    api.getCategories()
+      .then((data: Category[]) => setCategories(data))
+      .catch(() => { /* ignore */ });
+  }, []);
 
   // Calculate potential savings across all BOM items
   useEffect(() => {
@@ -438,14 +447,45 @@ export default function BomPanel({
     return () => { cancelled = true; };
   }, [bom]);
 
-  // Filter materials for the add dropdown
-  const availableMaterials = materials
-    .filter((m) => !bom.some((b) => b.material_id === m.id))
-    .filter((m) => {
-      if (!materialSearch.trim()) return true;
-      const q = materialSearch.toLowerCase();
-      return m.name.toLowerCase().includes(q) || m.category_name.toLowerCase().includes(q);
-    });
+  // Filter materials: exclude already-in-BOM, match search query, match category
+  const availableMaterials = useMemo(() => {
+    return materials
+      .filter((m) => !bom.some((b) => b.material_id === m.id))
+      .filter((m) => {
+        if (!materialSearch.trim()) return true;
+        const q = materialSearch.toLowerCase();
+        return m.name.toLowerCase().includes(q) || m.category_name.toLowerCase().includes(q);
+      })
+      .filter((m) => {
+        if (!activeCategory) return true;
+        return m.category_name === activeCategory;
+      });
+  }, [materials, bom, materialSearch, activeCategory]);
+
+  // Get the display name for a category (locale-aware)
+  const getCategoryDisplayName = useCallback((cat: Category) => {
+    if (locale === 'fi' && cat.display_name_fi) return cat.display_name_fi;
+    return cat.display_name;
+  }, [locale]);
+
+  // Get primary pricing info for a material
+  const getPrimaryPrice = useCallback((m: Material) => {
+    if (!m.pricing || m.pricing.length === 0) return null;
+    const primary = m.pricing.find((p) => p.is_primary) || m.pricing[0];
+    return primary;
+  }, []);
+
+  // Quick-add handler
+  const handleQuickAdd = useCallback((materialId: string) => {
+    if (quickAddId === materialId) {
+      onAdd(materialId, quickAddQty);
+      setQuickAddId(null);
+      setQuickAddQty(1);
+    } else {
+      setQuickAddId(materialId);
+      setQuickAddQty(1);
+    }
+  }, [quickAddId, quickAddQty, onAdd]);
 
   return (
     <div
@@ -480,7 +520,6 @@ export default function BomPanel({
             )}
           </div>
         </div>
-        {/* Cost savings indicator */}
         {totalSavings > 0 && (
           <div
             title={t('pricing.savingsTooltip')}
@@ -508,7 +547,6 @@ export default function BomPanel({
             </span>
           </div>
         )}
-        {/* Cost breakdown donut chart */}
         {bom.length > 0 && total > 0 && (
           <CostBreakdownChart bom={bom} materials={materials} total={total} />
         )}
@@ -611,90 +649,281 @@ export default function BomPanel({
         )}
       </div>
 
-      {/* Add material section with search */}
+      {/* Material browser section */}
       <div
         style={{
-          padding: 12,
           borderTop: "1px solid var(--border)",
           display: "flex",
           flexDirection: "column",
-          gap: 6,
         }}
       >
-        <input
-          type="text"
-          value={materialSearch}
-          onChange={(e) => setMaterialSearch(e.target.value)}
-          placeholder={t('pricing.searchMaterials')}
+        <div style={{ padding: "10px 12px 0" }}>
+          <div
+            className="label-mono"
+            style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 8 }}
+          >
+            {t('pricing.browseMaterials')}
+          </div>
+
+          {/* Search input */}
+          <div style={{ position: "relative", marginBottom: 8 }}>
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              value={materialSearch}
+              onChange={(e) => setMaterialSearch(e.target.value)}
+              placeholder={t('pricing.searchMaterials')}
+              style={{
+                width: "100%",
+                padding: "7px 8px 7px 28px",
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 12,
+                color: "var(--text-primary)",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Category filter tabs */}
+          {categories.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 4,
+                flexWrap: "wrap",
+                marginBottom: 8,
+              }}
+            >
+              <button
+                onClick={() => setActiveCategory("")}
+                style={{
+                  padding: "3px 8px",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  border: "1px solid",
+                  borderColor: !activeCategory ? "var(--amber-border)" : "var(--border)",
+                  borderRadius: 12,
+                  background: !activeCategory ? "rgba(196,145,92,0.12)" : "transparent",
+                  color: !activeCategory ? "var(--amber)" : "var(--text-muted)",
+                  cursor: "pointer",
+                  transition: "all 0.12s ease",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t('pricing.allCategories')}
+              </button>
+              {categories.map((cat) => {
+                const catName = getCategoryDisplayName(cat);
+                const isActive = activeCategory === cat.display_name;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(isActive ? "" : cat.display_name)}
+                    style={{
+                      padding: "3px 8px",
+                      fontSize: 10,
+                      fontWeight: 500,
+                      border: "1px solid",
+                      borderColor: isActive ? "var(--amber-border)" : "var(--border)",
+                      borderRadius: 12,
+                      background: isActive ? "rgba(196,145,92,0.12)" : "transparent",
+                      color: isActive ? "var(--amber)" : "var(--text-muted)",
+                      cursor: "pointer",
+                      transition: "all 0.12s ease",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {catName}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Material cards list */}
+        <div
           style={{
-            width: "100%",
-            padding: "7px 8px",
-            background: "var(--bg-tertiary)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-            fontSize: 12,
-            color: "var(--text-primary)",
-            outline: "none",
+            maxHeight: 220,
+            overflowY: "auto",
+            padding: "0 12px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
           }}
-        />
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <select
-            value={selectedMat}
-            onChange={(e) => setSelectedMat(e.target.value)}
-            style={{
-              flex: 1,
-              padding: "7px 8px",
-              background: "var(--bg-tertiary)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: 12,
-              color: "var(--text-primary)",
-              outline: "none",
-            }}
-          >
-            <option value="">{t('editor.addMaterial')}</option>
-            {availableMaterials.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min={1}
-            value={qty}
-            onChange={(e) => setQty(parseInt(e.target.value) || 1)}
-            style={{
-              width: 48,
-              padding: "7px 6px",
-              background: "var(--bg-tertiary)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: 12,
-              color: "var(--text-primary)",
-              outline: "none",
-              fontFamily: "var(--font-mono)",
-            }}
-          />
-          <button
-            className={`btn ${selectedMat ? "btn-primary" : ""}`}
-            onClick={() => {
-              if (selectedMat) {
-                onAdd(selectedMat, qty);
-                setSelectedMat("");
-                setQty(1);
-                setMaterialSearch("");
-              }
-            }}
-            disabled={!selectedMat}
-            style={{
-              padding: "7px 14px",
-              fontSize: 12,
-              opacity: selectedMat ? 1 : 0.4,
-            }}
-          >
-            {t('editor.add')}
-          </button>
+        >
+          {availableMaterials.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "16px 8px", color: "var(--text-muted)", fontSize: 12 }}>
+              {t('pricing.noResults')}
+            </div>
+          ) : (
+            availableMaterials.map((m) => {
+              const price = getPrimaryPrice(m);
+              const isSelected = quickAddId === m.id;
+              return (
+                <div
+                  key={m.id}
+                  style={{
+                    padding: "8px 10px",
+                    background: isSelected ? "rgba(196,145,92,0.08)" : "var(--bg-tertiary)",
+                    border: isSelected ? "1px solid var(--amber-border)" : "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: "pointer",
+                    transition: "all 0.12s ease",
+                  }}
+                  onClick={() => handleQuickAdd(m.id)}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.borderColor = "var(--amber-border)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)";
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {m.image_url ? (
+                      <img
+                        src={m.image_url}
+                        alt={m.name}
+                        style={{ width: 24, height: 24, borderRadius: 3, objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 3,
+                          background: getCategoryColor(m.category_name, 0),
+                          opacity: 0.3,
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {m.name}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
+                        <span style={{
+                          fontSize: 10,
+                          color: "var(--text-muted)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {m.category_name}
+                        </span>
+                        {price && (
+                          <>
+                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>&middot;</span>
+                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                              {price.supplier_name}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {price ? (
+                      <span style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "var(--success)",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}>
+                        {Number(price.unit_price).toFixed(2)} &euro;
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>
+                        --
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quick-add row: shown when this card is selected */}
+                  {isSelected && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginTop: 6,
+                        paddingTop: 6,
+                        borderTop: "1px solid var(--border)",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>
+                        {t('pricing.setQuantity')}
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={quickAddQty}
+                        onChange={(e) => setQuickAddQty(parseInt(e.target.value) || 1)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            onAdd(m.id, quickAddQty);
+                            setQuickAddId(null);
+                            setQuickAddQty(1);
+                          }
+                        }}
+                        style={{
+                          width: 52,
+                          padding: "3px 6px",
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          color: "var(--text-primary)",
+                          outline: "none",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      />
+                      {price && (
+                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                          {price.unit}
+                        </span>
+                      )}
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => {
+                          onAdd(m.id, quickAddQty);
+                          setQuickAddId(null);
+                          setQuickAddQty(1);
+                        }}
+                        style={{
+                          marginLeft: "auto",
+                          padding: "3px 10px",
+                          fontSize: 11,
+                        }}
+                      >
+                        {t('editor.add')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
