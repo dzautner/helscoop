@@ -10,12 +10,17 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
+import AddressSearch from "@/components/AddressSearch";
 import Link from "next/link";
-import type { Project, Template } from "@/types";
+import type { Project, Template, BuildingResult } from "@/types";
 
 type SortKey = "modified" | "created" | "name" | "cost";
 
-export default function ProjectList() {
+export default function ProjectList({
+  onCreateFromBuilding,
+}: {
+  onCreateFromBuilding?: (building: BuildingResult) => Promise<void> | void;
+}) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [newName, setNewName] = useState("");
@@ -171,9 +176,6 @@ export default function ProjectList() {
               </svg>
               {t('nav.settings')}
             </Link>
-            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => (window.location.href = "/admin")}>
-              {t('nav.admin')}
-            </button>
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => { setToken(null); window.location.reload(); }}>
               {t('nav.logout')}
             </button>
@@ -202,9 +204,6 @@ export default function ProjectList() {
             </svg>
             {t('nav.settings')}
           </Link>
-          <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={() => (window.location.href = "/admin")}>
-            {t('nav.admin')}
-          </button>
           <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={() => { setToken(null); window.location.reload(); }}>
             {t('nav.logout')}
           </button>
@@ -251,6 +250,16 @@ export default function ProjectList() {
             creating={creating}
             onCreateFromTemplate={createFromTemplate}
           />
+
+          {/* Address import */}
+          {onCreateFromBuilding && (
+            <div style={{ marginTop: 28 }}>
+              <div className="label-mono" style={{ marginBottom: 14, letterSpacing: "0.1em" }}>
+                {t('search.sectionLabel')}
+              </div>
+              <AddressSearch onCreateProject={onCreateFromBuilding} compact />
+            </div>
+          )}
         </div>
 
         {loading ? (

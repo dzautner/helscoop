@@ -48,6 +48,27 @@ export async function setAuthToken(page: Page, token: string): Promise<void> {
   }, token);
   await page.reload();
   await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1500);
+
+  const isLoggedIn = await page
+    .getByText(/omat projektit|my projects/i)
+    .isVisible({ timeout: 5000 })
+    .catch(() => false);
+
+  if (!isLoggedIn) {
+    const hasLoginForm = await page
+      .locator('input[type="email"]')
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    if (hasLoginForm) {
+      await page.evaluate((t) => {
+        localStorage.setItem("helscoop_token", t);
+      }, token);
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(1500);
+    }
+  }
 }
 
 export async function loginViaUI(

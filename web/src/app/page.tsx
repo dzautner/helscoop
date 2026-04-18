@@ -65,8 +65,7 @@ export default function Home() {
 
   return (
     <div>
-      <AddressSearch onCreateProject={handleCreateFromBuilding} />
-      <ProjectList />
+      <ProjectList onCreateFromBuilding={handleCreateFromBuilding} />
     </div>
   );
 }
