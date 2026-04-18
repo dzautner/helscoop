@@ -6,6 +6,7 @@ import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
 import type { Project, Template } from "@/types";
@@ -21,6 +22,7 @@ export default function ProjectList() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("modified");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
 
@@ -76,8 +78,14 @@ export default function ProjectList() {
     setCreating(false);
   }
 
-  async function deleteProject(id: string) {
-    if (!confirm(t('project.deleteConfirm'))) return;
+  function deleteProject(id: string) {
+    setDeleteTarget(id);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
     try {
       await api.deleteProject(id);
       setProjects(projects.filter((p) => p.id !== id));
@@ -361,6 +369,17 @@ export default function ProjectList() {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={t('dialog.deleteProjectTitle')}
+        message={t('dialog.deleteProjectMessage')}
+        confirmText={t('project.delete')}
+        cancelText={t('dialog.cancel')}
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
