@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectEditor } from "@/components/Skeleton";
+
+const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ width: "100%", height: "100%", background: "#1a1816", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+      Ladataan 3D-nakyma...
+    </div>
+  ),
+});
 
 interface Material {
   id: string;
@@ -505,6 +515,11 @@ export default function ProjectPage() {
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const [wireframe, setWireframe] = useState(false);
+  const [objectCount, setObjectCount] = useState(0);
+  const [sceneError, setSceneError] = useState<string | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   // Undo/redo history for scene script
   const historyRef = useRef<string[]>([]);
@@ -883,22 +898,143 @@ export default function ProjectPage() {
 
       {/* Main content */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        {/* Left: Viewport + Code */}
         <div
           style={{
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            padding: 16,
-            gap: 12,
+            overflow: "hidden",
           }}
         >
-          <SceneEditor sceneJs={sceneJs} onChange={handleSceneChange} />
+          {/* Toolbar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              background: "var(--bg-tertiary)",
+              borderBottom: "1px solid var(--border)",
+              flexShrink: 0,
+            }}
+          >
+            <button
+              className="btn"
+              onClick={() => setShowCode(!showCode)}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: showCode ? "rgba(196,145,92,0.2)" : "transparent",
+                color: showCode ? "#c4915c" : "var(--text-muted)",
+                border: showCode ? "1px solid rgba(196,145,92,0.3)" : "1px solid transparent",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              {showCode ? "Piilota koodi" : "Nayta koodi"}
+            </button>
+            <div style={{ width: 1, height: 16, background: "var(--border)" }} />
+            <button
+              className="btn"
+              onClick={() => setWireframe(!wireframe)}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: wireframe ? "rgba(196,145,92,0.2)" : "transparent",
+                color: wireframe ? "#c4915c" : "var(--text-muted)",
+                border: wireframe ? "1px solid rgba(196,145,92,0.3)" : "1px solid transparent",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              Rautalanka
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                const container = viewportRef.current;
+                if (container) {
+                  const el = container.querySelector("div") as HTMLDivElement & { resetCamera?: () => void };
+                  el?.resetCamera?.();
+                }
+              }}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: "transparent",
+                color: "var(--text-muted)",
+                border: "1px solid transparent",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+                <path d="M1 4v6h6" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              Nollaa kamera
+            </button>
+            <div style={{ flex: 1 }} />
+            <span style={{
+              fontSize: 11,
+              color: sceneError ? "var(--danger, #e06c75)" : "var(--text-muted)",
+              fontFamily: "var(--font-mono)",
+            }}>
+              {sceneError
+                ? `Virhe: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
+                : `${objectCount} objektia`}
+            </span>
+          </div>
+
+          {/* 3D Viewport */}
+          <div
+            ref={viewportRef}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              padding: 8,
+              paddingBottom: showCode ? 0 : 8,
+            }}
+          >
+            <Viewport3D
+              sceneJs={sceneJs}
+              wireframe={wireframe}
+              onObjectCount={setObjectCount}
+              onError={setSceneError}
+            />
+          </div>
+
+          {/* Collapsible Code Editor */}
+          {showCode && (
+            <div
+              style={{
+                height: 260,
+                flexShrink: 0,
+                padding: "0 8px 8px 8px",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <SceneEditor sceneJs={sceneJs} onChange={handleSceneChange} />
+            </div>
+          )}
         </div>
+
+        {/* Chat panel */}
         {showChat && (
           <div style={{ width: 340, borderLeft: "1px solid var(--border)", flexShrink: 0 }}>
             <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
           </div>
         )}
+
+        {/* BOM panel */}
         <BomPanel
           bom={bom}
           materials={materials}
