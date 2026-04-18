@@ -94,6 +94,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ token, password }),
     }),
+  verifyEmail: (token: string) =>
+    apiFetch(`/auth/verify-email?token=${encodeURIComponent(token)}`),
+  resendVerification: () =>
+    apiFetch("/auth/resend-verification", { method: "POST" }),
 
   getProjects: () => apiFetch("/projects"),
   getProject: (id: string) => apiFetch(`/projects/${id}`),

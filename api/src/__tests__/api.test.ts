@@ -21,6 +21,16 @@ describe("API structure", () => {
     expect(auth.requireAdmin).toBeTypeOf("function");
     expect(auth.login).toBeTypeOf("function");
     expect(auth.register).toBeTypeOf("function");
+    expect(auth.verifyEmail).toBeTypeOf("function");
+    expect(auth.resendVerification).toBeTypeOf("function");
+  });
+
+  it("email module exports required functions", async () => {
+    const email = await import("../email");
+    expect(email.sendEmail).toBeTypeOf("function");
+    expect(email.sendPasswordResetEmail).toBeTypeOf("function");
+    expect(email.sendVerificationEmail).toBeTypeOf("function");
+    expect(email.sendPriceAlertEmail).toBeTypeOf("function");
   });
 
   it("db module exports pool and query", async () => {
@@ -94,6 +104,17 @@ describe("SQL migrations", () => {
     }
   });
 
+  it("006_email_verification.sql has required columns", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const sqlPath = path.resolve(__dirname, "../../../db/migrations/006_email_verification.sql");
+    const sql = fs.readFileSync(sqlPath, "utf-8");
+
+    expect(sql).toContain("email_verified");
+    expect(sql).toContain("verification_token");
+    expect(sql).toContain("verification_token_expires");
+  });
+
   it("seed has pricing entries for key materials", async () => {
     const fs = await import("fs");
     const path = await import("path");
@@ -164,6 +185,7 @@ describe("Web app", () => {
       "../../../web/src/app/project/[id]/page.tsx",
       "../../../web/src/app/admin/page.tsx",
       "../../../web/src/lib/api.ts",
+      "../../../web/src/app/verify-email/page.tsx",
     ];
 
     for (const page of pages) {
@@ -184,6 +206,7 @@ describe("Web app", () => {
       "updateProject", "deleteProject", "duplicateProject",
       "getMaterials", "getSuppliers", "getStalePrices",
       "exportBOM", "chat",
+      "verifyEmail", "resendVerification",
     ];
 
     for (const method of requiredMethods) {
