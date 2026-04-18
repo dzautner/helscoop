@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
+import { useToast } from "@/components/ToastProvider";
+import { SkeletonProjectEditor } from "@/components/Skeleton";
 
 interface Material {
   id: string;
@@ -298,6 +300,7 @@ function ChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   async function send() {
     if (!input.trim() || loading) return;
@@ -310,10 +313,11 @@ function ChatPanel({
     try {
       const reply = await api.chat(newMessages, sceneJs);
       setMessages([...newMessages, reply]);
-    } catch {
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "AI-avustajan virhe / AI assistant error", "error");
       setMessages([
         ...newMessages,
-        { role: "assistant", content: "Something went wrong. Please try again." },
+        { role: "assistant", content: "Jokin meni pieleen. Yrita uudelleen." },
       ]);
     }
     setLoading(false);
@@ -489,6 +493,7 @@ export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
+  const { toast } = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -496,7 +501,7 @@ export default function ProjectPage() {
   const [sceneJs, setSceneJs] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
   const [showChat, setShowChat] = useState(false);
@@ -567,14 +572,15 @@ export default function ProjectPage() {
         }, 0);
       })
       .catch((err) => {
-        if (err.message?.includes("401") || err.message?.includes("authorization")) {
+        if (err.message?.includes("401") || err.message?.includes("authorization") || err.message?.includes("Session expired")) {
           setToken(null);
           router.push("/");
         } else {
-          setError(err.message);
+          toast(err instanceof Error ? err.message : "Projektin lataus epaonnistui / Failed to load project", "error");
+          setLoadError(true);
         }
       });
-  }, [projectId, router]);
+  }, [projectId, router, toast]);
 
   // Save function (used by both auto-save and manual save)
   const save = useCallback(async () => {
@@ -603,11 +609,12 @@ export default function ProjectPage() {
       await Promise.all(savePromises);
       setLastSaved(new Date().toLocaleTimeString());
       setSaveStatus("saved");
+      toast("Tallennettu / Saved", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      toast(err instanceof Error ? err.message : "Tallennus epaonnistui / Save failed", "error");
       setSaveStatus("unsaved");
     }
-  }, [projectId, projectName, projectDesc, sceneJs, bom]);
+  }, [projectId, projectName, projectDesc, sceneJs, bom, toast]);
 
   // Schedule auto-save (debounced 2 seconds)
   const scheduleAutoSave = useCallback(() => {
@@ -718,11 +725,11 @@ export default function ProjectPage() {
     );
   }, []);
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="anim-up" style={{ padding: 60, textAlign: "center" }}>
         <h2 className="heading-display" style={{ marginBottom: 8 }}>Virhe</h2>
-        <p style={{ color: "var(--danger)", marginBottom: 16 }}>{error}</p>
+        <p style={{ color: "var(--danger)", marginBottom: 16 }}>Projektia ei voitu ladata / Could not load project</p>
         <button className="btn btn-primary" onClick={() => router.push("/")}>
           Takaisin projekteihin
         </button>
@@ -731,11 +738,7 @@ export default function ProjectPage() {
   }
 
   if (!project) {
-    return (
-      <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
-        Ladataan...
-      </div>
-    );
+    return <SkeletonProjectEditor />;
   }
 
   return (
@@ -846,14 +849,19 @@ export default function ProjectPage() {
           Tallenna
         </button>
         <button className="btn btn-ghost" onClick={async () => {
-          const res = await api.exportBOM(projectId);
-          const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `bom_${projectId}.json`;
-          a.click();
-          URL.revokeObjectURL(url);
+          try {
+            const res = await api.exportBOM(projectId);
+            const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `bom_${projectId}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast("BOM viety / BOM exported", "success");
+          } catch (err) {
+            toast(err instanceof Error ? err.message : "BOM-vienti epaonnistui / BOM export failed", "error");
+          }
         }}>
           Vie BOM
         </button>
