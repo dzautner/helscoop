@@ -132,14 +132,17 @@ See `examples/` for parametric examples:
 ### Render Mode
 
 ```
-./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720 [--yaw Y --pitch P --dist D] [--supersample 2] [--background white]
+./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720
+./build/viewer/dingcad_viewer --help
 ```
 
-Yaw and pitch are in degrees. Default camera: 40° yaw, 23° pitch. `--supersample 2` renders at 2x resolution and downscales for smoother edges. `--background white` gives a clean studio look with bright environment reflections.
+Background modes: `--background white` (clean studio), `--background transparent` (alpha channel for compositing).
 
-Camera presets with `--camera <name>`: `front`, `back`, `left`, `right`, `top`, `bottom`, `iso` (45°/35°), `iso-back`, `three-quarter` (default angles).
+`--supersample 2` renders at 2x resolution for smoother edges. Camera presets: `--camera front|back|left|right|top|bottom|iso|three-quarter`.
 
-Turntable animation: `--turntable 36` renders 36 frames rotating 360° around the model, outputting `name_0000.png` through `name_0035.png`.
+Turntable animation: `--turntable 36` renders 36 frames rotating 360°.
+
+Run `--help` for the full list of camera, filtering, and render options.
 
 Architecture visual doc pipeline:
 
