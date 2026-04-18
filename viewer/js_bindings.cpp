@@ -1172,6 +1172,70 @@ JSValue JsCircle2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   return result;
 }
 
+// ellipse2D(radiusX, radiusY, segments?) — returns a polygon array for an ellipse
+JSValue JsEllipse2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "ellipse2D expects (radiusX, radiusY, segments?)");
+  double rx = 10.0, ry = 5.0;
+  int32_t segments = 48;
+  if (JS_ToFloat64(ctx, &rx, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &ry, argv[1]) < 0) return JS_EXCEPTION;
+  if (argc >= 3 && JS_IsNumber(argv[2])) {
+    if (JS_ToInt32(ctx, &segments, argv[2]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 3) segments = 3;
+
+  JSValue poly = JS_NewArray(ctx);
+  for (int i = 0; i < segments; i++) {
+    double angle = 2.0 * M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, rx * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, ry * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(i), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
+// slot2D(length, width, segments?) — stadium/slot shape (rect with semicircle ends)
+JSValue JsSlot2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "slot2D expects (length, width, segments?)");
+  double length = 40.0, width = 10.0;
+  int32_t segments = 16;
+  if (JS_ToFloat64(ctx, &length, argv[0]) < 0) return JS_EXCEPTION;
+  if (JS_ToFloat64(ctx, &width, argv[1]) < 0) return JS_EXCEPTION;
+  if (argc >= 3 && JS_IsNumber(argv[2])) {
+    if (JS_ToInt32(ctx, &segments, argv[2]) < 0) return JS_EXCEPTION;
+  }
+  if (segments < 4) segments = 4;
+
+  double r = width / 2.0;
+  double halfLen = (length - width) / 2.0;
+  if (halfLen < 0) halfLen = 0;
+
+  JSValue poly = JS_NewArray(ctx);
+  int idx = 0;
+  // Right semicircle (centered at +halfLen, 0)
+  for (int i = 0; i <= segments; i++) {
+    double angle = -M_PI / 2.0 + M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, halfLen + r * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, r * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  // Left semicircle (centered at -halfLen, 0)
+  for (int i = 0; i <= segments; i++) {
+    double angle = M_PI / 2.0 + M_PI * i / segments;
+    JSValue pt = JS_NewArray(ctx);
+    JS_SetPropertyUint32(ctx, pt, 0, JS_NewFloat64(ctx, -halfLen + r * cos(angle)));
+    JS_SetPropertyUint32(ctx, pt, 1, JS_NewFloat64(ctx, r * sin(angle)));
+    JS_SetPropertyUint32(ctx, poly, static_cast<uint32_t>(idx++), pt);
+  }
+  JSValue result = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, result, 0, poly);
+  return result;
+}
+
 // rect2D(width, height, center?) — returns a polygon array for a rectangle
 JSValue JsRect2D(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
   if (argc < 2) return JS_ThrowTypeError(ctx, "rect2D expects (width, height, center?)");
@@ -2123,6 +2187,10 @@ void RegisterBindingsInternal(JSContext *ctx) {
                     JS_NewCFunction(ctx, JsHull2D, "hull2D", 1));
   JS_SetPropertyStr(ctx, global, "star2D",
                     JS_NewCFunction(ctx, JsStar2D, "star2D", 3));
+  JS_SetPropertyStr(ctx, global, "ellipse2D",
+                    JS_NewCFunction(ctx, JsEllipse2D, "ellipse2D", 3));
+  JS_SetPropertyStr(ctx, global, "slot2D",
+                    JS_NewCFunction(ctx, JsSlot2D, "slot2D", 3));
   JS_SetPropertyStr(ctx, global, "torus",
                     JS_NewCFunction(ctx, JsTorus, "torus", 2));
   JS_SetPropertyStr(ctx, global, "boolean",

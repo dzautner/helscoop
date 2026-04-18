@@ -88,6 +88,8 @@ offset2D(polygon, {delta, join, segments}) // join: "round"|"square"|"miter"|"be
 hull2D(points)                             // convex hull of [[x,y], ...] points
 hull2D(polygon1, polygon2, ...)            // convex hull wrapping multiple polygons
 star2D(outerRadius, innerRadius, points)   // star polygon (5=pentagram, 6=hexagram, etc.)
+ellipse2D(radiusX, radiusY, segments?)     // ellipse polygon
+slot2D(length, width, segments?)           // stadium/slot shape (rect with semicircle ends)
 
 // Deformation & splitting
 warp(geometry, ([x,y,z]) => [x',y',z'])  // per-vertex coordinate transform
