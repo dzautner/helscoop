@@ -1,13 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, setAuthToken } from "./helpers";
+import { registerUser, loginViaUI } from "./helpers";
 
 test.describe("Templates", () => {
-  let token: string;
+  let user: { email: string; password: string; name: string; token: string };
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    const user = await registerUser(page, `tpl-${Date.now()}`);
-    token = user.token;
+    user = await registerUser(page, `tpl-${Date.now()}`);
     await page.close();
   });
 
@@ -28,7 +27,8 @@ test.describe("Templates", () => {
   test("each template scene renders correctly in viewport", async ({
     page,
   }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     // Get templates
     const res = await page.request.get("http://localhost:3051/templates");
@@ -39,7 +39,7 @@ test.describe("Templates", () => {
       const projRes = await page.request.post(
         "http://localhost:3051/projects",
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${user.token}` },
           data: {
             name: `Template: ${tpl.name}`,
             scene_js: tpl.scene_js,
@@ -49,6 +49,7 @@ test.describe("Templates", () => {
       const project = await projRes.json();
 
       await page.goto(`/project/${project.id}`);
+      await page.waitForTimeout(2000);
       const canvas = page.locator("canvas");
       await expect(canvas).toBeVisible({ timeout: 15_000 });
 

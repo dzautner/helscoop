@@ -1,22 +1,20 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, setAuthToken, dismissOnboarding } from "./helpers";
+import { registerUser, loginViaUI, dismissOnboarding } from "./helpers";
 
 const API_URL = "http://localhost:3051";
 
 test.describe("Project CRUD", () => {
-  let token: string;
+  let user: { email: string; password: string; name: string; token: string };
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    const user = await registerUser(page, `crud-${Date.now()}`);
-    token = user.token;
+    user = await registerUser(page, `crud-${Date.now()}`);
     await page.close();
   });
 
   test("creates a new project from the project list", async ({ page }) => {
-    await setAuthToken(page, token);
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
     await dismissOnboarding(page);
 
     // Type project name in the new project input
@@ -49,7 +47,8 @@ test.describe("Project CRUD", () => {
   });
 
   test("project editor renders 3D viewport with objects", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const sceneJs = `
 const floor = box(6, 0.2, 4);
@@ -59,7 +58,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     `.trim();
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "E2E Render Test",
         description: "Testing 3D rendering",
@@ -69,6 +68,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     // Wait for Three.js canvas
@@ -93,10 +93,11 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("edits scene code and sees viewport update", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "E2E Code Edit",
         scene_js:
@@ -106,6 +107,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
@@ -127,15 +129,17 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("project name is editable and auto-saves", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: { name: "Original Name" },
     });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     const nameInput = page.locator('input[value="Original Name"]');
@@ -150,10 +154,11 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("deletes a project", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: { name: "To Be Deleted" },
     });
     const project = await res.json();

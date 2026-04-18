@@ -1,19 +1,18 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, setAuthToken } from "./helpers";
+import { registerUser, loginViaUI } from "./helpers";
 
 const API_URL = "http://localhost:3051";
 
 test.describe("BOM Panel", () => {
-  let token: string;
+  let user: { email: string; password: string; name: string; token: string };
   let projectId: string;
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    const user = await registerUser(page, `bom-${Date.now()}`);
-    token = user.token;
+    user = await registerUser(page, `bom-${Date.now()}`);
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "BOM Test Project",
         scene_js:
@@ -26,8 +25,10 @@ test.describe("BOM Panel", () => {
   });
 
   test("BOM panel is visible in editor", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
     await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     // BOM panel should show (contains "MATERIAALI" or "MATERIAL" or cost text)
@@ -39,8 +40,10 @@ test.describe("BOM Panel", () => {
   });
 
   test("material search filters the list", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
     await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     // Look for search input in BOM panel (Finnish: "Hae materiaalia...")
@@ -59,8 +62,10 @@ test.describe("BOM Panel", () => {
   });
 
   test("toggles BOM panel with Cmd+B", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
     await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
     await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
 

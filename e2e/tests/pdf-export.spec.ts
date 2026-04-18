@@ -1,18 +1,17 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, setAuthToken } from "./helpers";
+import { registerUser, loginViaUI } from "./helpers";
 
 test.describe("PDF Export", () => {
-  let token: string;
+  let user: { email: string; password: string; name: string; token: string };
   let projectId: string;
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    const user = await registerUser(page, `pdf-${Date.now()}`);
-    token = user.token;
+    user = await registerUser(page, `pdf-${Date.now()}`);
 
     // Create project with BOM
     const res = await page.request.post("http://localhost:3051/projects", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "PDF Export Test",
         description: "Testing PDF generation",
@@ -27,7 +26,7 @@ test.describe("PDF Export", () => {
     await page.request.put(
       `http://localhost:3051/projects/${projectId}/bom`,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${user.token}` },
         data: {
           items: [
             { material_id: "pine_48x148_c24", quantity: 42, unit: "jm" },
@@ -43,7 +42,7 @@ test.describe("PDF Export", () => {
     const res = await page.request.get(
       `http://localhost:3051/projects/${projectId}/pdf?lang=fi`,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${user.token}` },
       }
     );
     expect(res.status()).toBe(200);
@@ -58,8 +57,10 @@ test.describe("PDF Export", () => {
   });
 
   test("PDF export button triggers download in editor", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
     await page.goto(`/project/${projectId}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
     await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
 

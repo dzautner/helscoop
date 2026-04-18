@@ -1,13 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, setAuthToken, dismissOnboarding } from "./helpers";
+import { registerUser, loginViaUI, dismissOnboarding } from "./helpers";
 
 test.describe("Building Lookup & Import", () => {
-  let token: string;
+  let user: { email: string; password: string; name: string; token: string };
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    const user = await registerUser(page, `building-${Date.now()}`);
-    token = user.token;
+    user = await registerUser(page, `building-${Date.now()}`);
     await page.close();
   });
 
@@ -67,9 +66,8 @@ test.describe("Building Lookup & Import", () => {
   test("imports a building into a project and renders it", async ({
     page,
   }) => {
-    await setAuthToken(page, token);
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
     await dismissOnboarding(page);
 
     const addressInput = page.locator('[data-tour="address-input"] input');

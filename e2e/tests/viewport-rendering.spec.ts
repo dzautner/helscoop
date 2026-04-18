@@ -1,25 +1,25 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, setAuthToken } from "./helpers";
+import { registerUser, loginViaUI } from "./helpers";
 
 const API_URL = "http://localhost:3051";
 
 test.describe("3D Viewport Rendering", () => {
-  let token: string;
+  let user: { email: string; password: string; name: string; token: string };
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    const user = await registerUser(page, `viewport-${Date.now()}`);
-    token = user.token;
+    user = await registerUser(page, `viewport-${Date.now()}`);
     await page.close();
   });
 
   test("renders a simple box scene with correct object count", async ({
     page,
   }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "Box Test",
         scene_js:
@@ -29,6 +29,7 @@ test.describe("3D Viewport Rendering", () => {
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     const canvas = page.locator("canvas");
     await expect(canvas).toBeVisible({ timeout: 15_000 });
 
@@ -43,7 +44,8 @@ test.describe("3D Viewport Rendering", () => {
   });
 
   test("renders sauna template with 7 objects", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const saunaScene = `
 const floor = box(4, 0.2, 3);
@@ -63,12 +65,13 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
     `.trim();
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: { name: "Sauna Render Test", scene_js: saunaScene },
     });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
 
     await expect(page.getByText(/7\s*(objects|objektia)/i)).toBeVisible({
@@ -81,7 +84,8 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
   test("renders Ribbingintie demo building with 15+ objects", async ({
     page,
   }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const buildingRes = await page.request.get(
       `${API_URL}/building?address=Ribbingintie+109-11,+00890,+Helsinki`
@@ -90,7 +94,7 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
     expect(building.confidence).toBe("verified");
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "Ribbingintie 109-11",
         scene_js: building.scene_js,
@@ -99,6 +103,7 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
 
     await expect(
@@ -116,10 +121,11 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
   });
 
   test("wireframe toggle works", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "Wireframe Test",
         scene_js:
@@ -129,6 +135,7 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
 
     await page.screenshot({ path: "test-results/viewport-solid.png" });
@@ -143,10 +150,11 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
   });
 
   test("shows error for invalid scene code", async ({ page }) => {
-    await setAuthToken(page, token);
+    await loginViaUI(page, user.email, user.password);
+    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     const res = await page.request.post(`${API_URL}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "Error Test",
         scene_js: "this is not valid JavaScript; let crash = undefined.foo;",
@@ -155,6 +163,7 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
     const project = await res.json();
 
     await page.goto(`/project/${project.id}`);
+    await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
     // Should show error indicator
