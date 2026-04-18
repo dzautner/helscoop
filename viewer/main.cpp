@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
   std::set<std::string> renderFocusObjects;
   std::set<std::string> renderFocusCategories;
   bool renderWhiteBackground = false;
+  int renderSupersample = 1;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -190,6 +191,9 @@ int main(int argc, char *argv[]) {
       std::string bg = argv[i + 1];
       if (bg == "white" || bg == "clean") renderWhiteBackground = true;
       i += 1;
+    } else if (arg == "--supersample" && i + 1 < argc) {
+      renderSupersample = std::clamp(std::atoi(argv[i + 1]), 1, 4);
+      i += 1;
     } else if (arg == "--interior-cutaway") {
       renderHiddenCategories.insert("sheathing");
       renderHiddenCategories.insert("roofing");
@@ -251,8 +255,10 @@ int main(int argc, char *argv[]) {
 
   SetConfigFlags(windowFlags);
   TraceLog(LOG_INFO, "Window init start: renderMode=%d headlessRender=%d", renderMode ? 1 : 0, headlessRender ? 1 : 0);
+  const int ssWidth = renderWidth * renderSupersample;
+  const int ssHeight = renderHeight * renderSupersample;
   if (renderMode) {
-    InitWindow(renderWidth, renderHeight, "dingcad");
+    InitWindow(ssWidth, ssHeight, "dingcad");
   } else {
     InitWindow(1280, 720, "dingcad");
   }
@@ -2058,6 +2064,9 @@ int main(int argc, char *argv[]) {
       // Use ExportImage instead of TakeScreenshot to support absolute paths
       // (TakeScreenshot strips directory components)
       Image screenImage = LoadImageFromScreen();
+      if (screenImage.width != renderWidth || screenImage.height != renderHeight) {
+        ImageResize(&screenImage, renderWidth, renderHeight);
+      }
       auto absOutputPath = std::filesystem::absolute(renderOutputPath);
       ExportImage(screenImage, absOutputPath.string().c_str());
       UnloadImage(screenImage);

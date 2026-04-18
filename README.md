@@ -116,10 +116,10 @@ See `examples/` for parametric examples:
 ### Render Mode
 
 ```
-./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720 [--yaw Y --pitch P --dist D]
+./build/viewer/dingcad_viewer --render scene.js output.png --size 1280 720 [--yaw Y --pitch P --dist D] [--supersample 2] [--background white]
 ```
 
-Yaw and pitch are in degrees. Default camera: 40° yaw, 23° pitch.
+Yaw and pitch are in degrees. Default camera: 40° yaw, 23° pitch. `--supersample 2` renders at 2x resolution and downscales for smoother edges. `--background white` gives a clean studio look with bright environment reflections.
 
 Architecture visual doc pipeline:
 
