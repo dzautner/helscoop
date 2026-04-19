@@ -12,9 +12,12 @@ import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
+import CommandPalette from "@/components/CommandPalette";
+import type { Command } from "@/components/CommandPalette";
 import OnboardingTour from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { generateQuotePdf } from "@/lib/pdf";
+import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
@@ -95,6 +98,7 @@ export default function ProjectPage() {
   const projectId = params.id as string;
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { toggle: toggleTheme } = useTheme();
   const { track } = useAnalytics();
   const { markCodeEditor, markChat } = useEditorSession();
 
@@ -111,6 +115,7 @@ export default function ProjectPage() {
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -350,6 +355,13 @@ export default function ProjectPage() {
       descriptionKey: "shortcuts.toggleBom",
     },
     {
+      key: "Cmd+K",
+      mod: true,
+      code: "k",
+      action: () => setShowCommandPalette((v) => !v),
+      descriptionKey: "shortcuts.commandPalette",
+    },
+    {
       key: "Cmd+Enter",
       mod: true,
       code: "Enter",
@@ -390,6 +402,179 @@ export default function ProjectPage() {
   ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo]);
 
   useKeyboardShortcuts(shortcuts);
+
+  /* ── Command palette commands ───────────────────────────── */
+  const paletteCommands = useMemo<Command[]>(() => {
+    const icon = (d: string) => (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={d} />
+      </svg>
+    );
+
+    return [
+      {
+        id: "toggle-wireframe",
+        labelKey: "commandPalette.toggleWireframe",
+        labelSecondaryKey: "commandPalette.toggleWireframeEn",
+        icon: icon("M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"),
+        action: () => setWireframe((v) => !v),
+      },
+      {
+        id: "reset-camera",
+        labelKey: "commandPalette.resetCamera",
+        labelSecondaryKey: "commandPalette.resetCameraEn",
+        icon: icon("M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10"),
+        action: () => {
+          const container = viewportRef.current;
+          if (container) {
+            const el = container.querySelector("div") as HTMLDivElement & { resetCamera?: () => void };
+            el?.resetCamera?.();
+          }
+        },
+      },
+      {
+        id: "toggle-code-editor",
+        labelKey: "commandPalette.toggleCodeEditor",
+        labelSecondaryKey: "commandPalette.toggleCodeEditorEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+          </svg>
+        ),
+        action: () => { if (!showCode) markCodeEditor(); setShowCode((v) => !v); },
+      },
+      {
+        id: "toggle-bom",
+        labelKey: "commandPalette.toggleBom",
+        labelSecondaryKey: "commandPalette.toggleBomEn",
+        shortcut: "Cmd+B",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>
+        ),
+        action: () => setShowBom((v) => !v),
+      },
+      {
+        id: "export-pdf",
+        labelKey: "commandPalette.exportPdf",
+        labelSecondaryKey: "commandPalette.exportPdfEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+        ),
+        action: () => {
+          try {
+            track("bom_exported", { format: "pdf" });
+            generateQuotePdf({ projectName, projectDescription: projectDesc, bom, locale });
+            toast(t("toast.bomExported"), "success");
+          } catch (err) {
+            toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
+          }
+        },
+      },
+      {
+        id: "share-project",
+        labelKey: "commandPalette.shareProject",
+        labelSecondaryKey: "commandPalette.shareProjectEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+        ),
+        action: async () => {
+          if (!shareToken) {
+            setShareLoading(true);
+            try {
+              const res = await api.shareProject(projectId);
+              setShareToken(res.share_token);
+            } catch (err) {
+              toast(err instanceof Error ? err.message : t("toast.shareFailed"), "error");
+              setShareLoading(false);
+              return;
+            }
+            setShareLoading(false);
+          }
+          setShowShareDialog(true);
+        },
+      },
+      {
+        id: "toggle-theme",
+        labelKey: "commandPalette.toggleTheme",
+        labelSecondaryKey: "commandPalette.toggleThemeEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+        ),
+        action: toggleTheme,
+      },
+      {
+        id: "show-shortcuts",
+        labelKey: "commandPalette.showShortcuts",
+        labelSecondaryKey: "commandPalette.showShortcutsEn",
+        shortcut: "Cmd+/",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <line x1="6" y1="8" x2="6.01" y2="8" />
+            <line x1="10" y1="8" x2="10.01" y2="8" />
+            <line x1="14" y1="8" x2="14.01" y2="8" />
+            <line x1="18" y1="8" x2="18.01" y2="8" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+          </svg>
+        ),
+        action: () => setShowShortcutsHelp(true),
+      },
+      {
+        id: "save",
+        labelKey: "commandPalette.save",
+        labelSecondaryKey: "commandPalette.saveEn",
+        shortcut: "Cmd+S",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+        ),
+        action: save,
+      },
+      {
+        id: "show-docs",
+        labelKey: "commandPalette.showDocs",
+        labelSecondaryKey: "commandPalette.showDocsEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        ),
+        action: () => setShowDocs((v) => !v),
+      },
+    ];
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, markCodeEditor]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -1063,6 +1248,13 @@ export default function ProjectPage() {
         open={showShortcutsHelp}
         onClose={() => setShowShortcutsHelp(false)}
         shortcuts={shortcuts}
+      />
+
+      {/* Command palette (Cmd+K) */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        commands={paletteCommands}
       />
 
       <OnboardingTour />
