@@ -1967,6 +1967,9 @@ select:focus {
   display: flex;
   align-items: center;
 }
+.chat-send-btn[data-ready="true"]:not(:disabled) {
+  color: var(--amber);
+}
 .chat-send-btn:hover:not(:disabled) {
   color: var(--amber);
 }
