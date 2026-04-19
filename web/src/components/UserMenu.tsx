@@ -80,53 +80,16 @@ export default function UserMenu({ userName }: { userName: string }) {
             </div>
             <Link
               href="/settings"
+              className="menu-item"
               onClick={() => setOpen(false)}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "8px 12px",
-                background: "none",
-                color: "var(--text-primary)",
-                fontSize: 13,
-                cursor: "pointer",
-                textAlign: "left",
-                borderRadius: "var(--radius-sm)",
-                fontFamily: "inherit",
-                textDecoration: "none",
-                transition: "background 0.12s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-tertiary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-              }}
             >
               {t("nav.settings")}
             </Link>
             <button
+              className="menu-item"
               onClick={() => {
                 setToken(null);
                 window.location.reload();
-              }}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                background: "none",
-                border: "none",
-                color: "var(--text-primary)",
-                fontSize: 13,
-                cursor: "pointer",
-                textAlign: "left",
-                borderRadius: "var(--radius-sm)",
-                fontFamily: "inherit",
-                transition: "background 0.12s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-tertiary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
               }}
             >
               {t("nav.logout")}

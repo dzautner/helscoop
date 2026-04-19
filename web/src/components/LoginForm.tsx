@@ -251,15 +251,8 @@ export default function LoginForm({
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a
                     href="/forgot-password"
-                    style={{
-                      color: "var(--text-muted)",
-                      fontSize: 12,
-                      textDecoration: "none",
-                      fontFamily: "var(--font-body)",
-                      transition: "color 0.12s ease",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--amber)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
+                    className="link-muted"
+                    style={{ fontSize: 12 }}
                   >
                     {t('auth.forgotPassword')}
                   </a>
@@ -338,18 +331,9 @@ export default function LoginForm({
 
           <div style={{ textAlign: "center" }}>
             <button
+              className="link-amber"
               onClick={() => { setIsRegister(!isRegister); setError(""); }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--amber)",
-                cursor: "pointer",
-                fontSize: 13,
-                fontFamily: "var(--font-body)",
-                transition: "opacity 0.12s ease",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.8"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+              style={{ fontSize: 13 }}
             >
               {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}
             </button>
@@ -361,20 +345,10 @@ export default function LoginForm({
             justifyContent: "center",
             gap: 16,
           }}>
-            <a
-              href="/privacy"
-              style={{ color: "var(--text-muted)", fontSize: 11, textDecoration: "none" }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--amber)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
-            >
+            <a href="/privacy" className="link-muted" style={{ fontSize: 11 }}>
               {t('legal.privacyPolicy')}
             </a>
-            <a
-              href="/terms"
-              style={{ color: "var(--text-muted)", fontSize: 11, textDecoration: "none" }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--amber)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
-            >
+            <a href="/terms" className="link-muted" style={{ fontSize: 11 }}>
               {t('legal.termsOfService')}
             </a>
           </div>

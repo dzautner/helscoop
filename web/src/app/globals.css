@@ -322,6 +322,70 @@ body {
   background: rgba(199, 95, 95, 0.1);
 }
 
+/* ── Link styles ─────────────────────────────────── */
+.link-muted {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+.link-muted:hover {
+  color: var(--amber);
+}
+
+.link-amber {
+  background: none;
+  border: none;
+  color: var(--amber);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: opacity 0.12s ease;
+}
+.link-amber:hover {
+  opacity: 0.8;
+}
+
+/* ── Menu item hover ─────────────────────────────── */
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+/* ── Language switcher ───────────────────────────── */
+.lang-switch {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.lang-switch:hover {
+  border-color: var(--amber-border);
+  color: var(--amber);
+}
+
 @keyframes slideLeft {
   from { opacity: 0; transform: translateX(8px); }
   to { opacity: 1; transform: translateX(0); }
