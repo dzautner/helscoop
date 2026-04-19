@@ -628,7 +628,7 @@ function PriceComparisonPopup({
                               fontSize: 10,
                               fontWeight: 600,
                               padding: "2px 6px",
-                              borderRadius: "var(--radius-md)",
+                              borderRadius: "var(--radius-sm)",
                               background: trend.direction === "down" ? "rgba(74, 124, 89, 0.12)" : "rgba(239, 68, 68, 0.08)",
                               color: trend.direction === "down" ? "var(--success)" : "var(--danger)",
                               display: "inline-flex",
