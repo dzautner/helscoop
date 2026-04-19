@@ -32,6 +32,9 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Data export
+  const [exportingData, setExportingData] = useState(false);
+
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -119,6 +122,28 @@ export default function SettingsPage() {
       );
       setDeletingAccount(false);
     }
+  }
+
+  async function handleExportData() {
+    setExportingData(true);
+    try {
+      const data = await api.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const date = new Date().toISOString().split("T")[0];
+      a.download = `helscoop_data_export_${date}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(t("settings.dataExported"), "success");
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : t("settings.dataExportFailed"),
+        "error"
+      );
+    }
+    setExportingData(false);
   }
 
   if (loading) {
@@ -455,6 +480,46 @@ export default function SettingsPage() {
           >
             {t("settings.accountDesc")}
           </p>
+
+          <div style={{ marginBottom: 24 }}>
+            <p
+              style={{
+                color: "var(--text-muted)",
+                fontSize: 13,
+                lineHeight: 1.6,
+                margin: "0 0 12px 0",
+              }}
+            >
+              {t("settings.exportDataDesc")}
+            </p>
+            <button
+              className="btn btn-ghost"
+              onClick={handleExportData}
+              disabled={exportingData}
+              style={{ padding: "11px 24px", display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              {exportingData ? (
+                <span className="btn-spinner" />
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  {t("settings.exportData")}
+                </>
+              )}
+            </button>
+          </div>
+
+          <div
+            style={{
+              height: 1,
+              background: "var(--border-strong)",
+              margin: "0 0 24px 0",
+            }}
+          />
 
           <div
             style={{
