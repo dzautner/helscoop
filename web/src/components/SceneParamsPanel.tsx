@@ -130,7 +130,9 @@ function ParamSlider({
   };
 
   const pct =
-    ((localValue - param.min) / (param.max - param.min)) * 100;
+    param.max === param.min
+      ? 100
+      : ((localValue - param.min) / (param.max - param.min)) * 100;
 
   return (
     <div className="scene-param-item">
@@ -153,6 +155,7 @@ function ParamSlider({
         max={param.max}
         step={param.step}
         value={localValue}
+        disabled={param.max === param.min}
         onChange={(e) => handleInput(parseFloat(e.target.value))}
         style={
           {
