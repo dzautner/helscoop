@@ -316,40 +316,136 @@ body {
   padding: 12px;
 }
 
+/* ── Empty state (shared) ──────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.empty-state-illustration {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--amber-glow);
+  border: 1px solid var(--amber-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.empty-state:hover .empty-state-illustration {
+  border-color: var(--amber);
+  box-shadow: 0 0 16px rgba(229,160,75,0.18);
+  transform: translateY(-2px);
+}
+
+.empty-state-title {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.empty-state-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 320px;
+  margin-bottom: 18px;
+}
+
+.empty-state-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--amber);
+  color: #09090b;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.empty-state-cta:hover {
+  background: var(--amber-light);
+  box-shadow: 0 0 20px rgba(229, 160, 75, 0.18), 0 2px 8px rgba(229, 160, 75, 0.1);
+  transform: translateY(-0.5px);
+}
+
+.empty-state-cta:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* BOM empty — reuse shared empty-state */
 .bom-empty {
   text-align: center;
   padding: 40px 20px;
 }
 
 .bom-empty-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 16px;
-  border-radius: var(--radius-md);
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border-radius: var(--radius-lg);
   background: var(--amber-glow);
   border: 1px solid var(--amber-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 
 .bom-empty:hover .bom-empty-icon {
   border-color: var(--amber);
-  box-shadow: 0 0 12px rgba(229,160,75,0.15);
+  box-shadow: 0 0 16px rgba(229,160,75,0.18);
+  transform: translateY(-2px);
 }
 
 .bom-empty-title {
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 
 .bom-empty-hint {
   color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 280px;
+  margin: 0 auto 18px;
+}
+
+.bom-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--amber);
   font-size: 12px;
-  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--amber-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bom-empty-cta:hover {
+  background: var(--amber-glow);
+  border-color: var(--amber);
+  box-shadow: 0 0 12px rgba(229,160,75,0.1);
 }
 
 .bom-item-card {
@@ -649,7 +745,6 @@ body {
   transform: none;
 }
 
-/* Loading state: dim button while spinner shows */
 .btn[data-loading="true"] {
   opacity: 0.7;
   pointer-events: none;
@@ -1584,10 +1679,14 @@ select:focus {
 
 /* Dashboard layout */
 .dash-empty {
-  padding: 32px 28px;
+  padding: 48px 28px;
   text-align: center;
   border-radius: var(--radius-lg);
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .dash-empty p {
@@ -1623,17 +1722,22 @@ select:focus {
   border-radius: var(--radius-xl);
   border: 1px dashed var(--border-strong);
   background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .dash-no-results-title {
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 15px;
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .dash-no-results-desc {
   color: var(--text-muted);
   font-size: 13px;
+  margin-bottom: 18px;
 }
 
 .dash-project-grid {
@@ -1969,6 +2073,22 @@ select:focus {
 .viewport-cam-btn:active {
   transform: scale(0.95);
   transition-duration: 0.04s;
+}
+
+/* === Ruler / measurement labels (CSS2DRenderer) === */
+.ruler-label {
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #09090b;
+  background: var(--amber);
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
 }
 
 /* === Focus-visible — keyboard accessibility === */
