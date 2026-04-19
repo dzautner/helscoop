@@ -360,3 +360,214 @@ describe("edge cases", () => {
     ).toBe('"foo<bar>" is not defined \u2014 check spelling');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. Exhaustive key parity — every fi key must have a corresponding en key
+// ---------------------------------------------------------------------------
+
+describe("exhaustive i18n key parity", () => {
+  const tFi = getTranslation("fi");
+  const tEn = getTranslation("en");
+
+  // All top-level namespaces with all their leaf keys
+  const allKeys = [
+    // nav
+    "nav.projects", "nav.admin", "nav.logout", "nav.back", "nav.settings",
+    // auth
+    "auth.login", "auth.loginTitle", "auth.loginSubtitle", "auth.loginSubtitleBuilding",
+    "auth.register", "auth.registerTitle", "auth.registerSubtitle",
+    "auth.email", "auth.emailPlaceholder", "auth.password", "auth.passwordPlaceholder",
+    "auth.name", "auth.namePlaceholder", "auth.noAccount", "auth.hasAccount",
+    "auth.loading", "auth.loginFailed",
+    "auth.forgotPassword", "auth.forgotPasswordTitle", "auth.forgotPasswordSubtitle",
+    "auth.forgotPasswordSend", "auth.forgotPasswordSent", "auth.forgotPasswordBack",
+    "auth.resetPasswordTitle", "auth.resetPasswordSubtitle", "auth.resetPasswordNew",
+    "auth.resetPasswordNewPlaceholder", "auth.resetPasswordConfirm",
+    "auth.resetPasswordConfirmPlaceholder", "auth.resetPasswordSubmit",
+    "auth.resetPasswordSuccess", "auth.resetPasswordMismatch", "auth.resetPasswordInvalid",
+    // brand
+    "brand.tagline", "brand.trustProducts", "brand.trustSuppliers", "brand.trustFree",
+    "brand.description", "brand.featureMaterials", "brand.featureMaterialsDesc",
+    "brand.featureSuppliers", "brand.featureSuppliersDesc",
+    "brand.featureAI", "brand.featureAIDesc",
+    // search
+    "search.sectionLabel", "search.title", "search.subtitle", "search.placeholder",
+    "search.searching", "search.searchButton", "search.createFromBuilding",
+    "search.creatingProject", "search.createError", "search.notFound",
+    "search.yearBuilt", "search.area", "search.floors", "search.material",
+    "search.heating", "search.bomRows", "search.verified", "search.estimated",
+    "search.dataSources",
+    // project
+    "project.myProjects", "project.projectCount", "project.startFirst",
+    "project.loadingProjects", "project.newProjectPlaceholder", "project.create",
+    "project.open", "project.copy", "project.delete", "project.deleteConfirm",
+    "project.noProjects", "project.noProjectsDesc", "project.emptyDescription",
+    "project.descriptionPlaceholder", "project.orStartFromTemplate",
+    "project.searchPlaceholder", "project.sortByName", "project.sortByModified",
+    "project.sortByCreated", "project.sortByCost", "project.noSearchResults",
+    "project.noSearchResultsDesc", "project.emptyTitle", "project.emptyHint",
+    "project.emptyCta", "project.noSearchResultsCta",
+    // toast
+    "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
+    "toast.templateCreated", "toast.saved", "toast.bomExported",
+    "toast.loadProjectsFailed", "toast.createProjectFailed", "toast.templateFailed",
+    "toast.deleteFailed", "toast.duplicateFailed", "toast.loadProjectFailed",
+    "toast.saveFailed", "toast.bomExportFailed", "toast.aiError",
+    "toast.shareFailed", "toast.unshareFailed", "toast.linkCopied",
+    "toast.projectUnshared", "toast.loadMaterialsFailed", "toast.loadSuppliersFailed",
+    "toast.loadPricingFailed", "toast.materialRemoved", "toast.undo",
+    // editor
+    "editor.scene", "editor.materialList", "editor.save", "editor.saved",
+    "editor.saving", "editor.unsaved", "editor.export", "editor.exportPdf",
+    "editor.undo", "editor.redo", "editor.undoShortcut", "editor.redoShortcut",
+    "editor.assistant", "editor.aiAssistant", "editor.describeChange",
+    "editor.continueConversation", "editor.describePrompt",
+    "editor.exampleRoof", "editor.exampleWindow",
+    "editor.suggestionRoof", "editor.suggestionWindow", "editor.suggestionGarage",
+    "editor.applyToScene", "editor.thinking",
+    "editor.message", "editor.messages",
+    "editor.objectSingular", "editor.objectPlural",
+    "editor.chatMinimize", "editor.chatExpand", "editor.chatInputLabel", "editor.chatSendLabel",
+    "editor.addMaterial", "editor.add",
+    "editor.noMaterials", "editor.noMaterialsHint", "editor.noMaterialsCta",
+    "editor.error", "editor.errorLoadProject", "editor.backToProjects",
+    "editor.loadingProject", "editor.chatError",
+    "editor.viewportCrashTitle", "editor.viewportCrashMessage", "editor.resetScene",
+    "editor.loading3D", "editor.showCode", "editor.hideCode", "editor.wireframe",
+    "editor.params", "editor.resetCamera",
+    "editor.cameraFront", "editor.cameraSide", "editor.cameraTop", "editor.cameraIso",
+    "editor.screenshot", "editor.screenshotAriaLabel",
+    "editor.ruler", "editor.rulerTooltip",
+    "editor.measureWidth", "editor.measureHeight", "editor.measureDepth",
+    "editor.measureRadius", "editor.measureDiameter",
+    "editor.sceneErrorPrefix", "editor.objectCount", "editor.bomRowCount",
+    "editor.estimatedTotal", "editor.inclVat", "editor.costBreakdown",
+    "editor.confirmApplyTitle", "editor.confirmApplyMessage", "editor.confirmApplyUndo",
+    "editor.cancel", "editor.dontAskAgain",
+    "editor.docs", "editor.share", "editor.duplicateProject", "editor.parameters",
+    "editor.quantityFor",
+    // share
+    "share.title", "share.description", "share.generating", "share.copyLink",
+    "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
+    "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
+    "share.signUpCta", "share.materials", "share.total",
+    // shortcuts
+    "shortcuts.title", "shortcuts.save", "shortcuts.toggleBom", "shortcuts.applyCode",
+    "shortcuts.closePanel", "shortcuts.showShortcuts", "shortcuts.undo", "shortcuts.redo",
+    "shortcuts.commandPalette", "shortcuts.escToClose",
+    // settings
+    "settings.title", "settings.profile", "settings.profileDesc", "settings.name",
+    "settings.email", "settings.saveProfile", "settings.security", "settings.securityDesc",
+    "settings.currentPassword", "settings.newPassword", "settings.confirmPassword",
+    "settings.changePassword", "settings.passwordMismatch", "settings.passwordTooShort",
+    "settings.account", "settings.accountDesc", "settings.exportData",
+    "settings.exportDataDesc", "settings.deleteAccount", "settings.deleteAccountWarning",
+    "settings.deleteAccountConfirm", "settings.profileUpdated", "settings.profileUpdateFailed",
+    "settings.passwordChanged", "settings.passwordChangeFailed",
+    "settings.accountDeleted", "settings.accountDeleteFailed",
+    "settings.dataExported", "settings.dataExportFailed", "settings.backToProjects",
+    // pricing
+    "pricing.compareTitle", "pricing.supplier", "pricing.unitPrice", "pricing.buyLink",
+    "pricing.cheapest", "pricing.primary", "pricing.noSuppliers", "pricing.loading",
+    "pricing.savingsLabel", "pricing.savingsTooltip", "pricing.perUnit", "pricing.close",
+    "pricing.lastChecked", "pricing.viewProduct", "pricing.searchMaterials",
+    "pricing.allCategories", "pricing.noResults", "pricing.browseMaterials",
+    "pricing.setQuantity", "pricing.showHistory", "pricing.hideHistory",
+    "pricing.showTrend", "pricing.limitedHistory",
+    // units
+    "units.jm", "units.sqm", "units.m2", "units.m3", "units.kpl",
+    "units.sheet", "units.box", "units.liter", "units.sakki",
+    "units.jmLong", "units.sqmLong", "units.m2Long", "units.m3Long",
+    "units.kplLong", "units.sheetLong", "units.boxLong", "units.literLong", "units.sakkiLong",
+    // dialog
+    "dialog.confirm", "dialog.cancel", "dialog.deleteProjectTitle",
+    "dialog.deleteProjectMessage", "dialog.deleteAccountTitle", "dialog.deleteAccountMessage",
+    // admin
+    "admin.adminPanel", "admin.adminDesc", "admin.materials", "admin.suppliers",
+    "admin.pricing", "admin.search", "admin.name", "admin.category",
+    "admin.wasteFactor", "admin.price", "admin.supplier", "admin.others",
+    "admin.noPrice", "admin.stalePrices", "admin.staleThreshold", "admin.allUpToDate",
+    "admin.website", "admin.products", "admin.oldestPrice", "admin.material",
+    "admin.lastUpdated", "admin.age", "admin.checkingAccess",
+    // onboarding
+    "onboarding.welcomeTitle", "onboarding.welcomeBody", "onboarding.welcomeStart",
+    "onboarding.welcomeSkip", "onboarding.stepAddress", "onboarding.stepViewport",
+    "onboarding.stepChat", "onboarding.stepMaterials", "onboarding.stepExport",
+    "onboarding.next", "onboarding.skip", "onboarding.done", "onboarding.stepOf",
+    "onboarding.restartTour", "onboarding.restartTourDesc", "onboarding.tourRestarted",
+    // legal
+    "legal.privacyPolicy", "legal.termsOfService", "legal.acceptTerms",
+    "legal.acceptTermsRequired", "legal.and", "legal.lastUpdated",
+    "legal.privacyTitle", "legal.privacyIntro", "legal.privacyDataCollected",
+    "legal.privacyDataCollectedBody", "legal.privacyHowUsed", "legal.privacyHowUsedBody",
+    "legal.privacyStorage", "legal.privacyStorageBody", "legal.privacyThirdParty",
+    "legal.privacyThirdPartyBody", "legal.privacyRights", "legal.privacyRightsBody",
+    "legal.privacyCookies", "legal.privacyCookiesBody", "legal.privacyContact",
+    "legal.privacyContactBody", "legal.termsTitle", "legal.termsIntro",
+    "legal.termsUse", "legal.termsUseBody", "legal.termsIP", "legal.termsIPBody",
+    "legal.termsAI", "legal.termsAIBody", "legal.termsPrices", "legal.termsPricesBody",
+    "legal.termsLiability", "legal.termsLiabilityBody", "legal.termsChanges",
+    "legal.termsChangesBody",
+    // screenshot
+    "screenshot.download", "screenshot.copy", "screenshot.copied",
+    // commandPalette
+    "commandPalette.title", "commandPalette.placeholder", "commandPalette.noResults",
+    "commandPalette.navigate", "commandPalette.execute", "commandPalette.close",
+    "commandPalette.toggleWireframe", "commandPalette.toggleWireframeEn",
+    "commandPalette.resetCamera", "commandPalette.resetCameraEn",
+    "commandPalette.toggleCodeEditor", "commandPalette.toggleCodeEditorEn",
+    "commandPalette.toggleBom", "commandPalette.toggleBomEn",
+    "commandPalette.exportPdf", "commandPalette.exportPdfEn",
+    "commandPalette.shareProject", "commandPalette.shareProjectEn",
+    "commandPalette.toggleTheme", "commandPalette.toggleThemeEn",
+    "commandPalette.showShortcuts", "commandPalette.showShortcutsEn",
+    "commandPalette.save", "commandPalette.saveEn",
+    "commandPalette.showDocs", "commandPalette.showDocsEn",
+    // validation
+    "validation.unmatchedCloser", "validation.unmatchedOpener", "validation.typoDetected",
+    "validation.undefinedIdentifier", "validation.emptyScene", "validation.tooManyObjects",
+    "validation.farFromOrigin", "validation.invalidDimension", "validation.warningsTitle",
+    // errors
+    "errors.notFoundTitle", "errors.notFoundMessage", "errors.backToProjects",
+    "errors.searchAddress", "errors.serverErrorTitle", "errors.serverErrorMessage",
+    "errors.tryAgain", "errors.backToDashboard", "errors.showDetails", "errors.hideDetails",
+    "errors.projectNotFoundTitle", "errors.projectNotFoundMessage",
+    "errors.connectionLost", "errors.reconnected",
+  ];
+
+  it("every Finnish key has a corresponding English translation", () => {
+    const missingInEn: string[] = [];
+    for (const key of allKeys) {
+      const fiVal = tFi(key);
+      const enVal = tEn(key);
+      // If fi resolves but en falls back to the key itself, it is missing
+      if (fiVal !== key && enVal === key) {
+        missingInEn.push(key);
+      }
+    }
+    expect(missingInEn).toEqual([]);
+  });
+
+  it("every English key has a corresponding Finnish translation", () => {
+    const missingInFi: string[] = [];
+    for (const key of allKeys) {
+      const fiVal = tFi(key);
+      const enVal = tEn(key);
+      // If en resolves but fi falls back to the key itself, it is missing
+      if (enVal !== key && fiVal === key) {
+        missingInFi.push(key);
+      }
+    }
+    expect(missingInFi).toEqual([]);
+  });
+
+  it("no key resolves to fallback in both locales (i.e., all keys exist)", () => {
+    const missingInBoth: string[] = [];
+    for (const key of allKeys) {
+      if (tFi(key) === key && tEn(key) === key) {
+        missingInBoth.push(key);
+      }
+    }
+    expect(missingInBoth).toEqual([]);
+  });
+});
