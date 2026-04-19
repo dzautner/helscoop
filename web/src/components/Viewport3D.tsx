@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
+import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from "three-bvh-csg";
 import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
 import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
@@ -120,6 +121,104 @@ function getMaterialPBR(materialId: string): MaterialPBR {
   return MATERIAL_PBR[materialId] || { roughness: 0.7, metalness: 0.05 };
 }
 
+const csgEvaluator = new Evaluator();
+
+function applyTransform(obj: SceneObject): THREE.Matrix4 {
+  const m = new THREE.Matrix4();
+  const pos = new THREE.Vector3(obj.position[0], obj.position[1], obj.position[2]);
+  const rot = new THREE.Euler(
+    obj.rotation[0] * Math.PI / 180,
+    obj.rotation[1] * Math.PI / 180,
+    obj.rotation[2] * Math.PI / 180
+  );
+  const scl = new THREE.Vector3(obj.scale[0], obj.scale[1], obj.scale[2]);
+  m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scl);
+  return m;
+}
+
+function resolveToGeometry(obj: SceneObject, parentMatrix?: THREE.Matrix4): THREE.BufferGeometry | null {
+  const localMatrix = applyTransform(obj);
+  const worldMatrix = parentMatrix ? parentMatrix.clone().multiply(localMatrix) : localMatrix;
+
+  if (obj.geometry === "difference" || obj.geometry === "intersection") {
+    if (!obj.children || obj.children.length < 2) return null;
+    const opType = obj.geometry === "difference" ? SUBTRACTION : INTERSECTION;
+
+    const geomA = resolveToGeometry(obj.children[0], worldMatrix);
+    const geomB = resolveToGeometry(obj.children[1], worldMatrix);
+    if (!geomA || !geomB) return geomA || null;
+
+    const brushA = new Brush(geomA);
+    brushA.updateMatrixWorld(true);
+    const brushB = new Brush(geomB);
+    brushB.updateMatrixWorld(true);
+
+    try {
+      const result = csgEvaluator.evaluate(brushA, brushB, opType);
+      return result.geometry;
+    } catch {
+      return geomA;
+    }
+  }
+
+  if (obj.geometry === "group" && obj.children) {
+    const geometries: THREE.BufferGeometry[] = [];
+    for (const child of obj.children) {
+      const g = resolveToGeometry(child, worldMatrix);
+      if (g) geometries.push(g);
+    }
+    if (geometries.length === 0) return null;
+    if (geometries.length === 1) return geometries[0];
+    return mergeGeometries(geometries);
+  }
+
+  const geom = createGeometry(obj);
+  geom.applyMatrix4(worldMatrix);
+  return geom;
+}
+
+function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  let totalVerts = 0;
+  let totalIdx = 0;
+  for (const g of geometries) {
+    totalVerts += g.attributes.position.count;
+    totalIdx += g.index ? g.index.count : g.attributes.position.count;
+  }
+  const positions = new Float32Array(totalVerts * 3);
+  const normals = new Float32Array(totalVerts * 3);
+  const indices: number[] = [];
+  let vertOffset = 0;
+  for (const g of geometries) {
+    const pos = g.attributes.position;
+    const nrm = g.attributes.normal;
+    for (let i = 0; i < pos.count; i++) {
+      positions[(vertOffset + i) * 3] = pos.getX(i);
+      positions[(vertOffset + i) * 3 + 1] = pos.getY(i);
+      positions[(vertOffset + i) * 3 + 2] = pos.getZ(i);
+      if (nrm) {
+        normals[(vertOffset + i) * 3] = nrm.getX(i);
+        normals[(vertOffset + i) * 3 + 1] = nrm.getY(i);
+        normals[(vertOffset + i) * 3 + 2] = nrm.getZ(i);
+      }
+    }
+    if (g.index) {
+      for (let i = 0; i < g.index.count; i++) {
+        indices.push(g.index.getX(i) + vertOffset);
+      }
+    } else {
+      for (let i = 0; i < pos.count; i++) {
+        indices.push(vertOffset + i);
+      }
+    }
+    vertOffset += pos.count;
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  merged.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  merged.setIndex(indices);
+  return merged;
+}
+
 function addSceneObjects(
   parent: THREE.Group,
   objects: SceneObject[],
@@ -141,6 +240,23 @@ function addSceneObjects(
       );
       count += addSceneObjects(group, obj.children, wireframe);
       parent.add(group);
+    } else if (obj.geometry === "difference" || obj.geometry === "intersection") {
+      const geometry = resolveToGeometry(obj);
+      if (geometry) {
+        const pbr = getMaterialPBR(obj.material);
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(obj.color[0], obj.color[1], obj.color[2]),
+          roughness: pbr.roughness,
+          metalness: pbr.metalness,
+          wireframe,
+          ...(pbr.transparent ? { transparent: true, opacity: pbr.opacity ?? 1 } : {}),
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        parent.add(mesh);
+        count++;
+      }
     } else {
       const geometry = createGeometry(obj);
       const pbr = getMaterialPBR(obj.material);

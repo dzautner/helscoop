@@ -10,8 +10,10 @@
  * The Viewport3D renderer handles the conversion to Y-up for Three.js.
  */
 
+export type MeshType = "box" | "cylinder" | "sphere" | "group" | "hull" | "difference" | "intersection";
+
 export interface MeshDescriptor {
-  type: "box" | "cylinder" | "sphere" | "group" | "hull";
+  type: MeshType;
   args: number[];
   position: [number, number, number];
   rotation: [number, number, number];
@@ -21,7 +23,7 @@ export interface MeshDescriptor {
 }
 
 export interface SceneObject {
-  geometry: "box" | "cylinder" | "sphere" | "group" | "hull";
+  geometry: MeshType;
   args: number[];
   position: [number, number, number];
   rotation: [number, number, number];
@@ -195,12 +197,38 @@ function unionImpl(...args: any[]): MeshDescriptor {
   };
 }
 
-function differenceImpl(a: MeshDescriptor, _b: MeshDescriptor): MeshDescriptor {
-  return a;
+function differenceImpl(...args: MeshDescriptor[]): MeshDescriptor {
+  if (args.length === 0) return createMesh("group", []);
+  if (args.length === 1) return args[0];
+  let result = args[0];
+  for (let i = 1; i < args.length; i++) {
+    result = {
+      type: "difference" as MeshType,
+      args: [],
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      children: [result, args[i]],
+    };
+  }
+  return result;
 }
 
-function intersectionImpl(a: MeshDescriptor, _b: MeshDescriptor): MeshDescriptor {
-  return a;
+function intersectionImpl(...args: MeshDescriptor[]): MeshDescriptor {
+  if (args.length === 0) return createMesh("group", []);
+  if (args.length === 1) return args[0];
+  let result = args[0];
+  for (let i = 1; i < args.length; i++) {
+    result = {
+      type: "intersection" as MeshType,
+      args: [],
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      children: [result, args[i]],
+    };
+  }
+  return result;
 }
 
 // ── Higher-level primitives ──────────────────────────────────────────────────
