@@ -5,6 +5,7 @@ build/
 renders/
 *.png
 !materials/textures/**/*.png
+!web/public/og-default.png
 
 # macOS
 .DS_Store
