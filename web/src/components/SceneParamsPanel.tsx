@@ -129,6 +129,7 @@ function ParamSlider({
   onChange: (name: string, value: number) => void;
 }) {
   const [localValue, setLocalValue] = useState(param.value);
+  const [dragging, setDragging] = useState(false);
 
   const handleInput = (val: number) => {
     const clamped = Math.min(param.max, Math.max(param.min, val));
@@ -140,6 +141,11 @@ function ParamSlider({
     param.max === param.min
       ? 100
       : ((localValue - param.min) / (param.max - param.min)) * 100;
+
+  const displayValue =
+    param.step >= 1
+      ? String(Math.round(localValue))
+      : localValue.toFixed(Math.max(0, -Math.floor(Math.log10(param.step))));
 
   return (
     <div className="scene-param-item">
@@ -156,25 +162,37 @@ function ParamSlider({
           onChange={(e) => handleInput(parseFloat(e.target.value) || param.min)}
         />
       </div>
-      <input
-        type="range"
-        className="scene-param-slider"
-        min={param.min}
-        max={param.max}
-        step={param.step}
-        value={localValue}
-        disabled={param.max === param.min}
-        aria-label={param.label}
-        aria-valuemin={param.min}
-        aria-valuemax={param.max}
-        aria-valuenow={localValue}
-        onChange={(e) => handleInput(parseFloat(e.target.value))}
-        style={
-          {
-            "--pct": `${pct}%`,
-          } as React.CSSProperties
-        }
-      />
+      <div className="scene-param-slider-wrap">
+        <span
+          className="scene-param-slider-tooltip"
+          data-visible={dragging}
+          style={{ left: `${pct}%` }}
+        >
+          {displayValue}
+        </span>
+        <input
+          type="range"
+          className="scene-param-slider"
+          min={param.min}
+          max={param.max}
+          step={param.step}
+          value={localValue}
+          disabled={param.max === param.min}
+          aria-label={param.label}
+          aria-valuemin={param.min}
+          aria-valuemax={param.max}
+          aria-valuenow={localValue}
+          onChange={(e) => handleInput(parseFloat(e.target.value))}
+          onPointerDown={() => setDragging(true)}
+          onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
+          style={
+            {
+              "--pct": `${pct}%`,
+            } as React.CSSProperties
+          }
+        />
+      </div>
     </div>
   );
 }
