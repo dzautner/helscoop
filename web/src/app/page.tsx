@@ -6,6 +6,7 @@ import { api, setToken, getToken } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 import AddressSearch from "@/components/AddressSearch";
 import FeatureHighlights from "@/components/FeatureHighlights";
+import LandingFooter from "@/components/LandingFooter";
 import ProjectList from "@/components/ProjectList";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import type { BuildingResult } from "@/types";
@@ -68,6 +69,7 @@ export default function Home() {
           }
         />
         <FeatureHighlights />
+        <LandingFooter />
       </>
     );
   }

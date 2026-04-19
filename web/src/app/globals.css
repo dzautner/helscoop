@@ -2052,6 +2052,44 @@ select:focus {
 }
 
 /* Feature highlights grid */
+/* Landing footer */
+.landing-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+  padding: 48px 24px 24px;
+}
+
+.landing-footer-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.2fr 1.5fr 0.8fr;
+  gap: 40px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.landing-footer-source-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.landing-footer-source {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.landing-footer-bottom {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+}
+
 .feature-section {
   padding: 48px 24px 40px;
   border-bottom: 1px solid var(--border);
@@ -2249,6 +2287,11 @@ select:focus {
   .feature-grid {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  .landing-footer-inner {
+    grid-template-columns: 1fr;
+    gap: 24px;
   }
 
   .settings-card {
