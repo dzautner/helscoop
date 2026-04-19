@@ -1975,6 +1975,17 @@ select:focus {
   cursor: default;
 }
 
+.chat-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  color: var(--text-muted);
+}
+
+.chat-input-bar-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .chat-suggestion-chip {
   padding: 5px 12px;
   border-radius: 20px;
