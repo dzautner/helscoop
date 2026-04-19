@@ -42,6 +42,8 @@ function DataSourcesSection({ label, sources }: { label: string; sources: string
     <div style={{ marginBottom: 12 }}>
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={label}
         style={{
           background: "none",
           border: "none",
@@ -123,6 +125,7 @@ export default function AddressSearch({
           <input
             className="input"
             placeholder={t('search.placeholder')}
+            aria-label={t('search.placeholder')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -135,6 +138,7 @@ export default function AddressSearch({
             className={`btn ${query.trim().length >= 3 ? "btn-primary" : "btn-ghost"}`}
             onClick={search}
             disabled={loading || query.trim().length < 3}
+            aria-label={t('search.searchButton')}
             style={{ padding: "12px 20px", fontSize: 13 }}
           >
             {loading ? t('search.searching') : t('search.searchButton')}
@@ -225,6 +229,7 @@ export default function AddressSearch({
           <input
             className="input"
             placeholder={t('search.placeholder')}
+            aria-label={t('search.placeholder')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -237,6 +242,7 @@ export default function AddressSearch({
             className={`btn ${query.trim().length >= 3 ? "btn-primary" : "btn-ghost"}`}
             onClick={search}
             disabled={loading || query.trim().length < 3}
+            aria-label={t('search.searchButton')}
             style={{ padding: "14px 28px", fontSize: 14 }}
           >
             {loading ? t('search.searching') : t('search.searchButton')}
