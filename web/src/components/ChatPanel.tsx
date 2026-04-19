@@ -282,7 +282,7 @@ export default function ChatPanel({
           }}
           onFocus={() => setInputFocused(true)}
           onBlur={() => setInputFocused(false)}
-          placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.describeChange')}
+          placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.continueConversation')}
           disabled={loading}
         />
         <button
