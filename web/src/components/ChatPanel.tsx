@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { ChatMessage } from "@/types";
 
@@ -22,8 +23,10 @@ export default function ChatPanel({
   const [expanded, setExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const usedSuggestionRef = useRef(false);
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { track } = useAnalytics();
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -38,6 +41,7 @@ export default function ChatPanel({
   }, [messages, expanded]);
 
   function handleApplyClick(code: string) {
+    track("chat_code_applied", {} as Record<string, never>);
     if (skipConfirm) {
       onApplyCode(code);
       return;
@@ -54,6 +58,8 @@ export default function ChatPanel({
 
   async function send() {
     if (!input.trim() || loading) return;
+    track("chat_message_sent", { suggestion_used: usedSuggestionRef.current });
+    usedSuggestionRef.current = false;
     const userMsg: ChatMessage = { role: "user", content: input };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -178,6 +184,7 @@ export default function ChatPanel({
               className="chat-suggestion-chip"
               onClick={() => {
                 setInput(suggestion);
+                usedSuggestionRef.current = true;
                 inputRef.current?.focus();
               }}
             >
