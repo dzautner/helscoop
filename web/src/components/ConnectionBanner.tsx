@@ -94,7 +94,7 @@ export default function ConnectionBanner() {
         zIndex: 9999,
         padding: "8px 16px",
         background: isReconnected ? "var(--forest)" : "var(--amber)",
-        color: isReconnected ? "#fff" : "var(--bg-primary)",
+        color: isReconnected ? "var(--text-primary)" : "var(--bg-primary)",
         fontSize: 13,
         fontWeight: 500,
         textAlign: "center",

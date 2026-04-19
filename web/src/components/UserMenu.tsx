@@ -63,7 +63,7 @@ export default function UserMenu({ userName }: { userName: string }) {
               minWidth: 180,
               padding: "6px",
               zIndex: 100,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+              boxShadow: "var(--shadow-lg)",
             }}
           >
             <div
