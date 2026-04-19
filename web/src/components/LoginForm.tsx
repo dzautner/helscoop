@@ -75,112 +75,58 @@ export default function LoginForm({
       <div className="login-brand">
         <div style={{ position: "relative", zIndex: 1 }}>
           <div className="anim-up" style={{ marginBottom: 36 }}>
-            <h1 className="heading-display" style={{ fontSize: 44, lineHeight: 1.05, marginBottom: 16 }}>
-              <span style={{ color: "var(--text-primary)" }}>Hel</span>
-              <span style={{ color: "var(--amber)" }}>scoop</span>
+            <h1 className="heading-display brand-title">
+              <span>Hel</span><span className="brand-title-accent">scoop</span>
             </h1>
-            <p style={{ fontSize: 17, lineHeight: 1.65, color: "var(--text-secondary)", maxWidth: 380 }}>
+            <p className="brand-subtitle">
               {t('brand.description')}
             </p>
           </div>
 
           {addressSearch && (
             <div className="anim-up delay-1" style={{ marginBottom: 28 }}>
-              <div className="label-mono" style={{
-                marginBottom: 10,
-                letterSpacing: "0.08em",
-                color: "var(--text-muted)",
-                fontSize: 10,
-              }}>
+              <div className="label-mono brand-tagline" style={{ marginBottom: 10 }}>
                 {t('search.sectionLabel')}
               </div>
               {addressSearch}
             </div>
           )}
 
-          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 36 }}>
+          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", marginBottom: 36 }}>
             {features.map((item, i) => (
-              <div key={i} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                padding: "14px 0",
-                borderBottom: "1px solid var(--border)",
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "var(--radius-sm)",
-                  background: "var(--amber-glow)",
-                  border: "1px solid var(--amber-border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}>
+              <div key={i} className="brand-feature-item">
+                <div className="brand-feature-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d={item.icon} />
                   </svg>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 500, fontSize: 14, color: "var(--text-primary)" }}>
-                    <span style={{
-                      color: "var(--amber)",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      marginRight: 6,
-                      letterSpacing: "0.02em",
-                    }}>
-                      {item.num}
-                    </span>
+                  <div className="brand-feature-label">
+                    <span className="brand-feature-num">{item.num}</span>
                     {item.label}
                   </div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{item.desc}</div>
+                  <div className="brand-feature-desc">{item.desc}</div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Trust stats */}
-          <div className="anim-up delay-3" style={{
-            display: "flex",
-            gap: 24,
-            padding: "16px 0",
-            borderBottom: "1px solid var(--border)",
-            marginBottom: 16,
-          }}>
+          <div className="anim-up delay-3 brand-stats">
             {[
               { value: "1 200+", label: t('brand.trustProducts') || "Products" },
               { value: "6", label: t('brand.trustSuppliers') || "Suppliers" },
               { value: "100%", label: t('brand.trustFree') || "Free" },
             ].map((stat, i) => (
-              <div key={i} style={{ textAlign: "center", flex: 1 }}>
-                <div style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "var(--amber)",
-                  letterSpacing: "-0.02em",
-                }}>{stat.value}</div>
-                <div style={{
-                  fontSize: 10,
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.06em",
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  marginTop: 2,
-                }}>{stat.label}</div>
+              <div key={i} className="brand-stat">
+                <div className="brand-stat-value">{stat.value}</div>
+                <div className="brand-stat-label">{stat.label}</div>
               </div>
             ))}
           </div>
 
           <div className="anim-up delay-3">
-            <div className="label-mono" style={{
-              color: "var(--amber)",
-              letterSpacing: "0.08em",
-              fontSize: 10,
-            }}>
+            <div className="label-mono brand-tagline">
               {t('brand.tagline')}
             </div>
           </div>
