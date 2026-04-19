@@ -192,7 +192,7 @@ export default function ChatPanel({
                           {t('editor.applyToScene')}
                         </button>
                         <span className="chat-apply-hint">
-                          {countSceneObjects(code)} {countSceneObjects(code) === 1 ? "object" : "objects"}
+                          {countSceneObjects(code)} {countSceneObjects(code) === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
                         </span>
                       </div>
                     )}
