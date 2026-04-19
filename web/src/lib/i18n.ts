@@ -46,6 +46,9 @@ const translations = {
     },
     brand: {
       tagline: 'N\u00c4E TALOSI \u00b7 MUUTA \u00b7 RAKENNA',
+      trustProducts: 'Tuotetta',
+      trustSuppliers: 'Toimittajaa',
+      trustFree: 'Ilmainen',
       description: 'Parametrinen suunnittelutyokalu rakennusprojekteille. Reaaliaikaiset hinnat suoraan K-Raudasta ja Sarokkaasta.',
       featureMaterials: 'Materiaalia',
       featureMaterialsDesc: 'puu, eriste, katto, betoni',
@@ -391,6 +394,9 @@ const translations = {
     },
     brand: {
       tagline: 'SEE YOUR HOUSE \u00b7 CHANGE IT \u00b7 BUILD',
+      trustProducts: 'Products',
+      trustSuppliers: 'Suppliers',
+      trustFree: 'Free',
       description: 'Parametric design tool for building projects. Real-time prices from K-Rauta and Sarokas.',
       featureMaterials: 'Materials',
       featureMaterialsDesc: 'wood, insulation, roofing, concrete',

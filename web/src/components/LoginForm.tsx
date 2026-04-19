@@ -139,6 +139,39 @@ export default function LoginForm({
             ))}
           </div>
 
+          {/* Trust stats */}
+          <div className="anim-up delay-3" style={{
+            display: "flex",
+            gap: 24,
+            padding: "16px 0",
+            borderBottom: "1px solid var(--border)",
+            marginBottom: 16,
+          }}>
+            {[
+              { value: "1 200+", label: t('brand.trustProducts') || "Products" },
+              { value: "6", label: t('brand.trustSuppliers') || "Suppliers" },
+              { value: "100%", label: t('brand.trustFree') || "Free" },
+            ].map((stat, i) => (
+              <div key={i} style={{ textAlign: "center", flex: 1 }}>
+                <div style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "var(--amber)",
+                  letterSpacing: "-0.02em",
+                }}>{stat.value}</div>
+                <div style={{
+                  fontSize: 10,
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.06em",
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="anim-up delay-3">
             <div className="label-mono" style={{
               color: "var(--amber)",
