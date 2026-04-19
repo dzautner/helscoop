@@ -246,7 +246,7 @@ export default function SettingsPage() {
                 disabled={savingProfile}
                 style={{ padding: "11px 24px" }}
               >
-                {savingProfile ? t("auth.loading") : t("settings.saveProfile")}
+                {savingProfile ? <span className="btn-spinner" /> : t("settings.saveProfile")}
               </button>
             </div>
           </form>
@@ -333,7 +333,7 @@ export default function SettingsPage() {
                 style={{ padding: "11px 24px" }}
               >
                 {changingPassword
-                  ? t("auth.loading")
+                  ? <span className="btn-spinner" />
                   : t("settings.changePassword")}
               </button>
             </div>

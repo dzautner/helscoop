@@ -56,7 +56,7 @@ export default function EmailVerificationBanner({ emailVerified }: Props) {
             className="btn btn-ghost"
             style={{ fontSize: 12, padding: "4px 12px" }}
           >
-            {resending ? "..." : "Laheta uudelleen / Resend"}
+            {resending ? <span className="btn-spinner" /> : "Lähetä uudelleen / Resend"}
           </button>
         )}
         <button

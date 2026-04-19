@@ -171,7 +171,7 @@ function ResetPasswordForm() {
             letterSpacing: "0.02em",
           }}
         >
-          {loading ? t("auth.loading") : t("auth.resetPasswordSubmit")}
+          {loading ? <span className="btn-spinner" /> : t("auth.resetPasswordSubmit")}
         </button>
       </form>
 

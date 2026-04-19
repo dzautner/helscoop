@@ -133,7 +133,7 @@ export default function ForgotPasswordPage() {
                   letterSpacing: "0.02em",
                 }}
               >
-                {loading ? t("auth.loading") : t("auth.forgotPasswordSend")}
+                {loading ? <span className="btn-spinner" /> : t("auth.forgotPasswordSend")}
               </button>
             </form>
 

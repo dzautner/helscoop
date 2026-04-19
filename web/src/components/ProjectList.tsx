@@ -239,7 +239,7 @@ export default function ProjectList({
               disabled={creating || !newName.trim()}
               style={{ padding: "11px 24px" }}
             >
-              {creating ? "..." : t('project.create')}
+              {creating ? <span className="btn-spinner" /> : t('project.create')}
             </button>
           </div>
 

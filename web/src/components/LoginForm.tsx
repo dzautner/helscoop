@@ -323,7 +323,7 @@ export default function LoginForm({
                 letterSpacing: "0.02em",
               }}
             >
-              {loading ? t('auth.loading') : isRegister ? t('auth.register') : t('auth.login')}
+              {loading ? <span className="btn-spinner" /> : isRegister ? t('auth.register') : t('auth.login')}
             </button>
           </form>
 
