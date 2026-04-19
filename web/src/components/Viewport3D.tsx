@@ -11,6 +11,7 @@ interface Viewport3DProps {
   wireframe?: boolean;
   onObjectCount?: (count: number) => void;
   onError?: (error: string | null) => void;
+  onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
@@ -226,6 +227,7 @@ export default function Viewport3D({
   wireframe = false,
   onObjectCount,
   onError,
+  onWarnings,
   captureRef,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -402,6 +404,7 @@ export default function Viewport3D({
 
       // Interpret and render
       const result = interpretScene(script);
+      onWarnings?.(result.warnings);
 
       if (result.error) {
         onError?.(result.error);
@@ -421,7 +424,7 @@ export default function Viewport3D({
       const count = addSceneObjects(group, result.objects, wf);
       onObjectCount?.(count);
     },
-    [onObjectCount, onError]
+    [onObjectCount, onError, onWarnings]
   );
 
   // Debounced scene update

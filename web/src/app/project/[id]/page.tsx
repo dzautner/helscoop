@@ -21,6 +21,37 @@ import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import type { Material, BomItem, Project } from "@/types";
 
+/** Parse a validation warning key like "validation.typoDetected:scene" into
+ *  an i18n key and parameters, then resolve via the translation function. */
+function formatWarning(raw: string, t: (key: string, params?: Record<string, string | number>) => string): string {
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx === -1) return t(raw);
+  const key = raw.substring(0, colonIdx);
+  const rest = raw.substring(colonIdx + 1);
+
+  // Different keys use different param names
+  if (key === "validation.unmatchedCloser" || key === "validation.unmatchedOpener") {
+    const [char, line] = rest.split(":");
+    return t(key, { char, line });
+  }
+  if (key === "validation.typoDetected") {
+    return t(key, { name: rest });
+  }
+  if (key === "validation.undefinedIdentifier") {
+    return t(key, { name: rest });
+  }
+  if (key === "validation.tooManyObjects") {
+    return t(key, { count: rest });
+  }
+  if (key === "validation.farFromOrigin") {
+    return t(key, { distance: rest });
+  }
+  if (key === "validation.invalidDimension") {
+    return t(key, { geometry: rest });
+  }
+  return t(key);
+}
+
 function Viewport3DLoading() {
   const { t } = useTranslation();
   return (
@@ -92,6 +123,7 @@ export default function ProjectPage() {
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
   const [viewportKey, setViewportKey] = useState(0);
+  const [sceneWarnings, setSceneWarnings] = useState<string[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const historyRef = useRef<string[]>([]);
@@ -738,10 +770,59 @@ export default function ProjectPage() {
                 wireframe={wireframe}
                 onObjectCount={setObjectCount}
                 onError={setSceneError}
+                onWarnings={setSceneWarnings}
                 captureRef={captureThumbRef}
               />
             </ErrorBoundary>
           </div>
+
+          {/* Scene validation warnings */}
+          {sceneWarnings.length > 0 && (
+            <div
+              style={{
+                padding: "6px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 3,
+                flexShrink: 0,
+              }}
+            >
+              {sceneWarnings.map((w, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "5px 10px",
+                    background: "var(--amber-glow)",
+                    border: "1px solid var(--amber-border)",
+                    borderRadius: "var(--radius-sm)",
+                    fontSize: 12,
+                    color: "var(--amber)",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <span>{formatWarning(w, t)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Collapsible Code Editor */}
           {showCode && (
