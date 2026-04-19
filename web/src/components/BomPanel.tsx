@@ -909,28 +909,18 @@ export default function BomPanel({
         )}
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+      <div className="bom-list">
         {bom.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 20px" }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              margin: "0 auto 16px",
-              borderRadius: "var(--radius-md)",
-              background: "var(--amber-glow)",
-              border: "1px solid var(--amber-border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}>
+          <div className="bom-empty">
+            <div className="bom-empty-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </div>
-            <div style={{ color: "var(--text-secondary)", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+            <div className="bom-empty-title">
               {t('editor.noMaterials')}
             </div>
-            <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+            <div className="bom-empty-hint">
               {t('editor.noMaterialsHint')}
             </div>
           </div>
@@ -941,18 +931,18 @@ export default function BomPanel({
               className="bom-item-card"
               onClick={() => setCompareMaterial({ id: item.material_id, name: item.material_name || item.material_id })}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="bom-item-header">
+                <div className="bom-item-info">
                   {item.image_url ? (
                     <img
                       src={item.image_url}
                       alt={item.material_name || ""}
-                      style={{ width: 28, height: 28, borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
+                      className="bom-item-thumb"
                     />
                   ) : (
-                    <div style={{ width: 28, height: 28, borderRadius: 4, background: "var(--bg-elevated)", flexShrink: 0 }} />
+                    <div className="bom-item-thumb-placeholder" />
                   )}
-                  <strong style={{ fontSize: 13, fontWeight: 500 }}>{item.material_name}</strong>
+                  <strong className="bom-item-name">{item.material_name}</strong>
                 </div>
                 <button
                   className="bom-remove-btn"
@@ -964,7 +954,7 @@ export default function BomPanel({
                   </svg>
                 </button>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+              <div className="bom-item-qty-row">
                 <input
                   type="number"
                   min={0.01}
@@ -974,27 +964,17 @@ export default function BomPanel({
                   onChange={(e) =>
                     onUpdateQty(item.material_id, parseFloat(e.target.value) || 0)
                   }
-                  style={{
-                    width: 56,
-                    padding: "4px 6px",
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    fontSize: 12,
-                    color: "var(--text-primary)",
-                    outline: "none",
-                    fontFamily: "var(--font-mono)",
-                  }}
+                  className="bom-item-qty-input"
                 />
-                <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                <span className="bom-item-unit">
                   {item.unit} x {Number(item.unit_price || 0).toFixed(2)}
                 </span>
-                <span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--success)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                <span className="bom-item-total">
                   {Number(item.total || 0).toFixed(2)}
                 </span>
               </div>
               {item.supplier && (
-                <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                <div className="bom-item-supplier">
                   {item.supplier}
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
                     <polyline points="6 9 12 15 18 9" />
