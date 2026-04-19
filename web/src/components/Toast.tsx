@@ -87,8 +87,8 @@ export function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onD
         <div
           style={{
             padding: "8px 16px",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-strong)",
+            background: "var(--surface-3)",
+            border: "1px solid var(--border-medium)",
             borderRadius: "var(--radius-md)",
             color: "var(--text-muted)",
             fontSize: 12,
