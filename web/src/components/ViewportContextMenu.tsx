@@ -170,8 +170,8 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
                 background: item.active
                   ? "var(--amber-glow)"
                   : isHovered
-                  ? "var(--bg-hover)"
-                  : "var(--bg-elevated)",
+                  ? "var(--surface-4)"
+                  : "var(--surface-2)",
                 color: item.active ? "var(--amber)" : isHovered ? "var(--text-primary)" : "var(--text-secondary)",
                 cursor: "pointer",
                 display: "flex",
@@ -213,8 +213,8 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
                   fontFamily: "var(--font-body)",
                   fontWeight: 500,
                   color: "var(--text-primary)",
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border-strong)",
+                  background: "var(--surface-3)",
+                  border: "1px solid var(--border-medium)",
                   borderRadius: "var(--radius-sm)",
                   padding: "4px 8px",
                   boxShadow: "var(--shadow-md)",

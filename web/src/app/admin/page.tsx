@@ -154,7 +154,7 @@ function MaterialsTab() {
                             width: 36,
                             height: 36,
                             borderRadius: "var(--radius-sm)",
-                            background: "var(--bg-elevated)",
+                            background: "var(--surface-2)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",

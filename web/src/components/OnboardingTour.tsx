@@ -138,8 +138,8 @@ export function WelcomeModal({
     >
       <div
         style={{
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-strong)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-medium)",
           borderRadius: "var(--radius-lg)",
           padding: "40px 36px 32px",
           maxWidth: 440,
@@ -362,8 +362,8 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
           top: tooltipPos.top,
           left: tooltipPos.left,
           width: 320,
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-strong)",
+          background: "var(--surface-3)",
+          border: "1px solid var(--border-medium)",
           borderRadius: "var(--radius-md)",
           padding: "20px",
           boxShadow: "var(--shadow-lg)",

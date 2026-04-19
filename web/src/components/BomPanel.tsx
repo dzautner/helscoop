@@ -1320,8 +1320,8 @@ export default function BomPanel({
                         style={{
                           width: 52,
                           padding: "3px 6px",
-                          background: "var(--bg-elevated)",
-                          border: "1px solid var(--border)",
+                          background: "var(--surface-2)",
+                          border: "1px solid var(--border-subtle)",
                           borderRadius: "var(--radius-sm)",
                           fontSize: 12,
                           color: "var(--text-primary)",
