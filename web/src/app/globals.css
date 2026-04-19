@@ -2833,7 +2833,10 @@ select:focus {
 .lang-switch:focus-visible,
 .menu-item:focus-visible,
 .link-muted:focus-visible,
-.link-amber:focus-visible {
+.link-amber:focus-visible,
+.viewport-cam-btn:focus-visible,
+.viewport-toolbar-btn:focus-visible,
+.scene-params-section-toggle:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--amber-glow);
@@ -2841,6 +2844,19 @@ select:focus {
 
 .input:focus-visible {
   outline: none;
+}
+
+.scene-param-value:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--amber-glow);
+}
+
+.scene-param-slider:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 4px var(--amber-glow);
 }
 
 .btn-ghost:focus-visible {
