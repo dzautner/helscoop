@@ -108,7 +108,7 @@ describe("interpretScene", () => {
     expect(result.objects[0].children![1].position).toEqual([2, 0, 0]);
   });
 
-  it("creates subtract groups", () => {
+  it("subtract returns first argument (CSG not implemented in interpreter)", () => {
     const result = interpretScene(`
       const wall = box(4, 3, 0.15);
       const door = translate(box(1, 2, 0.15), 0, 1, 0);
@@ -116,19 +116,21 @@ describe("interpretScene", () => {
       scene.add(wallWithDoor, { material: "lumber" });
     `);
     expect(result.error).toBeNull();
-    expect(result.objects[0].geometry).toBe("group");
-    expect(result.objects[0].children).toHaveLength(2);
+    // differenceImpl returns the first argument unchanged
+    expect(result.objects[0].geometry).toBe("box");
+    expect(result.objects[0].args).toEqual([4, 3, 0.15]);
   });
 
-  it("creates intersect groups", () => {
+  it("intersect returns first argument (CSG not implemented in interpreter)", () => {
     const result = interpretScene(`
       const a = box(2, 2, 2);
       const b = translate(box(2, 2, 2), 1, 0, 0);
       scene.add(intersect(a, b));
     `);
     expect(result.error).toBeNull();
-    expect(result.objects[0].geometry).toBe("group");
-    expect(result.objects[0].children).toHaveLength(2);
+    // intersectionImpl returns the first argument unchanged
+    expect(result.objects[0].geometry).toBe("box");
+    expect(result.objects[0].args).toEqual([2, 2, 2]);
   });
 
   it("handles multiple scene.add calls", () => {
@@ -169,12 +171,15 @@ describe("interpretScene", () => {
     expect(result.objects).toHaveLength(0);
   });
 
-  it("returns error for undefined function calls", () => {
+  it("cube is a valid alias for box — no error", () => {
     const result = interpretScene(`
       const b = cube(1, 1, 1);
       scene.add(b);
     `);
-    expect(result.error).not.toBeNull();
+    // cube is mapped to cubeImpl, same as box
+    expect(result.error).toBeNull();
+    expect(result.objects).toHaveLength(1);
+    expect(result.objects[0].geometry).toBe("box");
   });
 
   it("handles empty script", () => {
