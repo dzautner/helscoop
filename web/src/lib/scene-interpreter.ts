@@ -182,13 +182,47 @@ function checkBalancedDelimiters(script: string): string[] {
   return warnings;
 }
 
+/** Strip single-line and block comments from script */
+function stripComments(script: string): string {
+  let result = "";
+  let inString: string | null = null;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < script.length; i++) {
+    const ch = script[i];
+    const next = script[i + 1];
+
+    if (inLineComment) {
+      if (ch === "\n") { inLineComment = false; result += ch; }
+      continue;
+    }
+    if (inBlockComment) {
+      if (ch === "*" && next === "/") { inBlockComment = false; i++; }
+      else if (ch === "\n") result += ch;
+      continue;
+    }
+    if (inString) {
+      result += ch;
+      if (ch === "\\") { result += next || ""; i++; continue; }
+      if (ch === inString) inString = null;
+      continue;
+    }
+    if (ch === "/" && next === "/") { inLineComment = true; i++; continue; }
+    if (ch === "/" && next === "*") { inBlockComment = true; i++; continue; }
+    if (ch === '"' || ch === "'" || ch === "`") { inString = ch; }
+    result += ch;
+  }
+  return result;
+}
+
 /** Common typos for scene API identifiers */
 const SCENE_TYPOS: [RegExp, string][] = [
   [/\bscnee\s*\./g, "scene"],
   [/\bscen\s*\./g, "scene"],
   [/\bscene\s*\.\s*ad\b/g, "scene.add"],
-  [/\bscene\s*\.\s*addd?\b/g, "scene.add"],
-  [/\bboxx?\s*\(/g, "box"],
+  [/\bscene\s*\.\s*addd\b/g, "scene.add"],
+  [/\bboxx\s*\(/g, "box"],
   [/\bcyliner\s*\(/g, "cylinder"],
   [/\bshere\s*\(/g, "sphere"],
   [/\btranslte\s*\(/g, "translate"],
@@ -196,12 +230,12 @@ const SCENE_TYPOS: [RegExp, string][] = [
 ];
 
 function checkTypos(script: string): string[] {
+  const stripped = stripComments(script);
   const warnings: string[] = [];
   for (const [pattern, correct] of SCENE_TYPOS) {
-    if (pattern.test(script)) {
+    if (pattern.test(stripped)) {
       warnings.push(`validation.typoDetected:${correct}`);
     }
-    // Reset lastIndex for global regexps
     pattern.lastIndex = 0;
   }
   return warnings;
@@ -223,19 +257,18 @@ const KNOWN_IDENTIFIERS = new Set([
 
 /** Warn about bare identifiers that look like they should be primitives */
 function checkUndefinedPrimitives(script: string): string[] {
+  const stripped = stripComments(script);
   const warnings: string[] = [];
-  // Match function-call-like identifiers: someWord(
-  const callPattern = /\b([a-zA-Z_]\w*)\s*\(/g;
+  const callPattern = /(?<!\.\s*)\b([a-zA-Z_]\w*)\s*\(/g;
   let match;
   const seen = new Set<string>();
-  while ((match = callPattern.exec(script)) !== null) {
+  while ((match = callPattern.exec(stripped)) !== null) {
     const name = match[1];
     if (!KNOWN_IDENTIFIERS.has(name) && !seen.has(name)) {
-      // Check if it's defined in the script (const/let/var/function)
       const defPattern = new RegExp(
         `(?:const|let|var|function)\\s+${name}\\b`
       );
-      if (!defPattern.test(script)) {
+      if (!defPattern.test(stripped)) {
         seen.add(name);
         warnings.push(`validation.undefinedIdentifier:${name}`);
       }
