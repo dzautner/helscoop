@@ -31,13 +31,13 @@ export default function FeatureHighlights() {
   const { ref: sectionRef, inView } = useInView(0.15);
 
   const features = locale === 'fi' ? [
-    { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D-malli osoitteesta", desc: "Syota kotiosoitteesi ja nae talosi kolmiulotteisena mallina hetkessa" },
-    { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Muuta puhumalla", desc: "Kuvaile muutos suomeksi — \"lisaa terassi taakse\" — AI toteuttaa" },
-    { icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6", title: "Automaattinen materiaaliluettelo", desc: "Reaaliaikaiset hinnat K-Raudasta ja Sarokkaasta, suoraan projektiisi" },
+    { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D-malli osoitteesta", desc: "Syota kotiosoitteesi ja nae talosi kolmiulotteisena mallina hetkessa. Malli luodaan automaattisesti rakennustietorekisterin datan perusteella.", hero: true },
+    { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Muuta puhumalla", desc: "Kuvaile muutos suomeksi — \"lisaa terassi taakse\" — AI toteuttaa", hero: false },
+    { icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6", title: "Automaattinen materiaaliluettelo", desc: "Reaaliaikaiset hinnat K-Raudasta ja Sarokkaasta, suoraan projektiisi", hero: false },
   ] : [
-    { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D model from address", desc: "Enter your home address and see your house as a 3D model instantly" },
-    { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Modify by chatting", desc: "Describe changes in plain language — \"add a terrace in the back\" — AI executes" },
-    { icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6", title: "Automatic bill of materials", desc: "Real-time prices from K-Rauta and Stark, directly in your project" },
+    { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D model from address", desc: "Enter your home address and see your house as a 3D model instantly. The model is generated automatically from building registry data.", hero: true },
+    { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Modify by chatting", desc: "Describe changes in plain language — \"add a terrace in the back\" — AI executes", hero: false },
+    { icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6", title: "Automatic bill of materials", desc: "Real-time prices from K-Rauta and Stark, directly in your project", hero: false },
   ];
 
   return (
@@ -62,11 +62,11 @@ export default function FeatureHighlights() {
         {features.map((f, i) => (
           <div
             key={i}
-            className="feature-card"
+            className={`feature-card${f.hero ? ' feature-card--hero' : ''}`}
             style={{
               opacity: inView ? 1 : 0,
               transform: inView ? 'translateY(0)' : 'translateY(24px)',
-              transition: `opacity 0.5s ease ${0.15 + i * 0.12}s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${0.15 + i * 0.12}s`,
+              transition: `opacity 0.5s ease ${f.hero ? 0.1 : 0.15 + i * 0.12}s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${f.hero ? 0.1 : 0.15 + i * 0.12}s`,
             }}
           >
             <div className="feature-card-step">{String(i + 1).padStart(2, '0')}</div>
