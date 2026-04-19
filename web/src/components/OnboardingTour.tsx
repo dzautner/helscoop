@@ -125,11 +125,11 @@ export function WelcomeModal({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 10001,
+        zIndex: 1200,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0,0,0,0.6)",
+        background: "var(--backdrop)",
         backdropFilter: "blur(4px)",
       }}
       onClick={(e) => {
@@ -273,7 +273,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
         width: targetRect.width + padding * 2,
         height: targetRect.height + padding * 2,
         borderRadius: "var(--radius-md)",
-        zIndex: 10002,
+        zIndex: 1201,
         pointerEvents: "none" as const,
         border: "1.5px solid var(--amber-border)",
         transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -343,7 +343,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 10001,
+          zIndex: 1200,
           pointerEvents: "auto",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -358,7 +358,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
         tabIndex={-1}
         style={{
           position: "fixed",
-          zIndex: 10003,
+          zIndex: 1202,
           top: tooltipPos.top,
           left: tooltipPos.left,
           width: 320,

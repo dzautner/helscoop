@@ -106,7 +106,7 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
         position: "fixed",
         left: adjustedX,
         top: adjustedY,
-        zIndex: 10001,
+        zIndex: 200,
         pointerEvents: "auto",
         transform: "translate(-50%, -50%)",
         outline: "none",

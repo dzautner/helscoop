@@ -21,6 +21,14 @@ export default function ProjectCard({
   return (
     <div
       className="card card-interactive anim-up project-card-grid"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(`/project/${project.id}`);
+        }
+      }}
       style={{
         animationDelay: `${index * 0.04}s`,
         padding: 0,

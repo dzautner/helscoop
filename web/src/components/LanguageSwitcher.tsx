@@ -8,6 +8,7 @@ export function LanguageSwitcher() {
   return (
     <button
       className="lang-switch"
+      aria-label="Switch language"
       onClick={() => setLocale(locale === "fi" ? "en" : "fi")}
     >
       <span style={{ opacity: locale === "fi" ? 1 : 0.4, transition: "opacity 0.15s ease" }}>FI</span>

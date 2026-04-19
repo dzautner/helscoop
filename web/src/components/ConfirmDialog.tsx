@@ -106,7 +106,7 @@ export default function ConfirmDialog({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
+        zIndex: 1000,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -122,7 +122,7 @@ export default function ConfirmDialog({
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(0, 0, 0, 0.6)",
+          background: "var(--backdrop)",
           backdropFilter: "blur(4px)",
         }}
       />
