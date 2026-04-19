@@ -945,10 +945,15 @@ export default function BomPanel({
 
       <div className="bom-list">
         {bom.length === 0 ? (
-          <div className="bom-empty">
+          <div className="bom-empty anim-up">
             <div className="bom-empty-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14" />
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="6" y="8" width="20" height="20" rx="2" />
+                <path d="M6 14h20" />
+                <rect x="10" y="18" width="5" height="4" rx="0.5" />
+                <rect x="17" y="18" width="5" height="4" rx="0.5" />
+                <rect x="10" y="24" width="5" height="2" rx="0.5" />
+                <path d="M13 8V5M19 8V5" />
               </svg>
             </div>
             <div className="bom-empty-title">
@@ -957,6 +962,18 @@ export default function BomPanel({
             <div className="bom-empty-hint">
               {t('editor.noMaterialsHint')}
             </div>
+            <button
+              className="bom-empty-cta"
+              onClick={() => {
+                const searchInput = document.querySelector<HTMLInputElement>('[placeholder="' + t('pricing.searchMaterials') + '"]');
+                if (searchInput) searchInput.focus();
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              {t('editor.noMaterialsCta')}
+            </button>
           </div>
         ) : (
           bom.map((item) => (
