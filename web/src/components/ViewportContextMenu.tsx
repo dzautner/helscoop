@@ -21,7 +21,7 @@ interface ViewportContextMenuProps {
 /** Radius of the radial menu ring in pixels */
 const RING_RADIUS = 72;
 /** Size of each action button */
-const BUTTON_SIZE = 40;
+const BUTTON_SIZE = 44;
 
 export default function ViewportContextMenu({ items, position, onClose }: ViewportContextMenuProps) {
   const [visible, setVisible] = useState(false);

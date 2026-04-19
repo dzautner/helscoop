@@ -67,7 +67,12 @@ export default function EmailVerificationBanner({ emailVerified }: Props) {
             color: "var(--text-muted)",
             cursor: "pointer",
             fontSize: 16,
-            padding: "0 4px",
+            minWidth: 44,
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
             lineHeight: 1,
           }}
           aria-label="Sulje / Dismiss"

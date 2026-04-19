@@ -17,14 +17,15 @@ function UserAvatar({ name, onClick }: { name: string; onClick?: () => void }) {
   return (
     <button
       onClick={onClick}
+      aria-label={`User menu for ${name}`}
       style={{
-        width: 32,
-        height: 32,
+        width: 44,
+        height: 44,
         borderRadius: "50%",
         background: "var(--amber-glow)",
         border: "1px solid var(--amber-border)",
         color: "var(--amber)",
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 700,
         fontFamily: "var(--font-mono)",
         display: "flex",
