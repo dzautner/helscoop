@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#111113",
+            background: "var(--bg-secondary)",
             borderRadius: "var(--radius-md)",
           }}
         >
@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 height: 48,
                 margin: "0 auto 16px",
                 borderRadius: "50%",
-                background: "rgba(239,68,68,0.1)",
+                background: "var(--danger-dim)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -68,7 +68,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 height="24"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#ef4444"
+                stroke="var(--danger)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </div>
             <h3
               style={{
-                color: "#fafafa",
+                color: "var(--text-primary)",
                 fontSize: 16,
                 fontWeight: 600,
                 marginBottom: 8,
@@ -90,7 +90,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </h3>
             <p
               style={{
-                color: "#52525b",
+                color: "var(--text-muted)",
                 fontSize: 13,
                 lineHeight: 1.5,
                 marginBottom: 20,

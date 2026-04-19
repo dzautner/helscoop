@@ -126,6 +126,7 @@ export default function ProjectPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("helscoop_bom_width");
@@ -738,21 +739,31 @@ export default function ProjectPage() {
           <button
             className="btn btn-ghost"
             data-tooltip={t('project.copy')}
+            disabled={duplicating}
             onClick={async () => {
+              setDuplicating(true);
               try {
                 const dup = await api.duplicateProject(projectId);
                 toast(t('toast.projectDuplicated'), "success");
                 router.push(`/project/${dup.id}`);
               } catch (err) {
                 toast(err instanceof Error ? err.message : t('toast.duplicateFailed'), "error");
+              } finally {
+                setDuplicating(false);
               }
             }}
             style={{ padding: "5px 7px" }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
+            {duplicating ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
           </button>
           <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
           <button

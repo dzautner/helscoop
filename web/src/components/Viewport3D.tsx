@@ -299,7 +299,7 @@ export default function Viewport3D({
 
     // Camera — default to Iso preset
     const aspect = container.clientWidth / container.clientHeight;
-    const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 500);
     camera.position.set(5, 4, 5);
     camera.lookAt(0, 1.5, 0);
     cameraRef.current = camera;
@@ -325,7 +325,7 @@ export default function Viewport3D({
     controls.dampingFactor = 0.08;
     controls.target.set(0, 1.5, 0);
     controls.minDistance = 2;
-    controls.maxDistance = 50;
+    controls.maxDistance = 200;
     controls.maxPolarAngle = Math.PI * 0.85;
     controls.update();
     controlsRef.current = controls;
@@ -345,10 +345,10 @@ export default function Viewport3D({
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.camera.near = 0.5;
     dirLight.shadow.camera.far = 30;
-    dirLight.shadow.camera.left = -10;
-    dirLight.shadow.camera.right = 10;
-    dirLight.shadow.camera.top = 10;
-    dirLight.shadow.camera.bottom = -10;
+    dirLight.shadow.camera.left = -30;
+    dirLight.shadow.camera.right = 30;
+    dirLight.shadow.camera.top = 30;
+    dirLight.shadow.camera.bottom = -30;
     dirLight.shadow.bias = -0.001;
     scene.add(dirLight);
 
@@ -364,10 +364,10 @@ export default function Viewport3D({
     scene.add(gridHelper);
 
     // Depth fog
-    scene.fog = new THREE.Fog(0x1a1d22, 15, 45);
+    scene.fog = new THREE.Fog(0x1a1d22, 30, 120);
 
     // Ground plane (receives shadows)
-    const groundGeom = new THREE.PlaneGeometry(40, 40);
+    const groundGeom = new THREE.PlaneGeometry(100, 100);
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x1f1e1c,
       roughness: 0.92,
@@ -420,27 +420,25 @@ export default function Viewport3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const hasAutoFitRef = useRef(false);
+
   // Update scene objects when sceneJs or wireframe changes
   const updateScene = useCallback(
     (script: string, wf: boolean) => {
       const group = objectGroupRef.current;
       if (!group) return;
 
-      // Recursively dispose all geometries and materials (including nested groups)
-      // to prevent GPU memory leaks during prolonged editing sessions
       while (group.children.length > 0) {
         const child = group.children[0];
         disposeObject(child);
         group.remove(child);
       }
 
-      // Interpret and render
       const result = interpretScene(script);
       onWarnings?.(result.warnings);
 
       if (result.error) {
         onError?.(result.error);
-        // On error, try rendering last valid scene
         if (script !== lastValidSceneRef.current) {
           const fallback = interpretScene(lastValidSceneRef.current);
           if (!fallback.error) {
@@ -455,6 +453,30 @@ export default function Viewport3D({
       onError?.(null);
       const count = addSceneObjects(group, result.objects, wf);
       onObjectCount?.(count);
+
+      // Auto-fit camera on first load when scene has many objects
+      if (!hasAutoFitRef.current && count > 10) {
+        hasAutoFitRef.current = true;
+        const camera = cameraRef.current;
+        const controls = controlsRef.current;
+        if (camera && controls) {
+          const box = new THREE.Box3().setFromObject(group);
+          if (!box.isEmpty()) {
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.4;
+            const newPos: [number, number, number] = [
+              center.x + dist * 0.5,
+              center.y + dist * 0.4,
+              center.z + dist * 0.5,
+            ];
+            const newTarget: [number, number, number] = [center.x, center.y, center.z];
+            animateCamera(camera, controls, newPos, newTarget, 600);
+          }
+        }
+      }
     },
     [onObjectCount, onError, onWarnings]
   );

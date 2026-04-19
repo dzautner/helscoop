@@ -205,7 +205,7 @@ export default function SceneEditor({
             flexShrink: 0,
             overflow: "hidden",
             textAlign: "right",
-            color: "#3f3f46",
+            color: "var(--text-muted)",
             userSelect: "none",
             borderRight: "1px solid var(--border)",
             minWidth: 52,
@@ -216,7 +216,7 @@ export default function SceneEditor({
               key={i}
               style={{
                 height: "22.1px",
-                ...(i === cursorLine ? { color: "#71717a" } : {}),
+                ...(i === cursorLine ? { color: "var(--text-secondary)" } : {}),
               }}
             >
               {i + 1}
@@ -284,7 +284,7 @@ export default function SceneEditor({
               resize: "none",
               background: "transparent",
               color: "transparent",
-              caretColor: "#cdd6f4",
+              caretColor: "var(--text-primary)",
               outline: "none",
               zIndex: 2,
               overflow: "auto",

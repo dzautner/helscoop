@@ -414,7 +414,7 @@ const KNOWN_IDENTIFIERS = new Set([
   "box", "cube", "cylinder", "sphere",
   "translate", "rotate", "scale",
   "union", "difference", "intersection", "subtract", "intersect",
-  "withColor", "withPBR", "withMaterial",
+  "withColor", "withPBR", "withMaterial", "Wall", "hull",
   "scene",
   "Math", "console", "const", "let", "var", "for", "if", "else",
   "while", "do", "return", "function", "true", "false", "null",
@@ -426,7 +426,9 @@ const KNOWN_IDENTIFIERS = new Set([
 ]);
 
 function checkUndefinedPrimitives(script: string): string[] {
-  const stripped = stripComments(script);
+  let stripped = stripComments(script);
+  // Mask string contents to avoid matching identifiers inside string literals
+  stripped = stripped.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
   const warnings: string[] = [];
   const callPattern = /(?<!\.\s*)\b([a-zA-Z_]\w*)\s*\(/g;
   let match;
