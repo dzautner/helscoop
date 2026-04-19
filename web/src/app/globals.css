@@ -656,6 +656,10 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes toast-spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes breathe {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.7; }
