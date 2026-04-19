@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const API_URL = "http://localhost:3051";
+const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
 test.describe("Authentication", () => {
   const testPassword = "testpass123";
@@ -38,6 +38,9 @@ test.describe("Authentication", () => {
     await page.getByPlaceholder(/matti meikalainen|john smith/i).fill("E2E Auth Test");
     await page.locator('input[type="email"]').fill(testEmail);
     await page.locator('input[type="password"]').fill(testPassword);
+
+    // Accept terms
+    await page.locator('input[type="checkbox"]').check({ force: true });
 
     // Submit
     await page.getByRole("button", { name: /luo tili|create account/i }).click({ force: true });

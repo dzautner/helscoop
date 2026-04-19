@@ -114,7 +114,7 @@ export default function AddressSearch({
   if (compact) {
     return (
       <div>
-        <div className="address-search-bar" style={{ maxWidth: "none" }}>
+        <div className="address-search-bar" data-tour="address-input" style={{ maxWidth: "none" }}>
           <input
             className="input"
             placeholder={t('search.placeholder')}

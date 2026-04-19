@@ -6,6 +6,8 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import HeroIllustration from "@/components/HeroIllustration";
+import TrustLayer from "@/components/TrustLayer";
 import type { BuildingResult } from "@/types";
 
 export default function LoginForm({
@@ -73,6 +75,7 @@ export default function LoginForm({
     <div className="login-grid">
       {/* Left: Brand panel */}
       <div className="login-brand">
+        <HeroIllustration />
         <div style={{ position: "relative", zIndex: 1 }}>
           <div className="anim-up" style={{ marginBottom: 36 }}>
             <h1 className="heading-display brand-title">
@@ -111,18 +114,8 @@ export default function LoginForm({
             ))}
           </div>
 
-          {/* Trust stats */}
-          <div className="anim-up delay-3 brand-stats">
-            {[
-              { value: "1 200+", label: t('brand.trustProducts') || "Products" },
-              { value: "6", label: t('brand.trustSuppliers') || "Suppliers" },
-              { value: "100%", label: t('brand.trustFree') || "Free" },
-            ].map((stat, i) => (
-              <div key={i} className="brand-stat">
-                <div className="brand-stat-value">{stat.value}</div>
-                <div className="brand-stat-label">{stat.label}</div>
-              </div>
-            ))}
+          <div className="anim-up delay-3">
+            <TrustLayer />
           </div>
 
           <div className="anim-up delay-3">

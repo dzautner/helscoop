@@ -15,34 +15,27 @@ export default function FeatureHighlights() {
   ];
 
   return (
-    <section style={{
-      padding: "40px 24px",
-      borderBottom: "1px solid var(--border)",
-    }}>
+    <section className="feature-section">
       <h2 className="sr-only">{locale === 'fi' ? 'Ominaisuudet' : 'Features'}</h2>
-      <div className="feature-grid" style={{
-        maxWidth: 960,
-        margin: "0 auto",
-      }}>
+      <div className="feature-section-header anim-up">
+        <span className="label-mono" style={{ color: "var(--amber)", marginBottom: 8, display: "block" }}>
+          {locale === 'fi' ? 'MITEN SE TOIMII' : 'HOW IT WORKS'}
+        </span>
+        <h3 style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+          {locale === 'fi' ? 'Kolme askelta remonttiin' : 'Three steps to your renovation'}
+        </h3>
+      </div>
+      <div className="feature-grid">
         {features.map((f, i) => (
-          <div key={i} className="anim-up" style={{ animationDelay: `${i * 0.1}s`, textAlign: "center" }}>
-            <div style={{
-              width: 44,
-              height: 44,
-              borderRadius: 8,
-              background: "var(--bg-tertiary)",
-              border: "1px solid var(--border)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 14,
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
+          <div key={i} className="feature-card anim-up" style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+            <div className="feature-card-step">{String(i + 1).padStart(2, '0')}</div>
+            <div className="feature-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
                 <path d={f.icon} />
               </svg>
             </div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{f.title}</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5 }}>{f.desc}</p>
+            <h3 className="feature-card-title">{f.title}</h3>
+            <p className="feature-card-desc">{f.desc}</p>
           </div>
         ))}
       </div>

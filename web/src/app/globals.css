@@ -963,14 +963,16 @@ select:focus {
 }
 
 .brand-title {
-  font-size: 44px;
+  font-size: 48px;
   line-height: 1.05;
   margin-bottom: 16px;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .brand-title-accent {
   color: var(--amber);
+  text-shadow: 0 0 40px rgba(229, 160, 75, 0.3), 0 0 80px rgba(229, 160, 75, 0.1);
 }
 
 .brand-subtitle {
@@ -1012,6 +1014,87 @@ select:focus {
   -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 100%, black, transparent);
   pointer-events: none;
 }
+
+/* Hero blueprint illustration */
+.hero-illustration {
+  position: absolute;
+  right: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 420px;
+  height: 360px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.hero-blueprint-svg {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes blueprintDraw {
+  from { stroke-dashoffset: var(--dash-len); opacity: 0; }
+  10% { opacity: 1; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes blueprintDotReveal {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes blueprintTextReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bp-line {
+  stroke: var(--amber);
+  stroke-width: 1;
+  stroke-opacity: 0.18;
+  fill: none;
+  --dash-len: 800;
+  stroke-dasharray: var(--dash-len);
+  stroke-dashoffset: var(--dash-len);
+  animation: blueprintDraw 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.bp-dim {
+  stroke: var(--amber);
+  stroke-width: 0.5;
+  stroke-opacity: 0.12;
+  fill: none;
+  stroke-dasharray: 3 3;
+  --dash-len: 400;
+  stroke-dashoffset: var(--dash-len);
+  animation: blueprintDraw 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.bp-dot {
+  fill: var(--amber);
+  opacity: 0;
+  transform-origin: center;
+  animation: blueprintDotReveal 0.4s ease forwards;
+}
+
+.bp-text {
+  fill: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  fill-opacity: 0.15;
+  animation: blueprintTextReveal 0.8s ease forwards;
+}
+
+.bp-delay-1 { animation-delay: 0.3s; }
+.bp-delay-2 { animation-delay: 0.8s; }
+.bp-delay-3 { animation-delay: 1.3s; }
+.bp-delay-4 { animation-delay: 1.7s; }
+.bp-delay-5 { animation-delay: 2.1s; }
+.bp-delay-6 { animation-delay: 2.6s; }
 
 .login-brand .address-search-bar {
   max-width: none;
@@ -1090,10 +1173,11 @@ select:focus {
 
 .brand-stat-value {
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--amber);
   letter-spacing: -0.02em;
+  text-shadow: 0 0 20px rgba(229, 160, 75, 0.2);
 }
 
 .brand-stat-label {
@@ -1109,6 +1193,107 @@ select:focus {
   color: var(--amber);
   letter-spacing: 0.08em;
   font-size: 10px;
+}
+
+/* Trust layer */
+.trust-layer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.trust-partners {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trust-partners-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.trust-logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.trust-logo {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.trust-logo:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+
+.trust-stats-bar {
+  display: flex;
+  gap: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.trust-stat {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border);
+}
+
+.trust-stat:last-child {
+  border-right: none;
+}
+
+.trust-stat-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--amber);
+  letter-spacing: -0.02em;
+  display: block;
+}
+
+.trust-stat-label {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+  display: block;
+}
+
+.trust-proof {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--forest-dim);
+  border: 1px solid rgba(74, 124, 89, 0.15);
+}
+
+.trust-proof-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .login-form-panel {
@@ -1867,10 +2052,79 @@ select:focus {
 }
 
 /* Feature highlights grid */
+.feature-section {
+  padding: 48px 24px 40px;
+  border-bottom: 1px solid var(--border);
+}
+
+.feature-section-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.feature-card {
+  position: relative;
+  padding: 28px 24px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.feature-card:hover {
+  border-color: var(--amber-border);
+  box-shadow: 0 0 24px rgba(229, 160, 75, 0.06), 0 4px 16px rgba(0,0,0,0.2);
+  transform: translateY(-2px);
+}
+
+.feature-card-step {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--amber);
+  opacity: 0.4;
+  letter-spacing: 0.04em;
+}
+
+.feature-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--amber-glow);
+  border: 1px solid var(--amber-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  transition: box-shadow 0.2s ease;
+}
+
+.feature-card:hover .feature-card-icon {
+  box-shadow: 0 0 12px rgba(229, 160, 75, 0.15);
+}
+
+.feature-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.feature-card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
 }
 
 /* Settings */
@@ -1889,6 +2143,10 @@ select:focus {
   .login-brand {
     padding: 32px 20px;
     min-height: auto;
+  }
+
+  .hero-illustration {
+    display: none;
   }
 
   .login-form-panel {
