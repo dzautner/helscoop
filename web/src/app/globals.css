@@ -1711,7 +1711,7 @@ select:focus {
 
 .chat-input-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   padding: 10px 14px;
   background: rgba(24, 24, 27, 0.55);
@@ -1753,8 +1753,12 @@ select:focus {
   background: transparent;
   color: var(--text-primary);
   font-size: 13px;
+  line-height: 1.4;
   outline: none;
   font-family: inherit;
+  resize: none;
+  max-height: 96px;
+  overflow-y: auto;
 }
 .chat-input::placeholder {
   color: var(--text-muted);

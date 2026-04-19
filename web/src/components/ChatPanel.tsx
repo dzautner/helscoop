@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -47,7 +47,7 @@ export default function ChatPanel({
   const [expanded, setExpanded] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const usedSuggestionRef = useRef(false);
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -64,6 +64,17 @@ export default function ChatPanel({
       setExpanded(true);
     }
   }, [messages, expanded]);
+
+  const autoResizeTextarea = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 96) + "px"; // ~4 lines max
+  }, []);
+
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [input, autoResizeTextarea]);
 
   function handleApplyClick(code: string) {
     track("chat_code_applied", {} as Record<string, never>);
@@ -89,6 +100,7 @@ export default function ChatPanel({
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     setLoading(true);
 
     try {
@@ -253,12 +265,21 @@ export default function ChatPanel({
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-        <input
+        <textarea
           ref={inputRef}
           className="chat-input"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+          rows={1}
+          onChange={(e) => {
+            setInput(e.target.value);
+            autoResizeTextarea();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
           onFocus={() => setInputFocused(true)}
           onBlur={() => setInputFocused(false)}
           placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.describeChange')}
