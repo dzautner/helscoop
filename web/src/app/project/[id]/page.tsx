@@ -808,6 +808,7 @@ export default function ProjectPage() {
                 onError={setSceneError}
                 onWarnings={setSceneWarnings}
                 captureRef={captureThumbRef}
+                onToggleWireframe={() => setWireframe(!wireframe)}
               />
             </ErrorBoundary>
           </div>

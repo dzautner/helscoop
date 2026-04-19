@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
 import { useTranslation } from "@/components/LocaleProvider";
+import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
 
 interface Viewport3DProps {
   sceneJs: string;
@@ -13,6 +14,8 @@ interface Viewport3DProps {
   onError?: (error: string | null) => void;
   onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
+  /** Callback to toggle wireframe from context menu */
+  onToggleWireframe?: () => void;
 }
 
 interface CameraPreset {
@@ -229,6 +232,7 @@ export default function Viewport3D({
   onError,
   onWarnings,
   captureRef,
+  onToggleWireframe,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -238,6 +242,8 @@ export default function Viewport3D({
   const objectGroupRef = useRef<THREE.Group | null>(null);
   const animFrameRef = useRef<number>(0);
   const lastValidSceneRef = useRef<string>(sceneJs);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const { t } = useTranslation();
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -475,9 +481,113 @@ export default function Viewport3D({
     };
   }, [captureRef]);
 
+  // Right-click context menu handler
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuPos(null);
+  }, []);
+
+  // Screenshot handler for context menu
+  const handleScreenshot = useCallback(() => {
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!renderer || !scene || !camera) return;
+    renderer.render(scene, camera);
+    const canvas = renderer.domElement;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = canvas.width;
+    offscreen.height = canvas.height;
+    const ctx = offscreen.getContext("2d")!;
+    ctx.drawImage(canvas, 0, 0);
+    const fontSize = Math.max(12, Math.round(canvas.height * 0.018));
+    ctx.font = `${fontSize}px "SF Mono", "Fira Code", "Cascadia Code", monospace`;
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("helscoop.fi", canvas.width - fontSize, canvas.height - fontSize * 0.6);
+    const link = document.createElement("a");
+    link.download = "helscoop-screenshot.png";
+    link.href = offscreen.toDataURL("image/png");
+    link.click();
+  }, []);
+
+  // Build context menu items
+  const contextMenuItems: ContextMenuItem[] = [
+    {
+      id: "camera-front",
+      label: t("editor.cameraFront"),
+      icon: "M3 12h18M12 3v18",
+      onClick: () => {
+        const camera = cameraRef.current;
+        const controls = controlsRef.current;
+        if (camera && controls) animateCamera(camera, controls, [0, 2, 8], [0, 1.5, 0]);
+      },
+    },
+    {
+      id: "camera-side",
+      label: t("editor.cameraSide"),
+      icon: "M12 3v18M21 12H3",
+      onClick: () => {
+        const camera = cameraRef.current;
+        const controls = controlsRef.current;
+        if (camera && controls) animateCamera(camera, controls, [8, 2, 0], [0, 1.5, 0]);
+      },
+    },
+    {
+      id: "camera-top",
+      label: t("editor.cameraTop"),
+      icon: "M12 5v14M5 12h14M7.5 7.5l9 9M16.5 7.5l-9 9",
+      onClick: () => {
+        const camera = cameraRef.current;
+        const controls = controlsRef.current;
+        if (camera && controls) animateCamera(camera, controls, [0, 10, 0.01], [0, 0, 0]);
+      },
+    },
+    {
+      id: "camera-iso",
+      label: t("editor.cameraIso"),
+      icon: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
+      onClick: () => {
+        const camera = cameraRef.current;
+        const controls = controlsRef.current;
+        if (camera && controls) animateCamera(camera, controls, [5, 4, 5], [0, 1.5, 0]);
+      },
+    },
+    {
+      id: "wireframe",
+      label: t("editor.wireframe"),
+      icon: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z",
+      active: wireframe,
+      onClick: () => { onToggleWireframe?.(); },
+    },
+    {
+      id: "screenshot",
+      label: t("editor.screenshot"),
+      icon: "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+      onClick: handleScreenshot,
+    },
+    {
+      id: "reset-camera",
+      label: t("editor.resetCamera"),
+      icon: "M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15",
+      onClick: () => {
+        const camera = cameraRef.current;
+        const controls = controlsRef.current;
+        if (camera && controls) animateCamera(camera, controls, [5, 4, 5], [0, 1.5, 0]);
+      },
+    },
+  ];
+
   return (
     <div
       ref={containerRef}
+      onContextMenu={handleContextMenu}
       style={{
         width: "100%",
         height: "100%",
@@ -493,6 +603,11 @@ export default function Viewport3D({
         controlsRef={controlsRef}
         rendererRef={rendererRef}
         sceneRef={sceneRef}
+      />
+      <ViewportContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={closeContextMenu}
       />
     </div>
   );
