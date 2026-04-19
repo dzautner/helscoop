@@ -1,3 +1,16 @@
+export interface BuildingInfo {
+  address?: string;
+  type?: string;
+  year_built?: number;
+  material?: string;
+  floors?: number;
+  area_m2?: number;
+  heating?: string;
+  roof_type?: string;
+  roof_material?: string;
+  units?: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -8,6 +21,7 @@ export interface Project {
   scene_js?: string | null;
   display_scale?: number;
   thumbnail_url?: string | null;
+  building_info?: BuildingInfo | null;
   bom?: BomItem[];
 }
 

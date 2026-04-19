@@ -759,7 +759,14 @@ export default function ProjectPage() {
           )}
 
           {/* Embedded AI assistant */}
-          <ChatPanel sceneJs={sceneJs} onApplyCode={handleApplyCode} />
+          <ChatPanel
+            sceneJs={sceneJs}
+            onApplyCode={handleApplyCode}
+            bom={bom}
+            projectName={projectName}
+            projectDescription={projectDesc}
+            buildingInfo={project?.building_info ?? undefined}
+          />
         </div>
 
         {/* Resize handle + BOM panel */}

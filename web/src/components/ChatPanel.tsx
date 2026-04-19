@@ -6,14 +6,32 @@ import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, BomItem } from "@/types";
+
+interface ChatContextBuildingInfo {
+  address?: string;
+  type?: string;
+  year_built?: number;
+  area_m2?: number;
+  floors?: number;
+  material?: string;
+  heating?: string;
+}
 
 export default function ChatPanel({
   sceneJs,
   onApplyCode,
+  bom,
+  projectName,
+  projectDescription,
+  buildingInfo,
 }: {
   sceneJs: string;
   onApplyCode: (code: string) => void;
+  bom?: BomItem[];
+  projectName?: string;
+  projectDescription?: string;
+  buildingInfo?: ChatContextBuildingInfo;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -67,7 +85,17 @@ export default function ChatPanel({
     setLoading(true);
 
     try {
-      const reply = await api.chat(newMessages, sceneJs);
+      const bomSummary = bom?.map((item) => ({
+        material: item.material_name || item.material_id,
+        qty: item.quantity,
+        unit: item.unit,
+        total: item.total || (item.unit_price || 0) * item.quantity,
+      }));
+      const reply = await api.chat(newMessages, sceneJs, {
+        bomSummary,
+        buildingInfo,
+        projectInfo: { name: projectName, description: projectDescription },
+      });
       setMessages([...newMessages, reply]);
     } catch (err) {
       toast(err instanceof Error ? err.message : t('toast.aiError'), "error");
