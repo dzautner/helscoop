@@ -1862,12 +1862,42 @@ select:focus {
   gap: 20px;
 }
 
-/* Feature highlights grid */
+/* Feature highlights grid (legacy) */
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 }
+
+/* Bento grid feature showcase */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "model ai bom"
+    "export export share";
+  gap: 16px;
+}
+
+.bento-card {
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bento-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-subtle);
+}
+
+.bento-model { grid-area: model; }
+.bento-ai { grid-area: ai; }
+.bento-bom { grid-area: bom; }
+.bento-export { grid-area: export; }
+.bento-share { grid-area: share; }
 
 /* Settings */
 .settings-card {
@@ -1987,6 +2017,21 @@ select:focus {
   .feature-grid {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  .bento-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "model"
+      "ai"
+      "bom"
+      "export"
+      "share";
+    gap: 12px;
+  }
+
+  .bento-card {
+    padding: 18px;
   }
 
   .settings-card {
