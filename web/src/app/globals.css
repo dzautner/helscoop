@@ -58,6 +58,17 @@
 
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;
+
+  /* ── Z-index scale ─────────────────────────────────────────────── */
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-toast: 1100;
+  --z-onboarding: 1200;
+
+  /* ── Backdrop ──────────────────────────────────────────────────── */
+  --backdrop: rgba(0, 0, 0, 0.6);
 }
 
 /* ── Reduced-contrast mode for late-night sessions ────────────────── */
@@ -110,6 +121,8 @@
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
   --shadow-amber: 0 0 16px rgba(180,83,9,0.06);
   --shadow-sm: var(--shadow-subtle);
+
+  --backdrop: rgba(0, 0, 0, 0.6);
 }
 
 /* Light theme component overrides */

@@ -51,7 +51,7 @@ export default function UserMenu({ userName }: { userName: string }) {
         <>
           {/* Backdrop to close menu */}
           <div
-            style={{ position: "fixed", inset: 0, zIndex: 99 }}
+            style={{ position: "fixed", inset: 0, zIndex: 100 }}
             onClick={() => setOpen(false)}
           />
           <div
@@ -62,7 +62,7 @@ export default function UserMenu({ userName }: { userName: string }) {
               top: "calc(100% + 8px)",
               minWidth: 180,
               padding: "6px",
-              zIndex: 100,
+              zIndex: 200,
               boxShadow: "var(--shadow-lg)",
             }}
           >

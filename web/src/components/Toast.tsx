@@ -75,7 +75,7 @@ export function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onD
         position: "fixed",
         bottom: 24,
         right: 24,
-        zIndex: 10000,
+        zIndex: 1100,
         display: "flex",
         flexDirection: "column-reverse",
         gap: 8,
