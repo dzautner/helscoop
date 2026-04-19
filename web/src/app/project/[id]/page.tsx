@@ -10,7 +10,9 @@ import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
+import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
+import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
@@ -115,6 +117,7 @@ export default function ProjectPage() {
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+  const [showParams, setShowParams] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -313,6 +316,19 @@ export default function ProjectPage() {
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   }, [bomWidth]);
+
+  const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
+
+  const handleParamChange = useCallback(
+    (name: string, value: number) => {
+      setSceneJs((prev) => {
+        const updated = applyParamToScript(prev, name, value);
+        pushHistory(updated);
+        return updated;
+      });
+    },
+    [pushHistory]
+  );
 
   const handleSceneChange = useCallback(
     (code: string) => {
@@ -921,6 +937,23 @@ export default function ProjectPage() {
               </svg>
               {t('editor.docs') || "Docs"}
             </button>
+            {sceneParams.length > 0 && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showParams}
+                onClick={() => setShowParams(!showParams)}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="21" x2="4" y2="14" />
+                  <line x1="4" y1="10" x2="4" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12" y2="3" />
+                  <line x1="20" y1="21" x2="20" y2="16" />
+                  <line x1="20" y1="12" x2="20" y2="3" />
+                </svg>
+                Params
+              </button>
+            )}
             <div style={{ flex: 1 }} />
             <span className="viewport-status" data-error={!!sceneError}>
               {sceneError
@@ -1114,6 +1147,14 @@ export default function ProjectPage() {
             buildingInfo={project?.building_info ?? undefined}
           />
         </div>
+
+        {/* Scene parameters panel */}
+        {showParams && sceneParams.length > 0 && (
+          <SceneParamsPanel
+            params={sceneParams}
+            onParamChange={handleParamChange}
+          />
+        )}
 
         {/* Resize handle + BOM panel */}
         {showBom && (

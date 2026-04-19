@@ -366,6 +366,49 @@ function meshToSceneObject(
   };
 }
 
+export interface SceneParam {
+  name: string;
+  section: string;
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  step: number;
+}
+
+const PARAM_REGEX = /\/\/\s*@param\s+(\w+)\s+"([^"]+)"\s+(.+?)\s+\((\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\)/;
+const VALUE_REGEX = (name: string) =>
+  new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*(-?[\\d.]+)`);
+
+export function parseSceneParams(script: string): SceneParam[] {
+  const params: SceneParam[] = [];
+  const lines = script.split("\n");
+  for (const line of lines) {
+    const m = PARAM_REGEX.exec(line);
+    if (!m) continue;
+    const [, name, section, label, minStr, maxStr] = m;
+    const min = parseFloat(minStr);
+    const max = parseFloat(maxStr);
+    const valMatch = VALUE_REGEX(name).exec(script);
+    const value = valMatch ? parseFloat(valMatch[1]) : min;
+    const range = max - min;
+    const step = range <= 1 ? 1 : range <= 100 ? 1 : range <= 1000 ? 5 : 10;
+    params.push({ name, section, label, min, max, value, step });
+  }
+  return params;
+}
+
+export function applyParamToScript(
+  script: string,
+  paramName: string,
+  newValue: number
+): string {
+  const re = new RegExp(
+    `((?:const|let|var)\\s+${paramName}\\s*=\\s*)(-?[\\d.]+)`
+  );
+  return script.replace(re, `$1${newValue}`);
+}
+
 export function interpretScene(script: string): InterpreterResult {
   const warnings: string[] = [];
 
