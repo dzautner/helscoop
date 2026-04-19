@@ -113,6 +113,7 @@ export default function ProjectPage() {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const previousNameRef = useRef("");
   const [projectDesc, setProjectDesc] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
@@ -188,6 +189,7 @@ export default function ProjectPage() {
       .then(([proj, mats]) => {
         setProject(proj);
         setProjectName(proj.name);
+        previousNameRef.current = proj.name;
         setProjectDesc(proj.description || "");
         if (proj.share_token) setShareToken(proj.share_token);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
@@ -693,12 +695,31 @@ export default function ProjectPage() {
           </svg>
         </button>
         <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
-        <input
-          className="editor-header-name"
-          value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
-          title={projectName}
-        />
+        <div className="editor-header-name-wrapper">
+          <input
+            className="editor-header-name"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            onBlur={() => {
+              const trimmed = projectName.trim();
+              if (trimmed.length === 0) {
+                setProjectName(previousNameRef.current);
+              } else {
+                previousNameRef.current = trimmed;
+              }
+            }}
+            maxLength={100}
+            title={projectName}
+          />
+          {projectName.length > 80 && (
+            <span
+              className="editor-header-name-count"
+              data-near-limit={projectName.length >= 95}
+            >
+              {projectName.length}/100
+            </span>
+          )}
+        </div>
         <div className="editor-save-status" style={{
           color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--text-muted)",
         }}>

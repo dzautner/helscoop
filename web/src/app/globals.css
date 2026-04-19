@@ -2108,6 +2108,37 @@ select:focus {
   box-shadow: 0 0 0 1px var(--amber-border);
 }
 
+.editor-header-name-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-header-name-wrapper .editor-header-name {
+  flex: unset;
+  width: 100%;
+}
+
+.editor-header-name-count {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  pointer-events: none;
+  opacity: 0.7;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.editor-header-name-count[data-near-limit="true"] {
+  color: var(--warning, #e5c07b);
+  opacity: 1;
+}
+
 .editor-header-desc {
   font-size: 12px;
   color: var(--text-muted);
