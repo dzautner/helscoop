@@ -989,7 +989,7 @@ export default function ProjectPage() {
                   <line x1="20" y1="21" x2="20" y2="16" />
                   <line x1="20" y1="12" x2="20" y2="3" />
                 </svg>
-                Params
+                {t('editor.params') || "Params"}
               </button>
             )}
             <div style={{ flex: 1 }} />

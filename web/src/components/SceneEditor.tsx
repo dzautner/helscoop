@@ -275,6 +275,7 @@ export default function SceneEditor({
             onFocus={startCursorTracking}
             onBlur={stopCursorTracking}
             spellCheck={false}
+            aria-label={t("editor.scene")}
             style={{
               ...sharedStyle,
               paddingLeft: 20,
