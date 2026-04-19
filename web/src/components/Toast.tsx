@@ -355,7 +355,7 @@ function ProgressToast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id:
       <div
         style={{
           height: 3,
-          borderRadius: 2,
+          borderRadius: "2px",
           background: isComplete ? "rgba(74, 124, 89, 0.2)" : "rgba(229, 160, 75, 0.15)",
           overflow: "hidden",
         }}
@@ -364,7 +364,7 @@ function ProgressToast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id:
           style={{
             height: "100%",
             width: `${Math.min(100, Math.max(0, progress))}%`,
-            borderRadius: 2,
+            borderRadius: "2px",
             background: isComplete ? "var(--forest)" : "var(--amber)",
             transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease",
           }}

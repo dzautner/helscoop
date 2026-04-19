@@ -638,6 +638,10 @@ body::before {
   border-color: var(--amber-border);
   color: var(--text-secondary);
 }
+.category-chip:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
 .category-chip[data-active="true"] {
   border-color: var(--amber-border);
   background: var(--amber-glow);
@@ -782,6 +786,10 @@ body::before {
   border-color: var(--amber);
   box-shadow: 0 0 12px rgba(229,160,75,0.1);
 }
+.bom-empty-cta:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
 
 .bom-item-card {
   padding: 12px 14px;
@@ -893,6 +901,10 @@ body::before {
 .material-browse-card:hover {
   border-color: var(--amber-border);
 }
+.material-browse-card:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
 .material-browse-card[data-selected="true"] {
   background: var(--amber-glow);
   border-color: var(--amber-border);
@@ -917,6 +929,11 @@ body::before {
 .bom-remove-btn:hover {
   opacity: 1;
   background: rgba(199, 95, 95, 0.1);
+}
+.bom-remove-btn:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+  opacity: 1;
 }
 
 /* ── Link styles ─────────────────────────────────── */
