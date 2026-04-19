@@ -742,6 +742,109 @@ function PriceComparisonPopup({
   );
 }
 
+/* ── BOM item card with debounced quantity input ──────────── */
+function BomItemCard({
+  item,
+  materials,
+  locale,
+  onRemove,
+  onUpdateQty,
+  onCompare,
+}: {
+  item: BomItem;
+  materials: Material[];
+  locale: string;
+  onRemove: (materialId: string) => void;
+  onUpdateQty: (materialId: string, qty: number) => void;
+  onCompare: (id: string, name: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [localQty, setLocalQty] = useState(String(item.quantity));
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sync from props when quantity changes externally
+  useEffect(() => {
+    setLocalQty(String(item.quantity));
+  }, [item.quantity]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const handleQtyChange = (val: string) => {
+    setLocalQty(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onUpdateQty(item.material_id, parseFloat(val) || 0);
+    }, 300);
+  };
+
+  const handleQtyBlur = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    onUpdateQty(item.material_id, parseFloat(localQty) || 0);
+  };
+
+  return (
+    <div
+      className="bom-item-card"
+      onClick={() => onCompare(item.material_id, getLocalizedBomItemName(item, materials, locale))}
+    >
+      <div className="bom-item-header">
+        <div className="bom-item-info">
+          {item.image_url ? (
+            <img
+              src={item.image_url}
+              alt={getLocalizedBomItemName(item, materials, locale)}
+              className="bom-item-thumb"
+            />
+          ) : (
+            <div className="bom-item-thumb-placeholder" />
+          )}
+          <strong className="bom-item-name">{getLocalizedBomItemName(item, materials, locale)}</strong>
+        </div>
+        <button
+          className="bom-remove-btn"
+          onClick={(e) => { e.stopPropagation(); onRemove(item.material_id); }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div className="bom-item-qty-row">
+        <input
+          type="number"
+          min={0.01}
+          step={0.1}
+          value={localQty}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handleQtyChange(e.target.value)}
+          onBlur={handleQtyBlur}
+          className="bom-item-qty-input"
+        />
+        <span className="bom-item-unit">
+          {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
+        </span>
+        <span className="bom-item-total">
+          {Number(item.total || 0).toFixed(2)}
+        </span>
+      </div>
+      {item.supplier && (
+        <div className="bom-item-supplier">
+          {item.supplier}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BomPanel({
   bom,
   materials,
@@ -978,62 +1081,15 @@ export default function BomPanel({
           </div>
         ) : (
           bom.map((item) => (
-            <div
+            <BomItemCard
               key={item.material_id}
-              className="bom-item-card"
-              onClick={() => setCompareMaterial({ id: item.material_id, name: getLocalizedBomItemName(item, materials, locale) })}
-            >
-              <div className="bom-item-header">
-                <div className="bom-item-info">
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={getLocalizedBomItemName(item, materials, locale)}
-                      className="bom-item-thumb"
-                    />
-                  ) : (
-                    <div className="bom-item-thumb-placeholder" />
-                  )}
-                  <strong className="bom-item-name">{getLocalizedBomItemName(item, materials, locale)}</strong>
-                </div>
-                <button
-                  className="bom-remove-btn"
-                  onClick={(e) => { e.stopPropagation(); onRemove(item.material_id); }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              <div className="bom-item-qty-row">
-                <input
-                  type="number"
-                  min={0.01}
-                  step={0.1}
-                  value={item.quantity}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    onUpdateQty(item.material_id, parseFloat(e.target.value) || 0)
-                  }
-                  className="bom-item-qty-input"
-                />
-                <span className="bom-item-unit">
-                  {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
-                </span>
-                <span className="bom-item-total">
-                  {Number(item.total || 0).toFixed(2)}
-                </span>
-              </div>
-              {item.supplier && (
-                <div className="bom-item-supplier">
-                  {item.supplier}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </div>
-              )}
-            </div>
+              item={item}
+              materials={materials}
+              locale={locale}
+              onRemove={onRemove}
+              onUpdateQty={onUpdateQty}
+              onCompare={(id, name) => setCompareMaterial({ id, name })}
+            />
           ))
         )}
       </div>
