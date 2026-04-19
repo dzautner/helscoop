@@ -764,25 +764,48 @@ function BomItemCard({
   item,
   materials,
   locale,
+  index,
+  isFocused,
   onRemove,
   onUpdateQty,
   onCompare,
+  onNavigate,
+  onFocusIndex,
 }: {
   item: BomItem;
   materials: Material[];
   locale: string;
+  index: number;
+  isFocused: boolean;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   onCompare: (id: string, name: string) => void;
+  onNavigate: (direction: "up" | "down" | "next") => void;
+  onFocusIndex: (index: number) => void;
 }) {
   const { t } = useTranslation();
   const [localQty, setLocalQty] = useState(String(item.quantity));
+  const [prevQty, setPrevQty] = useState(String(item.quantity));
+  const [isEditing, setIsEditing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync from props when quantity changes externally
   useEffect(() => {
     setLocalQty(String(item.quantity));
+    setPrevQty(String(item.quantity));
   }, [item.quantity]);
+
+  // Focus the card when it becomes the focused index
+  useEffect(() => {
+    if (isFocused && cardRef.current) {
+      // Only focus the card if the input is not already focused
+      if (document.activeElement !== inputRef.current) {
+        cardRef.current.focus();
+      }
+    }
+  }, [isFocused]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -802,28 +825,122 @@ function BomItemCard({
   const handleQtyBlur = () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     onUpdateQty(item.material_id, parseFloat(localQty) || 0);
+    setIsEditing(false);
+    setPrevQty(localQty);
   };
+
+  const commitEdit = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    onUpdateQty(item.material_id, parseFloat(localQty) || 0);
+    setIsEditing(false);
+    setPrevQty(localQty);
+  };
+
+  const cancelEdit = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setLocalQty(prevQty);
+    onUpdateQty(item.material_id, parseFloat(prevQty) || 0);
+    setIsEditing(false);
+    // Return focus to the card row
+    cardRef.current?.focus();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEdit();
+      onNavigate("next");
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    } else if (e.key === "ArrowUp" && !isEditing) {
+      e.preventDefault();
+      onNavigate("up");
+    } else if (e.key === "ArrowDown" && !isEditing) {
+      e.preventDefault();
+      onNavigate("down");
+    }
+    // Stop propagation so card handler doesn't also fire
+    e.stopPropagation();
+  };
+
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const materialName = getLocalizedBomItemName(item, materials, locale);
+    switch (e.key) {
+      case "ArrowUp":
+        e.preventDefault();
+        onNavigate("up");
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        onNavigate("down");
+        break;
+      case "Tab":
+        // Let Tab naturally move to the input, but track focus
+        break;
+      case "Enter":
+        e.preventDefault();
+        // Focus the quantity input for editing
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+          setIsEditing(true);
+          setPrevQty(localQty);
+        }
+        break;
+      case "Delete":
+      case "Backspace":
+        // Only trigger remove if focus is on the card, not the input
+        if (document.activeElement === cardRef.current) {
+          e.preventDefault();
+          const confirmed = window.confirm(
+            t('editor.confirmRemoveItem', { name: materialName })
+          );
+          if (confirmed) {
+            onRemove(item.material_id);
+          }
+        }
+        break;
+      case " ":
+        e.preventDefault();
+        onCompare(item.material_id, materialName);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const materialName = getLocalizedBomItemName(item, materials, locale);
 
   return (
     <div
-      className="bom-item-card"
-      onClick={() => onCompare(item.material_id, getLocalizedBomItemName(item, materials, locale))}
+      ref={cardRef}
+      className={`bom-item-card${isFocused ? ' bom-item-focused' : ''}`}
+      tabIndex={0}
+      role="row"
+      aria-label={t('editor.bomItemRow', { name: materialName, qty: localQty, total: Number(item.total || 0).toFixed(2) })}
+      data-bom-index={index}
+      onClick={() => onCompare(item.material_id, materialName)}
+      onFocus={() => onFocusIndex(index)}
+      onKeyDown={handleCardKeyDown}
     >
       <div className="bom-item-header">
         <div className="bom-item-info">
           {item.image_url ? (
             <img
               src={item.image_url}
-              alt={getLocalizedBomItemName(item, materials, locale)}
+              alt={materialName}
               className="bom-item-thumb"
             />
           ) : (
             <div className="bom-item-thumb-placeholder" />
           )}
-          <strong className="bom-item-name">{getLocalizedBomItemName(item, materials, locale)}</strong>
+          <strong className="bom-item-name">{materialName}</strong>
         </div>
         <button
           className="bom-remove-btn"
+          tabIndex={-1}
+          aria-label={t('editor.removeMaterial', { name: materialName })}
           onClick={(e) => { e.stopPropagation(); onRemove(item.material_id); }}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -834,15 +951,19 @@ function BomItemCard({
       </div>
       <div className="bom-item-qty-row">
         <input
+          ref={inputRef}
           type="number"
           min={0.01}
           step={0.1}
           value={localQty}
           onClick={(e) => e.stopPropagation()}
+          onFocus={() => { setIsEditing(true); setPrevQty(localQty); }}
           onChange={(e) => handleQtyChange(e.target.value)}
           onBlur={handleQtyBlur}
+          onKeyDown={handleInputKeyDown}
           className="bom-item-qty-input"
-          aria-label={t('editor.quantityFor', { name: getLocalizedBomItemName(item, materials, locale) })}
+          tabIndex={isFocused ? 0 : -1}
+          aria-label={t('editor.quantityFor', { name: materialName })}
         />
         <span className="bom-item-unit">
           {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
@@ -885,7 +1006,31 @@ export default function BomPanel({
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
   const [quickAddQty, setQuickAddQty] = useState(1);
+  const [focusedBomIndex, setFocusedBomIndex] = useState(-1);
   const { t, locale } = useTranslation();
+
+  // Navigate between BOM item rows
+  const handleBomNavigate = useCallback((fromIndex: number, direction: "up" | "down" | "next") => {
+    let targetIndex: number;
+    if (direction === "up") {
+      targetIndex = Math.max(0, fromIndex - 1);
+    } else {
+      // "down" or "next" both go forward
+      targetIndex = Math.min(bom.length - 1, fromIndex + 1);
+    }
+    setFocusedBomIndex(targetIndex);
+    // Focus the target card's quantity input for "next" (Enter key flow)
+    if (direction === "next") {
+      requestAnimationFrame(() => {
+        const card = document.querySelector<HTMLDivElement>(`[data-bom-index="${targetIndex}"]`);
+        const input = card?.querySelector<HTMLInputElement>('.bom-item-qty-input');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
+    }
+  }, [bom.length]);
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const animatedTotal = useAnimatedNumber(total);
@@ -1066,7 +1211,7 @@ export default function BomPanel({
         )}
       </div>
 
-      <div className="bom-list">
+      <div className="bom-list" role="grid" aria-label={t('editor.materialList')}>
         {bom.length === 0 ? (
           <div className="bom-empty anim-up">
             <div className="bom-empty-icon">
@@ -1099,15 +1244,19 @@ export default function BomPanel({
             </button>
           </div>
         ) : (
-          bom.map((item) => (
+          bom.map((item, idx) => (
             <BomItemCard
               key={item.material_id}
               item={item}
               materials={materials}
               locale={locale}
+              index={idx}
+              isFocused={focusedBomIndex === idx}
               onRemove={onRemove}
               onUpdateQty={onUpdateQty}
               onCompare={(id, name) => setCompareMaterial({ id, name })}
+              onNavigate={(dir) => handleBomNavigate(idx, dir)}
+              onFocusIndex={setFocusedBomIndex}
             />
           ))
         )}
