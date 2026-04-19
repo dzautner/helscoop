@@ -213,6 +213,9 @@ const translations = {
       duplicateProject: 'Kopioi projekti',
       parameters: 'Parametrit',
       quantityFor: 'Maara: {{name}}',
+      confirmRemoveItem: 'Poistetaanko {{name}} materiaalilistasta?',
+      bomItemRow: '{{name}}, maara {{qty}}, yhteensa {{total}} EUR',
+      removeMaterial: 'Poista {{name}}',
     },
     share: {
       title: 'Jaa projekti',
@@ -682,6 +685,9 @@ const translations = {
       duplicateProject: 'Duplicate project',
       parameters: 'Parameters',
       quantityFor: 'Quantity for {{name}}',
+      confirmRemoveItem: 'Remove {{name}} from the material list?',
+      bomItemRow: '{{name}}, quantity {{qty}}, total {{total}} EUR',
+      removeMaterial: 'Remove {{name}}',
     },
     share: {
       title: 'Share project',

@@ -189,6 +189,11 @@
 [data-theme="light"] .bom-item-card:hover {
   background: rgba(255, 255, 255, 0.75);
 }
+[data-theme="light"] .bom-item-card:focus,
+[data-theme="light"] .bom-item-card.bom-item-focused {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.2);
+}
 
 [data-theme="light"] .chat-msg-user .chat-msg-content {
   background: rgba(180, 83, 9, 0.10);
@@ -809,6 +814,15 @@ body::before {
   border-color: var(--amber-border);
   background: rgba(24, 24, 27, 0.7);
   transform: translateX(-2px);
+}
+.bom-item-card:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(229, 160, 75, 0.25);
+}
+.bom-item-card.bom-item-focused {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(229, 160, 75, 0.25);
 }
 
 .bom-item-header {
