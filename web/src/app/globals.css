@@ -93,7 +93,8 @@
 }
 
 [data-theme="light"] .card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.03);
+  border-color: rgba(180, 83, 9, 0.25);
+  box-shadow: 0 0 16px rgba(180, 83, 9, 0.06), 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 [data-theme="light"] .btn-ghost {
@@ -1210,8 +1211,8 @@ select:focus {
 }
 
 .card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-subtle);
+  border-color: rgba(229, 160, 75, 0.3);
+  box-shadow: 0 0 20px rgba(229, 160, 75, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .badge {
@@ -2353,8 +2354,8 @@ select:focus {
 }
 
 .card-interactive:hover {
-  border-color: var(--amber-border);
-  box-shadow: var(--shadow-amber), 0 2px 12px rgba(0,0,0,0.3);
+  border-color: rgba(229, 160, 75, 0.3);
+  box-shadow: 0 0 20px rgba(229, 160, 75, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
 }
 
@@ -2507,8 +2508,8 @@ select:focus {
 }
 
 .feature-card:hover {
-  border-color: var(--amber-border);
-  box-shadow: 0 0 24px rgba(229, 160, 75, 0.06), 0 4px 16px rgba(0,0,0,0.2);
+  border-color: rgba(229, 160, 75, 0.3);
+  box-shadow: 0 0 20px rgba(229, 160, 75, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
   transform: translateY(-4px) scale(1.02);
 }
 
