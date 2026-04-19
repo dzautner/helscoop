@@ -1,9 +1,35 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+
+function useInView(threshold = 0.2) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+
+  return { ref, inView };
+}
 
 export default function FeatureHighlights() {
   const { locale } = useTranslation();
+  const { ref: sectionRef, inView } = useInView(0.15);
+
   const features = locale === 'fi' ? [
     { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D-malli osoitteesta", desc: "Syota kotiosoitteesi ja nae talosi kolmiulotteisena mallina hetkessa" },
     { icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", title: "Muuta puhumalla", desc: "Kuvaile muutos suomeksi — \"lisaa terassi taakse\" — AI toteuttaa" },
@@ -15,9 +41,16 @@ export default function FeatureHighlights() {
   ];
 
   return (
-    <section className="feature-section">
+    <section className="feature-section" ref={sectionRef}>
       <h2 className="sr-only">{locale === 'fi' ? 'Ominaisuudet' : 'Features'}</h2>
-      <div className="feature-section-header anim-up">
+      <div
+        className="feature-section-header"
+        style={{
+          opacity: inView ? 1 : 0,
+          transform: inView ? 'translateY(0)' : 'translateY(16px)',
+          transition: 'opacity 0.5s ease, transform 0.5s ease',
+        }}
+      >
         <span className="label-mono" style={{ color: "var(--amber)", marginBottom: 8, display: "block" }}>
           {locale === 'fi' ? 'MITEN SE TOIMII' : 'HOW IT WORKS'}
         </span>
@@ -27,7 +60,15 @@ export default function FeatureHighlights() {
       </div>
       <div className="feature-grid">
         {features.map((f, i) => (
-          <div key={i} className="feature-card anim-up" style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+          <div
+            key={i}
+            className="feature-card"
+            style={{
+              opacity: inView ? 1 : 0,
+              transform: inView ? 'translateY(0)' : 'translateY(24px)',
+              transition: `opacity 0.5s ease ${0.15 + i * 0.12}s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${0.15 + i * 0.12}s`,
+            }}
+          >
             <div className="feature-card-step">{String(i + 1).padStart(2, '0')}</div>
             <div className="feature-card-icon">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
