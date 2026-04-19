@@ -323,25 +323,9 @@ export default function ProjectList({
                 />
               </div>
               <select
+                className="select"
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
-                style={{
-                  padding: "11px 14px",
-                  background: "var(--bg-tertiary)",
-                  border: "1px solid var(--border-strong)",
-                  borderRadius: "var(--radius-sm)",
-                  color: "var(--text-secondary)",
-                  fontFamily: "var(--font-body)",
-                  fontSize: 13,
-                  outline: "none",
-                  cursor: "pointer",
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  paddingRight: 32,
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236f6860' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "right 12px center",
-                }}
               >
                 <option value="modified">{t('project.sortByModified')}</option>
                 <option value="name">{t('project.sortByName')}</option>
