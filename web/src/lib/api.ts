@@ -85,6 +85,8 @@ export const api = {
     apiFetch("/auth/password", { method: "PUT", body: JSON.stringify({ currentPassword, newPassword }) }),
   deleteAccount: () =>
     apiFetch("/auth/account", { method: "DELETE" }),
+  exportData: () =>
+    apiFetch("/auth/export-data"),
   forgotPassword: (email: string) =>
     apiFetch("/auth/forgot-password", {
       method: "POST",

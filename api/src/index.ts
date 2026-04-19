@@ -369,6 +369,77 @@ app.get("/auth/verify-email", authLimiter, async (req, res) => {
   }
 });
 
+// GDPR data export — rate limited to 1 request per minute per user
+const exportDataLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: IS_TEST ? 10000 : IS_DEV ? 100 : 1,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    return extractUserId(req) || req.ip || "unknown";
+  },
+  message: { error: "Too many export requests, please try again later" },
+});
+
+app.get("/auth/export-data", exportDataLimiter, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+
+    // Fetch user profile
+    const userResult = await query(
+      "SELECT id, email, name, role, email_verified, created_at FROM users WHERE id = $1",
+      [userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const profile = userResult.rows[0];
+
+    // Fetch all projects
+    const projectsResult = await query(
+      "SELECT id, name, description, scene_js, building_info, share_token, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY created_at",
+      [userId]
+    );
+
+    // Fetch all BOM items for user's projects
+    const bomResult = await query(
+      `SELECT pb.project_id, pb.material_id, pb.quantity, pb.unit
+       FROM project_bom pb
+       WHERE pb.project_id IN (SELECT id FROM projects WHERE user_id = $1)
+       ORDER BY pb.project_id`,
+      [userId]
+    );
+
+    // Group BOM items by project
+    const bomByProject: Record<string, typeof bomResult.rows> = {};
+    for (const item of bomResult.rows) {
+      (bomByProject[item.project_id] ||= []).push(item);
+    }
+
+    const projects = projectsResult.rows.map((p) => ({
+      ...p,
+      bom: bomByProject[p.id] || [],
+    }));
+
+    res.json({
+      exported_at: new Date().toISOString(),
+      profile: {
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        role: profile.role,
+        email_verified: profile.email_verified,
+        created_at: profile.created_at,
+      },
+      projects,
+    });
+  } catch (e) {
+    console.error("Data export error:", e);
+    res.status(500).json({ error: "Failed to export data" });
+  }
+});
+
 // Resend verification email
 app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (req, res) => {
   try {
