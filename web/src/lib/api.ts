@@ -177,10 +177,24 @@ export const api = {
       body: JSON.stringify({ items }),
     }),
 
-  chat: (messages: { role: string; content: string }[], currentScene: string) =>
+  chat: (
+    messages: { role: string; content: string }[],
+    currentScene: string,
+    context?: {
+      bomSummary?: { material: string; qty: number; unit: string; total: number }[];
+      buildingInfo?: { address?: string; type?: string; year_built?: number; area_m2?: number; floors?: number; material?: string; heating?: string };
+      projectInfo?: { name?: string; description?: string };
+    },
+  ) =>
     apiFetch("/chat", {
       method: "POST",
-      body: JSON.stringify({ messages, currentScene }),
+      body: JSON.stringify({
+        messages,
+        currentScene,
+        bomSummary: context?.bomSummary,
+        buildingInfo: context?.buildingInfo,
+        projectInfo: context?.projectInfo,
+      }),
     }),
 
   getBuilding: (address: string) =>

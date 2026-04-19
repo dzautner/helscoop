@@ -32,12 +32,90 @@ interface ChatMessage {
   content: string;
 }
 
+interface BomSummaryItem {
+  material: string;
+  qty: number;
+  unit: string;
+  total: number;
+}
+
+interface BuildingInfo {
+  address?: string;
+  type?: string;
+  year_built?: number;
+  area_m2?: number;
+  floors?: number;
+  material?: string;
+  heating?: string;
+}
+
+interface ProjectInfo {
+  name?: string;
+  description?: string;
+}
+
+function buildContextBlock(
+  currentScene: string,
+  bomSummary?: BomSummaryItem[],
+  buildingInfo?: BuildingInfo,
+  projectInfo?: ProjectInfo,
+): string {
+  let context = `\n\nCurrent scene script:\n\`\`\`javascript\n${currentScene}\n\`\`\``;
+
+  if (projectInfo?.name || projectInfo?.description) {
+    context += `\n\nProject: "${projectInfo.name || "Untitled"}"`;
+    if (projectInfo.description) {
+      context += ` — ${projectInfo.description}`;
+    }
+  }
+
+  if (buildingInfo && Object.keys(buildingInfo).length > 0) {
+    const parts: string[] = [];
+    if (buildingInfo.address) parts.push(`Address: ${buildingInfo.address}`);
+    if (buildingInfo.type) parts.push(`Type: ${buildingInfo.type}`);
+    if (buildingInfo.year_built) parts.push(`Built: ${buildingInfo.year_built}`);
+    if (buildingInfo.area_m2) parts.push(`Area: ${buildingInfo.area_m2} m²`);
+    if (buildingInfo.floors) parts.push(`Floors: ${buildingInfo.floors}`);
+    if (buildingInfo.material) parts.push(`Material: ${buildingInfo.material}`);
+    if (buildingInfo.heating) parts.push(`Heating: ${buildingInfo.heating}`);
+    if (parts.length > 0) {
+      context += `\n\nBuilding info:\n${parts.join(" | ")}`;
+      context += `\nUse this info to give contextual renovation advice (e.g. building age affects insulation recommendations, heating type affects energy upgrade suggestions).`;
+    }
+  }
+
+  if (bomSummary && bomSummary.length > 0) {
+    const bomLines = bomSummary
+      .slice(0, 20) // Cap at 20 items for token budget
+      .map((item) => `  ${item.material}: ${item.qty} ${item.unit} = ${item.total.toFixed(2)} EUR`);
+    const grandTotal = bomSummary.reduce((sum, item) => sum + item.total, 0);
+    context += `\n\nCurrent BOM (${bomSummary.length} items, total ${grandTotal.toFixed(2)} EUR):\n${bomLines.join("\n")}`;
+    context += `\nUse BOM data to give cost-aware suggestions. Reference actual prices when discussing additions or changes.`;
+  }
+
+  return context;
+}
+
 router.post("/", async (req, res) => {
-  const { messages, currentScene }: { messages: ChatMessage[]; currentScene: string } = req.body;
+  const {
+    messages,
+    currentScene,
+    bomSummary,
+    buildingInfo,
+    projectInfo,
+  }: {
+    messages: ChatMessage[];
+    currentScene: string;
+    bomSummary?: BomSummaryItem[];
+    buildingInfo?: BuildingInfo;
+    projectInfo?: ProjectInfo;
+  } = req.body;
 
   if (!messages?.length) {
     return res.status(400).json({ error: "Messages required" });
   }
+
+  const contextBlock = buildContextBlock(currentScene, bomSummary, buildingInfo, projectInfo);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -58,7 +136,7 @@ router.post("/", async (req, res) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2048,
-        system: SYSTEM_PROMPT + `\n\nCurrent scene script:\n\`\`\`javascript\n${currentScene}\n\`\`\``,
+        system: SYSTEM_PROMPT + contextBlock,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
       }),
     });

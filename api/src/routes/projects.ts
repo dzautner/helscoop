@@ -22,7 +22,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, description, scene_js } = req.body;
+  const { name, description, scene_js, building_info } = req.body;
   if (!name || typeof name !== "string") {
     return res.status(400).json({ error: "Project name is required" });
   }
@@ -30,9 +30,9 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
   const result = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.user!.id, name.trim(), description, scene_js]
+    `INSERT INTO projects (user_id, name, description, scene_js, building_info)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.user!.id, name.trim(), description, scene_js, building_info ? JSON.stringify(building_info) : null]
   );
   res.status(201).json(result.rows[0]);
 });
