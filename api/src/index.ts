@@ -392,6 +392,40 @@ app.use("/chat", chatLimiter, chatRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
+// Public shared project endpoint — no auth required
+app.get("/shared/:token", publicLimiter, async (req, res) => {
+  const { token } = req.params;
+  if (!token || typeof token !== "string" || token.length > 64) {
+    return res.status(400).json({ error: "Invalid share token" });
+  }
+
+  const result = await query(
+    "SELECT id, name, description, scene_js, building_info, created_at, updated_at FROM projects WHERE share_token = $1",
+    [token]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Shared project not found" });
+  }
+
+  const project = result.rows[0];
+
+  const bom = await query(
+    `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
+      p.unit_price, p.link, s.name AS supplier_name,
+      (pb.quantity * p.unit_price * m.waste_factor) AS total
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     JOIN categories c ON m.category_id = c.id
+     LEFT JOIN pricing p ON m.id = p.material_id AND p.is_primary = true
+     LEFT JOIN suppliers s ON p.supplier_id = s.id
+     WHERE pb.project_id = $1
+     ORDER BY c.sort_order`,
+    [project.id]
+  );
+
+  res.json({ ...project, bom: bom.rows });
+});
+
 // Public endpoints get the stricter IP-based limiter
 app.get("/materials/export/viewer", publicLimiter, async (_req, res) => {
   const { query: dbQuery } = await import("./db");

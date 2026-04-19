@@ -177,6 +177,13 @@ export const api = {
       body: JSON.stringify({ items }),
     }),
 
+  shareProject: (projectId: string) =>
+    apiFetch(`/projects/${projectId}/share`, { method: "POST" }),
+  unshareProject: (projectId: string) =>
+    apiFetch(`/projects/${projectId}/share`, { method: "DELETE" }),
+  getSharedProject: (token: string) =>
+    apiFetch(`/shared/${token}`),
+
   chat: (
     messages: { role: string; content: string }[],
     currentScene: string,
