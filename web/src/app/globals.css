@@ -827,6 +827,24 @@ select:focus {
   cursor: default;
 }
 
+.chat-suggestion-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+.chat-suggestion-chip:hover {
+  border-color: var(--amber-border);
+  color: var(--amber);
+  background: var(--amber-glow);
+}
+
 .chat-skip-confirm {
   position: fixed;
   bottom: 80px;
