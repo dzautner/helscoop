@@ -274,7 +274,25 @@ export default function ProjectList({
           </div>
         ) : projects.length === 0 ? (
           <div className="anim-up delay-1 dash-empty">
-            <p>{t('project.noProjectsDesc')}</p>
+            <div className="empty-state-illustration">
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="12" width="24" height="16" rx="1" />
+                <polyline points="4,12 16,4 28,12" />
+                <line x1="13" y1="20" x2="19" y2="20" />
+                <line x1="16" y1="17" x2="16" y2="23" />
+              </svg>
+            </div>
+            <div className="empty-state-title">{t('project.emptyTitle')}</div>
+            <div className="empty-state-hint">{t('project.emptyHint')}</div>
+            <button
+              className="empty-state-cta"
+              onClick={() => {
+                const input = document.querySelector<HTMLInputElement>('.input[placeholder]');
+                if (input) input.focus();
+              }}
+            >
+              {t('project.emptyCta')}
+            </button>
           </div>
         ) : (
           <>
@@ -316,13 +334,27 @@ export default function ProjectList({
             </div>
 
             {filteredProjects.length === 0 ? (
-              <div className="dash-no-results">
+              <div className="anim-up dash-no-results">
+                <div className="empty-state-illustration">
+                  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="13" cy="13" r="8" />
+                    <line x1="19" y1="19" x2="27" y2="27" />
+                    <rect x="8" y="16" width="10" height="8" rx="0.5" />
+                    <polyline points="8,16 13,12 18,16" />
+                  </svg>
+                </div>
                 <p className="dash-no-results-title">
                   {t('project.noSearchResults')}
                 </p>
                 <p className="dash-no-results-desc">
                   {t('project.noSearchResultsDesc')}
                 </p>
+                <button
+                  className="empty-state-cta"
+                  onClick={() => setSearchQuery("")}
+                >
+                  {t('project.noSearchResultsCta')}
+                </button>
               </div>
             ) : (
               <div className="dash-project-grid">
