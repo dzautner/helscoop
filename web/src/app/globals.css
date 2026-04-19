@@ -1115,6 +1115,23 @@ select:focus {
   align-items: center;
 }
 
+.project-card-thumb {
+  height: 120px;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-card-thumb-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, var(--bg-secondary));
+  pointer-events: none;
+}
+
 .project-card-actions {
   display: flex;
   gap: 4px;

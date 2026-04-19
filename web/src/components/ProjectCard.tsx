@@ -28,13 +28,10 @@ export default function ProjectCard({
       onClick={() => (window.location.href = `/project/${project.id}`)}
     >
       {/* Thumbnail or placeholder */}
-      <div style={{
-        height: 120,
+      <div className="project-card-thumb" style={{
         background: project.thumbnail_url
           ? `url(${project.thumbnail_url}) center/cover no-repeat`
-          : "linear-gradient(135deg, #1a1d22 0%, #111113 50%, #1f1e1c 100%)",
-        position: "relative",
-        borderBottom: "1px solid var(--border)",
+          : undefined,
       }}>
         {!project.thumbnail_url && (
           <div style={{
@@ -50,14 +47,7 @@ export default function ProjectCard({
             </svg>
           </div>
         )}
-        <div style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 40,
-          background: "linear-gradient(transparent, var(--bg-secondary))",
-        }} />
+        <div className="project-card-thumb-fade" />
       </div>
       <div style={{ padding: "14px 22px 18px" }}>
         <div style={{ minWidth: 0 }}>
@@ -78,13 +68,26 @@ export default function ProjectCard({
           </div>
         </div>
         <div className="project-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: 10 }}>
-          <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => (window.location.href = `/project/${project.id}`)}>
+          <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => (window.location.href = `/project/${project.id}`)}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
             {t('project.open')}
           </button>
-          <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => onDuplicate(project.id)}>
+          <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => onDuplicate(project.id)}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
             {t('project.copy')}
           </button>
-          <button className="btn btn-danger" style={{ padding: "6px 12px", fontSize: 12 }} onClick={() => onDelete(project.id)}>
+          <button className="btn btn-danger" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => onDelete(project.id)}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
             {t('project.delete')}
           </button>
         </div>
