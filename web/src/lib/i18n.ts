@@ -394,6 +394,11 @@ const translations = {
       termsChanges: 'Ehtojen muutokset',
       termsChangesBody: 'Voimme paivittaa naita ehtoja. Olennaisista muutoksista ilmoitetaan sahkopostitse. Jatkamalla palvelun kayttoa hyvaksyt muutokset.',
     },
+    screenshot: {
+      download: 'Lataa',
+      copy: 'Kopioi',
+      copied: 'Kopioitu!',
+    },
     validation: {
       unmatchedCloser: 'Sulkumerkilla {{char}} ei ole paria (rivi {{line}})',
       unmatchedOpener: 'Avausmerkilla {{char}} ei ole sulkumerkkia (rivi {{line}})',
@@ -814,6 +819,11 @@ const translations = {
       termsLiabilityBody: 'Helscoop is provided "as is" without warranties. We are not liable for damages arising from the use of the service or inaccurate pricing data.',
       termsChanges: 'Changes to terms',
       termsChangesBody: 'We may update these terms. Material changes will be communicated via email. Continued use of the service constitutes acceptance of changes.',
+    },
+    screenshot: {
+      download: 'Download',
+      copy: 'Copy',
+      copied: 'Copied!',
     },
     validation: {
       unmatchedCloser: 'Unmatched closing {{char}} on line {{line}}',

@@ -6,6 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
 import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
+import ScreenshotPopover from "@/components/ScreenshotPopover";
 
 interface Viewport3DProps {
   sceneJs: string;
@@ -14,8 +15,8 @@ interface Viewport3DProps {
   onError?: (error: string | null) => void;
   onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
-  /** Callback to toggle wireframe from context menu */
   onToggleWireframe?: () => void;
+  projectName?: string;
 }
 
 interface CameraPreset {
@@ -142,14 +143,17 @@ function CameraToolbar({
   controlsRef,
   rendererRef,
   sceneRef,
+  projectName,
 }: {
   cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
   controlsRef: React.RefObject<OrbitControls | null>;
   rendererRef: React.RefObject<THREE.WebGLRenderer | null>;
   sceneRef: React.RefObject<THREE.Scene | null>;
+  projectName?: string;
 }) {
   const { t } = useTranslation();
   const [activePreset, setActivePreset] = useState(3); // default to Iso
+  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
 
   const handlePreset = useCallback(
     (preset: CameraPreset, index: number) => {
@@ -191,37 +195,42 @@ function CameraToolbar({
       canvas.height - fontSize * 0.6
     );
 
-    // Download
-    const link = document.createElement("a");
-    link.download = "helscoop-screenshot.png";
-    link.href = offscreen.toDataURL("image/png");
-    link.click();
+    // Show popover instead of directly downloading
+    setScreenshotDataUrl(offscreen.toDataURL("image/png"));
   }, [rendererRef, sceneRef, cameraRef]);
 
   return (
-    <div className="viewport-cam-bar">
-      {CAMERA_PRESETS.map((preset, i) => (
+    <>
+      <div className="viewport-cam-bar">
+        {CAMERA_PRESETS.map((preset, i) => (
+          <button
+            key={i}
+            className="viewport-cam-btn"
+            data-active={i === activePreset}
+            onClick={() => handlePreset(preset, i)}
+            title={t(preset.key)}
+          >
+            {t(preset.key)}
+          </button>
+        ))}
         <button
-          key={i}
           className="viewport-cam-btn"
-          data-active={i === activePreset}
-          onClick={() => handlePreset(preset, i)}
-          title={t(preset.key)}
+          data-active={screenshotDataUrl !== null}
+          onClick={handleScreenshot}
+          title={`${t("editor.screenshot")} (Cmd+Shift+S)`}
         >
-          {t(preset.key)}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
         </button>
-      ))}
-      <button
-        className="viewport-cam-btn"
-        onClick={handleScreenshot}
-        title={t("editor.screenshot")}
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-          <circle cx="12" cy="13" r="4" />
-        </svg>
-      </button>
-    </div>
+      </div>
+      <ScreenshotPopover
+        imageDataUrl={screenshotDataUrl}
+        projectName={projectName}
+        onClose={() => setScreenshotDataUrl(null)}
+      />
+    </>
   );
 }
 
@@ -233,6 +242,7 @@ export default function Viewport3D({
   onWarnings,
   captureRef,
   onToggleWireframe,
+  projectName,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -603,6 +613,7 @@ export default function Viewport3D({
         controlsRef={controlsRef}
         rendererRef={rendererRef}
         sceneRef={sceneRef}
+        projectName={projectName}
       />
       <ViewportContextMenu
         items={contextMenuItems}
