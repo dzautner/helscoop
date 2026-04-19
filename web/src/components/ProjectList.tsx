@@ -267,34 +267,22 @@ export default function ProjectList({
         </div>
 
         {loading ? (
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="dash-project-grid">
             {[0, 1, 2].map((i) => (
               <SkeletonProjectCard key={i} delay={i * 0.08} />
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="anim-up delay-1" style={{
-            padding: "32px 28px",
-            textAlign: "center",
-            borderRadius: "var(--radius-lg)",
-            border: "1px dashed var(--border)",
-          }}>
-            <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-              {t('project.noProjectsDesc')}
-            </p>
+          <div className="anim-up delay-1 dash-empty">
+            <p>{t('project.noProjectsDesc')}</p>
           </div>
         ) : (
           <>
             {/* Search and sort bar */}
-            <div className="anim-up delay-1" style={{
-              display: "flex",
-              gap: 8,
-              marginBottom: 16,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}>
-              <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+            <div className="anim-up delay-1 dash-search-bar">
+              <div className="dash-search-wrap">
                 <svg
+                  className="dash-search-icon"
                   width="16"
                   height="16"
                   viewBox="0 0 24 24"
@@ -303,13 +291,6 @@ export default function ProjectList({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    pointerEvents: "none",
-                  }}
                 >
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -335,22 +316,16 @@ export default function ProjectList({
             </div>
 
             {filteredProjects.length === 0 ? (
-              <div style={{
-                padding: "48px 40px",
-                textAlign: "center",
-                borderRadius: "var(--radius-xl)",
-                border: "1px dashed var(--border-strong)",
-                background: "var(--bg-secondary)",
-              }}>
-                <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: 4 }}>
+              <div className="dash-no-results">
+                <p className="dash-no-results-title">
                   {t('project.noSearchResults')}
                 </p>
-                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+                <p className="dash-no-results-desc">
                   {t('project.noSearchResultsDesc')}
                 </p>
               </div>
             ) : (
-              <div style={{ display: "grid", gap: 10 }}>
+              <div className="dash-project-grid">
                 {filteredProjects.map((p, i) => (
                   <ProjectCard
                     key={p.id}

@@ -1554,6 +1554,65 @@ select:focus {
   color: var(--danger);
 }
 
+/* Dashboard layout */
+.dash-empty {
+  padding: 32px 28px;
+  text-align: center;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border);
+}
+
+.dash-empty p {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dash-search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dash-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.dash-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.dash-no-results {
+  padding: 48px 40px;
+  text-align: center;
+  border-radius: var(--radius-xl);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-secondary);
+}
+
+.dash-no-results-title {
+  color: var(--text-secondary);
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.dash-no-results-desc {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dash-project-grid {
+  display: grid;
+  gap: 10px;
+}
+
 /* Project cards */
 .project-card-grid {
   display: grid;
