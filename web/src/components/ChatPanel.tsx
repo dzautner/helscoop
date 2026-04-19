@@ -147,7 +147,8 @@ export default function ChatPanel({
           <button
             className="chat-collapse-btn"
             onClick={() => setExpanded(false)}
-            title="Minimize"
+            title={t('editor.chatMinimize')}
+            aria-label={t('editor.chatMinimize')}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 12 15 18 9" />
@@ -223,6 +224,7 @@ export default function ChatPanel({
         <button
           className="chat-expand-btn"
           onClick={() => setExpanded(true)}
+          aria-label={t('editor.chatExpand')}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="18 15 12 9 6 15" />
@@ -284,12 +286,14 @@ export default function ChatPanel({
           onBlur={() => setInputFocused(false)}
           placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.continueConversation')}
           disabled={loading}
+          aria-label={t('editor.chatInputLabel')}
         />
         <button
           className="chat-send-btn"
           onClick={send}
           disabled={loading || !input.trim()}
           data-ready={!!input.trim()}
+          aria-label={t('editor.chatSendLabel')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />

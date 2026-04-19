@@ -486,8 +486,15 @@ function PriceComparisonPopup({
         onClose();
       }
     };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
   }, [onClose]);
 
   // Build supplier color map
@@ -519,6 +526,9 @@ function PriceComparisonPopup({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={materialName}
       style={{
         position: "fixed",
         inset: 0,
