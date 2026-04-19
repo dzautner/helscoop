@@ -798,8 +798,11 @@ app.get("/bom/export/:projectId", authenticatedLimiter, requireAuth, async (req,
   res.json(rows);
 });
 
-app.listen(PORT, () => {
-  console.log(`Helscoop API running on port ${PORT}`);
-});
+// Only start listening when run directly, not when imported for testing
+if (!IS_TEST) {
+  app.listen(PORT, () => {
+    console.log(`Helscoop API running on port ${PORT}`);
+  });
+}
 
 export default app;
