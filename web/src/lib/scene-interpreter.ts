@@ -283,6 +283,16 @@ function withPBRImpl(geometry: any, opts: any): any {
   return { geometry, color: opts?.color, material: opts?.material };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withMaterialImpl(geometry: any, material: any, _objectId?: string): any {
+  return { geometry, material };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withColorIdImpl(geometry: any, color: any, _objectId?: string): any {
+  return { geometry, color };
+}
+
 // ── Scene export types ───────────────────────────────────────────────────────
 
 export interface InterpreterResult {
@@ -414,7 +424,7 @@ const KNOWN_IDENTIFIERS = new Set([
   "box", "cube", "cylinder", "sphere",
   "translate", "rotate", "scale",
   "union", "difference", "intersection", "subtract", "intersect",
-  "withColor", "withPBR", "withMaterial", "Wall", "hull",
+  "withColor", "withPBR", "withMaterial", "withColorId", "Wall", "hull",
   "scene",
   "Math", "console", "const", "let", "var", "for", "if", "else",
   "while", "do", "return", "function", "true", "false", "null",
@@ -673,6 +683,8 @@ if (typeof displayScale !== "undefined") { __result__.displayScale = displayScal
       "intersect",
       "withColor",
       "withPBR",
+      "withMaterial",
+      "withColorId",
       "Wall",
       "hull",
       "__sceneProxy__",
@@ -695,6 +707,8 @@ if (typeof displayScale !== "undefined") { __result__.displayScale = displayScal
       intersectionImpl,
       withColorImpl,
       withPBRImpl,
+      withMaterialImpl,
+      withColorIdImpl,
       wallImpl,
       hullImpl,
       sceneProxy,

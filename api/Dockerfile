@@ -19,6 +19,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/templates/*.js ./dist/templates/
 
 # Copy migrations for db:migrate at deploy time
 COPY --from=builder /app/node_modules/.package-lock.json ./node_modules/.package-lock.json

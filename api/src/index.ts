@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import { login, register, signToken, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, AuthUser } from "./auth";
 import { query } from "./db";
+import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
 import suppliersRouter from "./routes/suppliers";
@@ -731,149 +732,14 @@ scene.add(roof, { material: "roofing", color: [0.4, 0.38, 0.35] });`,
       description: "Kompakti kanakoppi 4–6 kanalle, pesälaatikolla ja ulkotarhalla",
       icon: "shed",
       estimated_cost: 1800,
-      scene_js: `// Kanala 2x1.5m — Finnish Chicken Coop with landscape
-// Coop structure
-const floor = box(2, 0.08, 1.5);
-const wall_back = translate(box(2, 1.4, 0.08), 0, 0.78, -0.71);
-const wall_left = translate(box(0.08, 1.4, 1.5), -0.96, 0.78, 0);
-const wall_right = translate(box(0.08, 1.4, 1.5), 0.96, 0.78, 0);
-const wall_front_upper = translate(box(2, 0.4, 0.08), 0, 1.28, 0.71);
-const wall_front_left = translate(box(1.1, 1.0, 0.08), -0.45, 0.58, 0.71);
-const wall_front_right = translate(box(0.3, 1.0, 0.08), 0.85, 0.58, 0.71);
-const nest_box = translate(box(0.6, 0.5, 0.5), -1.16, 0.55, -0.2);
-const nest_lid = translate(rotate(box(0.7, 0.04, 0.55), 0.15, 0, 0), -1.16, 0.82, -0.2);
-const perch = translate(rotate(box(0.06, 0.06, 1.3), 0, 0.3, 0), 0.2, 0.6, 0);
-const roof_l = translate(rotate(box(1.3, 0.04, 1.8), 0, 0, 0.25), -0.5, 1.7, 0);
-const roof_r = translate(rotate(box(1.3, 0.04, 1.8), 0, 0, -0.25), 0.5, 1.7, 0);
-const leg1 = translate(box(0.06, 0.4, 0.06), -0.9, -0.12, -0.65);
-const leg2 = translate(box(0.06, 0.4, 0.06), 0.9, -0.12, -0.65);
-const leg3 = translate(box(0.06, 0.4, 0.06), -0.9, -0.12, 0.65);
-const leg4 = translate(box(0.06, 0.4, 0.06), 0.9, -0.12, 0.65);
-
-// Chicken run (wire frame)
-const run_post1 = translate(box(0.05, 1.2, 0.05), 1.5, 0.6, -0.7);
-const run_post2 = translate(box(0.05, 1.2, 0.05), 1.5, 0.6, 0.7);
-const run_post3 = translate(box(0.05, 1.2, 0.05), 3.5, 0.6, -0.7);
-const run_post4 = translate(box(0.05, 1.2, 0.05), 3.5, 0.6, 0.7);
-const run_rail_top1 = translate(box(2.0, 0.04, 0.04), 2.5, 1.2, -0.7);
-const run_rail_top2 = translate(box(2.0, 0.04, 0.04), 2.5, 1.2, 0.7);
-const run_rail_top3 = translate(box(0.04, 0.04, 1.4), 3.5, 1.2, 0);
-const run_rail_bot1 = translate(box(2.0, 0.04, 0.04), 2.5, 0.02, -0.7);
-const run_rail_bot2 = translate(box(2.0, 0.04, 0.04), 2.5, 0.02, 0.7);
-
-// Chickens (body + head)
-const c1_body = translate(sphere(0.12), 2.0, 0.15, 0.2);
-const c1_head = translate(sphere(0.05), 2.12, 0.25, 0.2);
-const c1_beak = translate(box(0.04, 0.02, 0.02), 2.16, 0.24, 0.2);
-const c2_body = translate(sphere(0.11), 2.8, 0.14, -0.3);
-const c2_head = translate(sphere(0.045), 2.68, 0.23, -0.3);
-const c2_beak = translate(box(0.04, 0.02, 0.02), 2.64, 0.22, -0.3);
-const c3_body = translate(sphere(0.12), 3.2, 0.15, 0.1);
-const c3_head = translate(sphere(0.05), 3.08, 0.25, 0.15);
-
-// Pine trees (trunk + canopy layers)
-const t1_trunk = translate(cylinder(0.05, 2.2), -2.5, 0, 1.5);
-const t1_c1 = translate(sphere(0.35), -2.5, 1.4, 1.5);
-const t1_c2 = translate(sphere(0.28), -2.5, 1.8, 1.5);
-const t1_c3 = translate(sphere(0.18), -2.5, 2.1, 1.5);
-const t2_trunk = translate(cylinder(0.06, 2.6), -3.0, 0, -1.8);
-const t2_c1 = translate(sphere(0.38), -3.0, 1.6, -1.8);
-const t2_c2 = translate(sphere(0.3), -3.0, 2.0, -1.8);
-const t2_c3 = translate(sphere(0.2), -3.0, 2.4, -1.8);
-const t3_trunk = translate(cylinder(0.04, 2.0), 5.0, 0, -2.0);
-const t3_c1 = translate(sphere(0.3), 5.0, 1.2, -2.0);
-const t3_c2 = translate(sphere(0.22), 5.0, 1.6, -2.0);
-
-// Birch tree
-const b1_trunk = translate(cylinder(0.03, 2.4), 4.5, 0, 2.0);
-const b1_canopy = translate(sphere(0.35), 4.5, 1.9, 2.0);
-const b1_canopy2 = translate(sphere(0.28), 4.45, 2.2, 2.05);
-
-// Boulders
-const rock1 = translate(sphere(0.15), -1.5, 0.06, 1.0);
-const rock2 = translate(sphere(0.1), 4.0, 0.04, -1.5);
-const rock3 = translate(sphere(0.08), -0.5, 0.03, 1.5);
-
-// Gravel path
-const path1 = translate(box(3.5, 0.02, 0.5), 0.5, 0, 1.2);
-
-// Log pile
-const log1 = translate(rotate(cylinder(0.05, 0.4), 0, 0, 1.57), -1.5, 0.05, -1.0);
-const log2 = translate(rotate(cylinder(0.05, 0.4), 0, 0, 1.57), -1.5, 0.15, -1.0);
-const log3 = translate(rotate(cylinder(0.05, 0.4), 0, 0, 1.57), -1.5, 0.25, -1.0);
-const log4 = translate(rotate(cylinder(0.045, 0.4), 0, 0, 1.57), -1.5, 0.10, -0.9);
-const log5 = translate(rotate(cylinder(0.045, 0.4), 0, 0, 1.57), -1.5, 0.20, -0.9);
-
-// Add coop
-scene.add(floor, { material: "foundation", color: [0.6, 0.58, 0.55] });
-scene.add(wall_back, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(wall_left, { material: "lumber", color: [0.80, 0.66, 0.45] });
-scene.add(wall_right, { material: "lumber", color: [0.80, 0.66, 0.45] });
-scene.add(wall_front_upper, { material: "lumber", color: [0.80, 0.66, 0.45] });
-scene.add(wall_front_left, { material: "lumber", color: [0.80, 0.66, 0.45] });
-scene.add(wall_front_right, { material: "lumber", color: [0.80, 0.66, 0.45] });
-scene.add(nest_box, { material: "lumber", color: [0.7, 0.6, 0.4] });
-scene.add(nest_lid, { material: "lumber", color: [0.72, 0.62, 0.42] });
-scene.add(perch, { material: "lumber", color: [0.55, 0.45, 0.3] });
-scene.add(roof_l, { material: "roofing", color: [0.3, 0.32, 0.28] });
-scene.add(roof_r, { material: "roofing", color: [0.3, 0.32, 0.28] });
-scene.add(leg1, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(leg2, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(leg3, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(leg4, { material: "lumber", color: [0.5, 0.45, 0.35] });
-
-// Add run
-scene.add(run_post1, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_post2, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_post3, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_post4, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_rail_top1, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_rail_top2, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_rail_top3, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_rail_bot1, { material: "lumber", color: [0.5, 0.45, 0.35] });
-scene.add(run_rail_bot2, { material: "lumber", color: [0.5, 0.45, 0.35] });
-
-// Add chickens
-scene.add(c1_body, { color: [0.85, 0.55, 0.25] });
-scene.add(c1_head, { color: [0.85, 0.55, 0.25] });
-scene.add(c1_beak, { color: [0.9, 0.7, 0.2] });
-scene.add(c2_body, { color: [0.95, 0.95, 0.9] });
-scene.add(c2_head, { color: [0.95, 0.95, 0.9] });
-scene.add(c2_beak, { color: [0.9, 0.7, 0.2] });
-scene.add(c3_body, { color: [0.4, 0.25, 0.15] });
-scene.add(c3_head, { color: [0.4, 0.25, 0.15] });
-
-// Add trees
-scene.add(t1_trunk, { color: [0.45, 0.32, 0.2] });
-scene.add(t1_c1, { color: [0.2, 0.4, 0.22] });
-scene.add(t1_c2, { color: [0.18, 0.38, 0.2] });
-scene.add(t1_c3, { color: [0.16, 0.35, 0.18] });
-scene.add(t2_trunk, { color: [0.42, 0.3, 0.18] });
-scene.add(t2_c1, { color: [0.2, 0.42, 0.22] });
-scene.add(t2_c2, { color: [0.18, 0.4, 0.2] });
-scene.add(t2_c3, { color: [0.16, 0.36, 0.18] });
-scene.add(t3_trunk, { color: [0.45, 0.32, 0.2] });
-scene.add(t3_c1, { color: [0.2, 0.4, 0.22] });
-scene.add(t3_c2, { color: [0.18, 0.38, 0.2] });
-scene.add(b1_trunk, { color: [0.9, 0.88, 0.82] });
-scene.add(b1_canopy, { color: [0.35, 0.55, 0.25] });
-scene.add(b1_canopy2, { color: [0.3, 0.5, 0.22] });
-
-// Add landscape
-scene.add(rock1, { color: [0.6, 0.58, 0.55] });
-scene.add(rock2, { color: [0.55, 0.53, 0.5] });
-scene.add(rock3, { color: [0.58, 0.55, 0.52] });
-scene.add(path1, { color: [0.65, 0.6, 0.52] });
-scene.add(log1, { color: [0.5, 0.38, 0.22] });
-scene.add(log2, { color: [0.48, 0.36, 0.2] });
-scene.add(log3, { color: [0.5, 0.38, 0.22] });
-scene.add(log4, { color: [0.52, 0.4, 0.24] });
-scene.add(log5, { color: [0.48, 0.36, 0.2] });`,
+      scene_js: kanalaSceneJs,
       bom: [
-        { material_id: "pine_48x98_c24", quantity: 14, unit: "jm" },
-        { material_id: "osb_9mm", quantity: 6, unit: "m2" },
-        { material_id: "galvanized_roofing", quantity: 4, unit: "m2" },
-        { material_id: "screws_50mm", quantity: 120, unit: "kpl" },
+        { material_id: "pine_48x98_c24", quantity: 80, unit: "jm" },
+        { material_id: "pine_48x148_c24", quantity: 35, unit: "jm" },
+        { material_id: "osb_18mm", quantity: 12, unit: "m2" },
+        { material_id: "galvanized_roofing", quantity: 18, unit: "m2" },
+        { material_id: "screws_50mm", quantity: 500, unit: "kpl" },
+        { material_id: "concrete_block", quantity: 8, unit: "kpl" },
       ],
     },
   ]);
