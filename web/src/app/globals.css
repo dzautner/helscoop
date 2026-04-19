@@ -264,6 +264,18 @@
   border-radius: 99px;
 }
 
+/* Smooth theme transition */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: background-color 0.3s ease,
+              color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease,
+              backdrop-filter 0.3s ease !important;
+}
+
 /* 3D viewport stays dark */
 .viewport-always-dark {
   --bg-primary: #09090b;
