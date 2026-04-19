@@ -194,7 +194,7 @@ export default function KeyboardShortcutsHelp({
                   padding: "3px 8px",
                   background: "var(--bg-elevated)",
                   border: "1px solid var(--border)",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   color: "var(--text-primary)",
                   minWidth: 28,
                   textAlign: "center",
