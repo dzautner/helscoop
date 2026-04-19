@@ -440,6 +440,20 @@ body {
   color: var(--text-muted);
 }
 
+.scene-params-section-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.scene-params-section-body[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.scene-params-section-body-inner {
+  overflow: hidden;
+}
+
 .scene-params-items {
   padding: 0 14px 8px;
   display: flex;
