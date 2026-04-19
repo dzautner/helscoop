@@ -245,6 +245,18 @@ body {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
 .dropdown-menu {
   animation: dropdownIn 0.12s ease-out both;
 }
@@ -1505,6 +1517,52 @@ select:focus {
 .viewport-cam-btn:active {
   transform: scale(0.95);
   transition-duration: 0.04s;
+}
+
+/* === Focus-visible — keyboard accessibility === */
+.btn:focus-visible,
+.card-interactive:focus-visible,
+.lang-switch:focus-visible,
+.menu-item:focus-visible,
+.link-muted:focus-visible,
+.link-amber:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.input:focus-visible {
+  outline: none;
+}
+
+.btn-ghost:focus-visible {
+  outline-color: var(--text-secondary);
+}
+
+.btn-danger:focus-visible {
+  outline-color: var(--danger);
+}
+
+/* === Ghost/Danger active states === */
+.btn-ghost:active:not(:disabled) {
+  background: var(--bg-tertiary);
+  transform: scale(0.97);
+  transition-duration: 0.06s;
+}
+
+.btn-danger:active:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  transform: scale(0.97);
+  transition-duration: 0.06s;
+}
+
+/* === Reduced motion === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Screen-reader only */

@@ -1,18 +1,5 @@
 "use client";
 
-const shimmerStyle = {
-  background: `linear-gradient(
-    90deg,
-    var(--bg-tertiary) 25%,
-    var(--bg-elevated) 50%,
-    var(--bg-tertiary) 75%
-  )`,
-  backgroundSize: "200% 100%",
-  animation: "shimmer 1.8s ease-in-out infinite",
-  borderRadius: "var(--radius-sm)",
-};
-
-/** A single rectangular shimmer block. */
 export function SkeletonBlock({
   width,
   height,
@@ -26,8 +13,8 @@ export function SkeletonBlock({
 }) {
   return (
     <div
+      className="skeleton"
       style={{
-        ...shimmerStyle,
         width: width ?? "100%",
         height: height ?? 16,
         borderRadius: radius ?? "var(--radius-sm)",
