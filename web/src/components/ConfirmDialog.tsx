@@ -138,11 +138,11 @@ export default function ConfirmDialog({
           position: "relative",
           width: "100%",
           maxWidth: 420,
-          background: "var(--bg-elevated)",
+          background: "var(--bg-overlay, var(--bg-elevated))",
           border: "1px solid var(--border-strong)",
           borderRadius: "var(--radius-lg)",
           padding: "28px 28px 24px",
-          boxShadow: "0 16px 48px rgba(0, 0, 0, 0.4)",
+          boxShadow: "var(--shadow-lg)",
           animation: "dialogSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
         }}
       >
