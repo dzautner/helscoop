@@ -207,7 +207,7 @@ function ToastMessage({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: 
             fontSize: 11,
             fontWeight: 600,
             background: style.border,
-            borderRadius: 10,
+            borderRadius: "var(--radius-lg)",
             padding: "2px 7px",
             minWidth: 20,
             textAlign: "center",

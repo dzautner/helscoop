@@ -153,7 +153,7 @@ export function WelcomeModal({
             width: 44,
             height: 44,
             margin: "0 auto 20px",
-            borderRadius: 12,
+            borderRadius: "var(--radius-lg)",
             background: "var(--bg-tertiary)",
             border: "1px solid var(--border-strong)",
             display: "flex",
