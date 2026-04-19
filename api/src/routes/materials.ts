@@ -6,7 +6,7 @@ const router = Router();
 
 router.get("/", async (_req, res) => {
   const result = await query(`
-    SELECT m.*, c.display_name AS category_name,
+    SELECT m.*, c.display_name AS category_name, c.display_name_fi AS category_name_fi,
       (SELECT json_agg(json_build_object(
         'supplier_id', p.supplier_id,
         'supplier_name', s.name,

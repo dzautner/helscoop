@@ -5,6 +5,39 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
 import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow } from "@/types";
 
+/* ── Localization helpers ──────────────────────────────────── */
+
+/** Return the material name appropriate for the current locale */
+function getLocalizedMaterialName(
+  material: Material,
+  locale: string,
+): string {
+  if (locale === 'fi') return material.name_fi || material.name;
+  if (locale === 'en') return material.name_en || material.name;
+  return material.name;
+}
+
+/** Return the material name for a BOM item using the materials list */
+function getLocalizedBomItemName(
+  item: BomItem,
+  materials: Material[],
+  locale: string,
+): string {
+  const mat = materials.find((m) => m.id === item.material_id);
+  if (mat) return getLocalizedMaterialName(mat, locale);
+  return item.material_name || item.material_id;
+}
+
+/** Map a raw unit string (from DB) to locale-appropriate label */
+function localizeUnit(unit: string, t: (key: string) => string): string {
+  // Normalize: strip accents and lowercase for lookup
+  const normalized = unit.replace(/ä/g, 'a').replace(/ö/g, 'o').toLowerCase();
+  const translated = t(`units.${normalized}`);
+  // If the translation key resolves to itself, return original
+  if (translated === `units.${normalized}`) return unit;
+  return translated;
+}
+
 /* ── Category color palette ─────────────────────────────────── */
 const CATEGORY_COLORS: Record<string, string> = {
   "Sahatavara":  "#8B6F47",
@@ -616,7 +649,7 @@ function PriceComparisonPopup({
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                       <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-muted)" }}>
-                        <span>{price.unit} {t('pricing.perUnit')}</span>
+                        <span>{localizeUnit(price.unit, t)} {t('pricing.perUnit')}</span>
                         {price.sku && <span>SKU: {price.sku}</span>}
                         {price.last_scraped_at && (
                           <span>{t('pricing.lastChecked')}: {new Date(price.last_scraped_at).toLocaleDateString()}</span>
@@ -810,7 +843,8 @@ export default function BomPanel({
       .filter((m) => {
         if (!materialSearch.trim()) return true;
         const q = materialSearch.toLowerCase();
-        return m.name.toLowerCase().includes(q) || m.category_name.toLowerCase().includes(q);
+        const displayName = getLocalizedMaterialName(m, locale);
+        return displayName.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || m.category_name.toLowerCase().includes(q);
       })
       .filter((m) => {
         if (!activeCategory) return true;
@@ -929,20 +963,20 @@ export default function BomPanel({
             <div
               key={item.material_id}
               className="bom-item-card"
-              onClick={() => setCompareMaterial({ id: item.material_id, name: item.material_name || item.material_id })}
+              onClick={() => setCompareMaterial({ id: item.material_id, name: getLocalizedBomItemName(item, materials, locale) })}
             >
               <div className="bom-item-header">
                 <div className="bom-item-info">
                   {item.image_url ? (
                     <img
                       src={item.image_url}
-                      alt={item.material_name || ""}
+                      alt={getLocalizedBomItemName(item, materials, locale)}
                       className="bom-item-thumb"
                     />
                   ) : (
                     <div className="bom-item-thumb-placeholder" />
                   )}
-                  <strong className="bom-item-name">{item.material_name}</strong>
+                  <strong className="bom-item-name">{getLocalizedBomItemName(item, materials, locale)}</strong>
                 </div>
                 <button
                   className="bom-remove-btn"
@@ -967,7 +1001,7 @@ export default function BomPanel({
                   className="bom-item-qty-input"
                 />
                 <span className="bom-item-unit">
-                  {item.unit} x {Number(item.unit_price || 0).toFixed(2)}
+                  {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
                 </span>
                 <span className="bom-item-total">
                   {Number(item.total || 0).toFixed(2)}
@@ -1095,7 +1129,7 @@ export default function BomPanel({
                     {m.image_url ? (
                       <img
                         src={m.image_url}
-                        alt={m.name}
+                        alt={getLocalizedMaterialName(m, locale)}
                         style={{ width: 24, height: 24, borderRadius: 3, objectFit: "cover", flexShrink: 0 }}
                       />
                     ) : (
@@ -1119,7 +1153,7 @@ export default function BomPanel({
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}>
-                        {m.name}
+                        {getLocalizedMaterialName(m, locale)}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
                         <span style={{
@@ -1129,7 +1163,7 @@ export default function BomPanel({
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                         }}>
-                          {m.category_name}
+                          {locale === 'fi' && m.category_name_fi ? m.category_name_fi : m.category_name}
                         </span>
                         {price && (
                           <>
@@ -1203,7 +1237,7 @@ export default function BomPanel({
                       />
                       {price && (
                         <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                          {price.unit}
+                          {localizeUnit(price.unit, t)}
                         </span>
                       )}
                       <button

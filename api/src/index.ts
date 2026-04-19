@@ -420,6 +420,8 @@ app.get("/materials/export/viewer", publicLimiter, async (_req, res) => {
 
     materials[m.id] = {
       name: m.name,
+      name_fi: m.name_fi || m.name,
+      name_en: m.name_en || m.name,
       category: m.cat_id,
       tags: m.tags || [],
       visual: {
@@ -782,8 +784,11 @@ app.get("/categories", publicLimiter, async (_req, res) => {
 
 app.get("/bom/export/:projectId", authenticatedLimiter, requireAuth, async (req, res) => {
   const { query: dbQuery } = await import("./db");
+  const lang = (req.query.lang as string) || "fi";
   const result = await dbQuery(
-    `SELECT m.name, c.display_name AS category, pb.quantity, pb.unit,
+    `SELECT m.name, m.name_fi, m.name_en,
+      c.display_name AS category, c.display_name_fi AS category_fi,
+      pb.quantity, pb.unit,
       p.unit_price, (pb.quantity * p.unit_price * m.waste_factor) AS total,
       s.name AS supplier, p.link
      FROM project_bom pb
@@ -796,9 +801,16 @@ app.get("/bom/export/:projectId", authenticatedLimiter, requireAuth, async (req,
     [req.params.projectId]
   );
 
+  // Apply locale-specific names
+  const rows = result.rows.map((r) => ({
+    ...r,
+    name: lang === "en" ? (r.name_en || r.name) : (r.name_fi || r.name),
+    category: lang === "en" ? (r.category || r.category) : (r.category_fi || r.category),
+  }));
+
   if (req.query.format === "csv") {
     const header = "Material,Category,Qty,Unit,Price,Total,Supplier,Link\n";
-    const rows = result.rows
+    const csvRows = rows
       .map(
         (r) =>
           `"${r.name}","${r.category}",${r.quantity},"${r.unit}",${r.unit_price ?? 0},${r.total ?? 0},"${r.supplier ?? ""}","${r.link ?? ""}"`
@@ -809,10 +821,10 @@ app.get("/bom/export/:projectId", authenticatedLimiter, requireAuth, async (req,
       "Content-Disposition",
       `attachment; filename="bom_${req.params.projectId}.csv"`
     );
-    return res.send('\uFEFF' + header + rows);
+    return res.send('\uFEFF' + header + csvRows);
   }
 
-  res.json(result.rows);
+  res.json(rows);
 });
 
 app.listen(PORT, () => {
