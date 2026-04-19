@@ -279,6 +279,7 @@ body {
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
+  will-change: transform;
 }
 
 .dropdown-menu {
@@ -482,11 +483,14 @@ body {
 /* ── Link styles ─────────────────────────────────── */
 .link-muted {
   color: var(--text-muted);
-  text-decoration: none;
-  transition: color 0.12s ease;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 .link-muted:hover {
   color: var(--amber);
+  text-decoration-color: var(--amber);
 }
 
 .link-amber {
@@ -495,10 +499,14 @@ body {
   color: var(--amber);
   cursor: pointer;
   font-family: var(--font-body);
-  transition: opacity 0.12s ease;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease, opacity 0.15s ease;
 }
 .link-amber:hover {
-  opacity: 0.8;
+  text-decoration-color: var(--amber-dim);
+  opacity: 0.85;
 }
 
 /* ── Menu item hover ─────────────────────────────── */
@@ -623,7 +631,9 @@ body {
   font-weight: 500;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: all 0.12s cubic-bezier(0.2, 0, 0, 1);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, opacity 0.15s ease,
+              transform 0.1s cubic-bezier(0.2, 0, 0, 1);
   outline: none;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
@@ -633,9 +643,27 @@ body {
 .btn:active { transform: scale(0.97); }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  pointer-events: none;
   transform: none;
+}
+
+/* Loading state: dim button while spinner shows */
+.btn[data-loading="true"] {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Success flash after save/export actions */
+@keyframes btnSuccessFlash {
+  0%   { background: var(--forest); color: #fff; box-shadow: 0 0 12px var(--forest-dim); }
+  70%  { background: var(--forest); color: #fff; box-shadow: 0 0 12px var(--forest-dim); }
+  100% { background: var(--amber);  color: #09090b; box-shadow: none; }
+}
+
+.btn-success {
+  animation: btnSuccessFlash 1.2s ease-out both;
 }
 
 .btn-primary {
@@ -1952,6 +1980,7 @@ select:focus {
 .link-amber:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--amber-glow);
 }
 
 .input:focus-visible {
@@ -1960,10 +1989,12 @@ select:focus {
 
 .btn-ghost:focus-visible {
   outline-color: var(--text-secondary);
+  box-shadow: 0 0 0 4px rgba(161, 161, 170, 0.08);
 }
 
 .btn-danger:focus-visible {
   outline-color: var(--danger);
+  box-shadow: 0 0 0 4px var(--danger-dim);
 }
 
 /* === Ghost/Danger active states === */
