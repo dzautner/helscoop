@@ -183,11 +183,30 @@ router.post("/:id/duplicate", async (req, res) => {
   if (src.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
   const p = src.rows[0];
+
+  // Use locale header to determine copy suffix
+  const acceptLang = req.headers["accept-language"] || "";
+  const suffix = acceptLang.toLowerCase().startsWith("fi") ? "(kopio)" : "(copy)";
+
   const dup = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js, display_scale)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [req.user!.id, p.name + " (copy)", p.description, p.scene_js, p.display_scale]
+    `INSERT INTO projects (user_id, name, description, scene_js)
+     VALUES ($1,$2,$3,$4) RETURNING *`,
+    [req.user!.id, `${p.name} ${suffix}`, p.description, p.scene_js]
   );
+  const newId = dup.rows[0].id;
+
+  // Copy BOM items to the new project
+  const bomItems = await query(
+    "SELECT material_id, quantity, unit FROM project_bom WHERE project_id = $1",
+    [req.params.id]
+  );
+  for (const item of bomItems.rows) {
+    await query(
+      "INSERT INTO project_bom (project_id, material_id, quantity, unit) VALUES ($1, $2, $3, $4)",
+      [newId, item.material_id, item.quantity, item.unit]
+    );
+  }
+
   res.status(201).json(dup.rows[0]);
 });
 
