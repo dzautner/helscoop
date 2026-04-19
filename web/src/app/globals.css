@@ -826,7 +826,8 @@ body {
 
 .bom-item-qty-input {
   width: 56px;
-  padding: 8px 6px;
+  min-height: 44px;
+  padding: 10px 6px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2730,7 +2731,6 @@ select:focus {
 
   .bom-item-qty-input {
     padding: 10px 8px;
-    min-height: 44px;
   }
 }
 
