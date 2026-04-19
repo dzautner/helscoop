@@ -1107,6 +1107,108 @@ select:focus {
   font-size: 10px;
 }
 
+/* Trust layer */
+.trust-layer {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trust-partners {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trust-partners-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.trust-logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.trust-logo {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.trust-logo:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+
+.trust-stats-bar {
+  display: flex;
+  gap: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.trust-stat {
+  flex: 1;
+  text-align: center;
+  padding: 12px 8px;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border);
+}
+
+.trust-stat:last-child {
+  border-right: none;
+}
+
+.trust-stat-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--amber);
+  letter-spacing: -0.02em;
+  display: block;
+}
+
+.trust-stat-label {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+  display: block;
+}
+
+.trust-proof {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--forest-dim);
+  border: 1px solid rgba(74, 124, 89, 0.15);
+}
+
+.trust-proof-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 .login-form-panel {
   display: flex;
   align-items: center;

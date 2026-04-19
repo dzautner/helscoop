@@ -6,6 +6,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import TrustLayer from "@/components/TrustLayer";
 import type { BuildingResult } from "@/types";
 
 export default function LoginForm({
@@ -111,21 +112,12 @@ export default function LoginForm({
             ))}
           </div>
 
-          {/* Trust stats */}
-          <div className="anim-up delay-3 brand-stats">
-            {[
-              { value: "1 200+", label: t('brand.trustProducts') || "Products" },
-              { value: "6", label: t('brand.trustSuppliers') || "Suppliers" },
-              { value: "100%", label: t('brand.trustFree') || "Free" },
-            ].map((stat, i) => (
-              <div key={i} className="brand-stat">
-                <div className="brand-stat-value">{stat.value}</div>
-                <div className="brand-stat-label">{stat.label}</div>
-              </div>
-            ))}
+          {/* Trust layer: partner logos, stats, social proof */}
+          <div className="anim-up delay-3">
+            <TrustLayer />
           </div>
 
-          <div className="anim-up delay-3">
+          <div className="anim-up delay-3" style={{ marginTop: 16 }}>
             <div className="label-mono brand-tagline">
               {t('brand.tagline')}
             </div>
