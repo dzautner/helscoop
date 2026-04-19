@@ -1,34 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
-
-function useInView(threshold = 0.2) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          obs.disconnect();
-        }
-      },
-      { threshold }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-
-  return { ref, inView };
-}
+import ScrollReveal from "@/components/ScrollReveal";
 
 export default function FeatureHighlights() {
   const { locale } = useTranslation();
-  const { ref: sectionRef, inView } = useInView(0.15);
 
   const features = locale === 'fi' ? [
     { icon: "M3 21h18M9 8h1M9 12h1M5 21V5l7-3 7 3v16", title: "3D-malli osoitteesta", desc: "Syota kotiosoitteesi ja nae talosi kolmiulotteisena mallina hetkessa. Malli luodaan automaattisesti rakennustietorekisterin datan perusteella.", hero: true },
@@ -41,43 +17,32 @@ export default function FeatureHighlights() {
   ];
 
   return (
-    <section className="feature-section" ref={sectionRef}>
+    <section className="feature-section">
       <h2 className="sr-only">{locale === 'fi' ? 'Ominaisuudet' : 'Features'}</h2>
-      <div
-        className="feature-section-header"
-        style={{
-          opacity: inView ? 1 : 0,
-          transform: inView ? 'translateY(0)' : 'translateY(16px)',
-          transition: 'opacity 0.5s ease, transform 0.5s ease',
-        }}
-      >
-        <span className="label-mono" style={{ color: "var(--amber)", marginBottom: 8, display: "block" }}>
-          {locale === 'fi' ? 'MITEN SE TOIMII' : 'HOW IT WORKS'}
-        </span>
-        <h3 style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-          {locale === 'fi' ? 'Kolme askelta remonttiin' : 'Three steps to your renovation'}
-        </h3>
-      </div>
+      <ScrollReveal>
+        <div className="feature-section-header">
+          <span className="label-mono" style={{ color: "var(--amber)", marginBottom: 8, display: "block" }}>
+            {locale === 'fi' ? 'MITEN SE TOIMII' : 'HOW IT WORKS'}
+          </span>
+          <h3 style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+            {locale === 'fi' ? 'Kolme askelta remonttiin' : 'Three steps to your renovation'}
+          </h3>
+        </div>
+      </ScrollReveal>
       <div className="feature-grid">
         {features.map((f, i) => (
-          <div
-            key={i}
-            className={`feature-card${f.hero ? ' feature-card--hero' : ''}`}
-            style={{
-              opacity: inView ? 1 : 0,
-              transform: inView ? 'translateY(0)' : 'translateY(24px)',
-              transition: `opacity 0.5s ease ${f.hero ? 0.1 : 0.15 + i * 0.12}s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${f.hero ? 0.1 : 0.15 + i * 0.12}s`,
-            }}
-          >
-            <div className="feature-card-step">{String(i + 1).padStart(2, '0')}</div>
-            <div className="feature-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
-                <path d={f.icon} />
-              </svg>
+          <ScrollReveal key={i} delay={0.08 + i * 0.06}>
+            <div className={`feature-card${f.hero ? ' feature-card--hero' : ''}`}>
+              <div className="feature-card-step">{String(i + 1).padStart(2, '0')}</div>
+              <div className="feature-card-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={f.title}>
+                  <path d={f.icon} />
+                </svg>
+              </div>
+              <h3 className="feature-card-title">{f.title}</h3>
+              <p className="feature-card-desc">{f.desc}</p>
             </div>
-            <h3 className="feature-card-title">{f.title}</h3>
-            <p className="feature-card-desc">{f.desc}</p>
-          </div>
+          </ScrollReveal>
         ))}
       </div>
     </section>
