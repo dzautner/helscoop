@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
@@ -870,6 +871,7 @@ export default function BomPanel({
   const { t, locale } = useTranslation();
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const animatedTotal = useAnimatedNumber(total);
 
   // Fetch categories on mount
   useEffect(() => {
@@ -1005,7 +1007,7 @@ export default function BomPanel({
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
             <span style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
-              {total > 0 ? total.toLocaleString('fi-FI', { maximumFractionDigits: 0 }) : '0'}
+              {animatedTotal > 0 ? Math.round(animatedTotal).toLocaleString('fi-FI', { maximumFractionDigits: 0 }) : '0'}
             </span>
             <span style={{ fontSize: 14, color: "var(--text-muted)" }}>&euro;</span>
             {total > 0 && (
