@@ -2,6 +2,19 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
+// Mock the LocaleProvider's useTranslation hook
+vi.mock("@/components/LocaleProvider", () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        "dialog.confirm": "Confirm",
+        "dialog.cancel": "Cancel",
+      };
+      return translations[key] ?? key;
+    },
+  }),
+}));
+
 describe("ConfirmDialog", () => {
   const defaultProps = {
     open: true,
@@ -26,7 +39,7 @@ describe("ConfirmDialog", () => {
     ).toBeDefined();
   });
 
-  it("renders default button labels", () => {
+  it("renders default button labels from i18n", () => {
     render(<ConfirmDialog {...defaultProps} />);
     expect(screen.getByText("Confirm")).toBeDefined();
     expect(screen.getByText("Cancel")).toBeDefined();

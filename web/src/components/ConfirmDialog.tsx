@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "@/components/LocaleProvider";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -17,12 +18,15 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   variant = "default",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const resolvedConfirmText = confirmText ?? t("dialog.confirm");
+  const resolvedCancelText = cancelText ?? t("dialog.cancel");
   const dialogRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
@@ -179,7 +183,7 @@ export default function ConfirmDialog({
             onClick={onCancel}
             style={{ padding: "10px 20px", fontSize: 13 }}
           >
-            {cancelText}
+            {resolvedCancelText}
           </button>
           <button
             ref={confirmBtnRef}
@@ -198,7 +202,7 @@ export default function ConfirmDialog({
                 : {}),
             }}
           >
-            {confirmText}
+            {resolvedConfirmText}
           </button>
         </div>
       </div>
