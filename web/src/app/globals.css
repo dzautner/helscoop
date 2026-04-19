@@ -141,6 +141,66 @@
   border-bottom-color: rgba(0, 0, 0, 0.06);
 }
 
+[data-theme="light"] .editor-header {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px) saturate(1.3);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .viewport-toolbar {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .editor-bom-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(1.3);
+  border-left-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .chat-messages-area {
+  background: rgba(250, 250, 250, 0.7);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .chat-input-bar {
+  background: rgba(250, 250, 250, 0.6);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .chat-expand-btn {
+  background: rgba(250, 250, 250, 0.6);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .bom-item-card {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .bom-item-card:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+[data-theme="light"] .chat-suggestion-chip {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .chat-suggestion-chip:hover {
+  background: rgba(180, 83, 9, 0.06);
+}
+
+[data-theme="light"] .api-ref-panel {
+  background: rgba(250, 250, 250, 0.75);
+  backdrop-filter: blur(20px) saturate(1.3);
+  border-left-color: rgba(0, 0, 0, 0.06);
+}
+
 [data-theme="light"] .input {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.12);
@@ -450,16 +510,18 @@ body {
 
 .bom-item-card {
   padding: 12px 14px;
-  background: var(--bg-tertiary);
+  background: rgba(24, 24, 27, 0.5);
   border-radius: var(--radius-sm);
   margin-bottom: 6px;
   font-size: 13px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
 .bom-item-card:hover {
   border-color: var(--amber-border);
+  background: rgba(24, 24, 27, 0.7);
+  transform: translateX(-2px);
 }
 
 .bom-item-header {
@@ -1401,10 +1463,12 @@ select:focus {
 
 .editor-bom-panel {
   width: 340px;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary);
+  background: rgba(17, 17, 19, 0.68);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
   flex-shrink: 0;
 }
 
@@ -1419,8 +1483,10 @@ select:focus {
   max-height: 240px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: rgba(24, 24, 27, 0.65);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   border-bottom: none;
   animation: chatMsgIn 0.2s ease-out both;
@@ -1456,8 +1522,10 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: rgba(24, 24, 27, 0.55);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-bottom: none;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   color: var(--text-muted);
@@ -1598,18 +1666,19 @@ select:focus {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: rgba(24, 24, 27, 0.55);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 
 .chat-input-bar-focused,
 .chat-input-bar:focus-within {
   border-color: var(--amber-border);
   box-shadow: 0 0 0 2px var(--amber-glow);
-  background: linear-gradient(var(--bg-tertiary), var(--bg-tertiary)) padding-box,
-              linear-gradient(90deg, var(--amber-border), transparent, var(--amber-border)) border-box;
+  background: rgba(24, 24, 27, 0.75);
   animation: inputGlowSweep 2s ease-in-out infinite;
 }
 
@@ -1665,19 +1734,25 @@ select:focus {
 .chat-suggestion-chip {
   padding: 5px 12px;
   border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(30, 30, 34, 0.6);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
   color: var(--text-secondary);
   font-size: 11px;
   font-family: var(--font-body);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.12s ease;
   white-space: nowrap;
 }
 .chat-suggestion-chip:hover {
   border-color: var(--amber-border);
   color: var(--amber);
-  background: var(--amber-glow);
+  background: rgba(229, 160, 75, 0.08);
+  transform: translateY(-1px);
+}
+.chat-suggestion-chip:active {
+  transform: translateY(0);
 }
 
 .chat-skip-confirm {
@@ -1713,8 +1788,10 @@ select:focus {
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: rgba(17, 17, 19, 0.72);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
   min-height: 48px;
 }
@@ -1817,8 +1894,10 @@ select:focus {
   align-items: center;
   gap: 2px;
   padding: 6px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: rgba(17, 17, 19, 0.6);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
 }
 
@@ -2464,8 +2543,10 @@ select:focus {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-primary);
-  border-left: 1px solid var(--border);
+  background: rgba(9, 9, 11, 0.72);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
   overflow: hidden;
 }
 
