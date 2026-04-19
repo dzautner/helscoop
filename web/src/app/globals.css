@@ -246,12 +246,22 @@
   color: var(--text-muted);
 }
 
+[data-theme="light"] * {
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+}
+
 [data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.1);
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: 99px;
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(180, 83, 9, 0.25);
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: 99px;
 }
 
 /* 3D viewport stays dark */
@@ -292,10 +302,34 @@ body {
   color: var(--text-primary);
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* Scrollbar — thin, rounded, amber hover */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--amber-dim, rgba(229, 160, 75, 0.25));
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: 99px;
+}
 
 /* === Animations === */
 
