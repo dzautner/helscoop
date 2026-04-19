@@ -19,6 +19,7 @@ export type AnalyticsEvent =
   | "editor_session"
   | "bom_item_added"
   | "bom_item_removed"
+  | "bom_item_undo_remove"
   | "bom_exported"
   | "chat_message_sent"
   | "chat_code_applied"
@@ -33,6 +34,7 @@ export interface AnalyticsEventProps {
   editor_session: { duration_s: number; used_code_editor: boolean; used_chat: boolean };
   bom_item_added: { material_id: string; category?: string };
   bom_item_removed: { material_id: string };
+  bom_item_undo_remove: { material_id: string };
   bom_exported: { format: "pdf" | "csv" | "json" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;
