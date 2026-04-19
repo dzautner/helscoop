@@ -112,6 +112,10 @@ export default function ProjectPage() {
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
@@ -174,6 +178,7 @@ export default function ProjectPage() {
         setProject(proj);
         setProjectName(proj.name);
         setProjectDesc(proj.description || "");
+        if (proj.share_token) setShareToken(proj.share_token);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
         historyRef.current = [initialScene];
@@ -502,6 +507,37 @@ export default function ProjectPage() {
             </svg>
           </button>
           <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
+          <button
+            className="btn btn-ghost"
+            title={t('editor.share')}
+            onClick={async () => {
+              if (!shareToken) {
+                setShareLoading(true);
+                try {
+                  const res = await api.shareProject(projectId);
+                  setShareToken(res.share_token);
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : t('toast.shareFailed'), "error");
+                  setShareLoading(false);
+                  return;
+                }
+                setShareLoading(false);
+              }
+              setShowShareDialog(true);
+            }}
+            style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            {shareToken && (
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--forest)", flexShrink: 0 }} />
+            )}
+          </button>
           <div style={{ position: "relative" }} data-tour="export-btn">
             <button className="btn btn-ghost" title={t('editor.export')} onClick={() => setShowExportMenu(v => !v)} style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -881,6 +917,122 @@ export default function ProjectPage() {
           </div>
         )}
       </div>
+
+      {/* Share dialog */}
+      {showShareDialog && shareToken && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            animation: "fadeIn 0.15s ease both",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowShareDialog(false);
+          }}
+        >
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(4px)",
+          }} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: 460,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--radius-lg)",
+              padding: "28px 28px 24px",
+              boxShadow: "0 16px 48px rgba(0, 0, 0, 0.4)",
+              animation: "dialogSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
+            }}
+          >
+            <h2
+              className="heading-display"
+              style={{ fontSize: 18, margin: "0 0 8px", color: "var(--text-primary)" }}
+            >
+              {t('share.title')}
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: "0 0 20px", lineHeight: 1.5 }}>
+              {t('share.description')}
+            </p>
+
+            {/* Share URL field */}
+            <div style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+            }}>
+              <input
+                className="input"
+                readOnly
+                value={`${typeof window !== "undefined" ? window.location.origin : ""}/shared/${shareToken}`}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  fontFamily: "var(--font-mono)",
+                  padding: "10px 12px",
+                }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const url = `${window.location.origin}/shared/${shareToken}`;
+                  navigator.clipboard.writeText(url);
+                  setShareCopied(true);
+                  toast(t('toast.linkCopied'), "success");
+                  setTimeout(() => setShareCopied(false), 2000);
+                }}
+                style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+              >
+                {shareCopied ? t('share.copied') : t('share.copyLink')}
+              </button>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+              <button
+                className="btn btn-ghost"
+                onClick={async () => {
+                  if (!confirm(t('share.unshareConfirm'))) return;
+                  try {
+                    await api.unshareProject(projectId);
+                    setShareToken(null);
+                    setShowShareDialog(false);
+                    toast(t('toast.projectUnshared'), "success");
+                  } catch (err) {
+                    toast(err instanceof Error ? err.message : t('toast.unshareFailed'), "error");
+                  }
+                }}
+                style={{
+                  padding: "10px 16px",
+                  fontSize: 13,
+                  color: "var(--danger)",
+                }}
+              >
+                {t('share.unshare')}
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowShareDialog(false)}
+                style={{ padding: "10px 20px", fontSize: 13 }}
+              >
+                {t('editor.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Keyboard shortcuts help overlay */}
       <KeyboardShortcutsHelp

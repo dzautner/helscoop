@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import PDFDocument from "pdfkit";
 import { query } from "../db";
 import { requireAuth } from "../auth";
@@ -82,6 +83,45 @@ router.delete("/:id", async (req, res) => {
     req.params.id,
     req.user!.id,
   ]);
+  res.json({ ok: true });
+});
+
+// --------------------------------------------------------------------------
+// Share / Unshare endpoints
+// --------------------------------------------------------------------------
+router.post("/:id/share", async (req, res) => {
+  // Check ownership
+  const proj = await query(
+    "SELECT id, share_token FROM projects WHERE id=$1 AND user_id=$2",
+    [req.params.id, req.user!.id]
+  );
+  if (proj.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  // If already shared, return existing token
+  if (proj.rows[0].share_token) {
+    return res.json({ share_token: proj.rows[0].share_token });
+  }
+
+  // Generate a new share token (UUID v4)
+  const shareToken = crypto.randomUUID();
+  await query(
+    "UPDATE projects SET share_token = $1, updated_at = now() WHERE id = $2",
+    [shareToken, req.params.id]
+  );
+
+  res.json({ share_token: shareToken });
+});
+
+router.delete("/:id/share", async (req, res) => {
+  const result = await query(
+    "UPDATE projects SET share_token = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING id",
+    [req.params.id, req.user!.id]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
   res.json({ ok: true });
 });
 

@@ -22,6 +22,7 @@ export interface Project {
   display_scale?: number;
   thumbnail_url?: string | null;
   building_info?: BuildingInfo | null;
+  share_token?: string | null;
   bom?: BomItem[];
 }
 
