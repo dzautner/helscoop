@@ -71,7 +71,7 @@ test.describe("Authentication", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("rejects invalid credentials — stays on login", async ({ page }) => {
+  test("rejects invalid credentials — shows error without page reload", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
       localStorage.setItem("helscoop_onboarding_completed", "true");
@@ -82,16 +82,28 @@ test.describe("Authentication", () => {
     await page.locator('input[type="email"]').fill("nonexistent@test.com");
     await page.locator('input[type="password"]').fill("wrongpassword");
 
+    let navigated = false;
+    page.on("load", () => { navigated = true; });
+
     await page.getByRole("button", { name: /kirjaudu|sign in/i }).click({ force: true });
 
-    // Should NOT show projects list (user is not logged in)
-    await page.waitForTimeout(2000);
+    // Error message should appear inline
+    const errorBanner = page.locator(".anim-up").filter({
+      has: page.locator("text=/invalid|wrong|incorrect|virheellinen|väärä|failed|epäonnistui/i"),
+    });
+    await expect(errorBanner.first()).toBeVisible({ timeout: 5_000 });
+
+    // Login form should still be visible — no redirect
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
+
+    // Should NOT have navigated (page reload = bug)
+    expect(navigated).toBe(false);
+
+    // Should NOT show projects list
     await expect(
       page.getByText(/omat projektit|my projects/i)
     ).not.toBeVisible();
-
-    // Login form should still be visible
-    await expect(page.locator('input[type="email"]')).toBeVisible();
   });
 
   test("persists login across page reload", async ({ page }) => {

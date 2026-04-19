@@ -50,7 +50,8 @@ async function apiFetch(path: string, opts?: RequestInit) {
   const res = await fetch(`${API_URL}${path}`, { ...opts, headers });
 
   if (!res.ok) {
-    if (res.status === 401) {
+    const isAuthEndpoint = path.startsWith("/auth/login") || path.startsWith("/auth/register");
+    if (res.status === 401 && !isAuthEndpoint) {
       setToken(null);
       if (typeof window !== "undefined") {
         window.location.href = "/";
