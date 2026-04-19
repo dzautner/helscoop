@@ -5,6 +5,7 @@ import { api, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -32,6 +33,7 @@ export default function ProjectList({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { track } = useAnalytics();
 
   useEffect(() => {
     let mounted = true;
@@ -56,6 +58,7 @@ export default function ProjectList({
     if (!newName.trim()) return;
     setCreating(true);
     try {
+      track("project_created", { source: "blank" });
       const p = await api.createProject({ name: newName });
       setProjects([p, ...projects]);
       setNewName("");
@@ -69,6 +72,7 @@ export default function ProjectList({
   async function createFromTemplate(tmpl: Template) {
     setCreating(true);
     try {
+      track("project_created", { source: "template" });
       const p = await api.createProject({
         name: tmpl.name,
         description: tmpl.description,

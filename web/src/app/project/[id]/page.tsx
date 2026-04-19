@@ -16,6 +16,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { generateQuotePdf } from "@/lib/pdf";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import type { Material, BomItem, Project } from "@/types";
 
@@ -62,6 +63,8 @@ export default function ProjectPage() {
   const projectId = params.id as string;
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { track } = useAnalytics();
+  const { markCodeEditor, markChat } = useEditorSession();
 
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -277,10 +280,11 @@ export default function ProjectPage() {
 
   const handleApplyCode = useCallback(
     (code: string) => {
+      markChat();
       setSceneJs(code);
       pushHistory(code);
     },
-    [pushHistory]
+    [pushHistory, markChat]
   );
 
   /* ── Keyboard shortcuts ──────────────────────────────────────── */
@@ -360,6 +364,7 @@ export default function ProjectPage() {
       if (!mat) return;
       const pricing = mat.pricing?.find((p) => p.is_primary) || mat.pricing?.[0];
       bomChangedRef.current = true;
+      track("bom_item_added", { material_id: materialId, category: mat.category_name || "" });
       setBom((prev) => [
         ...prev,
         {
@@ -374,13 +379,14 @@ export default function ProjectPage() {
         },
       ]);
     },
-    [materials]
+    [materials, track]
   );
 
   const removeBomItem = useCallback((materialId: string) => {
     bomChangedRef.current = true;
+    track("bom_item_removed", { material_id: materialId });
     setBom((prev) => prev.filter((b) => b.material_id !== materialId));
-  }, []);
+  }, [track]);
 
   const updateBomQty = useCallback((materialId: string, qty: number) => {
     bomChangedRef.current = true;
@@ -490,6 +496,7 @@ export default function ProjectPage() {
                   onClick={async () => {
                     setShowExportMenu(false);
                     try {
+                      track("bom_exported", { format: "pdf" });
                       generateQuotePdf({ projectName, projectDescription: projectDesc, bom, locale });
                       toast(t('toast.bomExported'), "success");
                     } catch (err) {
@@ -509,6 +516,7 @@ export default function ProjectPage() {
                   onClick={async () => {
                     setShowExportMenu(false);
                     try {
+                      track("bom_exported", { format: "csv" });
                       await api.exportBOMCsv(projectId, projectName);
                       toast(t('toast.bomExported'), "success");
                     } catch (err) {
@@ -530,6 +538,7 @@ export default function ProjectPage() {
                   onClick={async () => {
                     setShowExportMenu(false);
                     try {
+                      track("bom_exported", { format: "json" });
                       const res = await api.exportBOM(projectId);
                       const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
                       const url = URL.createObjectURL(blob);
@@ -566,7 +575,7 @@ export default function ProjectPage() {
             <button
               className="viewport-toolbar-btn"
               data-active={showCode}
-              onClick={() => setShowCode(!showCode)}
+              onClick={() => { if (!showCode) markCodeEditor(); setShowCode(!showCode); }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="16 18 22 12 16 6" />

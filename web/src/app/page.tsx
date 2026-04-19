@@ -6,6 +6,7 @@ import { api, setToken, getToken } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 import AddressSearch from "@/components/AddressSearch";
 import ProjectList from "@/components/ProjectList";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import type { BuildingResult } from "@/types";
 
 const BUILDING_TYPE_LABELS: Record<string, Record<string, string>> = {
@@ -17,6 +18,7 @@ export default function Home() {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [pendingBuilding, setPendingBuilding] = useState<BuildingResult | null>(null);
+  const { track } = useAnalytics();
 
   useEffect(() => {
     if (getToken()) {
@@ -33,6 +35,7 @@ export default function Home() {
   }
 
   async function createProjectFromBuilding(building: BuildingResult) {
+    track("project_created", { source: "address", building_type: building.building_info.type });
     const buildingTypeLabels = BUILDING_TYPE_LABELS.fi;
     const project = await api.createProject({
       name: building.address,

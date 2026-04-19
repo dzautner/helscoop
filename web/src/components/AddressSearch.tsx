@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import type { BuildingResult } from "@/types";
 
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
@@ -89,6 +90,7 @@ export default function AddressSearch({
   const [result, setResult] = useState<BuildingResult | null>(null);
   const [searched, setSearched] = useState(false);
   const { t, locale } = useTranslation();
+  const { track } = useAnalytics();
 
   const search = useCallback(async () => {
     if (!query.trim() || query.trim().length < 3) return;
@@ -97,11 +99,13 @@ export default function AddressSearch({
     try {
       const data = await api.getBuilding(query.trim());
       setResult(data);
+      track("address_search", { query_length: query.trim().length, had_result: true });
     } catch {
       setResult(null);
+      track("address_search", { query_length: query.trim().length, had_result: false });
     }
     setLoading(false);
-  }, [query]);
+  }, [query, track]);
 
   const buildingTypeLabels = BUILDING_TYPE_LABELS[locale] || BUILDING_TYPE_LABELS.fi;
   const materialLabels = MATERIAL_LABELS[locale] || MATERIAL_LABELS.fi;

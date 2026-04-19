@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { BuildingResult } from "@/types";
@@ -24,6 +25,7 @@ export default function LoginForm({
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { t } = useTranslation();
+  const { track } = useAnalytics();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +40,7 @@ export default function LoginForm({
         ? await api.register(email, password, name)
         : await api.login(email, password);
       setToken(result.token);
+      track(isRegister ? "auth_register" : "auth_login", {} as Record<string, never>);
       onLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.loginFailed'));
