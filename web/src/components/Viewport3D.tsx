@@ -88,6 +88,38 @@ function createGeometry(obj: SceneObject): THREE.BufferGeometry {
   }
 }
 
+interface MaterialPBR {
+  roughness: number;
+  metalness: number;
+  opacity?: number;
+  transparent?: boolean;
+}
+
+const MATERIAL_PBR: Record<string, MaterialPBR> = {
+  galvanized_roofing: { roughness: 0.35, metalness: 0.85 },
+  galvanized_flashing: { roughness: 0.3, metalness: 0.8 },
+  hardware_cloth: { roughness: 0.5, metalness: 0.6, opacity: 0.7, transparent: true },
+  hinges_galvanized: { roughness: 0.4, metalness: 0.75 },
+  joist_hanger: { roughness: 0.45, metalness: 0.7 },
+  screws_50mm: { roughness: 0.35, metalness: 0.8 },
+  concrete_block: { roughness: 0.95, metalness: 0.0 },
+  builders_sand: { roughness: 0.98, metalness: 0.0 },
+  vapor_barrier: { roughness: 0.2, metalness: 0.1, opacity: 0.85, transparent: true },
+  insulation_100mm: { roughness: 0.9, metalness: 0.0 },
+  exterior_paint_red: { roughness: 0.6, metalness: 0.02 },
+  exterior_paint_yellow: { roughness: 0.6, metalness: 0.02 },
+  exterior_paint_gray_door: { roughness: 0.55, metalness: 0.03 },
+  exterior_paint_white: { roughness: 0.55, metalness: 0.02 },
+  osb_9mm: { roughness: 0.85, metalness: 0.0 },
+  osb_18mm: { roughness: 0.85, metalness: 0.0 },
+  door_thermal_bridge: { roughness: 0.5, metalness: 0.1 },
+  vent_thermal_bridge: { roughness: 0.5, metalness: 0.15 },
+};
+
+function getMaterialPBR(materialId: string): MaterialPBR {
+  return MATERIAL_PBR[materialId] || { roughness: 0.7, metalness: 0.05 };
+}
+
 function addSceneObjects(
   parent: THREE.Group,
   objects: SceneObject[],
@@ -111,11 +143,13 @@ function addSceneObjects(
       parent.add(group);
     } else {
       const geometry = createGeometry(obj);
+      const pbr = getMaterialPBR(obj.material);
       const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(obj.color[0], obj.color[1], obj.color[2]),
-        roughness: 0.7,
-        metalness: 0.05,
+        roughness: pbr.roughness,
+        metalness: pbr.metalness,
         wireframe,
+        ...(pbr.transparent ? { transparent: true, opacity: pbr.opacity ?? 1 } : {}),
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(obj.position[0], obj.position[1], obj.position[2]);
