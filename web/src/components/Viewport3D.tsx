@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
 import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
@@ -68,6 +69,20 @@ function createGeometry(obj: SceneObject): THREE.BufferGeometry {
       );
     case "sphere":
       return new THREE.SphereGeometry(obj.args[0] || 0.5, 16, 8);
+    case "hull": {
+      if (obj.hullVertices && obj.hullVertices.length >= 12) {
+        const points: THREE.Vector3[] = [];
+        for (let i = 0; i < obj.hullVertices.length; i += 3) {
+          points.push(new THREE.Vector3(
+            obj.hullVertices[i],
+            obj.hullVertices[i + 1],
+            obj.hullVertices[i + 2]
+          ));
+        }
+        return new ConvexGeometry(points);
+      }
+      return new THREE.BoxGeometry(1, 1, 1);
+    }
     default:
       return new THREE.BoxGeometry(1, 1, 1);
   }

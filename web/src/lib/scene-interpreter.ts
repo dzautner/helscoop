@@ -11,16 +11,17 @@
  */
 
 export interface MeshDescriptor {
-  type: "box" | "cylinder" | "sphere" | "group";
+  type: "box" | "cylinder" | "sphere" | "group" | "hull";
   args: number[];
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
   children?: MeshDescriptor[];
+  hullVertices?: number[];
 }
 
 export interface SceneObject {
-  geometry: "box" | "cylinder" | "sphere" | "group";
+  geometry: "box" | "cylinder" | "sphere" | "group" | "hull";
   args: number[];
   position: [number, number, number];
   rotation: [number, number, number];
@@ -29,6 +30,7 @@ export interface SceneObject {
   material: string;
   objectId?: string;
   children?: SceneObject[];
+  hullVertices?: number[];
 }
 
 function createMesh(
@@ -249,6 +251,52 @@ function wallImpl(opts: any): MeshDescriptor {
   return result;
 }
 
+function collectBoxCorners(mesh: MeshDescriptor): number[][] {
+  const corners: number[][] = [];
+  const px = mesh.position[0], py = mesh.position[1], pz = mesh.position[2];
+  const sx = mesh.scale[0], sy = mesh.scale[1], sz = mesh.scale[2];
+
+  if (mesh.type === "box") {
+    const hw = (mesh.args[0] || 1) * sx / 2;
+    const hh = (mesh.args[1] || 1) * sy / 2;
+    const hd = (mesh.args[2] || 1) * sz / 2;
+    for (const dx of [-1, 1]) {
+      for (const dy of [-1, 1]) {
+        for (const dz of [-1, 1]) {
+          corners.push([px + dx * hw, py + dy * hh, pz + dz * hd]);
+        }
+      }
+    }
+  } else if (mesh.type === "cylinder") {
+    const r = (mesh.args[0] || 0.5) * Math.max(sx, sy);
+    const hh = (mesh.args[1] || 1) * sz / 2;
+    for (let a = 0; a < 8; a++) {
+      const angle = (a / 8) * Math.PI * 2;
+      corners.push([px + r * Math.cos(angle), py + r * Math.sin(angle), pz - hh]);
+      corners.push([px + r * Math.cos(angle), py + r * Math.sin(angle), pz + hh]);
+    }
+  } else if (mesh.type === "sphere") {
+    const r = (mesh.args[0] || 0.5) * Math.max(sx, sy, sz);
+    for (const dx of [-1, 0, 1]) {
+      for (const dy of [-1, 0, 1]) {
+        for (const dz of [-1, 0, 1]) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          corners.push([px + (dx / len) * r, py + (dy / len) * r, pz + (dz / len) * r]);
+        }
+      }
+    }
+  } else if (mesh.type === "group" && mesh.children) {
+    for (const child of mesh.children) {
+      const childCorners = collectBoxCorners(child);
+      for (const c of childCorners) {
+        corners.push([px + c[0] * sx, py + c[1] * sy, pz + c[2] * sz]);
+      }
+    }
+  }
+  return corners;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function hullImpl(...args: any[]): MeshDescriptor {
   const parts: MeshDescriptor[] = [];
@@ -261,13 +309,35 @@ function hullImpl(...args: any[]): MeshDescriptor {
   }
   if (parts.length === 0) return createMesh("group", []);
   if (parts.length === 1) return parts[0];
+
+  const allCorners: number[][] = [];
+  for (const part of parts) {
+    allCorners.push(...collectBoxCorners(part));
+  }
+
+  if (allCorners.length < 4) {
+    return {
+      type: "group",
+      args: [],
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      children: parts,
+    };
+  }
+
+  const flat: number[] = [];
+  for (const c of allCorners) {
+    flat.push(c[0], c[1], c[2]);
+  }
+
   return {
-    type: "group",
+    type: "hull",
     args: [],
     position: [0, 0, 0],
     rotation: [0, 0, 0],
     scale: [1, 1, 1],
-    children: parts,
+    hullVertices: flat,
   };
 }
 
@@ -546,6 +616,7 @@ function meshToSceneObject(
     material,
     objectId,
     children: mesh.children?.map((c) => meshToSceneObject(c, material, color)),
+    hullVertices: mesh.hullVertices,
   };
 }
 
