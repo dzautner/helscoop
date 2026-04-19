@@ -256,6 +256,7 @@ function CameraToolbar({
           data-active={screenshotDataUrl !== null}
           onClick={handleScreenshot}
           data-tooltip={`${t("editor.screenshot")} (Cmd+Shift+S)`}
+          aria-label={t("editor.screenshotAriaLabel")}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
