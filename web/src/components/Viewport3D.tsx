@@ -16,6 +16,7 @@ interface Viewport3DProps {
   onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
   onToggleWireframe?: () => void;
+  /** Project name for screenshot filenames */
   projectName?: string;
 }
 
