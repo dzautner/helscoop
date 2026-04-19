@@ -812,7 +812,7 @@ body {
 
 .bom-item-qty-input {
   width: 56px;
-  padding: 4px 6px;
+  padding: 8px 6px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2701,6 +2701,11 @@ select:focus {
 
   .login-brand .heading-display {
     font-size: 32px;
+  }
+
+  .bom-item-qty-input {
+    padding: 10px 8px;
+    min-height: 44px;
   }
 }
 

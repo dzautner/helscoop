@@ -208,6 +208,7 @@ const translations = {
       dontAskAgain: 'Ala kysy uudelleen taman istunnon aikana',
       docs: 'Dokumentit',
       share: 'Jaa',
+      quantityFor: 'Maara: {{name}}',
     },
     share: {
       title: 'Jaa projekti',
@@ -672,6 +673,7 @@ const translations = {
       dontAskAgain: "Don't ask again this session",
       docs: 'Docs',
       share: 'Share',
+      quantityFor: 'Quantity for {{name}}',
     },
     share: {
       title: 'Share project',
