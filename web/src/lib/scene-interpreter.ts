@@ -2,8 +2,12 @@
  * Scene Script Interpreter for Helscoop
  *
  * Executes scene scripts in a sandboxed manner using the Function constructor.
- * Provides primitives (box, cylinder, sphere), transforms (translate, rotate),
- * boolean-like operations (union, subtract, intersect), and scene.add().
+ * Supports two APIs:
+ *   1. C++ viewer API: cube({size, center}), translate(m, [x,y,z]), scale(), export const scene
+ *   2. Simple API: box(w,h,d), scene.add(mesh, {material, color})
+ *
+ * The model coordinate system is Z-up (matching Manifold/C++ viewer).
+ * The Viewport3D renderer handles the conversion to Y-up for Three.js.
  */
 
 export interface MeshDescriptor {
@@ -11,6 +15,7 @@ export interface MeshDescriptor {
   args: number[];
   position: [number, number, number];
   rotation: [number, number, number];
+  scale: [number, number, number];
   children?: MeshDescriptor[];
 }
 
@@ -19,8 +24,10 @@ export interface SceneObject {
   args: number[];
   position: [number, number, number];
   rotation: [number, number, number];
+  scale: [number, number, number];
   color: [number, number, number];
   material: string;
+  objectId?: string;
   children?: SceneObject[];
 }
 
@@ -33,85 +40,250 @@ function createMesh(
     args,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
+    scale: [1, 1, 1],
   };
 }
 
-function box(w: number, h: number, d: number): MeshDescriptor {
-  return createMesh("box", [w, h, d]);
+// ── Primitives ───────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function cubeImpl(...rawArgs: any[]): MeshDescriptor {
+  let sx = 1, sy = 1, sz = 1;
+  let center = false;
+
+  if (rawArgs.length === 1 && Array.isArray(rawArgs[0])) {
+    [sx, sy, sz] = rawArgs[0];
+  } else if (rawArgs.length === 1 && typeof rawArgs[0] === "object" && rawArgs[0] !== null && rawArgs[0].size) {
+    [sx, sy, sz] = rawArgs[0].size;
+    center = !!rawArgs[0].center;
+  } else if (rawArgs.length >= 3) {
+    sx = rawArgs[0]; sy = rawArgs[1]; sz = rawArgs[2];
+    center = true;
+  } else if (rawArgs.length === 1 && typeof rawArgs[0] === "number") {
+    sx = sy = sz = rawArgs[0];
+  }
+
+  const mesh = createMesh("box", [Math.abs(sx), Math.abs(sy), Math.abs(sz)]);
+  if (!center) {
+    mesh.position = [sx / 2, sy / 2, sz / 2];
+  }
+  return mesh;
 }
 
-function cylinder(r: number, h: number): MeshDescriptor {
-  return createMesh("cylinder", [r, h]);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function cylinderImpl(...rawArgs: any[]): MeshDescriptor {
+  let radius = 0.5, height = 1;
+  let center = false;
+
+  if (rawArgs.length === 1 && typeof rawArgs[0] === "object" && rawArgs[0] !== null) {
+    if (rawArgs[0].radius !== undefined) radius = rawArgs[0].radius;
+    if (rawArgs[0].height !== undefined) height = rawArgs[0].height;
+    if (rawArgs[0].center) center = true;
+  } else if (rawArgs.length >= 2) {
+    radius = rawArgs[0]; height = rawArgs[1];
+    center = true;
+  } else if (rawArgs.length === 1) {
+    radius = rawArgs[0];
+  }
+
+  const mesh = createMesh("cylinder", [radius, height]);
+  if (!center) {
+    mesh.position = [0, 0, height / 2];
+  }
+  return mesh;
 }
 
-function sphere(r: number): MeshDescriptor {
-  return createMesh("sphere", [r]);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sphereImpl(...rawArgs: any[]): MeshDescriptor {
+  let radius = 0.5;
+
+  if (rawArgs.length === 1 && typeof rawArgs[0] === "object" && rawArgs[0] !== null) {
+    if (rawArgs[0].radius !== undefined) radius = rawArgs[0].radius;
+  } else if (rawArgs.length === 1 && typeof rawArgs[0] === "number") {
+    radius = rawArgs[0];
+  }
+
+  return createMesh("sphere", [radius]);
 }
 
-function translate(
-  mesh: MeshDescriptor,
-  x: number,
-  y: number,
-  z: number
-): MeshDescriptor {
+// ── Transforms ───────────────────────────────────────────────────────────────
+
+function cloneMesh(mesh: MeshDescriptor): MeshDescriptor {
   return {
     ...mesh,
-    position: [
-      mesh.position[0] + x,
-      mesh.position[1] + y,
-      mesh.position[2] + z,
-    ],
-    children: mesh.children ? [...mesh.children] : undefined,
+    position: [...mesh.position] as [number, number, number],
+    rotation: [...mesh.rotation] as [number, number, number],
+    scale: [...mesh.scale] as [number, number, number],
+    children: mesh.children ? mesh.children.map(cloneMesh) : undefined,
   };
 }
 
-function rotate(
-  mesh: MeshDescriptor,
-  rx: number,
-  ry: number,
-  rz: number
-): MeshDescriptor {
-  return {
-    ...mesh,
-    rotation: [
-      mesh.rotation[0] + rx,
-      mesh.rotation[1] + ry,
-      mesh.rotation[2] + rz,
-    ],
-    children: mesh.children ? [...mesh.children] : undefined,
-  };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function translateImpl(mesh: MeshDescriptor, ...rest: any[]): MeshDescriptor {
+  let dx = 0, dy = 0, dz = 0;
+  if (rest.length === 1 && Array.isArray(rest[0])) {
+    [dx, dy, dz] = rest[0];
+  } else if (rest.length >= 3) {
+    dx = rest[0]; dy = rest[1]; dz = rest[2];
+  }
+  const out = cloneMesh(mesh);
+  out.position[0] += dx;
+  out.position[1] += dy;
+  out.position[2] += dz;
+  return out;
 }
 
-function union(a: MeshDescriptor, b: MeshDescriptor): MeshDescriptor {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rotateImpl(mesh: MeshDescriptor, ...rest: any[]): MeshDescriptor {
+  let rx = 0, ry = 0, rz = 0;
+  if (rest.length === 1 && Array.isArray(rest[0])) {
+    [rx, ry, rz] = rest[0];
+  } else if (rest.length >= 3) {
+    rx = rest[0]; ry = rest[1]; rz = rest[2];
+  }
+  const out = cloneMesh(mesh);
+  out.rotation[0] += rx;
+  out.rotation[1] += ry;
+  out.rotation[2] += rz;
+  return out;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function scaleImpl(mesh: MeshDescriptor, factor: any): MeshDescriptor {
+  let sx: number, sy: number, sz: number;
+  if (Array.isArray(factor)) {
+    [sx, sy, sz] = factor;
+  } else {
+    sx = sy = sz = factor as number;
+  }
+  const out = cloneMesh(mesh);
+  out.position[0] *= sx;
+  out.position[1] *= sy;
+  out.position[2] *= sz;
+  out.scale[0] *= sx;
+  out.scale[1] *= sy;
+  out.scale[2] *= sz;
+  if (out.children) {
+    out.children = out.children.map(c => scaleImpl(c, factor));
+  }
+  return out;
+}
+
+// ── Boolean operations ───────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function unionImpl(...args: any[]): MeshDescriptor {
+  const parts: MeshDescriptor[] = [];
+  for (const arg of args) {
+    if (Array.isArray(arg)) {
+      parts.push(...arg);
+    } else if (arg && typeof arg === "object" && arg.type) {
+      parts.push(arg);
+    }
+  }
+  if (parts.length === 0) return createMesh("group", []);
+  if (parts.length === 1) return parts[0];
   return {
     type: "group",
     args: [],
     position: [0, 0, 0],
     rotation: [0, 0, 0],
-    children: [a, b],
+    scale: [1, 1, 1],
+    children: parts,
   };
 }
 
-function subtract(a: MeshDescriptor, b: MeshDescriptor): MeshDescriptor {
-  // For MVP, just return a (real CSG subtraction is complex)
+function differenceImpl(a: MeshDescriptor, _b: MeshDescriptor): MeshDescriptor {
+  return a;
+}
+
+function intersectionImpl(a: MeshDescriptor, _b: MeshDescriptor): MeshDescriptor {
+  return a;
+}
+
+// ── Higher-level primitives ──────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function wallImpl(opts: any): MeshDescriptor {
+  const start: [number, number] = opts.start || [0, 0];
+  const end: [number, number] = opts.end || [1000, 0];
+  const height: number = opts.height || 2400;
+  const studSize: [number, number] = opts.studSize || [48, 98];
+  const studSpacing: number = opts.studSpacing || 400;
+
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const wallLen = Math.sqrt(dx * dx + dy * dy);
+  const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+  const thickness = studSize[0];
+  const studW = studSize[1];
+  const plateH = studSize[0];
+  const studH = height - 2 * plateH;
+  const numStuds = Math.ceil(wallLen / studSpacing) + 1;
+
+  const parts: MeshDescriptor[] = [];
+
+  // Bottom plate
+  parts.push(cubeImpl({ size: [wallLen, thickness, plateH], center: false }));
+  // Top plate
+  parts.push(translateImpl(
+    cubeImpl({ size: [wallLen, thickness, plateH], center: false }),
+    [0, 0, height - plateH]
+  ));
+
+  // Studs
+  for (let i = 0; i < numStuds; i++) {
+    const x = Math.min(i * studSpacing, wallLen - studW);
+    parts.push(translateImpl(
+      cubeImpl({ size: [studW, thickness, studH], center: false }),
+      [x, 0, plateH]
+    ));
+  }
+
+  const frame = unionImpl(...parts);
+  let result = translateImpl(frame, [start[0], start[1], 0]);
+  if (Math.abs(angle) > 0.01) {
+    result = rotateImpl(result, [0, 0, angle]);
+  }
+  return result;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function hullImpl(...args: any[]): MeshDescriptor {
+  const parts: MeshDescriptor[] = [];
+  for (const arg of args) {
+    if (Array.isArray(arg)) {
+      parts.push(...arg);
+    } else if (arg && typeof arg === "object" && arg.type) {
+      parts.push(arg);
+    }
+  }
+  if (parts.length === 0) return createMesh("group", []);
+  if (parts.length === 1) return parts[0];
   return {
     type: "group",
     args: [],
     position: [0, 0, 0],
     rotation: [0, 0, 0],
-    children: [a, b],
+    scale: [1, 1, 1],
+    children: parts,
   };
 }
 
-function intersect(a: MeshDescriptor, b: MeshDescriptor): MeshDescriptor {
-  return {
-    type: "group",
-    args: [],
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-    children: [a, b],
-  };
+// ── Color/material helpers (provided to script sandbox) ──────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withColorImpl(geometry: any, color: any): any {
+  return { geometry, color };
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withPBRImpl(geometry: any, opts: any): any {
+  return { geometry, color: opts?.color, material: opts?.material };
+}
+
+// ── Scene export types ───────────────────────────────────────────────────────
 
 export interface InterpreterResult {
   objects: SceneObject[];
@@ -119,9 +291,8 @@ export interface InterpreterResult {
   warnings: string[];
 }
 
-// ── Pre-execution validation ──────────────────────────────────────────────
+// ── Pre-execution validation ─────────────────────────────────────────────────
 
-/** Check that braces, parens, and brackets are balanced */
 function checkBalancedDelimiters(script: string): string[] {
   const warnings: string[] = [];
   const stack: { char: string; line: number }[] = [];
@@ -154,7 +325,7 @@ function checkBalancedDelimiters(script: string): string[] {
     }
 
     if (inString) {
-      if (ch === "\\" ) { i++; continue; }
+      if (ch === "\\") { i++; continue; }
       if (ch === inString) inString = null;
       continue;
     }
@@ -182,7 +353,6 @@ function checkBalancedDelimiters(script: string): string[] {
   return warnings;
 }
 
-/** Strip single-line and block comments from script */
 function stripComments(script: string): string {
   let result = "";
   let inString: string | null = null;
@@ -216,7 +386,6 @@ function stripComments(script: string): string {
   return result;
 }
 
-/** Common typos for scene API identifiers */
 const SCENE_TYPOS: [RegExp, string][] = [
   [/\bscnee\s*\./g, "scene"],
   [/\bscen\s*\./g, "scene"],
@@ -241,11 +410,12 @@ function checkTypos(script: string): string[] {
   return warnings;
 }
 
-// Known identifiers provided by the interpreter sandbox
 const KNOWN_IDENTIFIERS = new Set([
-  "box", "cylinder", "sphere", "translate", "rotate",
-  "union", "subtract", "intersect", "scene",
-  // JS built-ins that are commonly used
+  "box", "cube", "cylinder", "sphere",
+  "translate", "rotate", "scale",
+  "union", "difference", "intersection", "subtract", "intersect",
+  "withColor", "withPBR", "withMaterial",
+  "scene",
   "Math", "console", "const", "let", "var", "for", "if", "else",
   "while", "do", "return", "function", "true", "false", "null",
   "undefined", "new", "this", "typeof", "instanceof", "void",
@@ -255,7 +425,6 @@ const KNOWN_IDENTIFIERS = new Set([
   "parseInt", "parseFloat", "isNaN", "isFinite", "Infinity", "NaN",
 ]);
 
-/** Warn about bare identifiers that look like they should be primitives */
 function checkUndefinedPrimitives(script: string): string[] {
   const stripped = stripComments(script);
   const warnings: string[] = [];
@@ -285,23 +454,7 @@ function preValidate(script: string): string[] {
   ];
 }
 
-// ── Post-execution validation ─────────────────────────────────────────────
-
-function collectPositionsAndDimensions(
-  objects: SceneObject[],
-  positions: [number, number, number][],
-  dimensions: { args: number[]; geometry: string }[]
-) {
-  for (const obj of objects) {
-    positions.push(obj.position);
-    if (obj.geometry !== "group") {
-      dimensions.push({ args: obj.args, geometry: obj.geometry });
-    }
-    if (obj.children) {
-      collectPositionsAndDimensions(obj.children, positions, dimensions);
-    }
-  }
-}
+// ── Post-execution validation ────────────────────────────────────────────────
 
 function postValidate(objects: SceneObject[]): string[] {
   const warnings: string[] = [];
@@ -310,7 +463,6 @@ function postValidate(objects: SceneObject[]): string[] {
     warnings.push("validation.emptyScene");
   }
 
-  // Count total objects (recursively)
   let totalCount = 0;
   function countObjects(objs: SceneObject[]) {
     for (const obj of objs) {
@@ -320,51 +472,104 @@ function postValidate(objects: SceneObject[]): string[] {
   }
   countObjects(objects);
 
-  if (totalCount > 200) {
+  if (totalCount > 10000) {
     warnings.push(`validation.tooManyObjects:${totalCount}`);
-  }
-
-  const positions: [number, number, number][] = [];
-  const dimensions: { args: number[]; geometry: string }[] = [];
-  collectPositionsAndDimensions(objects, positions, dimensions);
-
-  // Check positions far from origin
-  for (const pos of positions) {
-    const dist = Math.sqrt(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
-    if (dist > 50) {
-      warnings.push(`validation.farFromOrigin:${Math.round(dist)}`);
-      break; // One warning is enough
-    }
-  }
-
-  // Check zero or negative dimensions
-  for (const dim of dimensions) {
-    for (const arg of dim.args) {
-      if (arg <= 0) {
-        warnings.push(`validation.invalidDimension:${dim.geometry}`);
-        break;
-      }
-    }
   }
 
   return warnings;
 }
 
+// ── Material color lookup ────────────────────────────────────────────────────
+
+const MATERIAL_COLORS: Record<string, [number, number, number]> = {
+  "pine_48x98_c24": [1, 0.95, 0.85],
+  "pine_48x148_c24": [1, 0.95, 0.85],
+  "pressure_treated_48x148": [0.65, 0.72, 0.55],
+  "pressure_treated_148x148": [0.6, 0.68, 0.5],
+  "osb_9mm": [0.85, 0.75, 0.60],
+  "osb_18mm": [0.85, 0.75, 0.60],
+  "exterior_board_yellow": [0.95, 0.82, 0.28],
+  "galvanized_roofing": [0.75, 0.76, 0.78],
+  "galvanized_flashing": [0.7, 0.7, 0.73],
+  "hardware_cloth": [0.65, 0.65, 0.68],
+  "insulation_100mm": [0.95, 0.92, 0.55],
+  "vapor_barrier": [0.15, 0.15, 0.18],
+  "exterior_paint_red": [0.65, 0.22, 0.15],
+  "exterior_paint_yellow": [0.92, 0.78, 0.35],
+  "exterior_paint_gray_door": [0.45, 0.48, 0.52],
+  "exterior_paint_white": [0.96, 0.95, 0.93],
+  "hinges_galvanized": [0.68, 0.68, 0.7],
+  "joist_hanger": [0.72, 0.72, 0.74],
+  "screws_50mm": [0.6, 0.58, 0.55],
+  "concrete_block": [0.55, 0.55, 0.52],
+  "builders_sand": [0.85, 0.78, 0.6],
+  "nest_box_plywood": [0.55, 0.42, 0.3],
+  "trim_21x45": [0.88, 0.78, 0.58],
+  "door_thermal_bridge": [0.42, 0.46, 0.52],
+  "assembly_lumber_preview": [0.85, 0.72, 0.52],
+  "vent_thermal_bridge": [0.3, 0.3, 0.35],
+  "nest_access_thermal_bridge": [0.75, 0.65, 0.5],
+  "cedar_post_98x98": [0.62, 0.7, 0.52],
+};
+
+function materialColor(materialId: string): [number, number, number] {
+  return MATERIAL_COLORS[materialId] || [0.8, 0.8, 0.8];
+}
+
+// ── Conversion helpers ───────────────────────────────────────────────────────
+
 function meshToSceneObject(
   mesh: MeshDescriptor,
   material: string,
-  color: [number, number, number]
+  color: [number, number, number],
+  objectId?: string,
 ): SceneObject {
   return {
     geometry: mesh.type,
     args: mesh.args,
     position: mesh.position,
     rotation: mesh.rotation,
+    scale: mesh.scale,
     color,
     material,
+    objectId,
     children: mesh.children?.map((c) => meshToSceneObject(c, material, color)),
   };
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function coloredObjectToSceneObject(obj: any): SceneObject | null {
+  if (!obj || typeof obj !== "object") return null;
+
+  if (obj.type && obj.args) {
+    return meshToSceneObject(obj as MeshDescriptor, "default", [0.8, 0.8, 0.8]);
+  }
+
+  const geom = obj.geometry;
+  if (!geom || typeof geom !== "object") return null;
+
+  const mat: string = typeof obj.material === "string" ? obj.material : "default";
+  const color: [number, number, number] = Array.isArray(obj.color)
+    ? [obj.color[0], obj.color[1], obj.color[2]]
+    : materialColor(mat);
+  const objectId: string | undefined = typeof obj.objectId === "string" ? obj.objectId : undefined;
+
+  return meshToSceneObject(geom as MeshDescriptor, mat, color, objectId);
+}
+
+// ── Script preprocessing ─────────────────────────────────────────────────────
+
+function preprocessScript(script: string): string {
+  let processed = script;
+  processed = processed.replace(/\bexport\s+const\b/g, "const");
+  processed = processed.replace(/\bexport\s+let\b/g, "let");
+  processed = processed.replace(/\bexport\s+var\b/g, "var");
+  processed = processed.replace(/\bexport\s+function\b/g, "function");
+  processed = processed.replace(/\bexport\s+default\b/g, "");
+  return processed;
+}
+
+// ── @param support ───────────────────────────────────────────────────────────
 
 export interface SceneParam {
   name: string;
@@ -409,10 +614,11 @@ export function applyParamToScript(
   return script.replace(re, `$1${newValue}`);
 }
 
+// ── Main interpreter ─────────────────────────────────────────────────────────
+
 export function interpretScene(script: string): InterpreterResult {
   const warnings: string[] = [];
 
-  // Pre-execution validation
   warnings.push(...preValidate(script));
 
   const objects: SceneObject[] = [];
@@ -429,23 +635,77 @@ export function interpretScene(script: string): InterpreterResult {
   };
 
   try {
-    // Build the sandboxed function with restricted scope
+    const processed = preprocessScript(script);
+
+    // Detect which API the script uses:
+    // - "scene.add()" API: scene is a proxy object
+    // - "export const scene = [...]" API: scene is a user-declared array
+    const hasOwnScene = /\b(?:const|let|var)\s+scene\b/.test(processed);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resultBag: Record<string, any> = {};
+
+    let wrappedScript = "";
+    if (!hasOwnScene) {
+      wrappedScript = "var scene = __sceneProxy__;\n" + processed;
+    } else {
+      wrappedScript = processed + `
+;__result__.scene = scene;
+if (typeof materials !== "undefined") { __result__.materials = materials; }
+if (typeof displayScale !== "undefined") { __result__.displayScale = displayScale; }
+`;
+    }
+
     const fn = new Function(
       "box",
+      "cube",
       "cylinder",
       "sphere",
       "translate",
       "rotate",
+      "scale",
       "union",
+      "difference",
+      "intersection",
       "subtract",
       "intersect",
-      "scene",
-      script
+      "withColor",
+      "withPBR",
+      "Wall",
+      "hull",
+      "__sceneProxy__",
+      "__result__",
+      wrappedScript
     );
 
-    fn(box, cylinder, sphere, translate, rotate, union, subtract, intersect, sceneProxy);
+    fn(
+      cubeImpl,
+      cubeImpl,
+      cylinderImpl,
+      sphereImpl,
+      translateImpl,
+      rotateImpl,
+      scaleImpl,
+      unionImpl,
+      differenceImpl,
+      intersectionImpl,
+      differenceImpl,
+      intersectionImpl,
+      withColorImpl,
+      withPBRImpl,
+      wallImpl,
+      hullImpl,
+      sceneProxy,
+      resultBag,
+    );
 
-    // Post-execution validation
+    if (resultBag.scene && Array.isArray(resultBag.scene)) {
+      for (const item of resultBag.scene) {
+        const sceneObj = coloredObjectToSceneObject(item);
+        if (sceneObj) objects.push(sceneObj);
+      }
+    }
+
     warnings.push(...postValidate(objects));
 
     return { objects, error: null, warnings };

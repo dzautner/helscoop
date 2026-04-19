@@ -64,10 +64,10 @@ function createGeometry(obj: SceneObject): THREE.BufferGeometry {
         obj.args[0] || 0.5,
         obj.args[0] || 0.5,
         obj.args[1] || 1,
-        32
+        16
       );
     case "sphere":
-      return new THREE.SphereGeometry(obj.args[0] || 0.5, 32, 16);
+      return new THREE.SphereGeometry(obj.args[0] || 0.5, 16, 8);
     default:
       return new THREE.BoxGeometry(1, 1, 1);
   }
@@ -83,8 +83,15 @@ function addSceneObjects(
   for (const obj of objects) {
     if (obj.geometry === "group" && obj.children) {
       const group = new THREE.Group();
-      group.position.set(...obj.position);
-      group.rotation.set(...obj.rotation);
+      group.position.set(obj.position[0], obj.position[1], obj.position[2]);
+      const s = obj.scale;
+      group.scale.set(s[0], s[1], s[2]);
+      const r = obj.rotation;
+      group.rotation.set(
+        r[0] * Math.PI / 180,
+        r[1] * Math.PI / 180,
+        r[2] * Math.PI / 180
+      );
       count += addSceneObjects(group, obj.children, wireframe);
       parent.add(group);
     } else {
@@ -96,8 +103,15 @@ function addSceneObjects(
         wireframe,
       });
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(...obj.position);
-      mesh.rotation.set(...obj.rotation);
+      mesh.position.set(obj.position[0], obj.position[1], obj.position[2]);
+      const s = obj.scale;
+      mesh.scale.set(s[0], s[1], s[2]);
+      const r = obj.rotation;
+      mesh.rotation.set(
+        r[0] * Math.PI / 180,
+        r[1] * Math.PI / 180,
+        r[2] * Math.PI / 180
+      );
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       parent.add(mesh);
@@ -365,8 +379,9 @@ export default function Viewport3D({
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Object group (will be populated with scene objects)
+    // Object group — rotated to convert Z-up (Manifold/C++ viewer) to Y-up (Three.js)
     const objectGroup = new THREE.Group();
+    objectGroup.rotation.x = -Math.PI / 2;
     scene.add(objectGroup);
     objectGroupRef.current = objectGroup;
 
