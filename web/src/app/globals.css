@@ -240,6 +240,88 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dropdown-menu {
+  animation: dropdownIn 0.12s ease-out both;
+}
+
+/* ── Category filter chip ───────────────────────── */
+.category-chip {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  white-space: nowrap;
+}
+.category-chip:hover {
+  border-color: var(--amber-border);
+  color: var(--text-secondary);
+}
+.category-chip[data-active="true"] {
+  border-color: var(--amber-border);
+  background: var(--amber-glow);
+  color: var(--amber);
+}
+
+/* ── BOM item card ───────────────────────────────── */
+.bom-item-card {
+  padding: 12px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.bom-item-card:hover {
+  border-color: var(--amber-border);
+}
+
+/* ── Material browse card ────────────────────────── */
+.material-browse-card {
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.material-browse-card:hover {
+  border-color: var(--amber-border);
+}
+.material-browse-card[data-selected="true"] {
+  background: var(--amber-glow);
+  border-color: var(--amber-border);
+}
+
+/* ── BOM remove button ───────────────────────────── */
+.bom-remove-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0.5;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.12s ease, background 0.12s ease;
+  display: flex;
+  align-items: center;
+}
+.bom-remove-btn:hover {
+  opacity: 1;
+  background: rgba(199, 95, 95, 0.1);
+}
+
 @keyframes slideLeft {
   from { opacity: 0; transform: translateX(8px); }
   to { opacity: 1; transform: translateX(0); }
@@ -1325,6 +1407,11 @@ select:focus {
 
 .viewport-cam-btn:hover {
   background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.viewport-cam-btn[data-active="true"] {
+  background: rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.95);
 }
 

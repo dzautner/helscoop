@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
@@ -145,12 +145,14 @@ function CameraToolbar({
   sceneRef: React.RefObject<THREE.Scene | null>;
 }) {
   const { t } = useTranslation();
+  const [activePreset, setActivePreset] = useState(3); // default to Iso
 
   const handlePreset = useCallback(
-    (preset: CameraPreset) => {
+    (preset: CameraPreset, index: number) => {
       const camera = cameraRef.current;
       const controls = controlsRef.current;
       if (!camera || !controls) return;
+      setActivePreset(index);
       animateCamera(camera, controls, preset.position, preset.target);
     },
     [cameraRef, controlsRef]
@@ -198,7 +200,8 @@ function CameraToolbar({
         <button
           key={i}
           className="viewport-cam-btn"
-          onClick={() => handlePreset(preset)}
+          data-active={i === activePreset}
+          onClick={() => handlePreset(preset, i)}
           title={t(preset.key)}
         >
           {t(preset.key)}

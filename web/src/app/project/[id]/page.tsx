@@ -287,6 +287,7 @@ export default function ProjectPage() {
   const closeAllPanels = useCallback(() => {
     setShowCode(false);
     setShowShortcutsHelp(false);
+    setShowExportMenu(false);
   }, []);
 
   const shortcuts = useMemo<KeyboardShortcut[]>(() => [
@@ -472,7 +473,7 @@ export default function ProjectPage() {
               </svg>
             </button>
             {showExportMenu && (
-              <div style={{
+              <div className="dropdown-menu" style={{
                 position: "absolute",
                 top: "calc(100% + 6px)",
                 right: 0,

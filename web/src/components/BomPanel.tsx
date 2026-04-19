@@ -333,19 +333,9 @@ function PriceHistoryChart({
         {(["30d", "90d", "180d", "1y"] as TimeRange[]).map((r) => (
           <button
             key={r}
+            className="category-chip"
+            data-active={range === r}
             onClick={() => setRange(r)}
-            style={{
-              padding: "2px 8px",
-              fontSize: 10,
-              fontWeight: 600,
-              border: "1px solid",
-              borderColor: range === r ? "var(--amber-border)" : "var(--border)",
-              borderRadius: 10,
-              background: range === r ? "var(--amber-glow)" : "transparent",
-              color: range === r ? "var(--amber)" : "var(--text-muted)",
-              cursor: "pointer",
-              transition: "all 0.12s ease",
-            }}
           >
             {r}
           </button>
@@ -948,19 +938,8 @@ export default function BomPanel({
           bom.map((item) => (
             <div
               key={item.material_id}
-              style={{
-                padding: "12px 14px",
-                background: "var(--bg-tertiary)",
-                borderRadius: "var(--radius-sm)",
-                marginBottom: 6,
-                fontSize: 13,
-                border: "1px solid var(--border)",
-                cursor: "pointer",
-                transition: "border-color 0.15s ease",
-              }}
+              className="bom-item-card"
               onClick={() => setCompareMaterial({ id: item.material_id, name: item.material_name || item.material_id })}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--amber-border)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -976,20 +955,13 @@ export default function BomPanel({
                   <strong style={{ fontSize: 13, fontWeight: 500 }}>{item.material_name}</strong>
                 </div>
                 <button
+                  className="bom-remove-btn"
                   onClick={(e) => { e.stopPropagation(); onRemove(item.material_id); }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--danger)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    padding: "0 4px",
-                    opacity: 0.6,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
                 >
-                  x
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
@@ -1089,20 +1061,9 @@ export default function BomPanel({
               }}
             >
               <button
+                className="category-chip"
+                data-active={!activeCategory}
                 onClick={() => setActiveCategory("")}
-                style={{
-                  padding: "3px 8px",
-                  fontSize: 10,
-                  fontWeight: 500,
-                  border: "1px solid",
-                  borderColor: !activeCategory ? "var(--amber-border)" : "var(--border)",
-                  borderRadius: 12,
-                  background: !activeCategory ? "var(--amber-glow)" : "transparent",
-                  color: !activeCategory ? "var(--amber)" : "var(--text-muted)",
-                  cursor: "pointer",
-                  transition: "all 0.12s ease",
-                  whiteSpace: "nowrap",
-                }}
               >
                 {t('pricing.allCategories')}
               </button>
@@ -1112,20 +1073,9 @@ export default function BomPanel({
                 return (
                   <button
                     key={cat.id}
+                    className="category-chip"
+                    data-active={isActive}
                     onClick={() => setActiveCategory(isActive ? "" : cat.display_name)}
-                    style={{
-                      padding: "3px 8px",
-                      fontSize: 10,
-                      fontWeight: 500,
-                      border: "1px solid",
-                      borderColor: isActive ? "var(--amber-border)" : "var(--border)",
-                      borderRadius: 12,
-                      background: isActive ? "var(--amber-glow)" : "transparent",
-                      color: isActive ? "var(--amber)" : "var(--text-muted)",
-                      cursor: "pointer",
-                      transition: "all 0.12s ease",
-                      whiteSpace: "nowrap",
-                    }}
                   >
                     {catName}
                   </button>
@@ -1157,21 +1107,9 @@ export default function BomPanel({
               return (
                 <div
                   key={m.id}
-                  style={{
-                    padding: "8px 10px",
-                    background: isSelected ? "var(--amber-glow)" : "var(--bg-tertiary)",
-                    border: isSelected ? "1px solid var(--amber-border)" : "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    cursor: "pointer",
-                    transition: "all 0.12s ease",
-                  }}
+                  className="material-browse-card"
+                  data-selected={isSelected}
                   onClick={() => handleQuickAdd(m.id)}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.borderColor = "var(--amber-border)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)";
-                  }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {m.image_url ? (
