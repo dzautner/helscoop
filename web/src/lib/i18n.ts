@@ -181,6 +181,7 @@ const translations = {
       confirmApplyUndo: 'Voit kumota toiminnon nappaimilla',
       cancel: 'Peruuta',
       dontAskAgain: 'Ala kysy uudelleen taman istunnon aikana',
+      docs: 'Dokumentit',
     },
     shortcuts: {
       title: 'Pikanappaimet',
@@ -532,6 +533,7 @@ const translations = {
       confirmApplyUndo: 'You can undo with',
       cancel: 'Cancel',
       dontAskAgain: "Don't ask again this session",
+      docs: 'Docs',
     },
     shortcuts: {
       title: 'Keyboard shortcuts',
