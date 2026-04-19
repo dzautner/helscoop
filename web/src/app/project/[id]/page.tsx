@@ -696,6 +696,7 @@ export default function ProjectPage() {
           className="editor-header-name"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
+          title={projectName}
         />
         <div className="editor-save-status" style={{
           color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--text-muted)",

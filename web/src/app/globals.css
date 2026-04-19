@@ -590,7 +590,7 @@ body {
   font-size: 10px;
   font-weight: 500;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -2058,9 +2058,13 @@ select:focus {
   color: var(--text-primary);
   flex: 1;
   min-width: 0;
+  max-width: calc(100vw - 600px);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   transition: background 0.15s ease;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .editor-header-name:hover {
