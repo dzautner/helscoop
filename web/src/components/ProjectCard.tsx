@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Project } from "@/types";
 
@@ -14,6 +15,7 @@ export default function ProjectCard({
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const router = useRouter();
   const { t, locale } = useTranslation();
 
   return (
@@ -25,7 +27,7 @@ export default function ProjectCard({
         cursor: "pointer",
         overflow: "hidden",
       }}
-      onClick={() => (window.location.href = `/project/${project.id}`)}
+      onClick={() => (router.push(`/project/${project.id}`))}
     >
       {/* Thumbnail or placeholder */}
       <div className="project-card-thumb" style={{
@@ -68,7 +70,7 @@ export default function ProjectCard({
           </div>
         </div>
         <div className="project-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: 10 }}>
-          <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => (window.location.href = `/project/${project.id}`)}>
+          <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => (router.push(`/project/${project.id}`))}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               <polyline points="15 3 21 3 21 9" />

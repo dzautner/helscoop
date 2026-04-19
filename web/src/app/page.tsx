@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api, setToken, getToken } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 import AddressSearch from "@/components/AddressSearch";
@@ -13,6 +14,7 @@ const BUILDING_TYPE_LABELS: Record<string, Record<string, string>> = {
 };
 
 export default function Home() {
+  const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [pendingBuilding, setPendingBuilding] = useState<BuildingResult | null>(null);
 
@@ -40,7 +42,7 @@ export default function Home() {
     if (building.bom_suggestion.length > 0) {
       await api.saveBOM(project.id, building.bom_suggestion);
     }
-    window.location.href = `/project/${project.id}`;
+    router.push(`/project/${project.id}`);
   }
 
   async function handleLogin() {
