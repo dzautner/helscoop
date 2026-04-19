@@ -10,6 +10,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
+import SceneApiReference from "@/components/SceneApiReference";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import OnboardingTour from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -75,6 +76,7 @@ export default function ProjectPage() {
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
@@ -288,6 +290,7 @@ export default function ProjectPage() {
     setShowCode(false);
     setShowShortcutsHelp(false);
     setShowExportMenu(false);
+    setShowDocs(false);
   }, []);
 
   const shortcuts = useMemo<KeyboardShortcut[]>(() => [
@@ -602,6 +605,18 @@ export default function ProjectPage() {
               </svg>
               {t('editor.resetCamera')}
             </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={showDocs}
+              onClick={() => setShowDocs(!showDocs)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              {t('editor.docs') || "Docs"}
+            </button>
             <div style={{ flex: 1 }} />
             <span className="viewport-status" data-error={!!sceneError}>
               {sceneError
@@ -754,6 +769,19 @@ export default function ProjectPage() {
               style={{ width: bomWidth }}
             />
           </>
+        )}
+
+        {/* Scene API Reference panel */}
+        {showDocs && (
+          <div style={{ width: 320, flexShrink: 0, height: "100%", overflow: "hidden" }}>
+            <SceneApiReference
+              onInsertCode={(code) => {
+                setSceneJs((prev) => prev + "\n" + code);
+                pushHistory(sceneJs + "\n" + code);
+                setShowCode(true);
+              }}
+            />
+          </div>
         )}
       </div>
 
