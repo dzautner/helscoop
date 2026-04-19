@@ -460,7 +460,7 @@ export default function ProjectPage() {
 
       {/* Header */}
       <div className="editor-header">
-        <button className="btn btn-ghost" onClick={() => router.push("/")} style={{ padding: "6px 10px" }} title={t('nav.back')}>
+        <button className="btn btn-ghost" onClick={() => router.push("/")} style={{ padding: "6px 10px" }} title={t('nav.back')} aria-label={t('nav.back')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -487,6 +487,7 @@ export default function ProjectPage() {
             onClick={undo}
             disabled={!canUndo}
             title={t('editor.undoShortcut')}
+            aria-label={t('editor.undoShortcut')}
             style={{ padding: "5px 7px", opacity: canUndo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -499,6 +500,7 @@ export default function ProjectPage() {
             onClick={redo}
             disabled={!canRedo}
             title={t('editor.redoShortcut')}
+            aria-label={t('editor.redoShortcut')}
             style={{ padding: "5px 7px", opacity: canRedo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -510,6 +512,7 @@ export default function ProjectPage() {
           <button
             className="btn btn-ghost"
             title={t('editor.share')}
+            aria-label={t('editor.share')}
             onClick={async () => {
               if (!shareToken) {
                 setShareLoading(true);
@@ -539,7 +542,7 @@ export default function ProjectPage() {
             )}
           </button>
           <div style={{ position: "relative" }} data-tour="export-btn">
-            <button className="btn btn-ghost" title={t('editor.export')} onClick={() => setShowExportMenu(v => !v)} style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="btn btn-ghost" title={t('editor.export')} aria-label={t('editor.export')} onClick={() => setShowExportMenu(v => !v)} style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />

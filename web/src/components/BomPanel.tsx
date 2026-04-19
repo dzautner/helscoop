@@ -213,6 +213,7 @@ function CostBreakdownChart({
                   color: "var(--text-primary)",
                   whiteSpace: "nowrap",
                   fontSize: 10,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {s.pct.toFixed(0)}% &middot; {s.total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}&euro;
@@ -900,7 +901,7 @@ export default function BomPanel({
             {t('editor.estimatedTotal')}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--text-primary)" }}>
+            <span style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
               {total > 0 ? total.toLocaleString('fi-FI', { maximumFractionDigits: 0 }) : '0'}
             </span>
             <span style={{ fontSize: 14, color: "var(--text-muted)" }}>&euro;</span>
@@ -1200,6 +1201,7 @@ export default function BomPanel({
                         color: "var(--success)",
                         whiteSpace: "nowrap",
                         flexShrink: 0,
+                        fontVariantNumeric: "tabular-nums",
                       }}>
                         {Number(price.unit_price).toFixed(2)} &euro;
                       </span>

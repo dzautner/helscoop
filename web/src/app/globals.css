@@ -575,6 +575,7 @@ body {
   color: var(--text-primary);
   outline: none;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .bom-item-qty-input:focus {
@@ -592,6 +593,7 @@ body {
   color: var(--success);
   font-family: var(--font-mono);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .bom-item-supplier {
