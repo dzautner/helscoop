@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface ContextMenuItem {
   id: string;
@@ -26,22 +26,50 @@ const BUTTON_SIZE = 40;
 export default function ViewportContextMenu({ items, position, onClose }: ViewportContextMenuProps) {
   const [visible, setVisible] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     if (position) {
-      // Trigger enter animation
       requestAnimationFrame(() => setVisible(true));
+      setFocusedIndex(0);
     } else {
       setVisible(false);
     }
   }, [position]);
 
-  // Close on Escape
+  useEffect(() => {
+    if (visible && itemRefs.current[focusedIndex]) {
+      itemRefs.current[focusedIndex]!.focus();
+    }
+  }, [visible, focusedIndex]);
+
   useEffect(() => {
     if (!position) return;
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      switch (e.key) {
+        case "Escape":
+          e.preventDefault();
+          onClose();
+          break;
+        case "ArrowDown":
+        case "ArrowRight":
+          e.preventDefault();
+          setFocusedIndex((prev) => (prev + 1) % items.length);
+          break;
+        case "ArrowUp":
+        case "ArrowLeft":
+          e.preventDefault();
+          setFocusedIndex((prev) => (prev - 1 + items.length) % items.length);
+          break;
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          items[focusedIndex]?.onClick();
+          onClose();
+          break;
+      }
     }
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -54,7 +82,7 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
       window.removeEventListener("keydown", handleKey);
       window.removeEventListener("mousedown", handleClick);
     };
-  }, [position, onClose]);
+  }, [position, onClose, items, focusedIndex]);
 
   if (!position) return null;
 
@@ -72,6 +100,8 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
   return (
     <div
       ref={menuRef}
+      role="menu"
+      aria-label="Viewport actions"
       style={{
         position: "fixed",
         left: adjustedX,
@@ -79,6 +109,7 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
         zIndex: 10001,
         pointerEvents: "auto",
         transform: "translate(-50%, -50%)",
+        outline: "none",
       }}
     >
       {/* Center dot */}
@@ -102,7 +133,8 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
         const angle = startAngle + i * angleStep;
         const x = Math.cos(angle) * RING_RADIUS;
         const y = Math.sin(angle) * RING_RADIUS;
-        const isHovered = hoveredId === item.id;
+        const isFocused = focusedIndex === i;
+        const isHovered = hoveredId === item.id || isFocused;
 
         return (
           <div
@@ -119,12 +151,17 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
             }}
           >
             <button
+              ref={(el) => { itemRefs.current[i] = el; }}
+              role="menuitem"
+              tabIndex={isFocused ? 0 : -1}
+              aria-label={item.label}
               onClick={() => {
                 item.onClick();
                 onClose();
               }}
-              onMouseEnter={() => setHoveredId(item.id)}
+              onMouseEnter={() => { setHoveredId(item.id); setFocusedIndex(i); }}
               onMouseLeave={() => setHoveredId(null)}
+              onFocus={() => setFocusedIndex(i)}
               style={{
                 width: BUTTON_SIZE,
                 height: BUTTON_SIZE,
@@ -147,8 +184,8 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
                 backdropFilter: "blur(16px)",
                 transition: "all 0.15s ease",
                 transform: isHovered ? "scale(1.15)" : "scale(1)",
+                outline: "none",
               }}
-              title={item.label}
             >
               <svg
                 width="16"
