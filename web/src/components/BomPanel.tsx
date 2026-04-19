@@ -842,6 +842,7 @@ function BomItemCard({
           onChange={(e) => handleQtyChange(e.target.value)}
           onBlur={handleQtyBlur}
           className="bom-item-qty-input"
+          aria-label={t('editor.quantityFor', { name: getLocalizedBomItemName(item, materials, locale) })}
         />
         <span className="bom-item-unit">
           {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
