@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { ChatMessage } from "@/types";
+
+/** Check if two messages are from the same role and should be visually grouped */
+function shouldGroup(current: ChatMessage, prev: ChatMessage | undefined): boolean {
+  if (!prev) return false;
+  return current.role === prev.role;
+}
 
 export default function ChatPanel({
   sceneJs,
@@ -21,6 +27,7 @@ export default function ChatPanel({
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [skipConfirm, setSkipConfirm] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const usedSuggestionRef = useRef(false);
@@ -84,6 +91,14 @@ export default function ChatPanel({
     return match ? match[1].trim() : null;
   }
 
+  /** Count scene.add calls in code to show preview hint */
+  const countSceneObjects = useMemo(() => {
+    return (code: string): number => {
+      const matches = code.match(/scene\.add\(/g);
+      return matches ? matches.length : 0;
+    };
+  }, []);
+
   return (
     <div className="chat-embedded">
       {/* Messages area - expands when there are messages */}
@@ -104,31 +119,42 @@ export default function ChatPanel({
               const textContent = msg.content
                 .replace(/```(?:javascript|js)?\n[\s\S]*?```/g, "")
                 .trim();
+              const grouped = shouldGroup(msg, messages[i - 1]);
 
               return (
                 <div
                   key={i}
-                  className={`chat-msg ${msg.role === "user" ? "chat-msg-user" : "chat-msg-ai"}`}
+                  className={`chat-msg ${msg.role === "user" ? "chat-msg-user" : "chat-msg-ai"}${grouped ? " chat-msg-grouped" : ""}`}
                 >
-                  {msg.role === "assistant" && (
-                    <div className="chat-msg-avatar">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  {msg.role === "assistant" && !grouped && (
+                    <div className={`chat-msg-avatar${loading && i === messages.length - 1 ? " chat-avatar-active" : ""}`}>
+                      {/* Nordic-inspired geometric house icon */}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
                       </svg>
                     </div>
+                  )}
+                  {msg.role === "assistant" && grouped && (
+                    <div className="chat-msg-avatar-spacer" />
                   )}
                   <div className="chat-msg-content">
                     {textContent && <span>{textContent}</span>}
                     {code && (
-                      <button
-                        className="chat-apply-btn"
-                        onClick={() => handleApplyClick(code)}
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        {t('editor.applyToScene')}
-                      </button>
+                      <div className="chat-apply-bar">
+                        <button
+                          className="chat-apply-btn"
+                          onClick={() => handleApplyClick(code)}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          {t('editor.applyToScene')}
+                        </button>
+                        <span className="chat-apply-hint">
+                          {countSceneObjects(code)} {countSceneObjects(code) === 1 ? "object" : "objects"}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -136,15 +162,14 @@ export default function ChatPanel({
             })}
             {loading && (
               <div className="chat-msg chat-msg-ai">
-                <div className="chat-msg-avatar">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                <div className="chat-msg-avatar chat-avatar-active">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
                   </svg>
                 </div>
                 <div className="chat-msg-content">
-                  <div className="typing-dots">
-                    <span /><span /><span />
-                  </div>
+                  <div className="chat-shimmer-bar" />
                 </div>
               </div>
             )}
@@ -195,9 +220,10 @@ export default function ChatPanel({
       )}
 
       {/* Input bar - always visible */}
-      <div className="chat-input-bar">
+      <div className={`chat-input-bar${inputFocused ? " chat-input-bar-focused" : ""}`}>
         <svg className="chat-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
         <input
           ref={inputRef}
@@ -205,6 +231,8 @@ export default function ChatPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+          onFocus={() => setInputFocused(true)}
+          onBlur={() => setInputFocused(false)}
           placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.describeChange')}
           disabled={loading}
         />
