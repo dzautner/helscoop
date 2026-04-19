@@ -369,6 +369,78 @@ app.get("/auth/verify-email", authLimiter, async (req, res) => {
   }
 });
 
+// GDPR data export — download all user data as JSON
+app.get("/auth/data-export", authenticatedLimiter, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+
+    // Fetch user profile (excluding password hash and internal tokens)
+    const userResult = await query(
+      "SELECT id, email, name, role, email_verified, created_at FROM users WHERE id = $1",
+      [userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const user = userResult.rows[0];
+
+    // Fetch all projects with BOM data
+    const projectsResult = await query(
+      `SELECT id, name, description, scene_js, building_info, is_public, share_token,
+              created_at, updated_at
+       FROM projects WHERE user_id = $1 ORDER BY created_at`,
+      [userId]
+    );
+
+    const projects = [];
+    for (const project of projectsResult.rows) {
+      const bomResult = await query(
+        `SELECT pb.quantity, pb.unit, m.name AS material_name, m.name_fi, m.name_en,
+                c.display_name AS category,
+                p.unit_price, s.name AS supplier_name
+         FROM project_bom pb
+         JOIN materials m ON pb.material_id = m.id
+         JOIN categories c ON m.category_id = c.id
+         LEFT JOIN pricing p ON m.id = p.material_id AND p.is_primary = true
+         LEFT JOIN suppliers s ON p.supplier_id = s.id
+         WHERE pb.project_id = $1
+         ORDER BY c.sort_order`,
+        [project.id]
+      );
+
+      projects.push({
+        ...project,
+        building_info: project.building_info ? JSON.parse(project.building_info) : null,
+        bom: bomResult.rows,
+      });
+    }
+
+    const exportData = {
+      exported_at: new Date().toISOString(),
+      format_version: 1,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        email_verified: user.email_verified,
+        created_at: user.created_at,
+      },
+      projects,
+    };
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="helscoop_data_export_${new Date().toISOString().split("T")[0]}.json"`
+    );
+    res.json(exportData);
+  } catch (e) {
+    console.error("GDPR data export error:", e);
+    res.status(500).json({ error: "Failed to export data" });
+  }
+});
+
 // Resend verification email
 app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (req, res) => {
   try {

@@ -99,6 +99,26 @@ export const api = {
     apiFetch(`/auth/verify-email?token=${encodeURIComponent(token)}`),
   resendVerification: () =>
     apiFetch("/auth/resend-verification", { method: "POST" }),
+  exportUserData: async () => {
+    const t = getToken();
+    const res = await fetch(`${API_URL}/auth/data-export`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        ERROR_MESSAGES[res.status] || `Virhe ${res.status} / Error ${res.status}`,
+        res.status,
+        res.statusText
+      );
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `helscoop_data_export_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   getProjects: () => apiFetch("/projects"),
   getProject: (id: string) => apiFetch(`/projects/${id}`),

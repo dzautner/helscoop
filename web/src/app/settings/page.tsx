@@ -32,6 +32,9 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Data export
+  const [exportingData, setExportingData] = useState(false);
+
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -103,6 +106,20 @@ export default function SettingsPage() {
       );
     }
     setChangingPassword(false);
+  }
+
+  async function handleExportData() {
+    setExportingData(true);
+    try {
+      await api.exportUserData();
+      toast(t("settings.dataExported"), "success");
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : t("settings.dataExportFailed"),
+        "error"
+      );
+    }
+    setExportingData(false);
   }
 
   async function handleDeleteAccount() {
@@ -434,6 +451,79 @@ export default function SettingsPage() {
               {t("legal.termsOfService")}
             </Link>
           </div>
+        </div>
+
+        {/* Data export section (GDPR) */}
+        <div
+          className="card anim-up delay-3 settings-card"
+          style={{ marginBottom: 20 }}
+        >
+          <h2
+            className="heading-display"
+            style={{ fontSize: 20, marginBottom: 4 }}
+          >
+            {t("settings.dataExport")}
+          </h2>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 14,
+              marginBottom: 24,
+            }}
+          >
+            {t("settings.dataExportDesc")}
+          </p>
+
+          <div
+            style={{
+              padding: "16px 20px",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--amber-glow)",
+              border: "1px solid var(--amber-border)",
+              marginBottom: 16,
+            }}
+          >
+            <p
+              style={{
+                color: "var(--amber-light)",
+                fontSize: 13,
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              {t("settings.dataExportInfo")}
+            </p>
+          </div>
+
+          <button
+            className="btn btn-ghost"
+            onClick={handleExportData}
+            disabled={exportingData}
+            style={{ padding: "11px 24px" }}
+          >
+            {exportingData ? (
+              <span className="btn-spinner" />
+            ) : (
+              <>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ marginRight: 6 }}
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {t("settings.downloadData")}
+              </>
+            )}
+          </button>
         </div>
 
         {/* Account section */}
