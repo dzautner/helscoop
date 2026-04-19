@@ -163,7 +163,7 @@ export default function AddressSearch({
                 </div>
               </div>
               {createError && (
-                <div style={{ padding: "8px 12px", marginBottom: 8, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "var(--danger)", fontSize: 12 }}>
+                <div className="inline-error-banner">
                   {t('search.createError')}
                 </div>
               )}
@@ -328,7 +328,7 @@ export default function AddressSearch({
               )}
 
               {createError && (
-                <div style={{ padding: "10px 14px", marginBottom: 10, background: "rgba(220,50,50,0.1)", border: "1px solid rgba(220,50,50,0.3)", borderRadius: "var(--radius-sm)", color: "var(--danger)", fontSize: 13 }}>
+                <div className="inline-error-banner">
                   {t('search.createError')}
                 </div>
               )}

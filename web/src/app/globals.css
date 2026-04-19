@@ -1115,6 +1115,17 @@ body {
   border-color: rgba(239, 68, 68, 0.2);
 }
 
+.inline-error-banner {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--danger-dim);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .input {
   width: 100%;
   padding: 10px 14px;
