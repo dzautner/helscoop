@@ -22,6 +22,7 @@ import { generateQuotePdf } from "@/lib/pdf";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import type { Material, BomItem, Project } from "@/types";
@@ -137,6 +138,7 @@ export default function ProjectPage() {
   const [viewportKey, setViewportKey] = useState(0);
   const [sceneWarnings, setSceneWarnings] = useState<string[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const shareDialogRef = useRef<HTMLDivElement>(null);
 
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
@@ -418,6 +420,9 @@ export default function ProjectPage() {
   ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo]);
 
   useKeyboardShortcuts(shortcuts);
+
+  const closeShareDialog = useCallback(() => setShowShareDialog(false), []);
+  useFocusTrap(shareDialogRef, showShareDialog && !!shareToken, closeShareDialog);
 
   /* ── Command palette commands ───────────────────────────── */
   const paletteCommands = useMemo<Command[]>(() => {
@@ -1212,6 +1217,7 @@ export default function ProjectPage() {
             backdropFilter: "blur(4px)",
           }} />
           <div
+            ref={shareDialogRef}
             role="dialog"
             aria-modal="true"
             style={{
