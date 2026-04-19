@@ -603,7 +603,7 @@ export default function Viewport3D({
         width: "100%",
         height: "100%",
         minHeight: 200,
-        background: "#111113",
+        background: "var(--bg-secondary)",
         borderRadius: "var(--radius-md)",
         overflow: "hidden",
         position: "relative",
