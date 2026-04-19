@@ -760,6 +760,7 @@ export default function ProjectPage() {
           <button
             className="btn btn-ghost"
             data-tooltip={t('project.copy')}
+            aria-label={t('editor.duplicateProject')}
             disabled={duplicating}
             onClick={async () => {
               setDuplicating(true);
@@ -1253,6 +1254,7 @@ export default function ProjectPage() {
             ref={shareDialogRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="share-dialog-title"
             style={{
               position: "relative",
               width: "100%",
@@ -1266,6 +1268,7 @@ export default function ProjectPage() {
             }}
           >
             <h2
+              id="share-dialog-title"
               className="heading-display"
               style={{ fontSize: 18, margin: "0 0 8px", color: "var(--text-primary)" }}
             >

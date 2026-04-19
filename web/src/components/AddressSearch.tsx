@@ -7,13 +7,18 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import type { BuildingResult } from "@/types";
 
+function Viewport3DLoading() {
+  const { t } = useTranslation();
+  return (
+    <div style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+      {t('editor.loading3D')}
+    </div>
+  );
+}
+
 const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
   ssr: false,
-  loading: () => (
-    <div style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
-      Ladataan 3D...
-    </div>
-  ),
+  loading: () => <Viewport3DLoading />,
 });
 
 const BUILDING_TYPE_LABELS: Record<string, Record<string, string>> = {
