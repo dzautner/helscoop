@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { registerUser, loginViaUI } from "./helpers";
 
-const API_URL = "http://localhost:3051";
+const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
 test.describe("3D Viewport Rendering", () => {
   let user: { email: string; password: string; name: string; token: string };
