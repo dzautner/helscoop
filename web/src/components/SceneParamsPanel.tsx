@@ -152,6 +152,7 @@ function ParamSlider({
           min={param.min}
           max={param.max}
           step={param.step}
+          aria-label={param.label}
           onChange={(e) => handleInput(parseFloat(e.target.value) || param.min)}
         />
       </div>
@@ -163,6 +164,10 @@ function ParamSlider({
         step={param.step}
         value={localValue}
         disabled={param.max === param.min}
+        aria-label={param.label}
+        aria-valuemin={param.min}
+        aria-valuemax={param.max}
+        aria-valuenow={localValue}
         onChange={(e) => handleInput(parseFloat(e.target.value))}
         style={
           {
