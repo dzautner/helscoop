@@ -153,21 +153,43 @@ function animateCamera(
   requestAnimationFrame(step);
 }
 
+function computePresets(bounds: { center: THREE.Vector3; size: number } | null): CameraPreset[] {
+  if (!bounds) {
+    return [
+      { position: [0, 2, 8], target: [0, 1.5, 0], key: "editor.cameraFront" },
+      { position: [8, 2, 0], target: [0, 1.5, 0], key: "editor.cameraSide" },
+      { position: [0, 10, 0.01], target: [0, 0, 0], key: "editor.cameraTop" },
+      { position: [5, 4, 5], target: [0, 1.5, 0], key: "editor.cameraIso" },
+    ];
+  }
+  const { center, size } = bounds;
+  const d = size * 1.2;
+  const cx = center.x, cy = center.y, cz = center.z;
+  return [
+    { position: [cx, cy + d * 0.15, cz + d], target: [cx, cy, cz], key: "editor.cameraFront" },
+    { position: [cx + d, cy + d * 0.15, cz], target: [cx, cy, cz], key: "editor.cameraSide" },
+    { position: [cx, cy + d, cz + 0.01], target: [cx, cy, cz], key: "editor.cameraTop" },
+    { position: [cx + d * 0.55, cy + d * 0.45, cz + d * 0.55], target: [cx, cy, cz], key: "editor.cameraIso" },
+  ];
+}
+
 function CameraToolbar({
   cameraRef,
   controlsRef,
   rendererRef,
   sceneRef,
   projectName,
+  sceneBoundsRef,
 }: {
   cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
   controlsRef: React.RefObject<OrbitControls | null>;
   rendererRef: React.RefObject<THREE.WebGLRenderer | null>;
   sceneRef: React.RefObject<THREE.Scene | null>;
   projectName?: string;
+  sceneBoundsRef: React.RefObject<{ center: THREE.Vector3; size: number } | null>;
 }) {
   const { t } = useTranslation();
-  const [activePreset, setActivePreset] = useState(3); // default to Iso
+  const [activePreset, setActivePreset] = useState(3);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
 
   const handlePreset = useCallback(
@@ -176,9 +198,10 @@ function CameraToolbar({
       const controls = controlsRef.current;
       if (!camera || !controls) return;
       setActivePreset(index);
-      animateCamera(camera, controls, preset.position, preset.target);
+      const presets = computePresets(sceneBoundsRef.current);
+      animateCamera(camera, controls, presets[index].position, presets[index].target);
     },
-    [cameraRef, controlsRef]
+    [cameraRef, controlsRef, sceneBoundsRef]
   );
 
   const handleScreenshot = useCallback(() => {
@@ -267,6 +290,7 @@ export default function Viewport3D({
   const objectGroupRef = useRef<THREE.Group | null>(null);
   const animFrameRef = useRef<number>(0);
   const lastValidSceneRef = useRef<string>(sceneJs);
+  const sceneBoundsRef = useRef<{ center: THREE.Vector3; size: number } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const { t } = useTranslation();
 
@@ -454,17 +478,19 @@ export default function Viewport3D({
       const count = addSceneObjects(group, result.objects, wf);
       onObjectCount?.(count);
 
-      // Auto-fit camera on first load when scene has many objects
-      if (!hasAutoFitRef.current && count > 10) {
-        hasAutoFitRef.current = true;
-        const camera = cameraRef.current;
-        const controls = controlsRef.current;
-        if (camera && controls) {
-          const box = new THREE.Box3().setFromObject(group);
-          if (!box.isEmpty()) {
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
+      // Compute scene bounds and auto-fit camera on first load
+      const box = new THREE.Box3().setFromObject(group);
+      if (!box.isEmpty()) {
+        const center = box.getCenter(new THREE.Vector3());
+        const sizeVec = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
+        sceneBoundsRef.current = { center: center.clone(), size: maxDim };
+
+        if (!hasAutoFitRef.current && count > 10) {
+          hasAutoFitRef.current = true;
+          const camera = cameraRef.current;
+          const controls = controlsRef.current;
+          if (camera && controls) {
             const fov = camera.fov * (Math.PI / 180);
             const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.4;
             const newPos: [number, number, number] = [
@@ -498,7 +524,8 @@ export default function Viewport3D({
         const camera = cameraRef.current;
         const controls = controlsRef.current;
         if (camera && controls) {
-          animateCamera(camera, controls, [5, 4, 5], [0, 1.5, 0]);
+          const p = computePresets(sceneBoundsRef.current);
+          animateCamera(camera, controls, p[3].position, p[3].target);
         }
       };
   }, []);
@@ -574,7 +601,9 @@ export default function Viewport3D({
       onClick: () => {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
-        if (camera && controls) animateCamera(camera, controls, [0, 2, 8], [0, 1.5, 0]);
+        if (!camera || !controls) return;
+        const p = computePresets(sceneBoundsRef.current);
+        animateCamera(camera, controls, p[0].position, p[0].target);
       },
     },
     {
@@ -584,7 +613,9 @@ export default function Viewport3D({
       onClick: () => {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
-        if (camera && controls) animateCamera(camera, controls, [8, 2, 0], [0, 1.5, 0]);
+        if (!camera || !controls) return;
+        const p = computePresets(sceneBoundsRef.current);
+        animateCamera(camera, controls, p[1].position, p[1].target);
       },
     },
     {
@@ -594,7 +625,9 @@ export default function Viewport3D({
       onClick: () => {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
-        if (camera && controls) animateCamera(camera, controls, [0, 10, 0.01], [0, 0, 0]);
+        if (!camera || !controls) return;
+        const p = computePresets(sceneBoundsRef.current);
+        animateCamera(camera, controls, p[2].position, p[2].target);
       },
     },
     {
@@ -604,7 +637,9 @@ export default function Viewport3D({
       onClick: () => {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
-        if (camera && controls) animateCamera(camera, controls, [5, 4, 5], [0, 1.5, 0]);
+        if (!camera || !controls) return;
+        const p = computePresets(sceneBoundsRef.current);
+        animateCamera(camera, controls, p[3].position, p[3].target);
       },
     },
     {
@@ -627,7 +662,9 @@ export default function Viewport3D({
       onClick: () => {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
-        if (camera && controls) animateCamera(camera, controls, [5, 4, 5], [0, 1.5, 0]);
+        if (!camera || !controls) return;
+        const p = computePresets(sceneBoundsRef.current);
+        animateCamera(camera, controls, p[3].position, p[3].target);
       },
     },
   ];
@@ -652,6 +689,7 @@ export default function Viewport3D({
         rendererRef={rendererRef}
         sceneRef={sceneRef}
         projectName={projectName}
+        sceneBoundsRef={sceneBoundsRef}
       />
       <ViewportContextMenu
         items={contextMenuItems}
