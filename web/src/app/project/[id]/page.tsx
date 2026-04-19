@@ -1045,7 +1045,7 @@ export default function ProjectPage() {
                         height="24"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#ef4444"
+                        stroke="var(--danger)"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -1077,7 +1077,7 @@ export default function ProjectPage() {
                     </p>
                     <p
                       style={{
-                        color: "#ef4444",
+                        color: "var(--danger)",
                         fontSize: 12,
                         fontFamily: "var(--font-mono)",
                         marginBottom: 20,

@@ -661,7 +661,7 @@ function PriceComparisonPopup({
                           fontWeight: 600,
                           color: isCheapest ? "var(--success)" : "var(--text-primary)",
                         }}>
-                          {unitPrice.toFixed(2)} EUR
+                          {unitPrice.toFixed(2)} &euro;
                         </span>
                       </div>
                     </div>
@@ -750,7 +750,7 @@ function PriceComparisonPopup({
               {t('pricing.savingsLabel')}
             </span>
             <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--success)" }}>
-              -{priceData.savings_per_unit.toFixed(2)} EUR {t('pricing.perUnit')}
+              -{priceData.savings_per_unit.toFixed(2)} &euro; {t('pricing.perUnit')}
             </span>
           </div>
         )}
@@ -1057,7 +1057,7 @@ export default function BomPanel({
               fontWeight: 600,
               color: "var(--success)",
             }}>
-              -{totalSavings.toFixed(2)} EUR
+              -{totalSavings.toFixed(2)} &euro;
             </span>
           </div>
         )}
