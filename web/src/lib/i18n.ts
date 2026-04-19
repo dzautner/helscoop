@@ -211,6 +211,7 @@ const translations = {
       docs: 'Dokumentit',
       share: 'Jaa',
       duplicateProject: 'Kopioi projekti',
+      parameters: 'Parametrit',
       quantityFor: 'Maara: {{name}}',
     },
     share: {
@@ -679,6 +680,7 @@ const translations = {
       docs: 'Docs',
       share: 'Share',
       duplicateProject: 'Duplicate project',
+      parameters: 'Parameters',
       quantityFor: 'Quantity for {{name}}',
     },
     share: {

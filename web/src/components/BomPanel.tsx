@@ -1223,14 +1223,14 @@ export default function BomPanel({
                       <img
                         src={m.image_url}
                         alt={getLocalizedMaterialName(m, locale)}
-                        style={{ width: 24, height: 24, borderRadius: 3, objectFit: "cover", flexShrink: 0 }}
+                        style={{ width: 24, height: 24, borderRadius: "var(--radius-sm)", objectFit: "cover", flexShrink: 0 }}
                       />
                     ) : (
                       <div
                         style={{
                           width: 24,
                           height: 24,
-                          borderRadius: 3,
+                          borderRadius: "var(--radius-sm)",
                           background: getCategoryColor(m.category_name, 0),
                           opacity: 0.3,
                           flexShrink: 0,

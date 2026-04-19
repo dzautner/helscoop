@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import type { SceneParam } from "@/lib/scene-interpreter";
+import { useTranslation } from "@/components/LocaleProvider";
 
 interface SceneParamsPanelProps {
   params: SceneParam[];
@@ -12,6 +13,7 @@ export default function SceneParamsPanel({
   params,
   onParamChange,
 }: SceneParamsPanelProps) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -60,7 +62,7 @@ export default function SceneParamsPanel({
           <line x1="9" y1="8" x2="15" y2="8" />
           <line x1="17" y1="16" x2="23" y2="16" />
         </svg>
-        <span>Parameters</span>
+        <span>{t("editor.parameters")}</span>
         <span className="scene-params-count">{params.length}</span>
       </div>
       <div className="scene-params-body">
