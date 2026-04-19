@@ -144,9 +144,17 @@ export default function AddressSearch({
                   <div className="heading-display" style={{ fontSize: 15, marginBottom: 4 }}>
                     {result.address}
                   </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span className="badge badge-amber" style={{ fontSize: 11 }}>
                       {buildingTypeLabels[result.building_info.type] || result.building_info.type}
+                    </span>
+                    <span className="badge" style={{
+                      fontSize: 10,
+                      background: result.confidence === "verified" ? "rgba(34,197,94,0.1)" : "var(--amber-glow)",
+                      color: result.confidence === "verified" ? "rgb(34,197,94)" : "var(--amber)",
+                      border: `1px solid ${result.confidence === "verified" ? "rgba(34,197,94,0.2)" : "var(--amber-border)"}`,
+                    }}>
+                      {result.confidence === "verified" ? t('search.verified') : t('search.estimated')}
                     </span>
                     <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
                       {result.building_info.year_built} &middot; {result.building_info.area_m2} m&sup2;

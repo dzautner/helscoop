@@ -10,7 +10,7 @@ test.describe("PDF Export", () => {
     user = await registerUser(page, `pdf-${Date.now()}`);
 
     // Create project with BOM
-    const res = await page.request.post("http://localhost:3051/projects", {
+    const res = await page.request.post("http://localhost:3001/projects", {
       headers: { Authorization: `Bearer ${user.token}` },
       data: {
         name: "PDF Export Test",
@@ -24,7 +24,7 @@ test.describe("PDF Export", () => {
 
     // Add BOM items
     await page.request.put(
-      `http://localhost:3051/projects/${projectId}/bom`,
+      `http://localhost:3001/projects/${projectId}/bom`,
       {
         headers: { Authorization: `Bearer ${user.token}` },
         data: {
@@ -40,7 +40,7 @@ test.describe("PDF Export", () => {
 
   test("API returns valid PDF", async ({ page }) => {
     const res = await page.request.get(
-      `http://localhost:3051/projects/${projectId}/pdf?lang=fi`,
+      `http://localhost:3001/projects/${projectId}/pdf?lang=fi`,
       {
         headers: { Authorization: `Bearer ${user.token}` },
       }
@@ -67,10 +67,11 @@ test.describe("PDF Export", () => {
     // Set up download listener
     const downloadPromise = page.waitForEvent("download", { timeout: 15_000 });
 
-    // Click PDF export button
-    const pdfBtn = page.getByRole("button", {
-      name: /pdf|ladattava/i,
-    });
+    // Open export dropdown then click PDF
+    const exportTrigger = page.locator('[data-tour="export-btn"] button').first();
+    await exportTrigger.click();
+    await page.waitForTimeout(300);
+    const pdfBtn = page.getByRole("button", { name: /^PDF$/i });
     await pdfBtn.click();
 
     const download = await downloadPromise;

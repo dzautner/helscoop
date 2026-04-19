@@ -32,6 +32,7 @@ test.describe("Full User Flows", () => {
     await page.getByPlaceholder(/matti meikalainen|john smith/i).fill("E2E Flow User");
     await page.locator('input[type="email"]').fill(userEmail);
     await page.locator('input[type="password"]').fill(userPassword);
+    await page.locator('input[type="checkbox"]').check({ force: true });
     await page.getByRole("button", { name: /luo tili|create account/i }).click({ force: true });
 
     await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });

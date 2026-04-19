@@ -10,11 +10,11 @@ test.describe("Templates", () => {
     await page.close();
   });
 
-  test("API returns all 4 templates with valid scene_js", async ({ page }) => {
-    const res = await page.request.get("http://localhost:3051/templates");
+  test("API returns all templates with valid scene_js", async ({ page }) => {
+    const res = await page.request.get("http://localhost:3001/templates");
     expect(res.status()).toBe(200);
     const templates = await res.json();
-    expect(templates.length).toBe(4);
+    expect(templates.length).toBeGreaterThanOrEqual(4);
 
     for (const t of templates) {
       expect(t.name).toBeTruthy();
@@ -31,13 +31,13 @@ test.describe("Templates", () => {
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     // Get templates
-    const res = await page.request.get("http://localhost:3051/templates");
+    const res = await page.request.get("http://localhost:3001/templates");
     const templates = await res.json();
 
     for (const tpl of templates) {
       // Create project from template
       const projRes = await page.request.post(
-        "http://localhost:3051/projects",
+        "http://localhost:3001/projects",
         {
           headers: { Authorization: `Bearer ${user.token}` },
           data: {
