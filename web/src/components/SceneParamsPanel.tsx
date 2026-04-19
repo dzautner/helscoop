@@ -96,17 +96,22 @@ export default function SceneParamsPanel({
                 {sectionParams.length}
               </span>
             </button>
-            {!collapsed[section] && (
-              <div className="scene-params-items">
-                {sectionParams.map((p) => (
-                  <ParamSlider
-                    key={p.name}
-                    param={p}
-                    onChange={handleChange}
-                  />
-                ))}
+            <div
+              className="scene-params-section-body"
+              data-open={!collapsed[section]}
+            >
+              <div className="scene-params-section-body-inner">
+                <div className="scene-params-items">
+                  {sectionParams.map((p) => (
+                    <ParamSlider
+                      key={p.name}
+                      param={p}
+                      onChange={handleChange}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         ))}
       </div>
