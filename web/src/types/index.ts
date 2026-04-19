@@ -59,7 +59,10 @@ export interface Template {
 export interface Material {
   id: string;
   name: string;
+  name_fi: string | null;
+  name_en: string | null;
   category_name: string;
+  category_name_fi: string | null;
   image_url: string | null;
   pricing: { unit_price: number; unit: string; supplier_name: string; is_primary: boolean }[] | null;
 }
