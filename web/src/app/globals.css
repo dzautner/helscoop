@@ -3239,3 +3239,19 @@ select:focus {
 [data-theme="light"] .cmd-palette-backdrop {
   background: rgba(0, 0, 0, 0.25);
 }
+
+/* ── View Transitions API ──────────────────────────────── */
+
+.nav-bar {
+  view-transition-name: nav-bar;
+}
+
+.editor-header {
+  view-transition-name: editor-header;
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}

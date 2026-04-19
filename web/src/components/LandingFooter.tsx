@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/components/LocaleProvider";
+import ScrollReveal from "@/components/ScrollReveal";
 
 export default function LandingFooter() {
   const { locale } = useTranslation();
@@ -17,6 +18,7 @@ export default function LandingFooter() {
 
   return (
     <footer className="landing-footer">
+      <ScrollReveal>
       <div className="landing-footer-inner">
         <div className="landing-footer-brand">
           <div className="heading-display" style={{ fontSize: 20, marginBottom: 8 }}>
@@ -55,7 +57,9 @@ export default function LandingFooter() {
           </a>
         </div>
       </div>
+      </ScrollReveal>
 
+      <ScrollReveal delay={0.15}>
       <div className="landing-footer-bottom">
         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
           &copy; {year} Helscoop.{" "}
@@ -67,6 +71,7 @@ export default function LandingFooter() {
           Helsinki, Finland
         </span>
       </div>
+      </ScrollReveal>
     </footer>
   );
 }

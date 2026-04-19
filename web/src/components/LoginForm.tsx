@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import HeroIllustration from "@/components/HeroIllustration";
 import TrustLayer from "@/components/TrustLayer";
+import ScrollReveal from "@/components/ScrollReveal";
 import type { BuildingResult } from "@/types";
 
 export default function LoginForm({
@@ -77,52 +78,58 @@ export default function LoginForm({
       <div className="login-brand">
         <HeroIllustration />
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div className="anim-up" style={{ marginBottom: 36 }}>
-            <h1 className="heading-display brand-title">
-              <span>Hel</span><span className="brand-title-accent">scoop</span>
-            </h1>
-            <p className="brand-subtitle">
-              {t('brand.description')}
-            </p>
-          </div>
+          <ScrollReveal>
+            <div style={{ marginBottom: 36 }}>
+              <h1 className="heading-display brand-title">
+                <span>Hel</span><span className="brand-title-accent">scoop</span>
+              </h1>
+              <p className="brand-subtitle">
+                {t('brand.description')}
+              </p>
+            </div>
+          </ScrollReveal>
 
           {addressSearch && (
-            <div className="anim-up delay-1" style={{ marginBottom: 28 }}>
-              <div className="label-mono brand-tagline" style={{ marginBottom: 10 }}>
-                {t('search.sectionLabel')}
+            <ScrollReveal delay={0.1}>
+              <div style={{ marginBottom: 28 }}>
+                <div className="label-mono brand-tagline" style={{ marginBottom: 10 }}>
+                  {t('search.sectionLabel')}
+                </div>
+                {addressSearch}
               </div>
-              {addressSearch}
-            </div>
+            </ScrollReveal>
           )}
 
-          <div className="anim-up delay-2" style={{ display: "flex", flexDirection: "column", marginBottom: 36 }}>
+          <div style={{ display: "flex", flexDirection: "column", marginBottom: 36 }}>
             {features.map((item, i) => (
-              <div key={i} className="brand-feature-item">
-                <div className="brand-feature-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={item.icon} />
-                  </svg>
-                </div>
-                <div>
-                  <div className="brand-feature-label">
-                    <span className="brand-feature-num">{item.num}</span>
-                    {item.label}
+              <ScrollReveal key={i} delay={0.15 + i * 0.07}>
+                <div className="brand-feature-item">
+                  <div className="brand-feature-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={item.icon} />
+                    </svg>
                   </div>
-                  <div className="brand-feature-desc">{item.desc}</div>
+                  <div>
+                    <div className="brand-feature-label">
+                      <span className="brand-feature-num">{item.num}</span>
+                      {item.label}
+                    </div>
+                    <div className="brand-feature-desc">{item.desc}</div>
+                  </div>
                 </div>
-              </div>
+              </ScrollReveal>
             ))}
           </div>
 
-          <div className="anim-up delay-3">
+          <ScrollReveal delay={0.35}>
             <TrustLayer />
-          </div>
+          </ScrollReveal>
 
-          <div className="anim-up delay-3">
+          <ScrollReveal delay={0.4}>
             <div className="label-mono brand-tagline">
               {t('brand.tagline')}
             </div>
-          </div>
+          </ScrollReveal>
         </div>
       </div>
 
