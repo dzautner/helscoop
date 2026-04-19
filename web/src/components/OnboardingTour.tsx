@@ -289,17 +289,50 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
       )
     : { top: window.innerHeight / 2 - 75, left: window.innerWidth / 2 - 160 };
 
-  function handleNext() {
+  const handlePrev = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
+
+  const handleNext = useCallback(() => {
     if (currentStep < visibleSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       onComplete();
     }
-  }
+  }, [currentStep, visibleSteps.length, onComplete]);
 
-  function handleSkip() {
+  const handleSkip = useCallback(() => {
     onComplete();
-  }
+  }, [onComplete]);
+
+  // Keyboard navigation: Escape to skip, Enter/ArrowRight for next, ArrowLeft for previous
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      switch (e.key) {
+        case "Escape":
+          handleSkip();
+          break;
+        case "Enter":
+        case "ArrowRight":
+          handleNext();
+          break;
+        case "ArrowLeft":
+          handlePrev();
+          break;
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSkip, handleNext, handlePrev]);
+
+  // Auto-focus tooltip when it appears or step changes
+  useEffect(() => {
+    if (tooltipRef.current) {
+      tooltipRef.current.focus();
+    }
+  }, [currentStep]);
 
   const isLast = currentStep === visibleSteps.length - 1;
 
@@ -322,6 +355,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
       {/* Tooltip */}
       <div
         ref={tooltipRef}
+        tabIndex={-1}
         style={{
           position: "fixed",
           zIndex: 10003,
@@ -333,6 +367,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
           borderRadius: "var(--radius-md)",
           padding: "20px",
           boxShadow: "var(--shadow-lg)",
+          outline: "none",
           transition: "top 0.3s cubic-bezier(0.16, 1, 0.3, 1), left 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
           animation: "fadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
         }}
