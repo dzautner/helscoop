@@ -36,6 +36,173 @@ const char *kBrandText = "dingcad";
 constexpr float kBrandFontSize = 28.0f;
 constexpr float kSceneScale = 0.1f;  // convert mm scene units to renderer units
 
+// ---------------------------------------------------------------------------
+// Theme
+// ---------------------------------------------------------------------------
+enum class Theme { Light, Dark };
+
+struct ThemeColors {
+  Color background;
+  Color toolbarBg;
+  Color toolbarBorder;
+  Color buttonBg;
+  Color buttonHover;
+  Color buttonIcon;
+  Color tooltipBg;
+  Color tooltipText;
+  Color tooltipBorder;
+  Color brandText;
+  Color statusText;
+};
+
+ThemeColors GetThemeColors(Theme theme) {
+  if (theme == Theme::Dark) {
+    return {
+        {30, 30, 36, 255},       // background
+        {40, 40, 48, 230},       // toolbarBg
+        {60, 60, 70, 255},       // toolbarBorder
+        {50, 50, 58, 255},       // buttonBg
+        {70, 70, 82, 255},       // buttonHover
+        {200, 200, 210, 255},    // buttonIcon
+        {50, 50, 58, 240},       // tooltipBg
+        {220, 220, 230, 255},    // tooltipText
+        {80, 80, 92, 255},       // tooltipBorder
+        {160, 160, 170, 255},    // brandText
+        {160, 160, 170, 255},    // statusText
+    };
+  }
+  return {
+      RAYWHITE,                  // background
+      {240, 240, 245, 230},      // toolbarBg
+      {200, 200, 210, 255},      // toolbarBorder
+      {225, 225, 232, 255},      // buttonBg
+      {210, 210, 220, 255},      // buttonHover
+      {60, 60, 70, 255},         // buttonIcon
+      {45, 45, 55, 240},         // tooltipBg
+      {240, 240, 248, 255},      // tooltipText
+      {70, 70, 80, 255},         // tooltipBorder
+      DARKGRAY,                  // brandText
+      DARKGRAY,                  // statusText
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Toolbar button definition
+// ---------------------------------------------------------------------------
+struct ToolbarButton {
+  const char *icon;     // single-char label drawn on the button
+  const char *tooltip;  // text shown on hover
+  int keyTrigger;       // raylib KEY_ constant (0 = no keyboard trigger)
+};
+
+// ---------------------------------------------------------------------------
+// Tooltip drawing with arrow indicator, max-width, and word-wrap
+// ---------------------------------------------------------------------------
+constexpr float kTooltipMaxWidth  = 220.0f;
+constexpr float kTooltipFontSize  = 14.0f;
+constexpr float kTooltipPadH      = 10.0f;
+constexpr float kTooltipPadV      = 6.0f;
+constexpr float kTooltipArrowSize = 6.0f;
+constexpr float kTooltipRadius    = 4.0f;
+
+// Word-wrap a string to fit within maxWidth pixels at the given font/size.
+// Returns a vector of lines.
+std::vector<std::string> WrapText(Font font, const char *text, float fontSize,
+                                  float maxWidth) {
+  std::vector<std::string> lines;
+  std::string current;
+  std::string word;
+  auto flushWord = [&]() {
+    if (word.empty()) return;
+    std::string candidate = current.empty() ? word : current + " " + word;
+    Vector2 sz = MeasureTextEx(font, candidate.c_str(), fontSize, 0.0f);
+    if (!current.empty() && sz.x > maxWidth) {
+      lines.push_back(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+    word.clear();
+  };
+
+  for (const char *p = text; *p; ++p) {
+    if (*p == ' ' || *p == '\n') {
+      flushWord();
+      if (*p == '\n') {
+        lines.push_back(current);
+        current.clear();
+      }
+    } else {
+      word += *p;
+    }
+  }
+  flushWord();
+  if (!current.empty()) lines.push_back(current);
+  if (lines.empty()) lines.push_back("");
+  return lines;
+}
+
+// Draw a tooltip above a given anchor rectangle, with an arrow pointing down.
+void DrawTooltip(Font font, const char *text, Rectangle anchor,
+                 const ThemeColors &colors) {
+  std::vector<std::string> lines =
+      WrapText(font, text, kTooltipFontSize, kTooltipMaxWidth - 2 * kTooltipPadH);
+
+  // Measure bounding box
+  float contentW = 0.0f;
+  float contentH = 0.0f;
+  const float lineSpacing = kTooltipFontSize + 2.0f;
+  for (const auto &line : lines) {
+    Vector2 sz = MeasureTextEx(font, line.c_str(), kTooltipFontSize, 0.0f);
+    if (sz.x > contentW) contentW = sz.x;
+    contentH += lineSpacing;
+  }
+  contentH -= 2.0f; // remove trailing extra spacing
+
+  float boxW = contentW + 2 * kTooltipPadH;
+  float boxH = contentH + 2 * kTooltipPadV;
+
+  // Position: centered above the anchor, with arrow gap
+  float boxX = anchor.x + anchor.width * 0.5f - boxW * 0.5f;
+  float boxY = anchor.y - boxH - kTooltipArrowSize - 2.0f;
+
+  // Clamp to screen edges
+  const float sw = static_cast<float>(GetScreenWidth());
+  const float sh = static_cast<float>(GetScreenHeight());
+  if (boxX < 4.0f) boxX = 4.0f;
+  if (boxX + boxW > sw - 4.0f) boxX = sw - 4.0f - boxW;
+  if (boxY < 4.0f) boxY = 4.0f;
+
+  // Draw tooltip background with rounded corners
+  Rectangle box = {boxX, boxY, boxW, boxH};
+  DrawRectangleRounded(box, kTooltipRadius / std::min(boxW, boxH), 6,
+                       colors.tooltipBg);
+  DrawRectangleRoundedLinesEx(box, kTooltipRadius / std::min(boxW, boxH), 6,
+                              1.0f, colors.tooltipBorder);
+
+  // Draw arrow (triangle pointing down from tooltip to anchor)
+  float arrowCx = anchor.x + anchor.width * 0.5f;
+  // Clamp arrow horizontally within the box
+  arrowCx = Clamp(arrowCx, boxX + kTooltipArrowSize + 2.0f,
+                   boxX + boxW - kTooltipArrowSize - 2.0f);
+  float arrowTop = boxY + boxH;
+  Vector2 v1 = {arrowCx - kTooltipArrowSize, arrowTop};
+  Vector2 v2 = {arrowCx + kTooltipArrowSize, arrowTop};
+  Vector2 v3 = {arrowCx, arrowTop + kTooltipArrowSize};
+  DrawTriangle(v1, v3, v2, colors.tooltipBg);
+  // Arrow border lines
+  DrawLineEx(v1, v3, 1.0f, colors.tooltipBorder);
+  DrawLineEx(v3, v2, 1.0f, colors.tooltipBorder);
+
+  // Draw text lines
+  float textY = boxY + kTooltipPadV;
+  for (const auto &line : lines) {
+    DrawTextEx(font, line.c_str(), {boxX + kTooltipPadH, textY},
+               kTooltipFontSize, 0.0f, colors.tooltipText);
+    textY += lineSpacing;
+  }
+}
+
 // GLSL 330 core (desktop). Uses raylib's default attribute/uniform names.
 const char* kOutlineVS = R"glsl(
 #version 330
@@ -897,6 +1064,23 @@ int main() {
       1.0f};
   SetShaderValue(edgeShader, locInkColor, inkColor, SHADER_UNIFORM_VEC4);
 
+  // Theme state
+  Theme currentTheme = Theme::Light;
+
+  // Toolbar buttons
+  const std::vector<ToolbarButton> toolbarButtons = {
+      {"R", "Reload scene from file (R)", KEY_R},
+      {"P", "Export model as STL to Downloads (P)", KEY_P},
+      {"O", "Reset camera to default view (Space)", KEY_SPACE},
+      {"T", "Toggle dark/light theme (T)", KEY_T},
+  };
+  constexpr float kToolbarBtnSize   = 32.0f;
+  constexpr float kToolbarBtnGap    = 6.0f;
+  constexpr float kToolbarMargin    = 12.0f;
+  constexpr float kToolbarPadV      = 6.0f;
+  constexpr float kToolbarHeight    = kToolbarBtnSize + 2 * kToolbarPadV;
+  int hoveredButton = -1;  // index of hovered toolbar button, or -1
+
   auto makeRenderTargets = [&]() {
     const int width = std::max(GetScreenWidth(), 1);
     const int height = std::max(GetScreenHeight(), 1);
@@ -1021,7 +1205,7 @@ int main() {
       }
     }
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && hoveredButton < 0) {
       orbitYaw -= mouseDelta.x * 0.01f;
       orbitPitch += mouseDelta.y * 0.01f;
       const float limit = DEG2RAD * 89.0f;
@@ -1051,6 +1235,58 @@ int main() {
       orbitDistance = initialDistance;
       orbitYaw = initialYaw;
       orbitPitch = initialPitch;
+    }
+
+    // Toggle theme
+    if (IsKeyPressed(KEY_T)) {
+      currentTheme = (currentTheme == Theme::Light) ? Theme::Dark : Theme::Light;
+    }
+
+    // Toolbar hover detection
+    {
+      const Vector2 mouse = GetMousePosition();
+      const float sw = static_cast<float>(GetScreenWidth());
+      const float totalW =
+          static_cast<float>(toolbarButtons.size()) * kToolbarBtnSize +
+          static_cast<float>(toolbarButtons.size() - 1) * kToolbarBtnGap;
+      const float barX = (sw - totalW) * 0.5f - kToolbarMargin;
+      const float barY =
+          static_cast<float>(GetScreenHeight()) - kToolbarHeight - kToolbarMargin;
+
+      hoveredButton = -1;
+      for (int i = 0; i < static_cast<int>(toolbarButtons.size()); ++i) {
+        float bx = barX + kToolbarMargin +
+                   static_cast<float>(i) * (kToolbarBtnSize + kToolbarBtnGap);
+        float by = barY + kToolbarPadV;
+        Rectangle btnRect = {bx, by, kToolbarBtnSize, kToolbarBtnSize};
+        if (CheckCollisionPointRec(mouse, btnRect)) {
+          hoveredButton = i;
+          // Click triggers the button's action
+          if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            switch (toolbarButtons[i].keyTrigger) {
+              case KEY_R:
+                if (!scriptPath.empty()) reloadScene();
+                break;
+              case KEY_P:
+                exportRequested = true;
+                break;
+              case KEY_SPACE:
+                camera.target = initialTarget;
+                orbitDistance = initialDistance;
+                orbitYaw = initialYaw;
+                orbitPitch = initialPitch;
+                break;
+              case KEY_T:
+                currentTheme = (currentTheme == Theme::Light) ? Theme::Dark
+                                                              : Theme::Light;
+                break;
+              default:
+                break;
+            }
+          }
+          break;
+        }
+      }
     }
 
     const float moveSpeed = 0.05f * orbitDistance;
@@ -1135,8 +1371,10 @@ int main() {
     EndMode3D();
     EndTextureMode();
 
+    const ThemeColors tc = GetThemeColors(currentTheme);
+
     BeginDrawing();
-    ClearBackground(RAYWHITE);
+    ClearBackground(tc.background);
 
     const float texel[2] = {
         1.0f / static_cast<float>(rtNormalDepth.texture.width),
@@ -1154,12 +1392,57 @@ int main() {
     const Vector2 brandPos = {
         static_cast<float>(GetScreenWidth()) - textSize.x - margin,
         margin};
-    DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, DARKGRAY);
+    DrawTextEx(brandingFont, kBrandText, brandPos, kBrandFontSize, 0.0f, tc.brandText);
 
     if (!statusMessage.empty()) {
       constexpr float statusFontSize = 18.0f;
       const Vector2 statusPos = {margin, margin};
-      DrawTextEx(brandingFont, statusMessage.c_str(), statusPos, statusFontSize, 0.0f, DARKGRAY);
+      DrawTextEx(brandingFont, statusMessage.c_str(), statusPos, statusFontSize, 0.0f, tc.statusText);
+    }
+
+    // -----------------------------------------------------------------------
+    // Draw toolbar
+    // -----------------------------------------------------------------------
+    {
+      const float sw = static_cast<float>(GetScreenWidth());
+      const float sh = static_cast<float>(GetScreenHeight());
+      const int btnCount = static_cast<int>(toolbarButtons.size());
+      const float totalBtnW =
+          static_cast<float>(btnCount) * kToolbarBtnSize +
+          static_cast<float>(btnCount - 1) * kToolbarBtnGap;
+      const float barW = totalBtnW + 2 * kToolbarMargin;
+      const float barX = (sw - barW) * 0.5f;
+      const float barY = sh - kToolbarHeight - kToolbarMargin;
+
+      // Toolbar background
+      Rectangle barRect = {barX, barY, barW, kToolbarHeight};
+      DrawRectangleRounded(barRect, 0.3f, 6, tc.toolbarBg);
+      DrawRectangleRoundedLinesEx(barRect, 0.3f, 6, 1.0f, tc.toolbarBorder);
+
+      // Buttons
+      const float btnFontSize = 16.0f;
+      for (int i = 0; i < btnCount; ++i) {
+        float bx = barX + kToolbarMargin +
+                   static_cast<float>(i) * (kToolbarBtnSize + kToolbarBtnGap);
+        float by = barY + kToolbarPadV;
+        Rectangle btnRect = {bx, by, kToolbarBtnSize, kToolbarBtnSize};
+
+        Color bg = (i == hoveredButton) ? tc.buttonHover : tc.buttonBg;
+        DrawRectangleRounded(btnRect, 0.25f, 4, bg);
+
+        // Center the icon character in the button
+        const char *icon = toolbarButtons[i].icon;
+        Vector2 iconSz = MeasureTextEx(brandingFont, icon, btnFontSize, 0.0f);
+        float ix = bx + (kToolbarBtnSize - iconSz.x) * 0.5f;
+        float iy = by + (kToolbarBtnSize - iconSz.y) * 0.5f;
+        DrawTextEx(brandingFont, icon, {ix, iy}, btnFontSize, 0.0f,
+                   tc.buttonIcon);
+
+        // Tooltip on hover
+        if (i == hoveredButton) {
+          DrawTooltip(brandingFont, toolbarButtons[i].tooltip, btnRect, tc);
+        }
+      }
     }
 
     EndDrawing();
