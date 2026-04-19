@@ -129,6 +129,8 @@ const translations = {
       loadMaterialsFailed: 'Materiaalien lataus epaonnistui',
       loadSuppliersFailed: 'Toimittajien lataus epaonnistui',
       loadPricingFailed: 'Hintatietojen lataus epaonnistui',
+      materialRemoved: 'Materiaali poistettu',
+      undo: 'Kumoa',
     },
     editor: {
       scene: 'Kohtaus',
@@ -555,6 +557,8 @@ const translations = {
       loadMaterialsFailed: 'Failed to load materials',
       loadSuppliersFailed: 'Failed to load suppliers',
       loadPricingFailed: 'Failed to load pricing',
+      materialRemoved: 'Material removed',
+      undo: 'Undo',
     },
     editor: {
       scene: 'Scene',

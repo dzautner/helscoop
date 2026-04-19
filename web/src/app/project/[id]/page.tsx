@@ -423,10 +423,30 @@ export default function ProjectPage() {
   );
 
   const removeBomItem = useCallback((materialId: string) => {
+    let removedItem: BomItem | undefined;
+    setBom((prev) => {
+      removedItem = prev.find((b) => b.material_id === materialId);
+      return prev.filter((b) => b.material_id !== materialId);
+    });
     bomChangedRef.current = true;
     track("bom_item_removed", { material_id: materialId });
-    setBom((prev) => prev.filter((b) => b.material_id !== materialId));
-  }, [track]);
+
+    // Show undo toast — if the user clicks "Undo" within 5s, re-add the item
+    if (removedItem) {
+      const item = removedItem;
+      toast(t("toast.materialRemoved"), "info", {
+        duration: 5000,
+        action: {
+          label: t("toast.undo"),
+          onClick: () => {
+            bomChangedRef.current = true;
+            track("bom_item_undo_remove", { material_id: materialId });
+            setBom((prev) => [...prev, item]);
+          },
+        },
+      });
+    }
+  }, [track, toast, t]);
 
   const updateBomQty = useCallback((materialId: string, qty: number) => {
     bomChangedRef.current = true;
