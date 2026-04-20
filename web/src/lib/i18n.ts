@@ -43,6 +43,9 @@ const translations = {
       resetPasswordSuccess: 'Salasana vaihdettu. Voit nyt kirjautua uudella salasanallasi.',
       resetPasswordMismatch: 'Salasanat eivat tasmaa',
       resetPasswordInvalid: 'Virheellinen tai vanhentunut nollauslinkki',
+      passwordWeak: 'Heikko',
+      passwordMedium: 'Keskiverto',
+      passwordStrong: 'Vahva',
     },
     brand: {
       tagline: 'N\u00c4E TALOSI \u00b7 MUUTA \u00b7 RAKENNA',
@@ -583,6 +586,9 @@ const translations = {
       resetPasswordSuccess: 'Password updated. You can now sign in with your new password.',
       resetPasswordMismatch: 'Passwords do not match',
       resetPasswordInvalid: 'Invalid or expired reset link',
+      passwordWeak: 'Weak',
+      passwordMedium: 'Medium',
+      passwordStrong: 'Strong',
     },
     brand: {
       tagline: 'SEE YOUR HOUSE \u00b7 CHANGE IT \u00b7 BUILD',

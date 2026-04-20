@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -29,6 +29,21 @@ export default function LoginForm({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { t } = useTranslation();
   const { track } = useAnalytics();
+
+  const passwordStrength = useMemo(() => {
+    if (!password) return null;
+    const hasLength = password.length >= 8;
+    const hasNumber = /\d/.test(password);
+    const hasUpper = /[A-Z]/.test(password);
+    const hasSpecial = /[^A-Za-z0-9]/.test(password);
+    if (hasLength && hasNumber && hasUpper && hasSpecial) {
+      return { level: "strong" as const, label: t("auth.passwordStrong"), color: "var(--forest)", width: "100%" };
+    }
+    if (hasLength && hasNumber) {
+      return { level: "medium" as const, label: t("auth.passwordMedium"), color: "var(--amber)", width: "66%" };
+    }
+    return { level: "weak" as const, label: t("auth.passwordWeak"), color: "var(--danger)", width: "33%" };
+  }, [password, t]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -198,8 +213,35 @@ export default function LoginForm({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={isRegister ? 8 : undefined}
                 autoComplete={isRegister ? "new-password" : "current-password"}
               />
+              {isRegister && password && passwordStrength && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{
+                    height: 4,
+                    borderRadius: 2,
+                    background: "var(--border)",
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      height: "100%",
+                      width: passwordStrength.width,
+                      background: passwordStrength.color,
+                      borderRadius: 2,
+                      transition: "width 0.25s ease, background 0.25s ease",
+                    }} />
+                  </div>
+                  <div style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: passwordStrength.color,
+                    fontWeight: 500,
+                  }}>
+                    {passwordStrength.label}
+                  </div>
+                </div>
+              )}
               {!isRegister && (
                 <div style={{ marginTop: 8, textAlign: "right" }}>
                   <a
