@@ -1,12 +1,20 @@
 {
-  "version": 1,
+  "version": 2,
   "materials": {
     "pine_48x98_c24": {
       "name": "48x98 Runkopuu C24",
       "category": "lumber",
-      "tags": ["structural", "softwood", "framing"],
+      "tags": [
+        "structural",
+        "softwood",
+        "framing"
+      ],
       "visual": {
-        "albedo": [1.0, 0.95, 0.85],
+        "albedo": [
+          1.0,
+          0.95,
+          0.85
+        ],
         "roughness": 0.85,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
@@ -25,17 +33,37 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 2.60,
+        "unitPrice": 2.6,
         "supplier": "sarokas",
         "link": "https://www.sarokas.fi/mitallistettu-48x98-c24"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "framing_48",
+      "supplier_skus": [
+        {
+          "supplier": "sarokas",
+          "sku": "SAR-4898-C24"
+        }
+      ]
     },
     "pine_48x148_c24": {
       "name": "48x148 Lattiavasat C24",
       "category": "lumber",
-      "tags": ["structural", "softwood", "joists"],
+      "tags": [
+        "structural",
+        "softwood",
+        "joists"
+      ],
       "visual": {
-        "albedo": [1.0, 0.95, 0.85],
+        "albedo": [
+          1.0,
+          0.95,
+          0.85
+        ],
         "roughness": 0.85,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
@@ -54,18 +82,39 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 3.70,
+        "unitPrice": 3.7,
         "supplier": "sarokas",
         "link": "https://www.sarokas.fi/mitallistettu-48x148-c24"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "joists_48",
+      "supplier_skus": [
+        {
+          "supplier": "sarokas",
+          "sku": "SAR-48148-C24"
+        }
+      ]
     },
     "pressure_treated_48x148": {
       "name": "Kestopuu 48x148",
       "category": "lumber",
-      "tags": ["structural", "treated", "exterior", "ground-contact"],
+      "tags": [
+        "structural",
+        "treated",
+        "exterior",
+        "ground-contact"
+      ],
       "visual": {
-        "albedo": [0.65, 0.72, 0.55],
-        "roughness": 0.80,
+        "albedo": [
+          0.65,
+          0.72,
+          0.55
+        ],
+        "roughness": 0.8,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
       },
@@ -83,17 +132,39 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 3.80,
+        "unitPrice": 3.8,
         "supplier": "sarokas",
         "link": "https://www.sarokas.fi/kestopuu-48-148-vihrea"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "joists_48_treated",
+      "supplier_skus": [
+        {
+          "supplier": "sarokas",
+          "sku": "SAR-KP-48148"
+        }
+      ]
     },
     "pressure_treated_148x148": {
       "name": "Kestopuu Jalka 148x148",
       "category": "foundation",
-      "tags": ["structural", "treated", "exterior", "ground-contact", "skid"],
+      "tags": [
+        "structural",
+        "treated",
+        "exterior",
+        "ground-contact",
+        "skid"
+      ],
       "visual": {
-        "albedo": [0.60, 0.68, 0.50],
+        "albedo": [
+          0.6,
+          0.68,
+          0.5
+        ],
         "roughness": 0.82,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
@@ -104,18 +175,38 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 12.50,
+        "unitPrice": 12.5,
         "supplier": "sarokas",
         "link": "https://www.sarokas.fi/kestopuu-148x148-vihrea"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "skid_beams",
+      "supplier_skus": [
+        {
+          "supplier": "sarokas",
+          "sku": "SAR-KP-148148"
+        }
+      ]
     },
     "osb_9mm": {
       "name": "OSB 9mm Levy",
       "category": "sheathing",
-      "tags": ["composite", "structural", "wall"],
+      "tags": [
+        "composite",
+        "structural",
+        "wall"
+      ],
       "visual": {
-        "albedo": [1.0, 1.0, 1.0],
-        "roughness": 0.90,
+        "albedo": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "roughness": 0.9,
         "metallic": 0.0,
         "albedoTexture": "textures/osb/osb_albedo.png"
       },
@@ -125,17 +216,38 @@
       },
       "pricing": {
         "unit": "sheet",
-        "unitPrice": 12.50,
+        "unitPrice": 12.5,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/osb-levy-9mm"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "sheet",
+      "design_unit": "m2",
+      "conversion_factor": 2.97,
+      "vat_class": "standard",
+      "substitution_group": "sheathing_thin",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-OSB-9",
+          "ean": "6438400012345"
+        }
+      ]
     },
     "osb_18mm": {
       "name": "OSB 18mm Lattia",
       "category": "sheathing",
-      "tags": ["composite", "structural", "floor"],
+      "tags": [
+        "composite",
+        "structural",
+        "floor"
+      ],
       "visual": {
-        "albedo": [1.0, 1.0, 1.0],
+        "albedo": [
+          1.0,
+          1.0,
+          1.0
+        ],
         "roughness": 0.88,
         "metallic": 0.0,
         "albedoTexture": "textures/osb/osb_albedo.png"
@@ -146,17 +258,41 @@
       },
       "pricing": {
         "unit": "sheet",
-        "unitPrice": 22.00,
+        "unitPrice": 22.0,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/osb-levy-18mm"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "sheet",
+      "design_unit": "m2",
+      "conversion_factor": 2.97,
+      "vat_class": "standard",
+      "substitution_group": "sheathing_thick",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-OSB-18",
+          "ean": "6438400012346"
+        }
+      ]
     },
     "exterior_board_yellow": {
       "name": "Ulkoverhouslauta Keltainen",
       "category": "cladding",
-      "tags": ["wood", "exterior", "cladding", "finnish", "yellow", "painted"],
+      "tags": [
+        "wood",
+        "exterior",
+        "cladding",
+        "finnish",
+        "yellow",
+        "painted"
+      ],
       "visual": {
-        "albedo": [0.95, 0.82, 0.28],
+        "albedo": [
+          0.95,
+          0.82,
+          0.28
+        ],
         "roughness": 0.45,
         "metallic": 0.0
       },
@@ -166,18 +302,38 @@
       },
       "pricing": {
         "unit": "sheet",
-        "unitPrice": 28.00,
+        "unitPrice": 28.0,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/vaneri-9mm-ulko"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "sheet",
+      "design_unit": "m2",
+      "conversion_factor": 2.97,
+      "vat_class": "standard",
+      "substitution_group": "exterior_cladding",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-UVL-KELT"
+        }
+      ]
     },
     "galvanized_roofing": {
       "name": "Peltikatto Sinkitty",
       "category": "roofing",
-      "tags": ["metal", "exterior", "roof"],
+      "tags": [
+        "metal",
+        "exterior",
+        "roof"
+      ],
       "visual": {
-        "albedo": [0.75, 0.76, 0.78],
-        "roughness": 0.30,
+        "albedo": [
+          0.75,
+          0.76,
+          0.78
+        ],
+        "roughness": 0.3,
         "metallic": 0.98,
         "albedoTexture": "textures/metal/galvanized_albedo.png"
       },
@@ -187,18 +343,39 @@
       },
       "pricing": {
         "unit": "sqm",
-        "unitPrice": 8.50,
+        "unitPrice": 8.5,
         "supplier": "ruukki",
         "link": "https://www.ruukki.com/fin/katto"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "m2",
+      "design_unit": "m2",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "metal_roofing",
+      "supplier_skus": [
+        {
+          "supplier": "ruukki",
+          "sku": "RK-PELTI-SINK",
+          "url": "https://www.ruukki.com/fin/katto"
+        }
+      ]
     },
     "galvanized_flashing": {
       "name": "Pellitys Sinkitty",
       "category": "roofing",
-      "tags": ["metal", "exterior", "flashing"],
+      "tags": [
+        "metal",
+        "exterior",
+        "flashing"
+      ],
       "visual": {
-        "albedo": [0.70, 0.70, 0.73],
-        "roughness": 0.30,
+        "albedo": [
+          0.7,
+          0.7,
+          0.73
+        ],
+        "roughness": 0.3,
         "metallic": 1.0,
         "albedoTexture": "textures/metal/galvanized_albedo.png"
       },
@@ -208,18 +385,38 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 12.00,
+        "unitPrice": 12.0,
         "supplier": "ruukki",
         "link": "https://www.ruukki.com/fin/pellitys"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "metal_flashing",
+      "supplier_skus": [
+        {
+          "supplier": "ruukki",
+          "sku": "RK-PELLIT-SINK"
+        }
+      ]
     },
     "hardware_cloth": {
       "name": "Verkko 12.5mm Sinkitty",
       "category": "hardware",
-      "tags": ["metal", "mesh", "chicken-wire"],
+      "tags": [
+        "metal",
+        "mesh",
+        "chicken-wire"
+      ],
       "visual": {
-        "albedo": [0.65, 0.65, 0.68],
-        "roughness": 0.40,
+        "albedo": [
+          0.65,
+          0.65,
+          0.68
+        ],
+        "roughness": 0.4,
         "metallic": 0.9
       },
       "thermal": {
@@ -228,17 +425,37 @@
       },
       "pricing": {
         "unit": "sqm",
-        "unitPrice": 8.00,
+        "unitPrice": 8.0,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/verkko-sinkitty"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "roll",
+      "design_unit": "m2",
+      "conversion_factor": 10,
+      "vat_class": "standard",
+      "substitution_group": "hardware_mesh",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-VERKKO-125"
+        }
+      ]
     },
     "insulation_100mm": {
       "name": "Mineraalivilla 100mm",
       "category": "insulation",
-      "tags": ["thermal", "wall", "mineral-wool"],
+      "tags": [
+        "thermal",
+        "wall",
+        "mineral-wool"
+      ],
       "visual": {
-        "albedo": [0.95, 0.92, 0.55],
+        "albedo": [
+          0.95,
+          0.92,
+          0.55
+        ],
         "roughness": 0.95,
         "metallic": 0.0
       },
@@ -248,18 +465,39 @@
       },
       "pricing": {
         "unit": "sqm",
-        "unitPrice": 6.50,
+        "unitPrice": 6.5,
         "supplier": "paroc",
         "link": "https://www.paroc.fi/tuotteet/seinaeristeet"
-      }
+      },
+      "pack_size": 3,
+      "purchasable_unit": "pack",
+      "design_unit": "m2",
+      "conversion_factor": 1.8,
+      "vat_class": "standard",
+      "substitution_group": "wall_insulation_100",
+      "supplier_skus": [
+        {
+          "supplier": "paroc",
+          "sku": "PAR-EXTRA-100",
+          "ean": "6418400100001"
+        }
+      ]
     },
     "vapor_barrier": {
       "name": "Höyrynsulku PE",
       "category": "membrane",
-      "tags": ["plastic", "vapor", "barrier"],
+      "tags": [
+        "plastic",
+        "vapor",
+        "barrier"
+      ],
       "visual": {
-        "albedo": [0.15, 0.15, 0.18],
-        "roughness": 0.20,
+        "albedo": [
+          0.15,
+          0.15,
+          0.18
+        ],
+        "roughness": 0.2,
         "metallic": 0.0
       },
       "thermal": {
@@ -268,130 +506,293 @@
       },
       "pricing": {
         "unit": "sqm",
-        "unitPrice": 0.80,
+        "unitPrice": 0.8,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/hoyrynsulku"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "roll",
+      "design_unit": "m2",
+      "conversion_factor": 75,
+      "vat_class": "standard",
+      "substitution_group": "vapor_barriers",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-HOYR-PE"
+        }
+      ]
     },
     "exterior_paint_red": {
       "name": "Punamulta Ulkomaali",
       "category": "finish",
-      "tags": ["paint", "exterior", "traditional"],
+      "tags": [
+        "paint",
+        "exterior",
+        "traditional"
+      ],
       "visual": {
-        "albedo": [0.65, 0.22, 0.15],
-        "roughness": 0.60,
+        "albedo": [
+          0.65,
+          0.22,
+          0.15
+        ],
+        "roughness": 0.6,
         "metallic": 0.0
       },
       "pricing": {
         "unit": "liter",
-        "unitPrice": 12.00,
+        "unitPrice": 12.0,
         "supplier": "tikkurila",
         "link": "https://www.tikkurila.fi/punamulta"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "liter",
+      "design_unit": "m2",
+      "conversion_factor": 0.1,
+      "vat_class": "standard",
+      "substitution_group": "exterior_paint",
+      "supplier_skus": [
+        {
+          "supplier": "tikkurila",
+          "sku": "TIK-PUNA-10L"
+        }
+      ]
     },
     "exterior_paint_yellow": {
       "name": "Keltainen Ulkomaali",
       "category": "finish",
-      "tags": ["paint", "exterior", "traditional", "finnish"],
+      "tags": [
+        "paint",
+        "exterior",
+        "traditional",
+        "finnish"
+      ],
       "visual": {
-        "albedo": [0.92, 0.78, 0.35],
+        "albedo": [
+          0.92,
+          0.78,
+          0.35
+        ],
         "roughness": 0.55,
         "metallic": 0.0
       },
       "pricing": {
         "unit": "liter",
-        "unitPrice": 14.00,
+        "unitPrice": 14.0,
         "supplier": "tikkurila",
         "link": "https://www.tikkurila.fi/ulkomaali"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "liter",
+      "design_unit": "m2",
+      "conversion_factor": 0.1,
+      "vat_class": "standard",
+      "substitution_group": "exterior_paint",
+      "supplier_skus": [
+        {
+          "supplier": "tikkurila",
+          "sku": "TIK-KELT-10L"
+        }
+      ]
     },
     "exterior_paint_gray_door": {
       "name": "Harmaa Ovimaali",
       "category": "finish",
-      "tags": ["paint", "exterior", "door", "finnish"],
+      "tags": [
+        "paint",
+        "exterior",
+        "door",
+        "finnish"
+      ],
       "visual": {
-        "albedo": [0.45, 0.48, 0.52],
-        "roughness": 0.50,
+        "albedo": [
+          0.45,
+          0.48,
+          0.52
+        ],
+        "roughness": 0.5,
         "metallic": 0.0
       },
       "pricing": {
         "unit": "liter",
-        "unitPrice": 16.00,
+        "unitPrice": 16.0,
         "supplier": "tikkurila",
         "link": "https://www.tikkurila.fi/ovimaali"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "liter",
+      "design_unit": "m2",
+      "conversion_factor": 0.1,
+      "vat_class": "standard",
+      "substitution_group": "exterior_paint",
+      "supplier_skus": [
+        {
+          "supplier": "tikkurila",
+          "sku": "TIK-HARM-OVI"
+        }
+      ]
     },
     "exterior_paint_white": {
       "name": "Valkoinen Ulkomaali",
       "category": "finish",
-      "tags": ["paint", "exterior", "trim"],
+      "tags": [
+        "paint",
+        "exterior",
+        "trim"
+      ],
       "visual": {
-        "albedo": [0.96, 0.95, 0.93],
-        "roughness": 0.40,
+        "albedo": [
+          0.96,
+          0.95,
+          0.93
+        ],
+        "roughness": 0.4,
         "metallic": 0.0
       },
       "pricing": {
         "unit": "liter",
-        "unitPrice": 15.00,
+        "unitPrice": 15.0,
         "supplier": "tikkurila",
         "link": "https://www.tikkurila.fi/ulkomaali"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "liter",
+      "design_unit": "m2",
+      "conversion_factor": 0.1,
+      "vat_class": "standard",
+      "substitution_group": "exterior_paint",
+      "supplier_skus": [
+        {
+          "supplier": "tikkurila",
+          "sku": "TIK-VALK-10L"
+        }
+      ]
     },
     "hinges_galvanized": {
       "name": "Saranat Sinkitty",
       "category": "hardware",
-      "tags": ["metal", "hinge", "door"],
+      "tags": [
+        "metal",
+        "hinge",
+        "door"
+      ],
       "visual": {
-        "albedo": [0.68, 0.68, 0.70],
+        "albedo": [
+          0.68,
+          0.68,
+          0.7
+        ],
         "roughness": 0.35,
         "metallic": 1.0
       },
       "pricing": {
         "unit": "kpl",
-        "unitPrice": 3.50,
+        "unitPrice": 3.5,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/saranat"
-      }
+      },
+      "pack_size": 2,
+      "purchasable_unit": "pack",
+      "design_unit": "kpl",
+      "conversion_factor": 2,
+      "vat_class": "standard",
+      "substitution_group": "door_hinges",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-SARA-SINK"
+        }
+      ]
     },
     "joist_hanger": {
       "name": "Palkinkannatin 48mm",
       "category": "hardware",
-      "tags": ["metal", "structural", "connector"],
+      "tags": [
+        "metal",
+        "structural",
+        "connector"
+      ],
       "visual": {
-        "albedo": [0.72, 0.72, 0.74],
-        "roughness": 0.30,
+        "albedo": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.3,
         "metallic": 1.0
       },
       "pricing": {
         "unit": "kpl",
-        "unitPrice": 2.80,
+        "unitPrice": 2.8,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/palkinkannatin"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "kpl",
+      "design_unit": "kpl",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "joist_hangers",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-PALKKAN-48"
+        }
+      ]
     },
     "screws_50mm": {
       "name": "Ruuvit 4.5x50mm",
       "category": "fasteners",
-      "tags": ["metal", "screw", "exterior"],
+      "tags": [
+        "metal",
+        "screw",
+        "exterior"
+      ],
       "visual": {
-        "albedo": [0.60, 0.58, 0.55],
+        "albedo": [
+          0.6,
+          0.58,
+          0.55
+        ],
         "roughness": 0.45,
         "metallic": 0.95
       },
       "pricing": {
         "unit": "box",
-        "unitPrice": 18.00,
+        "unitPrice": 18.0,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/ruuvit-ulko"
-      }
+      },
+      "pack_size": 200,
+      "purchasable_unit": "box",
+      "design_unit": "kpl",
+      "conversion_factor": 200,
+      "vat_class": "standard",
+      "substitution_group": "wood_screws_50",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-RUUVI-4550",
+          "ean": "6438400054321"
+        }
+      ]
     },
     "concrete_block": {
       "name": "Betoniharkko 200mm",
       "category": "masonry",
-      "tags": ["concrete", "foundation", "structural"],
+      "tags": [
+        "concrete",
+        "foundation",
+        "structural"
+      ],
       "visual": {
-        "albedo": [0.55, 0.55, 0.52],
-        "roughness": 0.90,
+        "albedo": [
+          0.55,
+          0.55,
+          0.52
+        ],
+        "roughness": 0.9,
         "metallic": 0.0,
         "albedoTexture": "textures/concrete/concrete_albedo.png"
       },
@@ -401,34 +802,74 @@
       },
       "pricing": {
         "unit": "kpl",
-        "unitPrice": 4.50,
+        "unitPrice": 4.5,
         "supplier": "lakan-betoni",
         "link": "https://www.lakanbetoni.fi/harkot"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "kpl",
+      "design_unit": "kpl",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "foundation_blocks",
+      "supplier_skus": [
+        {
+          "supplier": "lakan-betoni",
+          "sku": "LB-HARKKO-200"
+        }
+      ]
     },
     "builders_sand": {
       "name": "Rakennushiekka 25kg",
       "category": "masonry",
-      "tags": ["sand", "foundation", "leveling"],
+      "tags": [
+        "sand",
+        "foundation",
+        "leveling"
+      ],
       "visual": {
-        "albedo": [0.85, 0.78, 0.60],
+        "albedo": [
+          0.85,
+          0.78,
+          0.6
+        ],
         "roughness": 0.95,
         "metallic": 0.0
       },
       "pricing": {
         "unit": "säkki",
-        "unitPrice": 4.50,
+        "unitPrice": 4.5,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/rakennushiekka"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "sakki",
+      "design_unit": "sakki",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "aggregates",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-HIEKKA-25"
+        }
+      ]
     },
     "nest_box_plywood": {
       "name": "Vaneri 12mm Pesälaatikko",
       "category": "interior",
-      "tags": ["plywood", "interior", "nest"],
+      "tags": [
+        "plywood",
+        "interior",
+        "nest"
+      ],
       "visual": {
-        "albedo": [0.55, 0.42, 0.30],
-        "roughness": 0.70,
+        "albedo": [
+          0.55,
+          0.42,
+          0.3
+        ],
+        "roughness": 0.7,
         "metallic": 0.0,
         "albedoTexture": "textures/plywood/plywood_albedo.png"
       },
@@ -438,17 +879,37 @@
       },
       "pricing": {
         "unit": "sheet",
-        "unitPrice": 32.00,
+        "unitPrice": 32.0,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/vaneri-12mm"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "sheet",
+      "design_unit": "m2",
+      "conversion_factor": 2.97,
+      "vat_class": "standard",
+      "substitution_group": "plywood_interior",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-VANERI-12"
+        }
+      ]
     },
     "trim_21x45": {
       "name": "Lista 21x45",
       "category": "trim",
-      "tags": ["softwood", "trim", "exterior"],
+      "tags": [
+        "softwood",
+        "trim",
+        "exterior"
+      ],
       "visual": {
-        "albedo": [0.88, 0.78, 0.58],
+        "albedo": [
+          0.88,
+          0.78,
+          0.58
+        ],
         "roughness": 0.65,
         "metallic": 0.0
       },
@@ -458,18 +919,38 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 1.20,
+        "unitPrice": 1.2,
         "supplier": "sarokas",
         "link": "https://www.sarokas.fi/lista-21x45"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "trim_small",
+      "supplier_skus": [
+        {
+          "supplier": "sarokas",
+          "sku": "SAR-LISTA-2145"
+        }
+      ]
     },
     "door_thermal_bridge": {
       "name": "Ovi (lämpösilta)",
       "category": "opening",
-      "tags": ["thermal-bridge", "door", "weak-point"],
+      "tags": [
+        "thermal-bridge",
+        "door",
+        "weak-point"
+      ],
       "visual": {
-        "albedo": [0.42, 0.46, 0.52],
-        "roughness": 0.50,
+        "albedo": [
+          0.42,
+          0.46,
+          0.52
+        ],
+        "roughness": 0.5,
         "metallic": 0.0
       },
       "thermal": {
@@ -480,9 +961,17 @@
     "assembly_lumber_preview": {
       "name": "Esikatselu Runko",
       "category": "assembly_preview",
-      "tags": ["preview", "assembly", "temporary"],
+      "tags": [
+        "preview",
+        "assembly",
+        "temporary"
+      ],
       "visual": {
-        "albedo": [0.85, 0.72, 0.52],
+        "albedo": [
+          0.85,
+          0.72,
+          0.52
+        ],
         "roughness": 0.75,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
@@ -491,10 +980,18 @@
     "vent_thermal_bridge": {
       "name": "Tuuletusaukko (lämpösilta)",
       "category": "opening",
-      "tags": ["thermal-bridge", "vent", "weak-point"],
+      "tags": [
+        "thermal-bridge",
+        "vent",
+        "weak-point"
+      ],
       "visual": {
-        "albedo": [0.3, 0.3, 0.35],
-        "roughness": 0.50,
+        "albedo": [
+          0.3,
+          0.3,
+          0.35
+        ],
+        "roughness": 0.5,
         "metallic": 0.5
       },
       "thermal": {
@@ -505,9 +1002,17 @@
     "nest_access_thermal_bridge": {
       "name": "Pesälaatikkoaukko (lämpösilta)",
       "category": "opening",
-      "tags": ["thermal-bridge", "nest", "weak-point"],
+      "tags": [
+        "thermal-bridge",
+        "nest",
+        "weak-point"
+      ],
       "visual": {
-        "albedo": [0.75, 0.65, 0.50],
+        "albedo": [
+          0.75,
+          0.65,
+          0.5
+        ],
         "roughness": 0.65,
         "metallic": 0.0
       },
@@ -519,9 +1024,19 @@
     "cedar_post_98x98": {
       "name": "Kestopuu Tolppa 98x98",
       "category": "lumber",
-      "tags": ["structural", "treated", "exterior", "post", "run"],
+      "tags": [
+        "structural",
+        "treated",
+        "exterior",
+        "post",
+        "run"
+      ],
       "visual": {
-        "albedo": [0.62, 0.70, 0.52],
+        "albedo": [
+          0.62,
+          0.7,
+          0.52
+        ],
         "roughness": 0.75,
         "metallic": 0.0,
         "albedoTexture": "textures/wood/pine_albedo.png"
@@ -536,10 +1051,22 @@
       },
       "pricing": {
         "unit": "jm",
-        "unitPrice": 8.50,
+        "unitPrice": 8.5,
         "supplier": "k-rauta",
         "link": "https://www.k-rauta.fi/tuote/kestopuu-tolppa"
-      }
+      },
+      "pack_size": 1,
+      "purchasable_unit": "jm",
+      "design_unit": "jm",
+      "conversion_factor": 1,
+      "vat_class": "standard",
+      "substitution_group": "treated_posts",
+      "supplier_skus": [
+        {
+          "supplier": "k-rauta",
+          "sku": "KR-KP-TOLPPA-98"
+        }
+      ]
     }
   },
   "suppliers": {
@@ -581,17 +1108,54 @@
     }
   },
   "categories": {
-    "lumber": { "displayName": "Sahatavara", "order": 1 },
-    "sheathing": { "displayName": "Levyt", "order": 2 },
-    "roofing": { "displayName": "Katto", "order": 3 },
-    "insulation": { "displayName": "Eristeet", "order": 4 },
-    "membrane": { "displayName": "Kalvot", "order": 5 },
-    "finish": { "displayName": "Pintakäsittely", "order": 6 },
-    "hardware": { "displayName": "Tarvikkeet", "order": 7 },
-    "fasteners": { "displayName": "Kiinnikkeet", "order": 8 },
-    "masonry": { "displayName": "Muuraus", "order": 9 },
-    "interior": { "displayName": "Sisustus", "order": 10 },
-    "trim": { "displayName": "Listat", "order": 11 },
-    "assembly_preview": { "displayName": "Preview", "order": 99, "hidden": true }
+    "lumber": {
+      "displayName": "Sahatavara",
+      "order": 1
+    },
+    "sheathing": {
+      "displayName": "Levyt",
+      "order": 2
+    },
+    "roofing": {
+      "displayName": "Katto",
+      "order": 3
+    },
+    "insulation": {
+      "displayName": "Eristeet",
+      "order": 4
+    },
+    "membrane": {
+      "displayName": "Kalvot",
+      "order": 5
+    },
+    "finish": {
+      "displayName": "Pintakäsittely",
+      "order": 6
+    },
+    "hardware": {
+      "displayName": "Tarvikkeet",
+      "order": 7
+    },
+    "fasteners": {
+      "displayName": "Kiinnikkeet",
+      "order": 8
+    },
+    "masonry": {
+      "displayName": "Muuraus",
+      "order": 9
+    },
+    "interior": {
+      "displayName": "Sisustus",
+      "order": 10
+    },
+    "trim": {
+      "displayName": "Listat",
+      "order": 11
+    },
+    "assembly_preview": {
+      "displayName": "Preview",
+      "order": 99,
+      "hidden": true
+    }
   }
 }

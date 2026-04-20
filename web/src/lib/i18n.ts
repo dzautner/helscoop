@@ -271,6 +271,7 @@ const translations = {
       noMatches: 'Ei osumia',
       closeFindReplace: 'Sulje haku',
       exportProject: 'Vie projekti (.helscoop)',
+      toBuy: 'Osta',
     },
     share: {
       title: 'Jaa projekti',
@@ -378,6 +379,12 @@ const translations = {
       boxLong: 'pakkaus',
       literLong: 'litra',
       sakkiLong: 'sakki',
+      pack: 'pkt',
+      packLong: 'pakkaus',
+      roll: 'rll',
+      rollLong: 'rulla',
+      pallet: 'lava',
+      palletLong: 'lava',
     },
     quote: {
       sectionLabel: 'KUSTANNUSARVIO',
@@ -885,6 +892,7 @@ const translations = {
       noMatches: 'No matches',
       closeFindReplace: 'Close find',
       exportProject: 'Export project (.helscoop)',
+      toBuy: 'Buy',
     },
     share: {
       title: 'Share project',
@@ -992,6 +1000,12 @@ const translations = {
       boxLong: 'box',
       literLong: 'liter',
       sakkiLong: 'bag',
+      pack: 'pack',
+      packLong: 'pack',
+      roll: 'roll',
+      rollLong: 'roll',
+      pallet: 'pallet',
+      palletLong: 'pallet',
     },
     quote: {
       sectionLabel: 'QUOTE SUMMARY',

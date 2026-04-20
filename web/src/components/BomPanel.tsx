@@ -7,7 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
-import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow } from "@/types";
+import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
 
@@ -40,6 +40,40 @@ function localizeUnit(unit: string, t: (key: string) => string): string {
   // If the translation key resolves to itself, return original
   if (translated === `units.${normalized}`) return unit;
   return translated;
+}
+
+/* ── Unit conversion helpers ───────────────────────────────── */
+
+/** VAT multiplier for Finnish VAT classes (as of 2024-09) */
+const VAT_RATES: Record<VatClass, number> = {
+  standard: 0.255,
+  reduced: 0.14,
+  zero: 0,
+};
+
+/** Return the VAT rate (0-1) for a material, defaulting to standard (25.5%) */
+function getVatRate(material: Material): number {
+  return VAT_RATES[material.vat_class ?? 'standard'] ?? VAT_RATES.standard;
+}
+
+/**
+ * Convert a design quantity to the number of purchasable packs required.
+ * Always rounds UP because you can't buy half a pack.
+ *
+ * @param designQty — how many design_units needed (e.g. 12 m2)
+ * @param conversionFactor — how many design_units per 1 purchasable_unit (e.g. 1.8 m2/pack)
+ * @param packSize — items per pack (e.g. 3 panels per pack)
+ * @returns number of purchasable packs to buy
+ */
+function designToPurchasable(
+  designQty: number,
+  conversionFactor?: number,
+  packSize?: number,
+): number {
+  if (!conversionFactor || conversionFactor <= 0) return designQty;
+  const unitsNeeded = designQty / conversionFactor;
+  const packs = packSize && packSize > 1 ? unitsNeeded / packSize : unitsNeeded;
+  return Math.ceil(packs);
 }
 
 /* ── Category color palette ─────────────────────────────────── */
@@ -1073,6 +1107,35 @@ function BomItemCard({
           {Number(item.total || 0).toFixed(2)}
         </span>
       </div>
+      {/* Purchasable quantity hint — shown when conversion differs from design */}
+      {(() => {
+        const mat = materials.find((m) => m.id === item.material_id);
+        if (!mat || !mat.conversion_factor || !mat.purchasable_unit) return null;
+        if (mat.design_unit === mat.purchasable_unit && (mat.pack_size ?? 1) <= 1) return null;
+        const purchaseQty = designToPurchasable(
+          parseFloat(localQty) || 0,
+          mat.conversion_factor,
+          mat.pack_size,
+        );
+        return (
+          <div
+            style={{
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+              padding: '2px 0 0 4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span style={{ opacity: 0.6 }}>{t('editor.toBuy')}</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+              {purchaseQty} {localizeUnit(mat.purchasable_unit, t)}
+            </span>
+          </div>
+        );
+      })()}
       {item.supplier && (
         <div className="bom-item-supplier">
           {item.supplier}
@@ -1736,6 +1799,9 @@ export {
   getCategoryColor,
   matchSceneMaterial,
   computeTrend,
+  designToPurchasable,
+  getVatRate,
+  VAT_RATES,
   CATEGORY_COLORS,
   FALLBACK_COLORS,
   MATERIAL_ALIASES,
