@@ -134,6 +134,7 @@ const translations = {
       templateCreated: 'Projekti luotu mallista',
       saved: 'Tallennettu',
       bomExported: 'BOM viety',
+      exportingBom: 'Viedään...',
       projectExported: 'Projekti viety .helscoop-tiedostona',
       projectExportFailed: 'Projektin vienti epaonnistui',
       projectImported: 'Projekti tuotu onnistuneesti',
@@ -470,6 +471,7 @@ const translations = {
     },
     screenshot: {
       dialogTitle: 'Kuvakaappaus',
+      popoverLabel: 'Kuvakaappauksen esikatselu',
       download: 'Lataa',
       copy: 'Kopioi',
       copied: 'Kopioitu!',
@@ -717,6 +719,7 @@ const translations = {
       templateCreated: 'Created from template',
       saved: 'Saved',
       bomExported: 'BOM exported',
+      exportingBom: 'Exporting...',
       projectExported: 'Project exported as .helscoop file',
       projectExportFailed: 'Project export failed',
       projectImported: 'Project imported successfully',
@@ -1053,6 +1056,7 @@ const translations = {
     },
     screenshot: {
       dialogTitle: 'Screenshot',
+      popoverLabel: 'Screenshot preview',
       download: 'Download',
       copy: 'Copy',
       copied: 'Copied!',
