@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.49.0",
     "@types/three": "^0.184.0",
     "framer-motion": "^12.38.0",
     "jspdf": "^4.2.1",

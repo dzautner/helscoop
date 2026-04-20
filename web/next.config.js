@@ -1,4 +1,5 @@
 const webpack = require("webpack");
+const { withSentryConfig } = require("@sentry/nextjs");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -31,4 +32,18 @@ const nextConfig = {
     return config;
   },
 };
-module.exports = nextConfig;
+
+// Wrap with Sentry only when DSN is configured (avoids build errors in dev
+// without a Sentry account).
+const hasSentryDsn = Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN);
+
+module.exports = hasSentryDsn
+  ? withSentryConfig(nextConfig, {
+      // Suppress Sentry build output in CI
+      silent: true,
+      // Disable source map upload unless SENTRY_AUTH_TOKEN is set
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+    })
+  : nextConfig;

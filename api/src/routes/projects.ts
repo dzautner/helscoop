@@ -3,6 +3,7 @@ import crypto from "crypto";
 import PDFDocument from "pdfkit";
 import { query } from "../db";
 import { requireAuth } from "../auth";
+import { logAuditEvent } from "../audit";
 
 const router = Router();
 
@@ -97,6 +98,7 @@ router.delete("/:id", async (req, res) => {
     "UPDATE projects SET deleted_at = NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
+  logAuditEvent(req.user!.id, "project.delete", { targetId: req.params.id, ip: req.ip });
   res.json({ ok: true });
 });
 
@@ -115,6 +117,7 @@ router.delete("/:id/permanent", async (req, res) => {
     "DELETE FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NOT NULL",
     [req.params.id, req.user!.id]
   );
+  logAuditEvent(req.user!.id, "project.permanent_delete", { targetId: req.params.id, ip: req.ip });
   res.json({ ok: true });
 });
 
