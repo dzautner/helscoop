@@ -286,6 +286,7 @@ const translations = {
     },
     shortcuts: {
       title: 'Pikanappaimet',
+      close: 'Sulje',
       save: 'Tallenna',
       toggleBom: 'Nayta/piilota materiaalilista',
       applyCode: 'Suorita koodi',
@@ -834,6 +835,7 @@ const translations = {
     },
     shortcuts: {
       title: 'Keyboard shortcuts',
+      close: 'Close',
       save: 'Save',
       toggleBom: 'Toggle material list',
       applyCode: 'Apply code',
