@@ -411,7 +411,7 @@ describe("exhaustive i18n key parity", () => {
     "project.openAriaLabel", "project.copyAriaLabel", "project.deleteAriaLabel",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
-    "toast.templateCreated", "toast.saved", "toast.bomExported",
+    "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",
     "toast.loadProjectsFailed", "toast.createProjectFailed", "toast.templateFailed",
     "toast.deleteFailed", "toast.duplicateFailed", "toast.loadProjectFailed",
     "toast.saveFailed", "toast.bomExportFailed", "toast.aiError",
@@ -488,6 +488,7 @@ describe("exhaustive i18n key parity", () => {
     // dialog
     "dialog.confirm", "dialog.cancel", "dialog.deleteProjectTitle",
     "dialog.deleteProjectMessage", "dialog.deleteAccountTitle", "dialog.deleteAccountMessage",
+    "dialog.deleteBomItemTitle", "dialog.deleteBomItemMessage",
     // admin
     "admin.adminPanel", "admin.adminDesc", "admin.materials", "admin.suppliers",
     "admin.pricing", "admin.search", "admin.name", "admin.category",
