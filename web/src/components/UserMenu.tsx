@@ -6,6 +6,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import Link from "next/link";
 
 function UserAvatar({ name, onClick, expanded }: { name: string; onClick?: () => void; expanded: boolean }) {
+  const { t } = useTranslation();
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -17,7 +18,7 @@ function UserAvatar({ name, onClick, expanded }: { name: string; onClick?: () =>
   return (
     <button
       onClick={onClick}
-      aria-label={`User menu for ${name}`}
+      aria-label={t('userMenu.avatarAriaLabel', { name })}
       aria-haspopup="true"
       aria-expanded={expanded}
       style={{
@@ -132,7 +133,7 @@ export default function UserMenu({ userName }: { userName: string }) {
           <div
             className="card anim-fade"
             role="menu"
-            aria-label={`${userName} menu`}
+            aria-label={t('userMenu.menuAriaLabel', { name: userName })}
             ref={menuRef}
             style={{
               position: "absolute",

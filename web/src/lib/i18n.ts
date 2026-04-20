@@ -631,6 +631,16 @@ const translations = {
       stalePrice: 'Vanha hinta',
       stalePriceDetail: 'Hintatieto on yli 90 paivaa vanha — tarkista toimittajalta',
     },
+    projectList: {
+      menuAriaLabel: 'Valikko',
+    },
+    userMenu: {
+      avatarAriaLabel: 'Käyttäjävalikko: {{name}}',
+      menuAriaLabel: '{{name}} — valikko',
+    },
+    bom: {
+      donutChartAriaLabel: 'Kustannuserittelyn kaavio: {{categories}}',
+    },
     upgrade: {
       title: 'Päivitä tilaus',
       subtitle: 'Tämä ominaisuus vaatii korkeamman tilauksen.',
@@ -1292,6 +1302,16 @@ const translations = {
       dataQuality: 'Data quality',
       stalePrice: 'Stale price',
       stalePriceDetail: 'Price data is over 90 days old \u2014 verify with supplier',
+    },
+    projectList: {
+      menuAriaLabel: 'Menu',
+    },
+    userMenu: {
+      avatarAriaLabel: 'User menu for {{name}}',
+      menuAriaLabel: '{{name}} menu',
+    },
+    bom: {
+      donutChartAriaLabel: 'Cost breakdown chart: {{categories}}',
     },
     upgrade: {
       title: 'Upgrade your plan',
