@@ -26,7 +26,7 @@
 
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
-  --text-muted: #52525b;
+  --text-muted: #71717a;
 
   --amber: #e5a04b;
   --amber-light: #f0b86a;
@@ -375,7 +375,7 @@
   --bg-tertiary: #18181b;
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
-  --text-muted: #52525b;
+  --text-muted: #71717a;
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.1);
 }
