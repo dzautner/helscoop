@@ -9,6 +9,8 @@ export interface BuildingInfo {
   roof_type?: string;
   roof_material?: string;
   units?: number;
+  confidence?: string;
+  data_sources?: string[];
 }
 
 export interface Project {
