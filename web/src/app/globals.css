@@ -2400,39 +2400,79 @@ select:focus {
   gap: 4px;
 }
 
-.editor-save-status {
-  display: flex;
+/* ── Save status pill ────────────────────────────────────── */
+
+.save-status-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   font-size: 11px;
   font-family: var(--font-mono);
   letter-spacing: 0.02em;
   padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  transition: color var(--transition-fast), opacity var(--transition-fast);
+  border-radius: 100px;
   white-space: nowrap;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  border: 1px solid transparent;
+  flex-shrink: 0;
 }
 
-.editor-save-dot {
+.save-status-pill[data-status="saved"] {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.save-status-pill[data-status="saving"] {
+  color: var(--accent);
+  background: var(--amber-glow);
+  border-color: var(--amber-border);
+}
+
+.save-status-pill[data-status="unsaved"] {
+  color: var(--warning, #e5c07b);
+  background: var(--warning-dim);
+  border-color: var(--warning-border);
+}
+
+.save-status-pill[data-status="error"] {
+  color: var(--danger);
+  background: var(--danger-dim);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.save-status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.save-status-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.save-status-dot {
+  display: block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  flex-shrink: 0;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  background: currentColor;
+  animation: saveStatusPulse 2s ease-in-out infinite;
 }
 
-.editor-save-dot[data-status="saved"] {
-  background: var(--success);
-  box-shadow: 0 0 4px var(--forest-dim);
+.save-status-label {
+  line-height: 1;
 }
 
-.editor-save-dot[data-status="saving"] {
-  background: var(--accent);
-  animation: pulse 1.5s infinite;
-}
-
-.editor-save-dot[data-status="unsaved"] {
-  background: var(--warning, #e5c07b);
+@keyframes saveStatusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* ── Draft recovery banner ────────────────────────────────── */

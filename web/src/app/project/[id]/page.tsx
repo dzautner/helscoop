@@ -28,6 +28,8 @@ import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import type { SaveableFields } from "@/hooks/useAutoSave";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
+import SaveStatusIndicator from "@/components/SaveStatusIndicator";
+import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project } from "@/types";
 
 /** Parse a validation warning key like "validation.typoDetected:scene" into
@@ -93,8 +95,6 @@ scene.add(wall2, { material: "lumber", color: [0.85, 0.75, 0.55] });
 scene.add(wall3, { material: "lumber", color: [0.85, 0.75, 0.55] });
 scene.add(wall4, { material: "lumber", color: [0.85, 0.75, 0.55] });
 `;
-
-type SaveStatus = "saved" | "saving" | "unsaved";
 
 const HISTORY_LIMIT = 50;
 
@@ -280,6 +280,7 @@ export default function ProjectPage() {
         toast(t('toast.saved'), "success");
       },
       onSaveError: (err: unknown) => {
+        setSaveStatus("error");
         toast(err instanceof Error ? err.message : t('toast.saveFailed'), "error");
         setSaveFailCount((c) => c + 1);
         setSaveErrorVisible(true);
@@ -299,7 +300,7 @@ export default function ProjectPage() {
   // Block navigation when there are unsaved changes
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (saveStatus === "unsaved" || saveStatus === "saving") {
+      if (saveStatus === "unsaved" || saveStatus === "saving" || saveStatus === "error") {
         e.preventDefault();
       }
     };
@@ -804,16 +805,7 @@ export default function ProjectPage() {
             </span>
           )}
         </div>
-        <div className="editor-save-status" style={{
-          color: saveStatus === "unsaved" ? "var(--warning, #e5c07b)" : saveStatus === "saving" ? "var(--accent)" : "var(--text-muted)",
-        }}>
-          <span className="editor-save-dot" data-status={saveStatus} />
-          {saveStatus === "saving"
-            ? t('editor.saving')
-            : saveStatus === "saved"
-              ? `${t('editor.saved')}${lastSaved ? ` ${lastSaved}` : ""}`
-              : t('editor.unsaved')}
-        </div>
+        <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
         <div className="editor-header-actions">
           <button
             className="btn btn-ghost"
