@@ -275,6 +275,7 @@ const translations = {
       closeFindReplace: 'Sulje haku',
       exportProject: 'Vie projekti (.helscoop)',
       toBuy: 'Osta',
+      paramSliderLabel: '{{name}} — liukusäädin',
     },
     share: {
       title: 'Jaa projekti',
@@ -500,6 +501,7 @@ const translations = {
     screenshot: {
       dialogTitle: 'Kuvakaappaus',
       popoverLabel: 'Kuvakaappauksen esikatselu',
+      previewAlt: 'Kuvakaappauksen esikatselu',
       download: 'Lataa',
       copy: 'Kopioi',
       copied: 'Kopioitu!',
@@ -507,6 +509,7 @@ const translations = {
     commandPalette: {
       title: 'Komentovalikko',
       placeholder: 'Hae komentoa...',
+      searchAriaLabel: 'Hae komentoja',
       noResults: 'Ei tuloksia',
       navigate: 'navigoi',
       execute: 'suorita',
@@ -617,6 +620,14 @@ const translations = {
       rivitalo: 'Rivitalo',
       kerrostalo: 'Kerrostalo',
       paritalo: 'Paritalo',
+      materialWood: 'Puu',
+      materialBrick: 'Tiili',
+      materialConcrete: 'Betoni',
+      materialLog: 'Hirsi',
+      heatingDistrict: 'Kaukolämpö',
+      heatingElectric: 'Sähkö',
+      heatingGroundSource: 'Maalämpöpumppu',
+      heatingOil: 'Öljy',
       material: {
         puu: 'Puu',
         tiili: 'Tiili',
@@ -954,6 +965,7 @@ const translations = {
       closeFindReplace: 'Close find',
       exportProject: 'Export project (.helscoop)',
       toBuy: 'Buy',
+      paramSliderLabel: '{{name}} slider',
     },
     share: {
       title: 'Share project',
@@ -1179,6 +1191,7 @@ const translations = {
     screenshot: {
       dialogTitle: 'Screenshot',
       popoverLabel: 'Screenshot preview',
+      previewAlt: 'Screenshot preview',
       download: 'Download',
       copy: 'Copy',
       copied: 'Copied!',
@@ -1186,6 +1199,7 @@ const translations = {
     commandPalette: {
       title: 'Command palette',
       placeholder: 'Search commands...',
+      searchAriaLabel: 'Search commands',
       noResults: 'No results',
       navigate: 'navigate',
       execute: 'execute',
@@ -1296,6 +1310,14 @@ const translations = {
       rivitalo: 'Terraced house',
       kerrostalo: 'Apartment block',
       paritalo: 'Semi-detached',
+      materialWood: 'Wood',
+      materialBrick: 'Brick',
+      materialConcrete: 'Concrete',
+      materialLog: 'Log',
+      heatingDistrict: 'District heating',
+      heatingElectric: 'Electric',
+      heatingGroundSource: 'Ground source heat pump',
+      heatingOil: 'Oil',
       material: {
         puu: 'Wood',
         tiili: 'Brick',

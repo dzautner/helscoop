@@ -433,8 +433,24 @@ function PriceHistoryChart({
 }) {
   const { t } = useTranslation();
   const [range, setRange] = useState<TimeRange>("90d");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const days = TIME_RANGE_DAYS[range];
   const cutoff = Date.now() - days * 86400000;
+
+  // Measure container width and update on resize
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
 
   const filtered = useMemo(
     () =>
@@ -461,7 +477,7 @@ function PriceHistoryChart({
 
   if (filtered.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: 16, color: "var(--text-muted)", fontSize: 12 }}>
+      <div ref={containerRef} style={{ textAlign: "center", padding: 16, color: "var(--text-muted)", fontSize: 12 }}>
         {t("pricing.limitedHistory")}
       </div>
     );
@@ -478,7 +494,7 @@ function PriceHistoryChart({
   const maxT = Math.max(...allTimes);
   const timeRange = maxT - minT || 1;
 
-  const chartW = 380;
+  const chartW = Math.max(containerWidth, 200);
   const chartH = 120;
   const padX = 4;
   const padY = 6;
@@ -492,7 +508,7 @@ function PriceHistoryChart({
   }
 
   return (
-    <div style={{ marginTop: 12 }}>
+    <div ref={containerRef} style={{ marginTop: 12 }}>
       {/* Time range selector */}
       <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
         {(["30d", "90d", "180d", "1y"] as TimeRange[]).map((r) => (
@@ -509,11 +525,10 @@ function PriceHistoryChart({
 
       {/* SVG chart */}
       <svg
-        width={chartW}
+        width="100%"
         height={chartH}
         style={{
-          width: "100%",
-          height: "auto",
+          display: "block",
           background: "var(--bg-tertiary)",
           borderRadius: "var(--radius-sm)",
           border: "1px solid var(--border)",

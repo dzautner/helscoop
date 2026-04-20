@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { resetOnboarding } from "@/components/OnboardingTour";
+import { Skeleton, SkeletonBlock } from "@/components/Skeleton";
 import Link from "next/link";
 
 interface UserProfile {
@@ -148,15 +149,54 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ color: "var(--text-muted)" }}>{t("auth.loading")}</span>
+      <div style={{ minHeight: "100vh" }}>
+        {/* Top bar skeleton */}
+        <div className="nav-bar">
+          <div className="nav-inner" style={{ maxWidth: 720 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <SkeletonBlock width={100} height={20} />
+              <div style={{ width: 1, height: 20, background: "var(--border-strong)", margin: "0 4px" }} />
+              <SkeletonBlock width={70} height={14} />
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <SkeletonBlock width={32} height={32} />
+              <SkeletonBlock width={32} height={32} />
+              <SkeletonBlock width={120} height={32} />
+            </div>
+          </div>
+        </div>
+        <div style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
+          {/* Title skeleton */}
+          <div style={{ marginBottom: 40 }}>
+            <SkeletonBlock width={200} height={36} />
+          </div>
+          {/* Card skeletons */}
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="card settings-card"
+              style={{
+                marginBottom: 20,
+                padding: "24px 28px",
+                animation: `fadeIn 0.3s ease ${i * 0.08}s both`,
+              }}
+            >
+              <Skeleton variant="text" width={160} height={20} style={{ marginBottom: 8 }} />
+              <Skeleton variant="text" width="80%" height={14} style={{ marginBottom: 24 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <Skeleton variant="text" width={60} height={10} style={{ marginBottom: 8 }} />
+                  <Skeleton variant="rect" width="100%" height={40} />
+                </div>
+                <div>
+                  <Skeleton variant="text" width={80} height={10} style={{ marginBottom: 8 }} />
+                  <Skeleton variant="rect" width="100%" height={40} />
+                </div>
+              </div>
+              <Skeleton variant="rect" width={140} height={40} style={{ marginTop: 16 }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

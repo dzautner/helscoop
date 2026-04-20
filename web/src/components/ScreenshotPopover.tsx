@@ -129,7 +129,7 @@ export default function ScreenshotPopover({
       >
         <img
           src={imageDataUrl}
-          alt="Screenshot preview"
+          alt={t("screenshot.previewAlt")}
           style={{
             width: "100%",
             aspectRatio: "16 / 9",

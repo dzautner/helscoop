@@ -343,6 +343,7 @@ export default function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("commandPalette.placeholder")}
+            aria-label={t("commandPalette.searchAriaLabel")}
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
