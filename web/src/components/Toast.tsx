@@ -253,37 +253,47 @@ function ToastMessage({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: 
           {toast.action.label}
         </button>
       )}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          dismiss();
-        }}
-        style={{
-          background: "none",
-          border: "none",
-          color: style.color,
-          opacity: 0.5,
-          cursor: "pointer",
-          padding: 2,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          transition: "opacity 0.15s ease",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.opacity = "1";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.opacity = "0.5";
-        }}
-        aria-label="Dismiss"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
+      <DismissButton style={style} onDismiss={dismiss} />
     </div>
+  );
+}
+
+function DismissButton({ style, onDismiss }: { style: { color: string }; onDismiss: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onDismiss();
+      }}
+      style={{
+        background: "none",
+        border: "none",
+        color: style.color,
+        opacity: 0.5,
+        cursor: "pointer",
+        padding: 2,
+        minWidth: 44,
+        minHeight: 44,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        transition: "opacity 0.15s ease",
+        margin: "-12px -14px -12px 0",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.opacity = "1";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.opacity = "0.5";
+      }}
+      aria-label={t('toast.dismiss')}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
   );
 }
 

@@ -160,6 +160,7 @@ const translations = {
       undo: 'Kumoa',
       overflowMore: '+{{count}} lisaa',
       copyFailed: 'Kopiointi epäonnistui',
+      dismiss: 'Sulje',
     },
     editor: {
       scene: 'Kohtaus',
@@ -707,6 +708,7 @@ const translations = {
       undo: 'Undo',
       overflowMore: '+{{count}} more',
       copyFailed: 'Copy failed',
+      dismiss: 'Dismiss',
     },
     editor: {
       scene: 'Scene',
