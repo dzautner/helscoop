@@ -117,6 +117,8 @@ const translations = {
       templateCreated: 'Projekti luotu mallista',
       saved: 'Tallennettu',
       bomExported: 'BOM viety',
+      projectExported: 'Projekti viety .helscoop-tiedostona',
+      projectExportFailed: 'Projektin vienti epaonnistui',
       loadProjectsFailed: 'Projektien lataus epaonnistui',
       createProjectFailed: 'Projektin luonti epaonnistui',
       templateFailed: 'Mallin luonti epaonnistui',
@@ -236,6 +238,7 @@ const translations = {
       replaceAll: 'Korvaa kaikki',
       noMatches: 'Ei osumia',
       closeFindReplace: 'Sulje haku',
+      exportProject: 'Vie projekti (.helscoop)',
     },
     share: {
       title: 'Jaa projekti',
@@ -464,6 +467,8 @@ const translations = {
       saveEn: 'Save project',
       showDocs: 'Nayta/piilota dokumentit',
       showDocsEn: 'Show/hide docs',
+      exportProject: 'Vie projekti (.helscoop)',
+      exportProjectEn: 'Export project (.helscoop)',
     },
     validation: {
       unmatchedCloser: 'Sulkumerkilla {{char}} ei ole paria (rivi {{line}})',
@@ -609,6 +614,8 @@ const translations = {
       templateCreated: 'Created from template',
       saved: 'Saved',
       bomExported: 'BOM exported',
+      projectExported: 'Project exported as .helscoop file',
+      projectExportFailed: 'Project export failed',
       loadProjectsFailed: 'Failed to load projects',
       createProjectFailed: 'Failed to create project',
       templateFailed: 'Template creation failed',
@@ -728,6 +735,7 @@ const translations = {
       replaceAll: 'Replace all',
       noMatches: 'No matches',
       closeFindReplace: 'Close find',
+      exportProject: 'Export project (.helscoop)',
     },
     share: {
       title: 'Share project',
@@ -956,6 +964,8 @@ const translations = {
       saveEn: 'Save project',
       showDocs: 'Show/hide docs',
       showDocsEn: 'Show/hide docs',
+      exportProject: 'Export project (.helscoop)',
+      exportProjectEn: 'Export project (.helscoop)',
     },
     validation: {
       unmatchedCloser: 'Unmatched closing {{char}} on line {{line}}',
