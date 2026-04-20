@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { query } from "./db";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
+import { Role, normalizeRole, ROLES, isValidRole } from "./permissions";
 
 const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
@@ -13,6 +14,7 @@ export interface AuthUser {
   role: string;
 }
 
+export { Role, ROLES, isValidRole, normalizeRole };
 
 declare global {
   namespace Express {
