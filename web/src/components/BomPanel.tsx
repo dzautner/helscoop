@@ -1549,12 +1549,23 @@ export default function BomPanel({
             availableMaterials.map((m) => {
               const price = getPrimaryPrice(m);
               const isSelected = quickAddId === m.id;
+              const displayName = getLocalizedMaterialName(m, locale);
               return (
                 <div
                   key={m.id}
                   className="material-browse-card"
                   data-selected={isSelected}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('pricing.addMaterial', { name: displayName }) || `Add ${displayName} to BOM`}
+                  aria-pressed={isSelected}
                   onClick={() => handleQuickAdd(m.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleQuickAdd(m.id);
+                    }
+                  }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {m.image_url ? (
