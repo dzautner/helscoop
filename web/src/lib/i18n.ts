@@ -507,6 +507,12 @@ const translations = {
       invalidDimension: '{{geometry}}-objektilla on nolla- tai negatiivinen mitta',
       warningsTitle: 'Varoitukset',
     },
+    saveStatus: {
+      saved: 'Tallennettu',
+      saving: 'Tallentaa...',
+      unsaved: 'Tallentamattomia muutoksia',
+      error: 'Tallennus epaonnistui',
+    },
     emailVerification: {
       banner: 'Vahvista sahkopostiosoitteesi. Tarkista postilaatikkosi.',
       resent: 'Lahetetty!',
@@ -1035,6 +1041,12 @@ const translations = {
       farFromOrigin: 'Object is {{distance}} units from origin — check position',
       invalidDimension: '{{geometry}} has zero or negative dimensions',
       warningsTitle: 'Warnings',
+    },
+    saveStatus: {
+      saved: 'Saved',
+      saving: 'Saving...',
+      unsaved: 'Unsaved changes',
+      error: 'Save failed',
     },
     emailVerification: {
       banner: 'Please verify your email. Check your inbox.',
