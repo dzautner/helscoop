@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslation } from "@/components/LocaleProvider";
 
 export default function Error({
   error,
@@ -11,6 +12,7 @@ export default function Error({
   reset: () => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div
@@ -46,7 +48,7 @@ export default function Error({
           className="heading-display"
           style={{ fontSize: 24, marginBottom: 8 }}
         >
-          Something went wrong
+          {t("errors.serverErrorTitle")}
         </h1>
 
         <p
@@ -57,7 +59,7 @@ export default function Error({
             lineHeight: 1.6,
           }}
         >
-          An unexpected error occurred. Please try again.
+          {t("errors.serverErrorMessage")}
         </p>
 
         <div
@@ -86,7 +88,7 @@ export default function Error({
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
-            Try again
+            {t("errors.tryAgain")}
           </button>
           <Link
             href="/"
@@ -97,7 +99,7 @@ export default function Error({
               fontSize: 14,
             }}
           >
-            Back to dashboard
+            {t("errors.backToDashboard")}
           </Link>
         </div>
 
@@ -115,7 +117,7 @@ export default function Error({
                 fontFamily: "var(--font-body)",
               }}
             >
-              {showDetails ? "Hide details" : "Show details"}
+              {showDetails ? t("errors.hideDetails") : t("errors.showDetails")}
             </button>
             {showDetails && (
               <pre
