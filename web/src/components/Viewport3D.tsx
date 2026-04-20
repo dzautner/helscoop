@@ -40,12 +40,12 @@ function disposeObject(obj: THREE.Object3D) {
     disposeObject(child);
     obj.remove(child);
   }
-  if (obj instanceof THREE.Mesh) {
+  if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
     obj.geometry.dispose();
     if (Array.isArray(obj.material)) {
       obj.material.forEach((m) => m.dispose());
     } else if (obj.material) {
-      obj.material.dispose();
+      (obj.material as THREE.Material).dispose();
     }
   }
 }
@@ -303,10 +303,10 @@ export default function Viewport3D({
     sceneRef.current = scene;
 
     // Sky gradient background
-    const canvas = document.createElement("canvas");
-    canvas.width = 2;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d")!;
+    let gradientCanvas: HTMLCanvasElement | null = document.createElement("canvas");
+    gradientCanvas.width = 2;
+    gradientCanvas.height = 512;
+    const ctx = gradientCanvas.getContext("2d")!;
     const gradient = ctx.createLinearGradient(0, 0, 0, 512);
     gradient.addColorStop(0, "#0d1117");
     gradient.addColorStop(0.25, "#151b2b");
@@ -316,7 +316,7 @@ export default function Viewport3D({
     gradient.addColorStop(1, "#1e1d1b");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 2, 512);
-    const bgTexture = new THREE.CanvasTexture(canvas);
+    const bgTexture = new THREE.CanvasTexture(gradientCanvas);
     bgTexture.magFilter = THREE.LinearFilter;
     scene.background = bgTexture;
 
@@ -436,13 +436,49 @@ export default function Viewport3D({
       resizeObserver.disconnect();
       cancelAnimationFrame(animFrameRef.current);
       controls.dispose();
+
+      // Dispose all meshes in the object group (user scene objects)
+      if (objectGroupRef.current) {
+        disposeObject(objectGroupRef.current);
+        objectGroupRef.current = null;
+      }
+
+      // Dispose grid helpers, axes, lights, and their materials
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else if (child.material) {
+            (child.material as THREE.Material).dispose();
+          }
+        }
+      });
+
+      // Dispose shadow map texture
+      dirLight.shadow.map?.dispose();
+
+      // Dispose background texture and release underlying canvas
+      scene.background = null;
+      bgTexture.dispose();
+      if (gradientCanvas) {
+        gradientCanvas.width = 0;
+        gradientCanvas.height = 0;
+        gradientCanvas = null;
+      }
+
+      groundGeom.dispose();
+      groundMat.dispose();
+
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
-      bgTexture.dispose();
-      groundGeom.dispose();
-      groundMat.dispose();
+
+      rendererRef.current = null;
+      sceneRef.current = null;
+      cameraRef.current = null;
+      controlsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
