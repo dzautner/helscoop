@@ -150,15 +150,15 @@ function ParamSlider({
   return (
     <div className="scene-param-item">
       <div className="scene-param-label-row">
-        <label className="scene-param-label">{param.label}</label>
+        <label className="scene-param-label" htmlFor={`param-${param.name}`}>{param.label}</label>
         <input
+          id={`param-${param.name}`}
           type="number"
           className="scene-param-value"
           value={localValue}
           min={param.min}
           max={param.max}
           step={param.step}
-          aria-label={param.label}
           onChange={(e) => handleInput(parseFloat(e.target.value) || param.min)}
         />
       </div>
@@ -171,6 +171,7 @@ function ParamSlider({
           {displayValue}
         </span>
         <input
+          id={`param-${param.name}-slider`}
           type="range"
           className="scene-param-slider"
           min={param.min}
@@ -178,7 +179,7 @@ function ParamSlider({
           step={param.step}
           value={localValue}
           disabled={param.max === param.min}
-          aria-label={param.label}
+          aria-label={`${param.label} slider`}
           aria-valuemin={param.min}
           aria-valuemax={param.max}
           aria-valuenow={localValue}
