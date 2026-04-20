@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = "helscoop-dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
 // Import the auth module - signToken and requireAuth are pure functions
 // that don't need a database connection
