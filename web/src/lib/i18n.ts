@@ -530,6 +530,12 @@ const translations = {
       resend: 'Laheta uudelleen',
       dismiss: 'Sulje',
     },
+    aria: {
+      switchLanguage: 'Vaihda kieli',
+      themeDark: 'Teema: Tumma',
+      themeLight: 'Teema: Vaalea',
+      themeAuto: 'Teema: Automaattinen',
+    },
     errors: {
       notFoundTitle: 'Sivua ei loytynyt',
       notFoundMessage: 'Etsimasi sivu ei ole olemassa tai se on siirretty.',
@@ -1081,6 +1087,12 @@ const translations = {
       resent: 'Sent!',
       resend: 'Resend',
       dismiss: 'Dismiss',
+    },
+    aria: {
+      switchLanguage: 'Switch language',
+      themeDark: 'Theme: Dark',
+      themeLight: 'Theme: Light',
+      themeAuto: 'Theme: Auto',
     },
     errors: {
       notFoundTitle: 'Page not found',
