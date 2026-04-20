@@ -137,6 +137,36 @@ router.put("/:id/bom", async (req, res) => {
   if (proj.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
 
+  // Validate all items before modifying anything
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const idx = i + 1;
+
+    if (
+      item.material_id == null ||
+      !Number.isInteger(Number(item.material_id)) ||
+      Number(item.material_id) <= 0
+    ) {
+      return res.status(400).json({
+        error: `Item ${idx}: material_id must be a positive integer`,
+      });
+    }
+
+    const qty = Number(item.quantity);
+    if (item.quantity == null || !Number.isFinite(qty) || qty <= 0) {
+      return res.status(400).json({
+        error: `Item ${idx}: quantity must be a positive finite number`,
+      });
+    }
+
+    // Cap quantity at a sensible upper bound to prevent abuse
+    if (qty > 1_000_000) {
+      return res.status(400).json({
+        error: `Item ${idx}: quantity must not exceed 1,000,000`,
+      });
+    }
+  }
+
   try {
     await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
     let inserted = 0;
