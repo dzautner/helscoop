@@ -1007,6 +1007,7 @@ export default function BomPanel({
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
   const [quickAddQty, setQuickAddQty] = useState(1);
   const [focusedBomIndex, setFocusedBomIndex] = useState(-1);
+  const [searchFocused, setSearchFocused] = useState(false);
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -1292,16 +1293,19 @@ export default function BomPanel({
               type="text"
               value={materialSearch}
               onChange={(e) => setMaterialSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               placeholder={t('pricing.searchMaterials')}
               style={{
                 width: "100%",
                 padding: "7px 8px 7px 28px",
                 background: "var(--bg-tertiary)",
-                border: "1px solid var(--border)",
+                border: searchFocused ? "1px solid var(--amber)" : "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 fontSize: 12,
                 color: "var(--text-primary)",
-                outline: "none",
+                outline: searchFocused ? "1px solid var(--amber)" : "none",
+                outlineOffset: "-1px",
               }}
             />
           </div>
