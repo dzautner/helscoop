@@ -106,6 +106,7 @@ export default function SceneEditor({
   const gutterRef = useRef<HTMLDivElement>(null);
 
   const [cursorLine, setCursorLine] = useState<number>(0);
+  const [isFocused, setIsFocused] = useState(false);
 
   /* ── Scroll sync ──────────────────────────────────────────────── */
   const syncScroll = useCallback(() => {
@@ -163,11 +164,13 @@ export default function SceneEditor({
   }, []);
 
   const startCursorTracking = useCallback(() => {
+    setIsFocused(true);
     if (intervalRef.current) return;
     intervalRef.current = setInterval(updateCursorLine, 50);
   }, [updateCursorLine]);
 
   const stopCursorTracking = useCallback(() => {
+    setIsFocused(false);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -208,12 +211,12 @@ export default function SceneEditor({
           flex: 1,
           display: "flex",
           position: "relative",
-          border: `1px solid ${error ? "rgba(224, 85, 85, 0.3)" : "var(--border)"}`,
+          border: `1px solid ${error ? "rgba(224, 85, 85, 0.3)" : isFocused ? "var(--amber-border)" : "var(--border)"}`,
           borderRadius: "var(--radius-md)",
           background: "var(--bg-tertiary)",
           overflow: "hidden",
           cursor: "text",
-          transition: "border-color 0.15s ease",
+          transition: "border-color 0.2s ease",
         }}
       >
         {/* ── Line numbers gutter ─────────────────────────────── */}
