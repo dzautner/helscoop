@@ -1,5 +1,8 @@
 "use client";
 
+/* ── Primitive skeleton shapes ────────────────────────────────── */
+
+/** Low-level block skeleton with configurable dimensions. */
 export function SkeletonBlock({
   width,
   height,
@@ -23,6 +26,68 @@ export function SkeletonBlock({
     />
   );
 }
+
+/**
+ * Variant-based skeleton with semantic presets.
+ *
+ *  - `text`   — single line of text (default 100% width, 14px tall)
+ *  - `card`   — rectangular card placeholder
+ *  - `circle` — avatar / icon circle
+ *  - `rect`   — generic rectangle with explicit width/height
+ */
+export function Skeleton({
+  variant = "text",
+  width,
+  height,
+  style,
+}: {
+  variant?: "text" | "card" | "circle" | "rect";
+  width?: string | number;
+  height?: string | number;
+  style?: React.CSSProperties;
+}) {
+  switch (variant) {
+    case "circle":
+      return (
+        <SkeletonBlock
+          width={width ?? 40}
+          height={height ?? 40}
+          radius="50%"
+          style={{ flexShrink: 0, ...style }}
+        />
+      );
+    case "card":
+      return (
+        <SkeletonBlock
+          width={width ?? "100%"}
+          height={height ?? 80}
+          radius="var(--radius-md)"
+          style={style}
+        />
+      );
+    case "rect":
+      return (
+        <SkeletonBlock
+          width={width ?? "100%"}
+          height={height ?? 48}
+          radius="var(--radius-sm)"
+          style={style}
+        />
+      );
+    case "text":
+    default:
+      return (
+        <SkeletonBlock
+          width={width ?? "100%"}
+          height={height ?? 14}
+          radius={4}
+          style={style}
+        />
+      );
+  }
+}
+
+/* ── Composite skeletons ──────────────────────────────────────── */
 
 /** Skeleton for a project card in the project list. */
 export function SkeletonProjectCard({ delay = 0 }: { delay?: number }) {
@@ -71,6 +136,87 @@ export function SkeletonTableRow({ columns = 5, delay = 0 }: { columns?: number;
         </td>
       ))}
     </tr>
+  );
+}
+
+/** Skeleton for the BOM panel while materials data is loading. */
+export function SkeletonBomPanel() {
+  return (
+    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Total cost card skeleton */}
+      <div
+        style={{
+          padding: "14px 16px",
+          background: "var(--bg-tertiary)",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <Skeleton variant="text" width={90} height={10} style={{ marginBottom: 8 }} />
+        <Skeleton variant="text" width={120} height={24} />
+      </div>
+      {/* BOM item skeletons */}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            padding: "12px 14px",
+            background: "var(--bg-tertiary)",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border)",
+            animation: `fadeIn 0.3s ease ${i * 0.06}s both`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <Skeleton variant="rect" width={28} height={28} />
+            <Skeleton variant="text" width="60%" height={14} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Skeleton variant="text" width={48} height={12} />
+            <Skeleton variant="text" width={60} height={12} />
+            <div style={{ flex: 1 }} />
+            <Skeleton variant="text" width={50} height={14} />
+          </div>
+        </div>
+      ))}
+      {/* Material browser skeleton */}
+      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 4 }}>
+        <Skeleton variant="text" width={110} height={10} style={{ marginBottom: 10 }} />
+        <Skeleton variant="rect" width="100%" height={32} />
+      </div>
+    </div>
+  );
+}
+
+/** Skeleton for price comparison popup content. */
+export function SkeletonPriceComparison() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            padding: "14px 16px",
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            animation: `fadeIn 0.3s ease ${i * 0.06}s both`,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Skeleton variant="text" width={100} height={14} />
+              <Skeleton variant="text" width={50} height={18} style={{ borderRadius: 100 }} />
+            </div>
+            <Skeleton variant="text" width={60} height={16} />
+          </div>
+          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+            <Skeleton variant="text" width={80} height={11} />
+            <Skeleton variant="text" width={60} height={11} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { SkeletonPriceComparison } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -683,9 +684,7 @@ function PriceComparisonPopup({
         {/* Body */}
         <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: 32, color: "var(--text-muted)", fontSize: 13 }}>
-              {t('pricing.loading')}
-            </div>
+            <SkeletonPriceComparison />
           ) : !priceData || priceData.prices.length === 0 ? (
             <div style={{ textAlign: "center", padding: 32, color: "var(--text-muted)", fontSize: 13 }}>
               {t('pricing.noSuppliers')}
@@ -1708,3 +1707,16 @@ export default function BomPanel({
     </div>
   );
 }
+
+/* ── Exported pure functions for unit testing ──────────────── */
+export {
+  getLocalizedMaterialName,
+  getLocalizedBomItemName,
+  localizeUnit,
+  getCategoryColor,
+  matchSceneMaterial,
+  computeTrend,
+  CATEGORY_COLORS,
+  FALLBACK_COLORS,
+  MATERIAL_ALIASES,
+};
