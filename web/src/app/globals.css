@@ -90,8 +90,22 @@
   --focus-ring-danger: 0 0 0 2px var(--danger);
   --focus-ring-danger-offset: 0 0 0 4px var(--danger-dim);
 
+  /* ── Syntax highlighting ───────────────────────────────────────── */
+  --syntax-keyword: #e5a04b;
+  --syntax-primitive: #e5a04b;
+  --syntax-transform: #7ab3e0;
+  --syntax-boolean: #8bc48b;
+  --syntax-scene-add: #f0b86a;
+  --syntax-number: #d4a0e0;
+  --syntax-comment: #5a5a64;
+  --syntax-string: #c4a06e;
+  --syntax-default: #9a9aa6;
+
   /* ── Backdrop ──────────────────────────────────────────────────── */
   --backdrop: rgba(0, 0, 0, 0.6);
+
+  /* ── Danger button contrast text ─────────────────────────────── */
+  --danger-contrast: #ffffff;
 }
 
 /* ── Reduced-contrast mode for late-night sessions ────────────────── */
@@ -167,6 +181,20 @@
   --focus-ring-danger-offset: 0 0 0 4px var(--danger-dim);
 
   --backdrop: rgba(0, 0, 0, 0.6);
+
+  /* ── Syntax highlighting (light) ────────────────────────────── */
+  --syntax-keyword: #b45309;
+  --syntax-primitive: #b45309;
+  --syntax-transform: #2563eb;
+  --syntax-boolean: #16a34a;
+  --syntax-scene-add: #92400e;
+  --syntax-number: #7c3aed;
+  --syntax-comment: #a1a1aa;
+  --syntax-string: #92400e;
+  --syntax-default: #3f3f46;
+
+  /* ── Danger button contrast text ─────────────────────────────── */
+  --danger-contrast: #ffffff;
 }
 
 /* Light theme component overrides */

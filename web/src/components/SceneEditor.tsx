@@ -21,17 +21,17 @@ function findAllMatches(text: string, query: string): FindMatch[] {
   return matches;
 }
 
-/* ── Syntax highlighting colours ─────────────────────────────────── */
+/* ── Syntax highlighting colours (CSS custom properties with fallbacks) ── */
 const COLORS = {
-  primitive: "#e5a04b",   // box, cylinder, sphere — warm amber
-  transform: "#7ab3e0",   // translate, rotate, scale — cool steel blue
-  boolean:   "#8bc48b",   // union, subtract, intersect — muted sage
-  sceneAdd:  "#f0b86a",   // scene.add — bright amber
-  number:    "#d4a0e0",   // numbers — soft lavender
-  comment:   "#5a5a64",   // comments — dim zinc
-  string:    "#c4a06e",   // strings — warm tan
-  keyword:   "#e5a04b",   // keywords — amber
-  default:   "#9a9aa6",   // default text — warm grey
+  primitive: "var(--syntax-primitive, #e5a04b)",
+  transform: "var(--syntax-transform, #7ab3e0)",
+  boolean:   "var(--syntax-boolean, #8bc48b)",
+  sceneAdd:  "var(--syntax-scene-add, #f0b86a)",
+  number:    "var(--syntax-number, #d4a0e0)",
+  comment:   "var(--syntax-comment, #5a5a64)",
+  string:    "var(--syntax-string, #c4a06e)",
+  keyword:   "var(--syntax-keyword, #e5a04b)",
+  default:   "var(--syntax-default, #9a9aa6)",
 };
 
 /* ── Token types & patterns ──────────────────────────────────────── */
