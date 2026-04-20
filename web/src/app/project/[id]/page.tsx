@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import type { Material, BomItem, Project } from "@/types";
 
@@ -109,6 +110,7 @@ export default function ProjectPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bom, setBom] = useState<BomItem[]>([]);
   const [sceneJs, setSceneJs] = useState("");
+  const [savedScript, setSavedScript] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -194,6 +196,7 @@ export default function ProjectPage() {
         if (proj.share_token) setShareToken(proj.share_token);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
+        setSavedScript(initialScene);
         historyRef.current = [initialScene];
         historyIndexRef.current = 0;
         setMaterials(mats);
@@ -245,6 +248,7 @@ export default function ProjectPage() {
         savePromises.push(api.saveThumbnail(projectId, thumbDataUrl));
       }
       await Promise.all(savePromises);
+      setSavedScript(sceneJs);
       setLastSaved(new Date().toLocaleTimeString());
       setSaveStatus("saved");
       toast(t('toast.saved'), "success");
@@ -342,6 +346,28 @@ export default function ProjectPage() {
     },
     [pushHistory]
   );
+
+  const handleRestoreDraft = useCallback(
+    (draft: string) => {
+      setSceneJs(draft);
+      pushHistory(draft);
+    },
+    [pushHistory]
+  );
+
+  const { hasDraft, restore: restoreDraft, discard: discardDraft, clearDraft } = useDraftRecovery(
+    projectId,
+    sceneJs,
+    savedScript,
+    handleRestoreDraft,
+  );
+
+  // Clear localStorage draft after successful save
+  useEffect(() => {
+    if (saveStatus === "saved" && savedScript) {
+      clearDraft();
+    }
+  }, [saveStatus, savedScript, clearDraft]);
 
   const handleApplyCode = useCallback(
     (code: string) => {
@@ -918,6 +944,42 @@ export default function ProjectPage() {
           </div>
         </div>
       </div>
+
+      {/* Draft recovery banner */}
+      {hasDraft && (
+        <div className="draft-recovery-banner">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+          <span>{t('editor.draftFound')}</span>
+          <div className="draft-recovery-actions">
+            <button
+              className="btn btn-ghost draft-recovery-btn"
+              onClick={restoreDraft}
+            >
+              {t('editor.draftRestore')}
+            </button>
+            <button
+              className="btn btn-ghost draft-recovery-btn"
+              onClick={discardDraft}
+            >
+              {t('editor.draftDiscard')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="editor-main">
