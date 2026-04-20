@@ -1073,6 +1073,15 @@ body::before {
 }
 
 /* ── Menu item hover ─────────────────────────────── */
+.avatar-btn:hover {
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 0 2px var(--amber-glow);
+}
+.avatar-btn:focus-visible {
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 0 2px var(--amber-glow), 0 0 0 4px var(--amber-border);
+}
+
 .menu-item {
   display: block;
   width: 100%;

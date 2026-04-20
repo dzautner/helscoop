@@ -87,9 +87,15 @@ function escapeHtml(s: string): string {
 export default function SceneEditor({
   sceneJs,
   onChange,
+  error,
+  errorLine,
 }: {
   sceneJs: string;
   onChange: (code: string) => void;
+  /** Current scene error message, or null when valid. */
+  error?: string | null;
+  /** 1-based line number of the error in the script, or null. */
+  errorLine?: number | null;
 }) {
   const { t } = useTranslation();
 
@@ -166,11 +172,22 @@ export default function SceneEditor({
     }
   }, []);
 
+  /* ── Error line (0-based index, or -1 if no error line) ──────── */
+  const errorLineIdx = error && errorLine != null && errorLine >= 1 && errorLine <= lines.length
+    ? errorLine - 1
+    : -1;
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }} />
+        <div style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: error ? "var(--danger)" : "var(--success)",
+          transition: "background 0.15s ease",
+        }} />
         <span style={{
           fontSize: 12,
           fontWeight: 500,
@@ -189,11 +206,12 @@ export default function SceneEditor({
           flex: 1,
           display: "flex",
           position: "relative",
-          border: "1px solid var(--border)",
+          border: `1px solid ${error ? "rgba(224, 85, 85, 0.3)" : "var(--border)"}`,
           borderRadius: "var(--radius-md)",
           background: "var(--bg-tertiary)",
           overflow: "hidden",
           cursor: "text",
+          transition: "border-color 0.15s ease",
         }}
       >
         {/* ── Line numbers gutter ─────────────────────────────── */}
@@ -216,7 +234,11 @@ export default function SceneEditor({
               key={i}
               style={{
                 height: "22.1px",
-                ...(i === cursorLine ? { color: "var(--text-secondary)" } : {}),
+                ...(i === errorLineIdx
+                  ? { color: "#e05555", fontWeight: 600 }
+                  : i === cursorLine
+                    ? { color: "var(--text-secondary)" }
+                    : {}),
               }}
             >
               {i + 1}
@@ -239,6 +261,23 @@ export default function SceneEditor({
               zIndex: 0,
             }}
           />
+
+          {/* Error-line highlight */}
+          {errorLineIdx >= 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: 20 + errorLineIdx * 22.1,
+                left: 0,
+                right: 0,
+                height: 22.1,
+                background: "rgba(224, 85, 85, 0.1)",
+                borderBottom: "2px solid rgba(224, 85, 85, 0.5)",
+                pointerEvents: "none",
+                zIndex: 0,
+              }}
+            />
+          )}
 
           {/* Syntax-highlighted overlay */}
           <pre
@@ -306,8 +345,100 @@ export default function SceneEditor({
               }
             }}
           />
+
+          {/* Inline error message decoration */}
+          {error && errorLineIdx >= 0 && (
+            <div
+              aria-live="polite"
+              style={{
+                position: "absolute",
+                top: 20 + (errorLineIdx + 1) * 22.1,
+                left: 20,
+                right: 8,
+                zIndex: 3,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "3px 8px",
+                  background: "rgba(224, 85, 85, 0.12)",
+                  border: "1px solid rgba(224, 85, 85, 0.25)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                  color: "#e05555",
+                  lineHeight: 1.4,
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ flexShrink: 0 }}
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                {error}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Bottom error banner (shown when error has no line number) */}
+      {error && errorLineIdx < 0 && (
+        <div
+          aria-live="polite"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 12px",
+            marginTop: 4,
+            background: "rgba(224, 85, 85, 0.1)",
+            border: "1px solid rgba(224, 85, 85, 0.25)",
+            borderRadius: "var(--radius-sm)",
+            fontSize: 12,
+            fontFamily: "var(--font-mono)",
+            color: "#e05555",
+            lineHeight: 1.4,
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {error}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -396,6 +396,8 @@ function withColorIdImpl(geometry: any, color: any, _objectId?: string): any {
 export interface InterpreterResult {
   objects: SceneObject[];
   error: string | null;
+  /** 1-based line number in the original script where the error occurred, if extractable. */
+  errorLine: number | null;
   warnings: string[];
 }
 
@@ -725,6 +727,63 @@ export function applyParamToScript(
   return script.replace(re, `$1${newValue}`);
 }
 
+// ── Error line extraction ───────────────────────────────────────────────────
+
+/**
+ * Try to extract a 1-based line number from a JS error thrown by `new Function()`.
+ *
+ * For syntax errors the engine usually embeds the line directly in the message.
+ * For runtime errors we inspect the stack trace for `<anonymous>:LINE:COL` or
+ * `Function:LINE:COL` patterns.
+ *
+ * `lineOffset` is the number of lines the wrapper prepends before the user
+ * script (e.g. 1 for the `var scene = __sceneProxy__;` line).
+ *
+ * Returns a 1-based line in the *original* user script, or null.
+ */
+function extractErrorLine(err: unknown, lineOffset: number): number | null {
+  if (!(err instanceof Error)) return null;
+
+  // 1. Check the stack trace for anonymous/Function line references.
+  //    Common patterns:
+  //      V8 (Chrome/Node):     "at anonymous (eval ...:LINE:COL)"
+  //                            "at Function (<anonymous>:LINE:COL)"
+  //                            "at eval (<anonymous>:LINE:COL)"
+  //      Firefox:              "anonymous@debugger eval code:LINE:COL"
+  //                            "@debugger eval code:LINE:COL"
+  //      Safari:               "anonymous@[native code]:LINE:COL" or similar
+  const stack = err.stack || "";
+
+  // Pattern: <anonymous>:LINE:COL or eval:LINE:COL or Function:LINE:COL
+  const stackLineMatch = stack.match(
+    /(?:<anonymous>|Function|eval)[^:]*:(\d+)(?::(\d+))?/
+  );
+  if (stackLineMatch) {
+    const rawLine = parseInt(stackLineMatch[1], 10);
+    if (!isNaN(rawLine)) {
+      // new Function() adds one implicit line for the function header
+      const adjusted = rawLine - 1 - lineOffset;
+      if (adjusted >= 1) return adjusted;
+    }
+  }
+
+  // 2. SyntaxError messages sometimes contain the line directly.
+  //    e.g. "Unexpected token '}' at line 5" or "(1:5)" notation.
+  if (err instanceof SyntaxError) {
+    // Check for "(LINE:COL)" pattern in message (Babel-like)
+    const parenMatch = err.message.match(/\((\d+):(\d+)\)/);
+    if (parenMatch) {
+      const rawLine = parseInt(parenMatch[1], 10);
+      if (!isNaN(rawLine)) {
+        const adjusted = rawLine - lineOffset;
+        if (adjusted >= 1) return adjusted;
+      }
+    }
+  }
+
+  return null;
+}
+
 // ── Main interpreter ─────────────────────────────────────────────────────────
 
 export function interpretScene(script: string): InterpreterResult {
@@ -823,12 +882,21 @@ if (typeof displayScale !== "undefined") { __result__.displayScale = displayScal
 
     warnings.push(...postValidate(objects));
 
-    return { objects, error: null, warnings };
+    return { objects, error: null, errorLine: null, warnings };
   } catch (err) {
+    const errorLine = extractErrorLine(err, hasOwnSceneOffset(script));
     return {
       objects,
       error: err instanceof Error ? err.message : String(err),
+      errorLine,
       warnings,
     };
   }
+}
+
+/** Helper: determine the line offset for the given script. */
+function hasOwnSceneOffset(script: string): number {
+  const processed = preprocessScript(script);
+  const hasOwnScene = /\b(?:const|let|var)\s+scene\b/.test(processed);
+  return hasOwnScene ? 0 : 1;
 }

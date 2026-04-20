@@ -139,6 +139,7 @@ export default function ProjectPage() {
   });
   const [objectCount, setObjectCount] = useState(0);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [sceneErrorLine, setSceneErrorLine] = useState<number | null>(null);
   const [viewportKey, setViewportKey] = useState(0);
   const [sceneWarnings, setSceneWarnings] = useState<string[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -630,6 +631,7 @@ export default function ProjectPage() {
     setSceneJs(DEFAULT_SCENE);
     pushHistory(DEFAULT_SCENE);
     setSceneError(null);
+    setSceneErrorLine(null);
     setViewportKey((k) => k + 1);
   }, [pushHistory]);
 
@@ -1167,6 +1169,7 @@ export default function ProjectPage() {
                 wireframe={wireframe}
                 onObjectCount={setObjectCount}
                 onError={setSceneError}
+                onErrorLine={setSceneErrorLine}
                 onWarnings={setSceneWarnings}
                 captureRef={captureThumbRef}
                 onToggleWireframe={() => setWireframe(!wireframe)}
@@ -1234,7 +1237,12 @@ export default function ProjectPage() {
                 flexDirection: "column",
               }}
             >
-              <SceneEditor sceneJs={sceneJs} onChange={handleSceneChange} />
+              <SceneEditor
+                sceneJs={sceneJs}
+                onChange={handleSceneChange}
+                error={sceneError}
+                errorLine={sceneErrorLine}
+              />
             </div>
           )}
 

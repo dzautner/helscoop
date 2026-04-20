@@ -34,7 +34,10 @@ function UserAvatar({ name, onClick }: { name: string; onClick?: () => void }) {
         cursor: "pointer",
         padding: 0,
         flexShrink: 0,
+        transition: "border-color var(--transition-fast), box-shadow var(--transition-fast)",
+        outline: "none",
       }}
+      className="avatar-btn"
     >
       {initials || "?"}
     </button>

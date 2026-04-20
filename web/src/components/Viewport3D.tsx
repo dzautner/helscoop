@@ -15,6 +15,8 @@ interface Viewport3DProps {
   wireframe?: boolean;
   onObjectCount?: (count: number) => void;
   onError?: (error: string | null) => void;
+  /** 1-based line number of the error in the original script, or null. */
+  onErrorLine?: (line: number | null) => void;
   onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
   onToggleWireframe?: () => void;
@@ -443,6 +445,7 @@ export default function Viewport3D({
   wireframe = false,
   onObjectCount,
   onError,
+  onErrorLine,
   onWarnings,
   captureRef,
   onToggleWireframe,
@@ -645,6 +648,7 @@ export default function Viewport3D({
 
       if (result.error) {
         onError?.(result.error);
+        onErrorLine?.(result.errorLine);
         if (script !== lastValidSceneRef.current) {
           const fallback = interpretScene(lastValidSceneRef.current);
           if (!fallback.error) {
@@ -657,6 +661,7 @@ export default function Viewport3D({
 
       lastValidSceneRef.current = script;
       onError?.(null);
+      onErrorLine?.(null);
       const count = addSceneObjects(group, result.objects, wf);
       onObjectCount?.(count);
 
@@ -686,7 +691,7 @@ export default function Viewport3D({
         }
       }
     },
-    [onObjectCount, onError, onWarnings]
+    [onObjectCount, onError, onErrorLine, onWarnings]
   );
 
   // Debounced scene update
