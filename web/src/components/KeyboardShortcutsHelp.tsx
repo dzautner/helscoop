@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 
@@ -46,6 +46,29 @@ export default function KeyboardShortcutsHelp({
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Return all focusable elements within the dialog panel.
+  const getFocusableElements = useCallback((): HTMLElement[] => {
+    if (!panelRef.current) return [];
+    return Array.from(
+      panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+  }, []);
+
+  // Save previously focused element, auto-focus close button, restore on
+  // unmount / close.
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    return () => {
+      previouslyFocusedRef.current?.focus();
+    };
+  }, [open]);
 
   // Close on click outside
   useEffect(() => {
@@ -59,18 +82,38 @@ export default function KeyboardShortcutsHelp({
     return () => document.removeEventListener("mousedown", handler);
   }, [open, onClose]);
 
-  // Close on Escape
+  // Close on Escape & focus trap
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        const focusable = getFocusableElements();
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+  }, [open, onClose, getFocusableElements]);
 
   if (!open) return null;
 
@@ -137,6 +180,8 @@ export default function KeyboardShortcutsHelp({
             {t("shortcuts.title")}
           </h2>
           <button
+            ref={closeButtonRef}
+            aria-label="Close"
             onClick={onClose}
             style={{
               background: "none",
