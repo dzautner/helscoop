@@ -54,7 +54,7 @@ router.post("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const result = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
@@ -239,7 +239,7 @@ router.put("/:id/thumbnail", async (req, res) => {
 
 router.post("/:id/duplicate", async (req, res) => {
   const src = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
   if (src.rows.length === 0)
@@ -321,7 +321,7 @@ router.get("/:id/pdf", async (req, res) => {
 
   // Fetch project
   const projResult = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
   if (projResult.rows.length === 0) {
