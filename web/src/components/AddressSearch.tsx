@@ -145,6 +145,29 @@ export default function AddressSearch({
           </button>
         </div>
 
+        {loading && (
+          <div
+            aria-live="polite"
+            aria-label={t('search.loading')}
+            style={{
+              marginTop: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              color: "var(--text-muted)",
+              fontSize: 13,
+            }}
+          >
+            <div
+              className="btn-spinner"
+              role="status"
+              aria-hidden="true"
+              style={{ borderTopColor: "#e5a04b", width: 16, height: 16, borderWidth: 2 }}
+            />
+            {t('search.loading')}
+          </div>
+        )}
+
         {result && (
           <div className="anim-up" style={{ marginTop: 16 }}>
             <div className="card" style={{ padding: "16px 18px" }}>
@@ -248,6 +271,30 @@ export default function AddressSearch({
             {loading ? t('search.searching') : t('search.searchButton')}
           </button>
         </div>
+
+        {loading && (
+          <div
+            aria-live="polite"
+            aria-label={t('search.loading')}
+            style={{
+              marginTop: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              color: "var(--text-muted)",
+              fontSize: 14,
+            }}
+          >
+            <div
+              className="btn-spinner"
+              role="status"
+              aria-hidden="true"
+              style={{ borderTopColor: "#e5a04b", width: 20, height: 20, borderWidth: 2 }}
+            />
+            {t('search.loading')}
+          </div>
+        )}
 
         {result && (
           <div className="anim-up building-result-grid" style={{
