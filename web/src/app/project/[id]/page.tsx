@@ -25,6 +25,8 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import type { SaveableFields } from "@/hooks/useAutoSave";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import type { Material, BomItem, Project } from "@/types";
 
@@ -151,9 +153,8 @@ export default function ProjectPage() {
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
 
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bomChangedRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const captureThumbRef = useRef<(() => string | null) | null>(null);
   const resizingRef = useRef(false);
 
@@ -204,12 +205,27 @@ export default function ProjectPage() {
         historyRef.current = [initialScene];
         historyIndexRef.current = 0;
         setMaterials(mats);
-        if (proj.bom) setBom(proj.bom.map((b: BomItem & { line_cost?: number }) => ({
-          ...b,
-          total: b.total ?? b.line_cost ?? ((b.unit_price || 0) * b.quantity),
-        })));
+        const initialBom = proj.bom
+          ? proj.bom.map((b: BomItem & { line_cost?: number }) => ({
+              ...b,
+              total: b.total ?? b.line_cost ?? ((b.unit_price || 0) * b.quantity),
+            }))
+          : [];
+        setBom(initialBom);
+        // Set the auto-save baseline to match what the server has
+        setSavedSnapshot({
+          name: proj.name,
+          description: proj.description || "",
+          scene_js: initialScene,
+          bom: initialBom.map((b: BomItem) => ({
+            material_id: b.material_id,
+            quantity: b.quantity,
+            unit: b.unit,
+          })),
+        });
         setTimeout(() => {
           initialLoadDoneRef.current = true;
+          setInitialLoadDone(true);
         }, 0);
       })
       .catch((err) => {
@@ -223,70 +239,64 @@ export default function ProjectPage() {
       });
   }, [projectId, router, toast, t]);
 
-  const save = useCallback(async () => {
-    setSaveStatus("saving");
-    try {
-      const savePromises: Promise<unknown>[] = [
-        api.updateProject(projectId, {
-          name: projectName,
-          description: projectDesc,
-          scene_js: sceneJs,
-        }),
-      ];
-      if (bomChangedRef.current) {
-        savePromises.push(
-          api.saveBOM(
-            projectId,
-            bom.map((b) => ({
-              material_id: b.material_id,
-              quantity: b.quantity,
-              unit: b.unit,
-            }))
-          )
-        );
-        bomChangedRef.current = false;
-      }
-      // Capture and save thumbnail in the background (non-blocking)
-      const thumbDataUrl = captureThumbRef.current?.();
-      if (thumbDataUrl) {
-        savePromises.push(api.saveThumbnail(projectId, thumbDataUrl));
-      }
-      await Promise.all(savePromises);
-      setSavedScript(sceneJs);
-      setLastSaved(new Date().toLocaleTimeString());
-      setSaveStatus("saved");
-      setSaveFailCount(0);
-      setSaveErrorVisible(false);
-      toast(t('toast.saved'), "success");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('toast.saveFailed'), "error");
-      setSaveStatus("unsaved");
-      setSaveFailCount((c) => c + 1);
-      setSaveErrorVisible(true);
-    }
-  }, [projectId, projectName, projectDesc, sceneJs, bom, toast, t]);
+  // Memoize the BOM in a save-friendly format to avoid unnecessary re-renders
+  const bomForSave = useMemo(
+    () => bom.map((b) => ({ material_id: b.material_id, quantity: b.quantity, unit: b.unit })),
+    [bom]
+  );
 
-  const scheduleAutoSave = useCallback(() => {
-    if (!initialLoadDoneRef.current) return;
-    setSaveStatus("unsaved");
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-    autoSaveTimerRef.current = setTimeout(() => {
-      save();
-    }, 2000);
-  }, [save]);
+  const saveableFields = useMemo<SaveableFields>(
+    () => ({
+      name: projectName,
+      description: projectDesc,
+      scene_js: sceneJs,
+      bom: bomForSave,
+    }),
+    [projectName, projectDesc, sceneJs, bomForSave]
+  );
 
-  useEffect(() => {
-    if (!initialLoadDoneRef.current) return;
-    scheduleAutoSave();
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, [sceneJs, projectName, projectDesc, bom, scheduleAutoSave]);
+  const autoSaveCallbacks = useMemo(
+    () => ({
+      onSaveProject: async (dirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js">>) => {
+        await api.updateProject(projectId, dirty);
+      },
+      onSaveBom: async (items: SaveableFields["bom"]) => {
+        await api.saveBOM(projectId, items);
+      },
+      onSaveThumbnail: async () => {
+        const thumbDataUrl = captureThumbRef.current?.();
+        if (thumbDataUrl) {
+          await api.saveThumbnail(projectId, thumbDataUrl);
+        }
+      },
+      onStatusChange: (status: "saved" | "saving" | "unsaved") => {
+        setSaveStatus(status);
+      },
+      onSaveSuccess: (saved: SaveableFields) => {
+        setSavedScript(saved.scene_js);
+        setLastSaved(new Date().toLocaleTimeString());
+        setSaveFailCount(0);
+        setSaveErrorVisible(false);
+        toast(t('toast.saved'), "success");
+      },
+      onSaveError: (err: unknown) => {
+        toast(err instanceof Error ? err.message : t('toast.saveFailed'), "error");
+        setSaveFailCount((c) => c + 1);
+        setSaveErrorVisible(true);
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectId, toast, t]
+  );
 
+  const { saveNow: save, setSavedSnapshot } = useAutoSave(saveableFields, autoSaveCallbacks, {
+    initialLoadDone,
+    debounceMs: 2000,
+    typingDebounceMs: 4000,
+    rapidFireThresholdMs: 800,
+  });
+
+  // Block navigation when there are unsaved changes
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (saveStatus === "unsaved" || saveStatus === "saving") {
@@ -689,7 +699,7 @@ export default function ProjectPage() {
       const mat = materials.find((m) => m.id === materialId);
       if (!mat) return;
       const pricing = mat.pricing?.find((p) => p.is_primary) || mat.pricing?.[0];
-      bomChangedRef.current = true;
+
       track("bom_item_added", { material_id: materialId, category: mat.category_name || "" });
       setBom((prev) => [
         ...prev,
@@ -714,7 +724,6 @@ export default function ProjectPage() {
       removedItem = prev.find((b) => b.material_id === materialId);
       return prev.filter((b) => b.material_id !== materialId);
     });
-    bomChangedRef.current = true;
     track("bom_item_removed", { material_id: materialId });
 
     // Show undo toast — if the user clicks "Undo" within 5s, re-add the item
@@ -725,7 +734,6 @@ export default function ProjectPage() {
         action: {
           label: t("toast.undo"),
           onClick: () => {
-            bomChangedRef.current = true;
             track("bom_item_undo_remove", { material_id: materialId });
             setBom((prev) => [...prev, item]);
           },
@@ -735,7 +743,6 @@ export default function ProjectPage() {
   }, [track, toast, t]);
 
   const updateBomQty = useCallback((materialId: string, qty: number) => {
-    bomChangedRef.current = true;
     setBom((prev) =>
       prev.map((b) =>
         b.material_id === materialId
