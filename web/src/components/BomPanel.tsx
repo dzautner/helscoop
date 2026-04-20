@@ -1568,6 +1568,7 @@ export default function BomPanel({
               <button
                 className="category-chip"
                 data-active={!activeCategory}
+                aria-pressed={!activeCategory}
                 onClick={() => setActiveCategory("")}
               >
                 {t('pricing.allCategories')}
@@ -1580,6 +1581,7 @@ export default function BomPanel({
                     key={cat.id}
                     className="category-chip"
                     data-active={isActive}
+                    aria-pressed={isActive}
                     onClick={() => setActiveCategory(isActive ? "" : cat.display_name)}
                   >
                     {catName}
@@ -1719,6 +1721,7 @@ export default function BomPanel({
                         value={quickAddQty}
                         onChange={(e) => setQuickAddQty(parseInt(e.target.value) || 1)}
                         autoFocus
+                        aria-label={t('pricing.quickAddQuantity', { name: displayName }) || `Quantity for ${displayName}`}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             onAdd(m.id, quickAddQty);
