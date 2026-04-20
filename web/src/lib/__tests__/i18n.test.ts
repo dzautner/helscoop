@@ -417,7 +417,7 @@ describe("exhaustive i18n key parity", () => {
     "toast.shareFailed", "toast.unshareFailed", "toast.linkCopied",
     "toast.projectUnshared", "toast.loadMaterialsFailed", "toast.loadSuppliersFailed",
     "toast.loadPricingFailed", "toast.materialRemoved", "toast.undo",
-    "toast.overflowMore",
+    "toast.overflowMore", "toast.dismiss",
     "toast.copyFailed",
     // editor
     "editor.scene", "editor.materialList", "editor.save", "editor.saved",
