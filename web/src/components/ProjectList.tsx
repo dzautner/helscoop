@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { api, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard } from "@/components/Skeleton";
@@ -31,10 +32,13 @@ export default function ProjectList({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("modified");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
+  const router = useRouter();
   const templateRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -115,6 +119,58 @@ export default function ProjectList({
     } catch (err) {
       toast(err instanceof Error ? err.message : t('toast.duplicateFailed'), "error");
     }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset the input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Validate required fields
+      if (!data.name || typeof data.name !== "string" || !data.scene_js || typeof data.scene_js !== "string") {
+        toast(t("toast.projectImportInvalid"), "error");
+        setImporting(false);
+        return;
+      }
+
+      track("project_imported", { format: "helscoop" });
+
+      const project = await api.createProject({
+        name: data.name,
+        description: data.description || undefined,
+        scene_js: data.scene_js,
+      });
+
+      // Import BOM items if present (only material_id, quantity, unit)
+      if (Array.isArray(data.bom) && data.bom.length > 0) {
+        const bomItems = data.bom
+          .filter((b: Record<string, unknown>) => b.material_id && b.quantity)
+          .map((b: Record<string, unknown>) => ({
+            material_id: String(b.material_id),
+            quantity: Number(b.quantity),
+            unit: (b.unit as string) || "kpl",
+          }));
+        if (bomItems.length > 0) {
+          await api.saveBOM(project.id, bomItems);
+        }
+      }
+
+      toast(t("toast.projectImported"), "success");
+      router.push(`/project/${project.id}`);
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        toast(t("toast.projectImportInvalid"), "error");
+      } else {
+        toast(err instanceof Error ? err.message : t("toast.projectImportFailed"), "error");
+      }
+    }
+    setImporting(false);
   }
 
   function projectCountText(count: number): string {
@@ -245,6 +301,33 @@ export default function ProjectList({
               style={{ padding: "11px 24px" }}
             >
               {creating ? <span className="btn-spinner" /> : t('project.create')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".helscoop,.json"
+              onChange={handleImportFile}
+              style={{ display: "none" }}
+              aria-label={t('project.importProject')}
+            />
+            <button
+              className="btn btn-ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              style={{ padding: "11px 16px", display: "flex", alignItems: "center", gap: 6 }}
+              data-tooltip={t('project.importProject')}
+              aria-label={t('project.importProject')}
+            >
+              {importing ? (
+                <span className="btn-spinner" />
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              )}
+              {t('project.import')}
             </button>
           </div>
 

@@ -22,6 +22,7 @@ export type AnalyticsEvent =
   | "bom_item_undo_remove"
   | "bom_exported"
   | "project_exported"
+  | "project_imported"
   | "chat_message_sent"
   | "chat_code_applied"
   | "auth_register"
@@ -38,6 +39,7 @@ export interface AnalyticsEventProps {
   bom_item_undo_remove: { material_id: string };
   bom_exported: { format: "pdf" | "csv" | "json" };
   project_exported: { format: "helscoop" };
+  project_imported: { format: "helscoop" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;
   auth_register: Record<string, never>;
