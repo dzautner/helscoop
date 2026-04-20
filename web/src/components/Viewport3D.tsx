@@ -786,7 +786,7 @@ export default function Viewport3D({
             <span style={{ color: "var(--text-secondary)", fontSize: 12, fontFamily: "var(--font-sans)" }}>
               {tessProgress && tessProgress.total > 0
                 ? `${Math.round((tessProgress.done / tessProgress.total) * 100)}%`
-                : "Computing\u2026"}
+                : t('editor.computing')}
             </span>
           </div>
         </>

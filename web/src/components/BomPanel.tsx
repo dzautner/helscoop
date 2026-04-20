@@ -210,7 +210,7 @@ function CostBreakdownChart({
   materials: Material[];
   total: number;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const slices = useMemo<CategorySlice[]>(() => {
     if (total <= 0) return [];
@@ -302,7 +302,7 @@ function CostBreakdownChart({
               className="heading-display"
               style={{ fontSize: 14, lineHeight: 1.1, color: "var(--text-primary)" }}
             >
-              {total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}
+              {total.toLocaleString(locale, { maximumFractionDigits: 0 })}
             </span>
             <span style={{ fontSize: 9, color: "var(--text-muted)" }}>&euro;</span>
           </div>
@@ -347,7 +347,7 @@ function CostBreakdownChart({
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {s.pct.toFixed(0)}% &middot; {s.total.toLocaleString("fi-FI", { maximumFractionDigits: 0 })}&euro;
+                {s.pct.toFixed(0)}% &middot; {s.total.toLocaleString(locale, { maximumFractionDigits: 0 })}&euro;
               </span>
             </div>
           ))}
@@ -961,7 +961,7 @@ function QuoteSummary({
   bom: BomItem[];
   materials: Material[];
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [quoteMode, setQuoteMode] = useState<"homeowner" | "contractor">("homeowner");
 
   const quote = useMemo(() => {
@@ -1000,7 +1000,7 @@ function QuoteSummary({
   };
 
   const formatEur = (n: number) =>
-    n.toLocaleString("fi-FI", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20ac";
+    n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20ac";
 
   return (
     <div
@@ -1612,7 +1612,7 @@ export default function BomPanel({
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
             <span style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
-              {animatedTotal > 0 ? Math.round(animatedTotal).toLocaleString('fi-FI', { maximumFractionDigits: 0 }) : '0'}
+              {animatedTotal > 0 ? Math.round(animatedTotal).toLocaleString(locale, { maximumFractionDigits: 0 }) : '0'}
             </span>
             <span style={{ fontSize: 14, color: "var(--text-muted)" }}>&euro;</span>
             {total > 0 && (
@@ -1697,7 +1697,7 @@ export default function BomPanel({
             onMouseEnter={(e) => { e.currentTarget.style.background = "var(--amber-glow)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
           >
-            {t('editor.syncFromScene') || 'Add them'}
+            {t('editor.syncFromScene')}
           </button>
         </div>
       )}

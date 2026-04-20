@@ -113,6 +113,10 @@ export default function TemplateGrid({
                 color: "var(--text-muted)",
                 fontSize: 13,
                 lineHeight: 1.5,
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical" as const,
+                overflow: "hidden",
               }}>
                 {tmpl.description}
               </div>

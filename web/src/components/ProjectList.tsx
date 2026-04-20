@@ -345,6 +345,7 @@ export default function ProjectList({
             <input
               className="input"
               placeholder={t('project.newProjectPlaceholder')}
+              aria-label={t('project.newProjectPlaceholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && createProject()}
@@ -471,6 +472,7 @@ export default function ProjectList({
                 <input
                   className="input"
                   placeholder={t('project.searchPlaceholder')}
+                  aria-label={t('project.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ paddingLeft: 36 }}

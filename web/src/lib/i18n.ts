@@ -276,6 +276,7 @@ const translations = {
       exportProject: 'Vie projekti (.helscoop)',
       toBuy: 'Osta',
       paramSliderLabel: '{{name}} — liukusäädin',
+      computing: 'Laskee\u2026',
     },
     share: {
       title: 'Jaa projekti',
@@ -966,6 +967,7 @@ const translations = {
       exportProject: 'Export project (.helscoop)',
       toBuy: 'Buy',
       paramSliderLabel: '{{name}} slider',
+      computing: 'Computing\u2026',
     },
     share: {
       title: 'Share project',
