@@ -119,6 +119,49 @@ export function WelcomeModal({
   onSkip: () => void;
 }) {
   const { t } = useTranslation();
+  const skipBtnRef = useRef<HTMLButtonElement>(null);
+  const startBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Focus trap: cycle between skip and start buttons, Escape to close
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onSkip();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        const focusable = [skipBtnRef.current, startBtnRef.current].filter(
+          Boolean
+        ) as HTMLElement[];
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    },
+    [onSkip]
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    // Focus the start button by default (primary action)
+    requestAnimationFrame(() => startBtnRef.current?.focus());
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   return (
     <div
@@ -137,6 +180,9 @@ export function WelcomeModal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-modal-title"
         style={{
           background: "var(--surface-overlay, var(--bg-elevated))",
           border: "1px solid var(--surface-border-overlay)",
@@ -177,6 +223,7 @@ export function WelcomeModal({
         </div>
 
         <h2
+          id="welcome-modal-title"
           className="heading-display"
           style={{
             fontSize: 24,
@@ -199,6 +246,7 @@ export function WelcomeModal({
 
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
           <button
+            ref={skipBtnRef}
             className="btn btn-ghost"
             onClick={onSkip}
             style={{ padding: "10px 20px" }}
@@ -206,6 +254,7 @@ export function WelcomeModal({
             {t("onboarding.welcomeSkip")}
           </button>
           <button
+            ref={startBtnRef}
             className="btn btn-primary"
             onClick={onStart}
             style={{ padding: "10px 24px" }}
