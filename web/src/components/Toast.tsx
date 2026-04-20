@@ -71,6 +71,9 @@ export function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onD
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-relevant="additions"
       style={{
         position: "fixed",
         bottom: 24,
@@ -162,6 +165,8 @@ function ToastMessage({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: 
 
   return (
     <div
+      role={toast.type === "error" ? "alert" : "status"}
+      aria-live={toast.type === "error" ? "assertive" : "polite"}
       style={{
         display: "flex",
         alignItems: "center",
@@ -305,6 +310,9 @@ function ProgressToast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id:
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label={`${toast.message} ${Math.round(progress)}%`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -353,6 +361,11 @@ function ProgressToast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id:
         </span>
       </div>
       <div
+        role="progressbar"
+        aria-valuenow={Math.round(progress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${toast.message} progress`}
         style={{
           height: 3,
           borderRadius: "2px",
