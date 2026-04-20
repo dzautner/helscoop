@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "@/components/LocaleProvider";
 
 export interface ContextMenuItem {
   id: string;
@@ -24,6 +25,7 @@ const RING_RADIUS = 72;
 const BUTTON_SIZE = 44;
 
 export default function ViewportContextMenu({ items, position, onClose }: ViewportContextMenuProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -101,7 +103,7 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
     <div
       ref={menuRef}
       role="menu"
-      aria-label="Viewport actions"
+      aria-label={t('viewport.contextMenuLabel')}
       style={{
         position: "fixed",
         left: adjustedX,

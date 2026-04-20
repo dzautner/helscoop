@@ -549,6 +549,9 @@ const translations = {
       errorBoundaryReset: 'Nollaa',
       retryNow: 'Yrita nyt',
     },
+    viewport: {
+      contextMenuLabel: 'Nakyman toiminnot',
+    },
   },
   en: {
     nav: {
@@ -1097,6 +1100,9 @@ const translations = {
       errorBoundaryTitle: '3D Error',
       errorBoundaryReset: 'Reset',
       retryNow: 'Retry now',
+    },
+    viewport: {
+      contextMenuLabel: 'Viewport actions',
     },
   },
 } as const;

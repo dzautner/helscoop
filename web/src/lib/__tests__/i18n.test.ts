@@ -539,6 +539,8 @@ describe("exhaustive i18n key parity", () => {
     "errors.tryAgain", "errors.backToDashboard", "errors.showDetails", "errors.hideDetails",
     "errors.projectNotFoundTitle", "errors.projectNotFoundMessage",
     "errors.connectionLost", "errors.reconnected", "errors.retryNow",
+    // viewport
+    "viewport.contextMenuLabel",
   ];
 
   it("every Finnish key has a corresponding English translation", () => {
