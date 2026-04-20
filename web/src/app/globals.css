@@ -2530,6 +2530,7 @@ select:focus {
   background: var(--amber-glow);
   color: var(--amber);
   border-color: var(--amber-border);
+  box-shadow: 0 0 8px var(--amber-glow), var(--shadow-subtle);
 }
 
 .viewport-status {

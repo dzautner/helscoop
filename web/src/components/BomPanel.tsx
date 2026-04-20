@@ -1152,7 +1152,11 @@ export default function BomPanel({
       data-tour="bom-panel"
       style={style}
     >
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+      <div style={{
+        padding: "16px 20px",
+        borderBottom: "1px solid var(--border)",
+        background: "linear-gradient(180deg, rgba(229,160,75,0.02) 0%, transparent 100%)",
+      }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
           <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
