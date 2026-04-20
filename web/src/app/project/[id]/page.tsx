@@ -113,6 +113,9 @@ export default function ProjectPage() {
   const [savedScript, setSavedScript] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [saveFailCount, setSaveFailCount] = useState(0);
+  const [saveErrorVisible, setSaveErrorVisible] = useState(false);
+  const [clipboardCopied, setClipboardCopied] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [projectName, setProjectName] = useState("");
   const previousNameRef = useRef("");
@@ -252,10 +255,14 @@ export default function ProjectPage() {
       setSavedScript(sceneJs);
       setLastSaved(new Date().toLocaleTimeString());
       setSaveStatus("saved");
+      setSaveFailCount(0);
+      setSaveErrorVisible(false);
       toast(t('toast.saved'), "success");
     } catch (err) {
       toast(err instanceof Error ? err.message : t('toast.saveFailed'), "error");
       setSaveStatus("unsaved");
+      setSaveFailCount((c) => c + 1);
+      setSaveErrorVisible(true);
     }
   }, [projectId, projectName, projectDesc, sceneJs, bom, toast, t]);
 
@@ -978,6 +985,54 @@ export default function ProjectPage() {
               onClick={discardDraft}
             >
               {t('editor.draftDiscard')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Save failure recovery banner */}
+      {saveErrorVisible && (
+        <div
+          className="save-failure-banner"
+          data-critical={saveFailCount >= 3}
+          role="alert"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>
+            {saveFailCount >= 3
+              ? t('editor.saveFailedCritical')
+              : t('editor.saveFailedBanner')}
+          </span>
+          <div className="save-failure-actions">
+            <button
+              className="btn btn-ghost save-failure-btn"
+              onClick={save}
+            >
+              {t('editor.saveFailedRetry')}
+            </button>
+            <button
+              className="btn btn-ghost save-failure-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(sceneJs);
+                setClipboardCopied(true);
+                toast(t('editor.saveFailedCopied'), "success");
+                setTimeout(() => setClipboardCopied(false), 2000);
+              }}
+            >
+              {clipboardCopied ? t('editor.saveFailedCopied') : t('editor.saveFailedCopy')}
             </button>
           </div>
         </div>
