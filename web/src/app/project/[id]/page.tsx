@@ -308,6 +308,30 @@ export default function ProjectPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [saveStatus]);
 
+  // Intercept browser back button (popstate) when there are unsaved changes
+  useEffect(() => {
+    if (saveStatus !== "unsaved" && saveStatus !== "saving" && saveStatus !== "error") return;
+    // Push a sentinel state so pressing back triggers popstate instead of leaving
+    window.history.pushState({ helscoop_guard: true }, "");
+    const handler = () => {
+      if (window.confirm(t("editor.unsavedWarning"))) {
+        // User confirmed — actually go back
+        window.history.back();
+      } else {
+        // User cancelled — re-push sentinel to keep the guard active
+        window.history.pushState({ helscoop_guard: true }, "");
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => {
+      window.removeEventListener("popstate", handler);
+      // Clean up the sentinel state if the component unmounts normally
+      if (window.history.state?.helscoop_guard) {
+        window.history.back();
+      }
+    };
+  }, [saveStatus, t]);
+
   useEffect(() => {
     if (!showExportMenu) return;
     const close = (e: MouseEvent) => {
