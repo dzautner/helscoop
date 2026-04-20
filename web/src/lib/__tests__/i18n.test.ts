@@ -449,6 +449,8 @@ describe("exhaustive i18n key parity", () => {
     "editor.cancel", "editor.dontAskAgain",
     "editor.docs", "editor.share", "editor.duplicateProject", "editor.parameters",
     "editor.unsavedWarning", "editor.quantityFor",
+    "editor.removeMaterial", "editor.confirmRemoveItem", "editor.bomItemRow",
+    "editor.sceneMaterialsDetected", "editor.syncFromScene",
     // share
     "share.title", "share.description", "share.generating", "share.copyLink",
     "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
