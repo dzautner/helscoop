@@ -204,3 +204,56 @@ export function requireRole(...roles: Role[]) {
     next();
   };
 }
+
+// ---------------------------------------------------------------------------
+// Object-level ownership middleware
+// ---------------------------------------------------------------------------
+
+/**
+ * Middleware factory: verify the authenticated user owns the project
+ * identified by `:id` in the route params, OR the user is an admin
+ * (admins can access any project).
+ *
+ * Must be placed after `requireAuth`. The project row is attached to
+ * `req.project` so downstream handlers can re-use it without a second query.
+ *
+ * Usage:
+ *   router.get("/:id", requireAuth, requireProjectOwnership(dbQuery), handler);
+ */
+export function requireProjectOwnership(
+  dbQuery: (text: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const projectId = req.params.id;
+    if (!projectId) {
+      return res.status(400).json({ error: "Project ID is required" });
+    }
+
+    const role = normalizeRole(req.user.role);
+
+    // Admins can access any project
+    if (role === "admin") {
+      return next();
+    }
+
+    // For non-admins, verify ownership
+    const result = await dbQuery(
+      "SELECT id, user_id FROM projects WHERE id = $1",
+      [projectId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    if (result.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ error: "You do not have access to this project" });
+    }
+
+    next();
+  };
+}

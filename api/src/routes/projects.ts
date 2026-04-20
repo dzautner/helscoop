@@ -3,6 +3,7 @@ import crypto from "crypto";
 import PDFDocument from "pdfkit";
 import { query } from "../db";
 import { requireAuth } from "../auth";
+import { requirePermission } from "../permissions";
 import { logAuditEvent } from "../audit";
 
 const router = Router();
@@ -37,7 +38,7 @@ router.get("/trash", async (req, res) => {
   res.json(result.rows);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("project:create"), async (req, res) => {
   const { name, description, scene_js, building_info } = req.body;
   if (!name || typeof name !== "string") {
     return res.status(400).json({ error: "Project name is required" });
@@ -124,7 +125,7 @@ router.delete("/:id/permanent", async (req, res) => {
 // --------------------------------------------------------------------------
 // Share / Unshare endpoints
 // --------------------------------------------------------------------------
-router.post("/:id/share", async (req, res) => {
+router.post("/:id/share", requirePermission("project:share"), async (req, res) => {
   // Check ownership
   const proj = await query(
     "SELECT id, share_token FROM projects WHERE id=$1 AND user_id=$2",
@@ -240,7 +241,7 @@ router.put("/:id/thumbnail", async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post("/:id/duplicate", async (req, res) => {
+router.post("/:id/duplicate", requirePermission("project:create"), async (req, res) => {
   const src = await query(
     "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]

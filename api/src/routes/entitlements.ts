@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { requireAuth, requireAdmin } from "../auth";
+import { requireAuth } from "../auth";
+import { requirePermission } from "../permissions";
 import {
   PLANS,
   getUserPlan,
@@ -69,7 +70,7 @@ router.get("/usage", requireAuth, async (req, res) => {
 // Set or revoke an admin override for a user/feature pair.
 // Body: { userId: string, feature: Feature, allow: boolean }
 // ---------------------------------------------------------------------------
-router.post("/admin/override", requireAuth, requireAdmin, (req, res) => {
+router.post("/admin/override", requireAuth, requirePermission("admin:access"), (req, res) => {
   const { userId, feature, allow } = req.body;
 
   if (!userId || typeof userId !== "string") {
@@ -110,7 +111,7 @@ router.post("/admin/override", requireAuth, requireAdmin, (req, res) => {
 router.get(
   "/admin/overrides/:userId",
   requireAuth,
-  requireAdmin,
+  requirePermission("admin:access"),
   (req, res) => {
     const overrides = getAdminOverrides(req.params.userId);
     res.json({ overrides });

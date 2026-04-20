@@ -2,7 +2,8 @@ import { Router } from "express";
 import * as fs from "fs";
 import * as path from "path";
 import { query } from "../db";
-import { requireAuth, requireAdmin } from "../auth";
+import { requireAuth } from "../auth";
+import { requirePermission } from "../permissions";
 
 const router = Router();
 
@@ -226,7 +227,7 @@ router.post("/catalog/convert", (req, res) => {
   res.json({ results });
 });
 
-router.post("/", requireAuth, requireAdmin, async (req, res) => {
+router.post("/", requireAuth, requirePermission("material:create"), async (req, res) => {
   const {
     id,
     name,
@@ -264,7 +265,7 @@ router.post("/", requireAuth, requireAdmin, async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
+router.put("/:id", requireAuth, requirePermission("material:update"), async (req, res) => {
   const { name, category_id, tags, description, waste_factor } = req.body;
   const result = await query(
     `UPDATE materials SET name=$1, category_id=$2, tags=$3, description=$4,
@@ -277,7 +278,7 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
   res.json(result.rows[0]);
 });
 
-router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
+router.delete("/:id", requireAuth, requirePermission("material:delete"), async (req, res) => {
   await query("DELETE FROM materials WHERE id=$1", [req.params.id]);
   res.json({ ok: true });
 });

@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { query } from "../db";
-import { requireAuth, requireAdmin } from "../auth";
+import { requireAuth } from "../auth";
+import { requirePermission } from "../permissions";
 
 const router = Router();
 
-router.get("/compare/:materialId", async (req, res) => {
+// GET /pricing/compare/:materialId — price comparison (anyone with pricing:read)
+router.get("/compare/:materialId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
   const result = await query(
     `SELECT p.*, s.name AS supplier_name, s.url AS supplier_url
      FROM pricing p
@@ -16,10 +18,11 @@ router.get("/compare/:materialId", async (req, res) => {
   res.json(result.rows);
 });
 
+// PUT /pricing/:materialId/:supplierId — update pricing (admin or partner with pricing:update)
 router.put(
   "/:materialId/:supplierId",
   requireAuth,
-  requireAdmin,
+  requirePermission("pricing:update"),
   async (req, res) => {
     const { unit_price, unit, sku, ean, link, is_primary } = req.body;
     const { materialId, supplierId } = req.params;
@@ -52,7 +55,8 @@ router.put(
   }
 );
 
-router.get("/history/:materialId", async (req, res) => {
+// GET /pricing/history/:materialId — price history (anyone with pricing:read)
+router.get("/history/:materialId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
   const result = await query(
     `SELECT ph.*, p.supplier_id, s.name AS supplier_name
      FROM pricing_history ph
@@ -66,7 +70,8 @@ router.get("/history/:materialId", async (req, res) => {
   res.json(result.rows);
 });
 
-router.get("/stale", requireAuth, requireAdmin, async (_req, res) => {
+// GET /pricing/stale — stale prices (admin only)
+router.get("/stale", requireAuth, requirePermission("admin:access"), async (_req, res) => {
   const result = await query(
     `SELECT m.id, m.name, p.supplier_id, s.name AS supplier_name,
       p.unit_price, p.last_scraped_at,

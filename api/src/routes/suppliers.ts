@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { query } from "../db";
-import { requireAuth, requireAdmin } from "../auth";
+import { requireAuth } from "../auth";
+import { requirePermission } from "../permissions";
 
 const router = Router();
 
-router.get("/", async (_req, res) => {
+// GET /suppliers — list all suppliers (anyone with supplier:read)
+router.get("/", requireAuth, requirePermission("supplier:read"), async (_req, res) => {
   const result = await query(
     `SELECT s.*,
       (SELECT COUNT(*) FROM pricing p WHERE p.supplier_id = s.id) AS product_count,
@@ -14,7 +16,8 @@ router.get("/", async (_req, res) => {
   res.json(result.rows);
 });
 
-router.get("/:id", async (req, res) => {
+// GET /suppliers/:id — single supplier detail (anyone with supplier:read)
+router.get("/:id", requireAuth, requirePermission("supplier:read"), async (req, res) => {
   const result = await query("SELECT * FROM suppliers WHERE id=$1", [
     req.params.id,
   ]);
@@ -30,7 +33,8 @@ router.get("/:id", async (req, res) => {
   res.json({ ...result.rows[0], products: products.rows });
 });
 
-router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
+// PUT /suppliers/:id — update supplier (admin or partner with supplier:update)
+router.put("/:id", requireAuth, requirePermission("supplier:update"), async (req, res) => {
   const { name, url, scrape_enabled, scrape_config } = req.body;
   const result = await query(
     `UPDATE suppliers SET name=$1, url=$2, scrape_enabled=$3,
@@ -43,7 +47,8 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res) => {
   res.json(result.rows[0]);
 });
 
-router.get("/:id/scrape-history", async (req, res) => {
+// GET /suppliers/:id/scrape-history — scrape history (admin only)
+router.get("/:id/scrape-history", requireAuth, requirePermission("admin:access"), async (req, res) => {
   const result = await query(
     `SELECT * FROM scrape_runs WHERE supplier_id=$1 ORDER BY started_at DESC LIMIT 50`,
     [req.params.id]
