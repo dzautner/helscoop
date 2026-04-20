@@ -237,12 +237,14 @@ export default function SettingsPage() {
           >
             <div>
               <label
+                htmlFor="settings-name"
                 className="label-mono"
                 style={{ display: "block", marginBottom: 8 }}
               >
                 {t("settings.name")}
               </label>
               <input
+                id="settings-name"
                 className="input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -251,12 +253,14 @@ export default function SettingsPage() {
             </div>
             <div>
               <label
+                htmlFor="settings-email"
                 className="label-mono"
                 style={{ display: "block", marginBottom: 8 }}
               >
                 {t("settings.email")}
               </label>
               <input
+                id="settings-email"
                 className="input"
                 type="email"
                 value={email}
@@ -304,12 +308,14 @@ export default function SettingsPage() {
           >
             <div>
               <label
+                htmlFor="settings-current-password"
                 className="label-mono"
                 style={{ display: "block", marginBottom: 8 }}
               >
                 {t("settings.currentPassword")}
               </label>
               <input
+                id="settings-current-password"
                 className="input"
                 type="password"
                 value={currentPassword}
@@ -320,12 +326,14 @@ export default function SettingsPage() {
             </div>
             <div>
               <label
+                htmlFor="settings-new-password"
                 className="label-mono"
                 style={{ display: "block", marginBottom: 8 }}
               >
                 {t("settings.newPassword")}
               </label>
               <input
+                id="settings-new-password"
                 className="input"
                 type="password"
                 value={newPassword}
@@ -336,12 +344,14 @@ export default function SettingsPage() {
             </div>
             <div>
               <label
+                htmlFor="settings-confirm-password"
                 className="label-mono"
                 style={{ display: "block", marginBottom: 8 }}
               >
                 {t("settings.confirmPassword")}
               </label>
               <input
+                id="settings-confirm-password"
                 className="input"
                 type="password"
                 value={confirmPassword}

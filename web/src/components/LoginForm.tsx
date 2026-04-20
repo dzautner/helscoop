@@ -169,6 +169,7 @@ export default function LoginForm({
                   placeholder={t('auth.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  required
                   autoComplete="name"
                 />
               </div>
