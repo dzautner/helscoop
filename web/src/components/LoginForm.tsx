@@ -57,7 +57,7 @@ export default function LoginForm({
       const result = isRegister
         ? await api.register(email, password, name)
         : await api.login(email, password);
-      setToken(result.token);
+      setToken(result.token, result.token_expires_at);
       track(isRegister ? "auth_register" : "auth_login", {} as Record<string, never>);
       onLogin();
     } catch (err) {

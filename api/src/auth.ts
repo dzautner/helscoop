@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { query } from "./db";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
+import { Role, normalizeRole, ROLES, isValidRole } from "./permissions";
 
 const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
@@ -13,6 +14,8 @@ export interface AuthUser {
   role: string;
 }
 
+export { Role, ROLES, isValidRole, normalizeRole };
+
 declare global {
   namespace Express {
     interface Request {
@@ -21,8 +24,50 @@ declare global {
   }
 }
 
+// Access token lifetime: 15 minutes for security; refresh extends the session.
+const ACCESS_TOKEN_EXPIRES = "15m";
+const ACCESS_TOKEN_SECONDS = 15 * 60;
+
+// Grace window (seconds) within which an expired token can still be refreshed.
+// Prevents race conditions when a request is in-flight at the moment of expiry.
+const REFRESH_GRACE_SECONDS = 60;
+
 export function signToken(user: AuthUser): string {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(user, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
+}
+
+/** Returns the absolute expiry timestamp (epoch seconds) for a freshly-signed token. */
+export function tokenExpiresAt(): number {
+  return Math.floor(Date.now() / 1000) + ACCESS_TOKEN_SECONDS;
+}
+
+/**
+ * Verify a token for refresh purposes.
+ * Accepts tokens that are still valid OR expired within the grace window.
+ * Returns the decoded user payload, or null if the token is invalid / too old.
+ */
+export function verifyForRefresh(token: string): AuthUser | null {
+  // First try normal verification
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as AuthUser;
+    return { id: payload.id, email: payload.email, role: payload.role };
+  } catch (err) {
+    // If expired, check grace window
+    if (err instanceof jwt.TokenExpiredError) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET, {
+          ignoreExpiration: true,
+        }) as AuthUser & { exp: number };
+        const expiredAgo = Math.floor(Date.now() / 1000) - payload.exp;
+        if (expiredAgo <= REFRESH_GRACE_SECONDS) {
+          return { id: payload.id, email: payload.email, role: payload.role };
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
