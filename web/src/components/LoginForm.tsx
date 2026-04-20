@@ -217,7 +217,7 @@ export default function LoginForm({
                 autoComplete={isRegister ? "new-password" : "current-password"}
               />
               {isRegister && password && passwordStrength && (
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: 8 }} role="meter" aria-label={t("auth.passwordStrength")} aria-valuenow={passwordStrength.level === "strong" ? 3 : passwordStrength.level === "medium" ? 2 : 1} aria-valuemin={1} aria-valuemax={3}>
                   <div style={{
                     height: 4,
                     borderRadius: 2,
@@ -291,7 +291,7 @@ export default function LoginForm({
             )}
 
             {error && (
-              <div className="anim-up" style={{
+              <div role="alert" className="anim-up" style={{
                 padding: "10px 14px",
                 borderRadius: "var(--radius-md)",
                 background: "var(--danger-dim)",

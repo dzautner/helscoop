@@ -20,9 +20,9 @@ export default function FeatureHighlights() {
           <span className="label-mono" style={{ color: "var(--amber)", marginBottom: 8, display: "block" }}>
             {t("landing.featuresLabel")}
           </span>
-          <h3 style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
             {t("landing.featuresTitle")}
-          </h3>
+          </h2>
         </div>
       </ScrollReveal>
       <div className="feature-grid">

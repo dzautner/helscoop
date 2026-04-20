@@ -480,6 +480,7 @@ export default function ProjectList({
                 className="select"
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label={t('project.sortBy')}
               >
                 <option value="modified">{t('project.sortByModified')}</option>
                 <option value="name">{t('project.sortByName')}</option>

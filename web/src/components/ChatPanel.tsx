@@ -154,7 +154,7 @@ export default function ChatPanel({
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
-          <div className="chat-messages-scroll">
+          <div className="chat-messages-scroll" role="log" aria-label={t('editor.chatMessages')}>
             {messages.map((msg, i) => {
               const code = msg.role === "assistant" ? extractCode(msg.content) : null;
               const textContent = msg.content
