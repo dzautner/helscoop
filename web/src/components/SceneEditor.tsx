@@ -5,14 +5,15 @@ import { useTranslation } from "@/components/LocaleProvider";
 
 /* ── Syntax highlighting colours ─────────────────────────────────── */
 const COLORS = {
-  primitive: "#e5a04b",   // box, cylinder, sphere
-  transform: "#60a5fa",   // translate, rotate, scale
-  boolean:   "#4ade80",   // union, subtract, intersect
-  sceneAdd:  "#e5a04b",   // scene.add
-  number:    "#c084fc",
-  comment:   "#52525b",
-  string:    "#4ade80",
-  default:   "#a1a1aa",
+  primitive: "#e5a04b",   // box, cylinder, sphere — warm amber
+  transform: "#7ab3e0",   // translate, rotate, scale — cool steel blue
+  boolean:   "#8bc48b",   // union, subtract, intersect — muted sage
+  sceneAdd:  "#f0b86a",   // scene.add — bright amber
+  number:    "#d4a0e0",   // numbers — soft lavender
+  comment:   "#5a5a64",   // comments — dim zinc
+  string:    "#c4a06e",   // strings — warm tan
+  keyword:   "#e5a04b",   // keywords — amber
+  default:   "#9a9aa6",   // default text — warm grey
 };
 
 /* ── Token types & patterns ──────────────────────────────────────── */
@@ -25,6 +26,7 @@ const TOKEN_RULES: [RegExp, TokenKind][] = [
   [/\b(?:box|cylinder|sphere)\b/,                           "primitive"],
   [/\b(?:translate|rotate|scale)\b/,                        "transform"],
   [/\b(?:union|subtract|intersect)\b/,                      "boolean"],
+  [/\b(?:const|let|var|function|return|if|else|for|while|new|true|false|null)\b/, "keyword"],
   [/\b\d+(?:\.\d+)?\b/,                                    "number"],
 ];
 
