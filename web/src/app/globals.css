@@ -3249,6 +3249,44 @@ select:focus {
   transition-duration: 0.04s;
 }
 
+/* === Viewport tessellation progress bar === */
+.viewport-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.viewport-progress-fill {
+  height: 100%;
+  background: var(--amber);
+  transition: width 0.15s ease-out;
+  box-shadow: 0 0 8px var(--amber-glow);
+}
+
+.viewport-computing-pill {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  padding: 6px 16px;
+  z-index: 5;
+  pointer-events: none;
+  animation: fadeIn 0.3s ease;
+}
+
 /* === Ruler / measurement labels (CSS2DRenderer) === */
 .ruler-label {
   padding: 2px 7px;
