@@ -1109,11 +1109,15 @@ export default function ProjectPage() {
             </button>
             <button
               className="btn btn-ghost save-failure-btn"
-              onClick={() => {
-                navigator.clipboard.writeText(sceneJs);
-                setClipboardCopied(true);
-                toast(t('editor.saveFailedCopied'), "success");
-                setTimeout(() => setClipboardCopied(false), 2000);
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(sceneJs);
+                  setClipboardCopied(true);
+                  toast(t('editor.saveFailedCopied'), "success");
+                  setTimeout(() => setClipboardCopied(false), 2000);
+                } catch {
+                  toast(t('toast.copyFailed'), "error");
+                }
               }}
             >
               {clipboardCopied ? t('editor.saveFailedCopied') : t('editor.saveFailedCopy')}
@@ -1508,12 +1512,16 @@ export default function ProjectPage() {
               />
               <button
                 className="btn btn-primary"
-                onClick={() => {
+                onClick={async () => {
                   const url = `${window.location.origin}/shared/${shareToken}`;
-                  navigator.clipboard.writeText(url);
-                  setShareCopied(true);
-                  toast(t('toast.linkCopied'), "success");
-                  setTimeout(() => setShareCopied(false), 2000);
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    setShareCopied(true);
+                    toast(t('toast.linkCopied'), "success");
+                    setTimeout(() => setShareCopied(false), 2000);
+                  } catch {
+                    toast(t('toast.copyFailed'), "error");
+                  }
                 }}
                 style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
               >

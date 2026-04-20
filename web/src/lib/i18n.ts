@@ -156,6 +156,7 @@ const translations = {
       materialRemoved: 'Materiaali poistettu',
       undo: 'Kumoa',
       overflowMore: '+{{count}} lisaa',
+      copyFailed: 'Kopiointi epäonnistui',
     },
     editor: {
       scene: 'Kohtaus',
@@ -695,6 +696,7 @@ const translations = {
       materialRemoved: 'Material removed',
       undo: 'Undo',
       overflowMore: '+{{count}} more',
+      copyFailed: 'Copy failed',
     },
     editor: {
       scene: 'Scene',
