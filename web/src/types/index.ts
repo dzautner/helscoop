@@ -57,6 +57,15 @@ export interface Template {
   bom: { material_id: string; quantity: number; unit: string }[];
 }
 
+export interface SupplierSku {
+  supplier: string;
+  sku: string;
+  ean?: string;
+  url?: string;
+}
+
+export type VatClass = 'standard' | 'reduced' | 'zero';
+
 export interface Material {
   id: string;
   name: string;
@@ -66,6 +75,20 @@ export interface Material {
   category_name_fi: string | null;
   image_url: string | null;
   pricing: { unit_price: number; unit: string; supplier_name: string; is_primary: boolean }[] | null;
+  /** How many design_units fit in one purchasable_unit (e.g. 1 pack = 1.8 m2) */
+  conversion_factor?: number;
+  /** Number of items in one purchasable pack */
+  pack_size?: number;
+  /** Unit retailers sell (e.g. "pack", "roll", "pallet") */
+  purchasable_unit?: string;
+  /** Unit used in design/BOM calculations (e.g. "m2", "jm", "kpl") */
+  design_unit?: string;
+  /** Finnish VAT rate class: standard (25.5%), reduced (14%), zero (0%) */
+  vat_class?: VatClass;
+  /** Retailer-specific SKU/EAN mappings */
+  supplier_skus?: SupplierSku[];
+  /** Grouping key for interchangeable materials */
+  substitution_group?: string;
 }
 
 export interface BomItem {

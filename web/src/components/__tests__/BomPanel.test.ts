@@ -15,11 +15,14 @@ import {
   getCategoryColor,
   matchSceneMaterial,
   computeTrend,
+  designToPurchasable,
+  getVatRate,
+  VAT_RATES,
   CATEGORY_COLORS,
   FALLBACK_COLORS,
   MATERIAL_ALIASES,
 } from "@/components/BomPanel";
-import type { Material, BomItem, PriceHistoryRow } from "@/types";
+import type { Material, BomItem, PriceHistoryRow, VatClass } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -911,5 +914,120 @@ describe("CATEGORY_COLORS", () => {
   it("has entries for at least 7 categories", () => {
     // 7 Finnish + 7 English = 14 entries
     expect(Object.keys(CATEGORY_COLORS).length).toBeGreaterThanOrEqual(14);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. designToPurchasable
+// ---------------------------------------------------------------------------
+
+describe("designToPurchasable", () => {
+  it("returns design quantity when no conversion factor", () => {
+    expect(designToPurchasable(10)).toBe(10);
+    expect(designToPurchasable(10, undefined, undefined)).toBe(10);
+  });
+
+  it("returns design quantity when conversion factor is 0 or negative", () => {
+    expect(designToPurchasable(10, 0)).toBe(10);
+    expect(designToPurchasable(10, -1)).toBe(10);
+  });
+
+  it("converts m2 to sheets (1 sheet = 2.97 m2)", () => {
+    // 10 m2 / 2.97 m2 per sheet = 3.37 -> ceil = 4 sheets
+    expect(designToPurchasable(10, 2.97)).toBe(4);
+  });
+
+  it("converts m2 to insulation packs (3 panels of 1.8 m2 each)", () => {
+    // 12 m2 / 1.8 m2 per panel = 6.67 panels / 3 per pack = 2.22 -> ceil = 3 packs
+    expect(designToPurchasable(12, 1.8, 3)).toBe(3);
+  });
+
+  it("rounds up to whole packs", () => {
+    // 1.8 m2 / 1.8 m2 per panel = 1 panel / 3 per pack = 0.33 -> ceil = 1 pack
+    expect(designToPurchasable(1.8, 1.8, 3)).toBe(1);
+  });
+
+  it("handles exact multiples without over-ordering", () => {
+    // 5.4 m2 / 1.8 m2 per panel = 3 panels / 3 per pack = 1 pack exactly
+    expect(designToPurchasable(5.4, 1.8, 3)).toBe(1);
+  });
+
+  it("handles screws: 200 kpl per box", () => {
+    // 500 kpl / 200 per box = 2.5 -> ceil = 3 boxes
+    expect(designToPurchasable(500, 200, 1)).toBe(3);
+  });
+
+  it("handles zero design quantity", () => {
+    expect(designToPurchasable(0, 2.97)).toBe(0);
+  });
+
+  it("handles pack_size of 1 (no multi-packing)", () => {
+    // 10 m2 / 2.97 m2 per sheet = 3.37 -> ceil = 4
+    expect(designToPurchasable(10, 2.97, 1)).toBe(4);
+  });
+
+  it("handles 1:1 conversion (jm lumber)", () => {
+    expect(designToPurchasable(15, 1, 1)).toBe(15);
+    expect(designToPurchasable(15, 1)).toBe(15);
+  });
+
+  it("handles vapor barrier rolls (1 roll = 75 m2)", () => {
+    // 100 m2 / 75 m2 per roll = 1.33 -> ceil = 2 rolls
+    expect(designToPurchasable(100, 75)).toBe(2);
+    // Exactly 75 m2 = 1 roll
+    expect(designToPurchasable(75, 75)).toBe(1);
+  });
+
+  it("handles paint (1 liter covers 0.1 m2 = 10 m2/liter)", () => {
+    // 15 m2 / 0.1 = 150 liters -> ceil = 150
+    expect(designToPurchasable(15, 0.1)).toBe(150);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. getVatRate
+// ---------------------------------------------------------------------------
+
+describe("getVatRate", () => {
+  it("returns 25.5% for standard VAT", () => {
+    const mat = makeMaterial({ vat_class: "standard" });
+    expect(getVatRate(mat)).toBe(0.255);
+  });
+
+  it("returns 14% for reduced VAT", () => {
+    const mat = makeMaterial({ vat_class: "reduced" });
+    expect(getVatRate(mat)).toBe(0.14);
+  });
+
+  it("returns 0% for zero VAT", () => {
+    const mat = makeMaterial({ vat_class: "zero" });
+    expect(getVatRate(mat)).toBe(0);
+  });
+
+  it("defaults to standard (25.5%) when vat_class is undefined", () => {
+    const mat = makeMaterial();
+    expect(getVatRate(mat)).toBe(0.255);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 16. VAT_RATES constant
+// ---------------------------------------------------------------------------
+
+describe("VAT_RATES", () => {
+  it("has exactly three VAT classes", () => {
+    expect(Object.keys(VAT_RATES)).toEqual(["standard", "reduced", "zero"]);
+  });
+
+  it("standard rate is 25.5% (Finnish rate as of Sep 2024)", () => {
+    expect(VAT_RATES.standard).toBe(0.255);
+  });
+
+  it("reduced rate is 14%", () => {
+    expect(VAT_RATES.reduced).toBe(0.14);
+  });
+
+  it("zero rate is 0", () => {
+    expect(VAT_RATES.zero).toBe(0);
   });
 });
