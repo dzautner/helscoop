@@ -9,18 +9,15 @@ import FeatureHighlights from "@/components/FeatureHighlights";
 import LandingFooter from "@/components/LandingFooter";
 import ProjectList from "@/components/ProjectList";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useTranslation } from "@/components/LocaleProvider";
 import type { BuildingResult } from "@/types";
-
-const BUILDING_TYPE_LABELS: Record<string, Record<string, string>> = {
-  fi: { omakotitalo: "Omakotitalo", rivitalo: "Rivitalo", kerrostalo: "Kerrostalo", paritalo: "Paritalo" },
-  en: { omakotitalo: "Detached house", rivitalo: "Terraced house", kerrostalo: "Apartment block", paritalo: "Semi-detached" },
-};
 
 export default function Home() {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [pendingBuilding, setPendingBuilding] = useState<BuildingResult | null>(null);
   const { track } = useAnalytics();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (getToken()) {
@@ -38,10 +35,10 @@ export default function Home() {
 
   async function createProjectFromBuilding(building: BuildingResult) {
     track("project_created", { source: "address", building_type: building.building_info.type });
-    const buildingTypeLabels = BUILDING_TYPE_LABELS.fi;
+    const buildingTypeLabel = t(`building.${building.building_info.type}`) || building.building_info.type;
     const project = await api.createProject({
       name: building.address,
-      description: `${buildingTypeLabels[building.building_info.type] || building.building_info.type}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
+      description: `${buildingTypeLabel}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
       scene_js: building.scene_js,
     });
     if (building.bom_suggestion.length > 0) {

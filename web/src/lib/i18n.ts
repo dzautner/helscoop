@@ -607,6 +607,12 @@ const translations = {
       feature3Title: 'Automaattinen materiaaliluettelo',
       feature3Desc: 'Reaaliaikaiset hinnat K-Raudasta ja Sarokkaasta, suoraan projektiisi',
     },
+    building: {
+      omakotitalo: 'Omakotitalo',
+      rivitalo: 'Rivitalo',
+      kerrostalo: 'Kerrostalo',
+      paritalo: 'Paritalo',
+    },
     viewport: {
       contextMenuLabel: 'Näkymän toiminnot',
     },
@@ -1245,6 +1251,12 @@ const translations = {
       feature2Desc: 'Describe changes in plain language \u2014 "add a terrace in the back" \u2014 AI executes',
       feature3Title: 'Automatic bill of materials',
       feature3Desc: 'Real-time prices from K-Rauta and Stark, directly in your project',
+    },
+    building: {
+      omakotitalo: 'Detached house',
+      rivitalo: 'Terraced house',
+      kerrostalo: 'Apartment block',
+      paritalo: 'Semi-detached',
     },
     viewport: {
       contextMenuLabel: 'Viewport actions',

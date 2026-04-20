@@ -552,6 +552,8 @@ describe("exhaustive i18n key parity", () => {
     "landing.featuresTitle", "landing.feature1Title", "landing.feature1Desc",
     "landing.feature2Title", "landing.feature2Desc",
     "landing.feature3Title", "landing.feature3Desc",
+    // building
+    "building.omakotitalo", "building.rivitalo", "building.kerrostalo", "building.paritalo",
     // viewport
     "viewport.contextMenuLabel",
   ];
