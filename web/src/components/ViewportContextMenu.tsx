@@ -166,12 +166,12 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
                 width: BUTTON_SIZE,
                 height: BUTTON_SIZE,
                 borderRadius: "50%",
-                border: `1px solid ${item.active ? "var(--amber-border)" : "var(--border-strong)"}`,
+                border: `1px solid ${item.active ? "var(--amber-border)" : "var(--surface-border-float)"}`,
                 background: item.active
                   ? "var(--amber-glow)"
                   : isHovered
                   ? "var(--bg-hover)"
-                  : "var(--bg-elevated)",
+                  : "var(--surface-float)",
                 color: item.active ? "var(--amber)" : isHovered ? "var(--text-primary)" : "var(--text-secondary)",
                 cursor: "pointer",
                 display: "flex",
@@ -216,8 +216,8 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
                 fontFamily: "var(--font-body)",
                 fontWeight: 500,
                 color: "var(--text-primary)",
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-strong)",
+                background: "var(--surface-float)",
+                border: "1px solid var(--surface-border-float)",
                 borderRadius: "var(--radius-sm)",
                 padding: "4px 8px",
                 boxShadow: "var(--shadow-md)",

@@ -377,8 +377,8 @@ export default function SceneEditor({
             gap: 6,
             padding: "8px 12px",
             marginBottom: 4,
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
+            background: "var(--surface-float)",
+            border: "1px solid var(--surface-border-float)",
             borderRadius: "var(--radius-md)",
             fontSize: 12,
           }}
