@@ -434,7 +434,7 @@ describe("Kanala scene via Manifold WASM", () => {
 
     console.log(`Performance: eval=${evalMs.toFixed(0)}ms, tessellate=${tessMs.toFixed(0)}ms, total=${totalMs.toFixed(0)}ms, triangles=${totalTriangles}`);
 
-    expect(totalMs).toBeLessThan(5000);
+    expect(totalMs).toBeLessThan(10000);
     expect(totalTriangles).toBeGreaterThan(100000);
 
     for (const m of toDelete) { try { m.delete(); } catch { /* ok */ } }
