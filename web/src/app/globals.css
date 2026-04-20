@@ -83,6 +83,12 @@
   --z-toast: 1100;
   --z-onboarding: 1200;
 
+  /* ── Focus ring tokens ────────────────────────────────────────── */
+  --focus-ring: 0 0 0 2px var(--amber);
+  --focus-ring-offset: 0 0 0 4px rgba(229, 160, 75, 0.25);
+  --focus-ring-danger: 0 0 0 2px var(--danger);
+  --focus-ring-danger-offset: 0 0 0 4px var(--danger-dim);
+
   /* ── Backdrop ──────────────────────────────────────────────────── */
   --backdrop: rgba(0, 0, 0, 0.6);
 }
@@ -152,6 +158,11 @@
   --surface-overlay: #ffffff;
   --surface-border-float: rgba(180, 83, 9, 0.1);
   --surface-border-overlay: rgba(180, 83, 9, 0.1);
+
+  --focus-ring: 0 0 0 2px var(--amber);
+  --focus-ring-offset: 0 0 0 4px rgba(180, 83, 9, 0.2);
+  --focus-ring-danger: 0 0 0 2px var(--danger);
+  --focus-ring-danger-offset: 0 0 0 4px var(--danger-dim);
 
   --backdrop: rgba(0, 0, 0, 0.6);
 }
@@ -259,7 +270,7 @@
 [data-theme="light"] .bom-item-card:focus,
 [data-theme="light"] .bom-item-card.bom-item-focused {
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.2);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 [data-theme="light"] .chat-msg-user .chat-msg-content {
@@ -289,7 +300,7 @@
 
 [data-theme="light"] .input:focus {
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.1);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 [data-theme="light"] .input::placeholder {
@@ -766,8 +777,8 @@ body::before {
   color: var(--text-secondary);
 }
 .category-chip:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 .category-chip[data-active="true"] {
   border-color: var(--amber-border);
@@ -914,8 +925,8 @@ body::before {
   box-shadow: 0 0 12px rgba(229,160,75,0.1);
 }
 .bom-empty-cta:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .bom-item-card {
@@ -936,11 +947,11 @@ body::before {
 .bom-item-card:focus {
   outline: none;
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px rgba(229, 160, 75, 0.25);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 .bom-item-card.bom-item-focused {
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px rgba(229, 160, 75, 0.25);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .bom-item-header {
@@ -1038,8 +1049,8 @@ body::before {
   border-color: var(--amber-border);
 }
 .material-browse-card:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 .material-browse-card[data-selected="true"] {
   background: var(--amber-glow);
@@ -1067,8 +1078,8 @@ body::before {
   background: rgba(199, 95, 95, 0.1);
 }
 .bom-remove-btn:focus-visible {
-  outline: 2px solid var(--danger);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring-danger), var(--focus-ring-danger-offset);
   opacity: 1;
 }
 
@@ -1108,7 +1119,7 @@ body::before {
 }
 .avatar-btn:focus-visible {
   border-color: var(--amber) !important;
-  box-shadow: 0 0 0 2px var(--amber-glow), 0 0 0 4px var(--amber-border);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .menu-item {
@@ -1346,7 +1357,7 @@ body::before {
 
 .input:focus {
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px var(--amber-glow), 0 0 0 4px rgba(229, 160, 75, 0.05);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
   background: var(--bg-elevated);
 }
 
@@ -1362,7 +1373,7 @@ select:hover:not(:disabled) {
 }
 select:focus {
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px var(--amber-glow);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
   outline: none;
 }
 
@@ -1390,12 +1401,12 @@ select:focus {
 
 .select:focus {
   border-color: var(--amber);
-  box-shadow: 0 0 0 2px var(--amber-glow);
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .select:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .card {
@@ -1859,8 +1870,8 @@ select:focus {
 }
 
 .nav-hamburger:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .nav-mobile-menu {
@@ -1984,8 +1995,8 @@ select:focus {
 }
 
 .chat-collapse-btn:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .chat-expand-btn {
@@ -2011,8 +2022,8 @@ select:focus {
 }
 
 .chat-expand-btn:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .chat-msg {
@@ -2251,8 +2262,8 @@ select:focus {
 }
 
 .chat-suggestion-chip:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .chat-skip-confirm {
@@ -3214,7 +3225,28 @@ select:focus {
   transform: translate(-50%, -50%);
 }
 
+/* === Interactive hover tint — subtle amber warmth on hover === */
+.btn:hover:not(:disabled),
+.menu-item:hover,
+.lang-switch:hover,
+.cmd-palette-item:hover:not([data-selected="true"]) {
+  background-color: rgba(229, 160, 75, 0.04);
+}
+
+[data-theme="light"] .btn:hover:not(:disabled),
+[data-theme="light"] .menu-item:hover,
+[data-theme="light"] .lang-switch:hover,
+[data-theme="light"] .cmd-palette-item:hover:not([data-selected="true"]) {
+  background-color: rgba(180, 83, 9, 0.04);
+}
+
+/* Preserve existing explicit hover backgrounds for variants that override */
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--amber-light);
+}
+
 /* === Focus-visible — keyboard accessibility === */
+/* Base focus ring: consistent amber glow with perceptual depth via layered shadows */
 .btn:focus-visible,
 .card-interactive:focus-visible,
 .lang-switch:focus-visible,
@@ -3223,37 +3255,50 @@ select:focus {
 .link-amber:focus-visible,
 .viewport-cam-btn:focus-visible,
 .viewport-toolbar-btn:focus-visible,
-.scene-params-section-toggle:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--amber-glow);
+.scene-params-section-toggle:focus-visible,
+.empty-state-cta:focus-visible,
+.chat-suggestion-chip:focus-visible,
+.cmd-palette-item:focus-visible,
+.bom-item-card:focus-visible,
+.category-chip:focus-visible,
+.avatar-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
-.input:focus-visible {
+/* Input-like elements: suppress browser outline, rely on existing :focus border + add outer glow */
+.input:focus-visible,
+.select:focus-visible {
   outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .scene-param-value:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 1px;
-  box-shadow: 0 0 0 4px var(--amber-glow);
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .scene-param-slider:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 3px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
   border-radius: 2px;
-  box-shadow: 0 0 0 4px var(--amber-glow);
 }
 
+/* Variant: ghost buttons use muted ring */
 .btn-ghost:focus-visible {
-  outline-color: var(--text-secondary);
-  box-shadow: 0 0 0 4px rgba(161, 161, 170, 0.08);
+  box-shadow: 0 0 0 2px var(--text-secondary), 0 0 0 4px rgba(161, 161, 170, 0.12);
 }
 
+/* Variant: danger buttons use red ring */
 .btn-danger:focus-visible {
-  outline-color: var(--danger);
-  box-shadow: 0 0 0 4px var(--danger-dim);
+  box-shadow: var(--focus-ring-danger), var(--focus-ring-danger-offset);
+}
+
+/* Variant: danger-themed elements */
+.bom-remove-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-danger), var(--focus-ring-danger-offset);
+  opacity: 1;
 }
 
 /* === Ghost/Danger active states === */
@@ -3532,8 +3577,8 @@ select:focus {
 }
 
 .api-ref-copy-btn:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
 
 .api-ref-materials {
