@@ -539,11 +539,11 @@ export default function Viewport3D({
     [onObjectCount, onError, onErrorLine, onWarnings]
   );
 
-  // Debounced scene update — 400ms to coalesce rapid param slider changes
+  // Debounced scene update — 100ms for snappy param slider response
   useEffect(() => {
     const timer = setTimeout(() => {
       updateScene(sceneJs, wireframe);
-    }, 400);
+    }, 100);
     return () => clearTimeout(timer);
   }, [sceneJs, wireframe, updateScene]);
 
