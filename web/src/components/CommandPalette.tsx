@@ -136,7 +136,7 @@ export default function CommandPalette({
   onClose: () => void;
   commands: Command[];
 }) {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -298,8 +298,6 @@ export default function CommandPalette({
 
   if (!open) return null;
 
-  const isFi = locale === "fi";
-
   // Map flatCommands index to display items
   let commandIndex = 0;
 
@@ -390,11 +388,10 @@ export default function CommandPalette({
                     <span className="cmd-palette-item-label">
                       {t(cmd.labelKey)}
                     </span>
-                    {cmd.labelSecondaryKey && (
+                    {cmd.labelSecondaryKey &&
+                      t(cmd.labelSecondaryKey) !== t(cmd.labelKey) && (
                       <span className="cmd-palette-item-label-secondary">
-                        {isFi
-                          ? t(cmd.labelSecondaryKey)
-                          : t(cmd.labelKey)}
+                        {t(cmd.labelSecondaryKey)}
                       </span>
                     )}
                   </div>
