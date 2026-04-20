@@ -87,6 +87,11 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem("helscoop-theme");var d=t==="light"?"light":t==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light":"dark";document.documentElement.setAttribute("data-theme",d);document.documentElement.style.background=d==="light"?"#fafafa":"#09090b"}catch(e){}})()`
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var l=localStorage.getItem("helscoop_locale")||"fi";document.documentElement.lang=l}catch(e){}})()`
+          }}
+        />
         {/* Plausible Analytics — privacy-first, no cookies, GDPR-compliant */}
         <script
           defer
