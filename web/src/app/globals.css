@@ -1816,6 +1816,11 @@ select:focus {
   padding: 4px;
 }
 
+.nav-hamburger:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
 .nav-mobile-menu {
   display: none;
   flex-direction: column;
@@ -1936,6 +1941,11 @@ select:focus {
   color: var(--text-primary);
 }
 
+.chat-collapse-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
 .chat-expand-btn {
   display: flex;
   align-items: center;
@@ -1956,6 +1966,11 @@ select:focus {
 .chat-expand-btn:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
+}
+
+.chat-expand-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 .chat-msg {
@@ -2191,6 +2206,11 @@ select:focus {
 }
 .chat-suggestion-chip:active {
   transform: translateY(0);
+}
+
+.chat-suggestion-chip:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 .chat-skip-confirm {
@@ -3317,6 +3337,11 @@ select:focus {
 .api-ref-copy-btn:hover {
   color: var(--amber);
   background: var(--bg-hover);
+}
+
+.api-ref-copy-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 .api-ref-materials {
