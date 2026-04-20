@@ -307,6 +307,19 @@ export default function SceneEditor({
     ? errorLine - 1
     : -1;
 
+  /* ── Auto-scroll to error line when it changes ───────────────── */
+  useEffect(() => {
+    if (errorLineIdx < 0) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    // Scroll so the error line is roughly centred in the visible area
+    const lineHeight = 22.1;
+    const paddingTop = 20;
+    const targetScrollTop = paddingTop + errorLineIdx * lineHeight - ta.clientHeight / 2 + lineHeight;
+    ta.scrollTop = Math.max(0, targetScrollTop);
+    syncScroll();
+  }, [errorLineIdx, syncScroll]);
+
   /* ── Sync find-highlight overlay scroll with textarea ─────────── */
   useEffect(() => {
     const ta = textareaRef.current;
