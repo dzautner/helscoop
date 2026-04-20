@@ -24,8 +24,8 @@ CREATE INDEX IF NOT EXISTS idx_affiliate_partners_active
 CREATE TABLE IF NOT EXISTS affiliate_clicks (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  material_id UUID NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
-  supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+  material_id TEXT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+  supplier_id TEXT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
   partner_id  UUID REFERENCES affiliate_partners(id) ON DELETE SET NULL,
   click_url   TEXT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
