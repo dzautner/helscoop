@@ -69,7 +69,7 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
   const result = await query(
-    `UPDATE projects SET name=$1, description=$2, scene_js=$3, updated_at=now()
+    `UPDATE projects SET name=COALESCE($1, name), description=COALESCE($2, description), scene_js=COALESCE($3, scene_js), updated_at=now()
      WHERE id=$4 AND user_id=$5 RETURNING *`,
     [name?.trim(), description, scene_js, req.params.id, req.user!.id]
   );
