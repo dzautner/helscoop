@@ -1578,6 +1578,16 @@ const translations = {
       generatedAt: 'Generated',
       downloadJson: 'Download JSON',
     },
+    compliance: {
+      title: 'Building code compliance',
+      minCeilingHeight: 'Ceiling height {{height}}mm is below the required 2500mm (RakMK G1)',
+      minDoorWidth: 'Door opening width {{width}}mm is below the required 800mm (RakMK F1)',
+      handrailRequired: 'Handrail required — platform is at {{elevation}}mm elevation (RakMK F2)',
+      maxBuildingHeight: 'Building height {{height}}mm exceeds the allowed {{limit}}mm (MRL 115\u00A7)',
+      minRoomArea: 'Room area {{area}}m\u00B2 is below the required {{limit}}m\u00B2 (RakMK G1)',
+      passed: '{{count}} / {{total}} checks passed',
+      allPassed: 'All checks passed',
+    },
   },
 } as const;
 
