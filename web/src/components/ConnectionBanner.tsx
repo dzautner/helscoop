@@ -86,6 +86,8 @@ export default function ConnectionBanner() {
   return (
     <div
       className="anim-up"
+      role="status"
+      aria-live="polite"
       style={{
         position: "fixed",
         top: 0,

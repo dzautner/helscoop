@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import Link from "next/link";
 
-function UserAvatar({ name, onClick }: { name: string; onClick?: () => void }) {
+function UserAvatar({ name, onClick, expanded }: { name: string; onClick?: () => void; expanded: boolean }) {
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -18,6 +18,8 @@ function UserAvatar({ name, onClick }: { name: string; onClick?: () => void }) {
     <button
       onClick={onClick}
       aria-label={`User menu for ${name}`}
+      aria-haspopup="true"
+      aria-expanded={expanded}
       style={{
         width: 44,
         height: 44,
@@ -47,10 +49,29 @@ function UserAvatar({ name, onClick }: { name: string; onClick?: () => void }) {
 export default function UserMenu({ userName }: { userName: string }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, closeMenu]);
 
   return (
-    <div style={{ position: "relative" }}>
-      <UserAvatar name={userName} onClick={() => setOpen(!open)} />
+    <div style={{ position: "relative" }} ref={triggerRef}>
+      <UserAvatar name={userName} onClick={() => setOpen(!open)} expanded={open} />
       {open && (
         <>
           {/* Backdrop to close menu */}
@@ -60,6 +81,8 @@ export default function UserMenu({ userName }: { userName: string }) {
           />
           <div
             className="card anim-fade"
+            role="menu"
+            aria-label={`${userName} menu`}
             style={{
               position: "absolute",
               right: 0,
@@ -85,12 +108,14 @@ export default function UserMenu({ userName }: { userName: string }) {
             <Link
               href="/settings"
               className="menu-item"
+              role="menuitem"
               onClick={() => setOpen(false)}
             >
               {t("nav.settings")}
             </Link>
             <button
               className="menu-item"
+              role="menuitem"
               onClick={() => {
                 setToken(null);
                 window.location.reload();
