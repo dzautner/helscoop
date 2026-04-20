@@ -39,6 +39,7 @@
 
   --danger: #ef4444;
   --danger-dim: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.2);
 
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.1);
@@ -138,6 +139,7 @@
 
   --danger: #dc2626;
   --danger-dim: rgba(220, 38, 38, 0.06);
+  --danger-border: rgba(220, 38, 38, 0.12);
 
   --warning: #ca8a04;
   --warning-dim: rgba(202, 138, 4, 0.08);
