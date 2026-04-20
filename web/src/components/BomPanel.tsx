@@ -1390,6 +1390,83 @@ function BomItemCard({
   );
 }
 
+/* ── CSV BOM export ────────────────────────────────────────── */
+
+/** Escape a CSV field: wrap in quotes if it contains the separator, quotes, or newlines */
+function escapeCsvField(value: string, separator: string): string {
+  if (value.includes(separator) || value.includes('"') || value.includes('\n')) {
+    return '"' + value.replace(/"/g, '""') + '"';
+  }
+  return value;
+}
+
+/**
+ * Generate a CSV string from BOM data with locale-aware formatting.
+ * Finnish locale: semicolon separator, comma decimal separator.
+ * English locale: comma separator, dot decimal separator.
+ */
+function generateBomCsv(
+  bom: BomItem[],
+  materials: Material[],
+  locale: string,
+  t: (key: string) => string,
+): string {
+  const isFi = locale === 'fi';
+  const sep = isFi ? ';' : ',';
+
+  const formatNumber = (n: number): string => {
+    const s = n.toFixed(2);
+    return isFi ? s.replace('.', ',') : s;
+  };
+
+  const headers = [
+    t('bom.csvMaterial'),
+    t('bom.csvQuantity'),
+    t('bom.csvUnit'),
+    t('bom.csvUnitPrice'),
+    t('bom.csvTotal'),
+    t('bom.csvSupplier'),
+    t('bom.csvCategory'),
+  ];
+
+  const rows = bom.map((item) => {
+    const mat = materials.find((m) => m.id === item.material_id);
+    const name = mat
+      ? getLocalizedMaterialName(mat, locale)
+      : item.material_name || item.material_id;
+    const supplier = item.supplier
+      || (mat?.pricing?.[0]?.supplier_name)
+      || '';
+    const category = item.category_name
+      || mat?.category_name
+      || '';
+
+    return [
+      escapeCsvField(name, sep),
+      formatNumber(item.quantity),
+      escapeCsvField(item.unit || '', sep),
+      formatNumber(item.unit_price ?? 0),
+      formatNumber(item.total ?? 0),
+      escapeCsvField(supplier, sep),
+      escapeCsvField(category, sep),
+    ].join(sep);
+  });
+
+  // UTF-8 BOM for Excel compatibility with Finnish characters
+  return '\uFEFF' + headers.map((h) => escapeCsvField(h, sep)).join(sep) + '\n' + rows.join('\n') + '\n';
+}
+
+/** Trigger a browser download of a CSV string */
+function downloadCsv(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function BomPanel({
   bom,
   materials,
@@ -1398,6 +1475,7 @@ export default function BomPanel({
   onUpdateQty,
   style,
   sceneJs,
+  projectName,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -1407,6 +1485,8 @@ export default function BomPanel({
   style?: React.CSSProperties;
   /** Scene script for extracting material declarations */
   sceneJs?: string;
+  /** Project name for export filenames */
+  projectName?: string;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -1654,6 +1734,52 @@ export default function BomPanel({
         )}
         {bom.length > 0 && (
           <QuoteSummary bom={bom} materials={materials} />
+        )}
+        {bom.length > 0 && (
+          <button
+            onClick={() => {
+              const date = new Date().toISOString().slice(0, 10);
+              const safeName = (projectName || 'project').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-_äöåÄÖÅ]/g, '');
+              const filename = `helscoop-bom-${safeName}-${date}.csv`;
+              const csv = generateBomCsv(bom, materials, locale, t);
+              downloadCsv(csv, filename);
+            }}
+            aria-label={t('bom.exportCsv')}
+            style={{
+              marginTop: 10,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "var(--font-body)",
+              color: "var(--text-secondary)",
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-secondary)";
+              e.currentTarget.style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--bg-tertiary)";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="3" y1="15" x2="21" y2="15" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
+            {t('bom.exportCsv')}
+          </button>
         )}
       </div>
 

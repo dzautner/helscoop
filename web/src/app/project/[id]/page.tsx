@@ -1581,6 +1581,7 @@ export default function ProjectPage() {
               onUpdateQty={updateBomQty}
               style={{ width: bomWidth }}
               sceneJs={sceneJs}
+              projectName={projectName}
             />
           </>
         )}

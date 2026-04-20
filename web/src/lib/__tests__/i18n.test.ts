@@ -554,6 +554,10 @@ describe("exhaustive i18n key parity", () => {
     "landing.feature3Title", "landing.feature3Desc",
     // building
     "building.omakotitalo", "building.rivitalo", "building.kerrostalo", "building.paritalo",
+    // bom
+    "bom.donutChartAriaLabel", "bom.exportCsv",
+    "bom.csvMaterial", "bom.csvQuantity", "bom.csvUnit",
+    "bom.csvUnitPrice", "bom.csvTotal", "bom.csvSupplier", "bom.csvCategory",
     // viewport
     "viewport.contextMenuLabel",
   ];
