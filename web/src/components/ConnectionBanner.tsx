@@ -149,28 +149,9 @@ export default function ConnectionBanner() {
 
   return (
     <div
-      className="anim-up"
+      className={`anim-up connection-banner ${isReconnected ? "connection-banner--ok" : "connection-banner--error"}`}
       role="status"
       aria-live="polite"
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        padding: "8px 16px",
-        background: isReconnected ? "var(--forest)" : "var(--amber)",
-        color: isReconnected ? "var(--text-primary)" : "var(--bg-primary)",
-        fontSize: 13,
-        fontWeight: 500,
-        textAlign: "center",
-        fontFamily: "var(--font-body)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        transition: "background 0.3s ease",
-      }}
     >
       {!isReconnected && (
         <svg
@@ -210,18 +191,7 @@ export default function ConnectionBanner() {
       {!isReconnected && (
         <button
           onClick={handleRetryNow}
-          style={{
-            marginLeft: 8,
-            padding: "2px 10px",
-            fontSize: 12,
-            fontWeight: 600,
-            fontFamily: "var(--font-body)",
-            background: "var(--bg-primary)",
-            color: "var(--amber)",
-            border: "none",
-            borderRadius: 4,
-            cursor: "pointer",
-          }}
+          className="connection-banner-retry"
         >
           {t("errors.retryNow")}
         </button>
