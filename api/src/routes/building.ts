@@ -184,10 +184,14 @@ function generateGenericBuilding(address: string): BuildingData {
     bom_suggestion: [
       { material_id: "pine_48x148_c24", quantity: Math.round(area * 0.6), unit: "jm" },
       { material_id: "pine_48x98_c24", quantity: Math.round(area * 0.4), unit: "jm" },
-      { material_id: "osb_11mm", quantity: Math.round(area * 0.35), unit: "m2" },
-      { material_id: "mineral_wool_150", quantity: Math.round(area * 0.7), unit: "m2" },
-      { material_id: "concrete_c25", quantity: Math.round(area * 0.06 * 10) / 10, unit: "m3" },
-      { material_id: "metal_roof_ruukki", quantity: Math.round(area * 0.55), unit: "m2" },
+      // osb_9mm: OSB 9mm sheathing sheets (2400×1200 mm ≈ 2.88 m²/sheet; area*0.35 m² → sheets)
+      { material_id: "osb_9mm", quantity: Math.ceil(area * 0.35 / 2.88), unit: "sheet" },
+      // insulation_100mm: Mineraalivilla 100mm, priced per sqm
+      { material_id: "insulation_100mm", quantity: Math.round(area * 0.7), unit: "sqm" },
+      // concrete_block: Betoniharkko 200mm, priced per kpl (~13 blocks/m³)
+      { material_id: "concrete_block", quantity: Math.round(area * 0.06 * 13), unit: "kpl" },
+      // galvanized_roofing: Peltikatto Sinkitty (Ruukki), priced per sqm
+      { material_id: "galvanized_roofing", quantity: Math.round(area * 0.55), unit: "sqm" },
     ],
   };
 }
