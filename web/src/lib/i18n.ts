@@ -659,6 +659,14 @@ const translations = {
     },
     bom: {
       donutChartAriaLabel: 'Kustannuserittelyn kaavio: {{categories}}',
+      exportCsv: 'Lataa CSV',
+      csvMaterial: 'Materiaali',
+      csvQuantity: 'Määrä',
+      csvUnit: 'Yksikkö',
+      csvUnitPrice: 'Yksikköhinta',
+      csvTotal: 'Yhteensä',
+      csvSupplier: 'Toimittaja',
+      csvCategory: 'Kategoria',
     },
     upgrade: {
       title: 'Päivitä tilaus',
@@ -1350,6 +1358,14 @@ const translations = {
     },
     bom: {
       donutChartAriaLabel: 'Cost breakdown chart: {{categories}}',
+      exportCsv: 'Download CSV',
+      csvMaterial: 'Material',
+      csvQuantity: 'Quantity',
+      csvUnit: 'Unit',
+      csvUnitPrice: 'Unit Price',
+      csvTotal: 'Total',
+      csvSupplier: 'Supplier',
+      csvCategory: 'Category',
     },
     upgrade: {
       title: 'Upgrade your plan',
