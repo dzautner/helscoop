@@ -1,7 +1,25 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+
+/* ── Find / Replace helpers ──────────────────────────────────────── */
+interface FindMatch {
+  start: number;
+  end: number;
+}
+
+function findAllMatches(text: string, query: string): FindMatch[] {
+  if (!query) return [];
+  const matches: FindMatch[] = [];
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(escaped, "gi");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    matches.push({ start: m.index, end: m.index + m[0].length });
+  }
+  return matches;
+}
 
 /* ── Syntax highlighting colours ─────────────────────────────────── */
 const COLORS = {
@@ -104,9 +122,71 @@ export default function SceneEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLPreElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [cursorLine, setCursorLine] = useState<number>(0);
   const [isFocused, setIsFocused] = useState(false);
+
+  /* ── Find / Replace state ────────────────────────────────────── */
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [replaceValue, setReplaceValue] = useState("");
+  const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
+
+  const findMatches = useMemo(() => findAllMatches(sceneJs, findQuery), [sceneJs, findQuery]);
+
+  // Clamp currentMatchIdx when matches change
+  useEffect(() => {
+    if (findMatches.length === 0) {
+      setCurrentMatchIdx(0);
+    } else if (currentMatchIdx >= findMatches.length) {
+      setCurrentMatchIdx(0);
+    }
+  }, [findMatches.length, currentMatchIdx]);
+
+  const openFindReplace = useCallback(() => {
+    setShowFindReplace(true);
+    setTimeout(() => findInputRef.current?.focus(), 0);
+  }, []);
+
+  const closeFindReplace = useCallback(() => {
+    setShowFindReplace(false);
+    setFindQuery("");
+    setReplaceValue("");
+    setCurrentMatchIdx(0);
+    textareaRef.current?.focus();
+  }, []);
+
+  const goToNextMatch = useCallback(() => {
+    if (findMatches.length === 0) return;
+    setCurrentMatchIdx((prev) => (prev + 1) % findMatches.length);
+  }, [findMatches.length]);
+
+  const goToPrevMatch = useCallback(() => {
+    if (findMatches.length === 0) return;
+    setCurrentMatchIdx((prev) => (prev - 1 + findMatches.length) % findMatches.length);
+  }, [findMatches.length]);
+
+  const replaceCurrent = useCallback(() => {
+    if (findMatches.length === 0 || !findQuery) return;
+    const match = findMatches[currentMatchIdx];
+    if (!match) return;
+    const newCode = sceneJs.slice(0, match.start) + replaceValue + sceneJs.slice(match.end);
+    onChange(newCode);
+    // After replacement the match at currentMatchIdx is gone; keep index clamped
+    if (currentMatchIdx >= findMatches.length - 1 && currentMatchIdx > 0) {
+      setCurrentMatchIdx(currentMatchIdx - 1);
+    }
+  }, [findMatches, currentMatchIdx, findQuery, replaceValue, sceneJs, onChange]);
+
+  const replaceAll = useCallback(() => {
+    if (findMatches.length === 0 || !findQuery) return;
+    const escaped = findQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(escaped, "gi");
+    onChange(sceneJs.replace(re, replaceValue));
+    setCurrentMatchIdx(0);
+  }, [findMatches.length, findQuery, replaceValue, sceneJs, onChange]);
 
   /* ── Scroll sync ──────────────────────────────────────────────── */
   const syncScroll = useCallback(() => {
@@ -121,6 +201,20 @@ export default function SceneEditor({
     }
   }, []);
 
+  // Scroll textarea so the current match is visible
+  useEffect(() => {
+    if (findMatches.length === 0) return;
+    const match = findMatches[currentMatchIdx];
+    if (!match) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    // Compute line number of the match
+    const linesBefore = sceneJs.slice(0, match.start).split("\n").length - 1;
+    const targetScrollTop = linesBefore * 22.1 - ta.clientHeight / 2 + 22.1;
+    ta.scrollTop = Math.max(0, targetScrollTop);
+    syncScroll();
+  }, [currentMatchIdx, findMatches, sceneJs, syncScroll]);
+
   /* ── Track cursor line ────────────────────────────────────────── */
   const updateCursorLine = useCallback(() => {
     const ta = textareaRef.current;
@@ -133,6 +227,37 @@ export default function SceneEditor({
   /* ── Highlighted HTML ─────────────────────────────────────────── */
   const lines = sceneJs.split("\n");
   const highlightedHtml = lines.map((l) => highlightLine(l)).join("\n");
+
+  /* ── Find-match highlight overlay HTML ───────────────────────── */
+  const findHighlightRef = useRef<HTMLPreElement>(null);
+  const findHighlightHtml = useMemo(() => {
+    if (findMatches.length === 0) return "";
+    // Build the text with invisible characters except where matches are highlighted
+    const parts: string[] = [];
+    let last = 0;
+    for (let i = 0; i < findMatches.length; i++) {
+      const m = findMatches[i];
+      // Invisible text before this match (still needed for positioning)
+      if (m.start > last) {
+        parts.push(`<span style="visibility:hidden">${escapeHtml(sceneJs.slice(last, m.start))}</span>`);
+      }
+      const isCurrent = i === currentMatchIdx;
+      const bg = isCurrent
+        ? "rgba(229, 160, 75, 0.45)"
+        : "rgba(229, 160, 75, 0.2)";
+      const border = isCurrent
+        ? "1px solid rgba(229, 160, 75, 0.7)"
+        : "1px solid rgba(229, 160, 75, 0.3)";
+      parts.push(
+        `<mark style="background:${bg};border:${border};border-radius:2px;color:transparent">${escapeHtml(sceneJs.slice(m.start, m.end))}</mark>`
+      );
+      last = m.end;
+    }
+    if (last < sceneJs.length) {
+      parts.push(`<span style="visibility:hidden">${escapeHtml(sceneJs.slice(last))}</span>`);
+    }
+    return parts.join("");
+  }, [findMatches, currentMatchIdx, sceneJs]);
 
   /* ── Shared text style (keep textarea + overlay pixel-identical) */
   const sharedStyle: React.CSSProperties = {
@@ -182,8 +307,31 @@ export default function SceneEditor({
     ? errorLine - 1
     : -1;
 
+  /* ── Sync find-highlight overlay scroll with textarea ─────────── */
+  useEffect(() => {
+    const ta = textareaRef.current;
+    const fh = findHighlightRef.current;
+    if (!ta || !fh) return;
+    const handler = () => {
+      fh.scrollTop = ta.scrollTop;
+      fh.scrollLeft = ta.scrollLeft;
+    };
+    ta.addEventListener("scroll", handler);
+    return () => ta.removeEventListener("scroll", handler);
+  }, [findMatches.length]);
+
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    <div
+      ref={containerRef}
+      onKeyDown={(e) => {
+        // Ctrl+F / Cmd+F — open find/replace
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          openFindReplace();
+        }
+      }}
+      style={{ flex: 1, display: "flex", flexDirection: "column" }}
+    >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{
@@ -203,6 +351,205 @@ export default function SceneEditor({
           {t("editor.scene")}
         </span>
       </div>
+
+      {/* ── Find / Replace bar ──────────────────────────────────── */}
+      {showFindReplace && (
+        <div
+          role="search"
+          aria-label={t("editor.find")}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              closeFindReplace();
+            }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              goToNextMatch();
+            }
+            if (e.key === "Enter" && e.shiftKey) {
+              e.preventDefault();
+              goToPrevMatch();
+            }
+          }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: "8px 12px",
+            marginBottom: 4,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+            fontSize: 12,
+          }}
+        >
+          {/* Find row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              ref={findInputRef}
+              type="text"
+              value={findQuery}
+              onChange={(e) => {
+                setFindQuery(e.target.value);
+                setCurrentMatchIdx(0);
+              }}
+              placeholder={t("editor.find")}
+              aria-label={t("editor.find")}
+              style={{
+                flex: 1,
+                padding: "4px 8px",
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                outline: "none",
+              }}
+            />
+            <span style={{
+              fontSize: 11,
+              color: "var(--text-muted)",
+              minWidth: 52,
+              textAlign: "center",
+              flexShrink: 0,
+            }}>
+              {findQuery
+                ? findMatches.length > 0
+                  ? `${currentMatchIdx + 1} / ${findMatches.length}`
+                  : t("editor.noMatches")
+                : ""}
+            </span>
+            <button
+              onClick={goToPrevMatch}
+              disabled={findMatches.length === 0}
+              title={t("editor.findPrevious")}
+              aria-label={t("editor.findPrevious")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                padding: 0,
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: findMatches.length > 0 ? "var(--text-secondary)" : "var(--text-muted)",
+                cursor: findMatches.length > 0 ? "pointer" : "default",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+            </button>
+            <button
+              onClick={goToNextMatch}
+              disabled={findMatches.length === 0}
+              title={t("editor.findNext")}
+              aria-label={t("editor.findNext")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                padding: 0,
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: findMatches.length > 0 ? "var(--text-secondary)" : "var(--text-muted)",
+                cursor: findMatches.length > 0 ? "pointer" : "default",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+            <button
+              onClick={closeFindReplace}
+              title={t("editor.closeFindReplace")}
+              aria-label={t("editor.closeFindReplace")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                padding: 0,
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+
+          {/* Replace row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="text"
+              value={replaceValue}
+              onChange={(e) => setReplaceValue(e.target.value)}
+              placeholder={t("editor.replace")}
+              aria-label={t("editor.replace")}
+              style={{
+                flex: 1,
+                padding: "4px 8px",
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={replaceCurrent}
+              disabled={findMatches.length === 0}
+              title={t("editor.replaceOne")}
+              aria-label={t("editor.replaceOne")}
+              style={{
+                padding: "4px 10px",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: findMatches.length > 0 ? "var(--text-secondary)" : "var(--text-muted)",
+                cursor: findMatches.length > 0 ? "pointer" : "default",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {t("editor.replaceOne")}
+            </button>
+            <button
+              onClick={replaceAll}
+              disabled={findMatches.length === 0}
+              title={t("editor.replaceAll")}
+              aria-label={t("editor.replaceAll")}
+              style={{
+                padding: "4px 10px",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                color: findMatches.length > 0 ? "var(--text-secondary)" : "var(--text-muted)",
+                cursor: findMatches.length > 0 ? "pointer" : "default",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {t("editor.replaceAll")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Editor container */}
       <div
@@ -284,6 +631,29 @@ export default function SceneEditor({
             />
           )}
 
+          {/* Find-match highlight overlay */}
+          {findMatches.length > 0 && (
+            <pre
+              ref={findHighlightRef}
+              aria-hidden
+              style={{
+                ...sharedStyle,
+                paddingLeft: 20,
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                overflow: "hidden",
+                pointerEvents: "none",
+                color: "transparent",
+                zIndex: 1,
+                background: "transparent",
+              }}
+              dangerouslySetInnerHTML={{ __html: findHighlightHtml }}
+            />
+          )}
+
           {/* Syntax-highlighted overlay */}
           <pre
             ref={overlayRef}
@@ -299,7 +669,7 @@ export default function SceneEditor({
               overflow: "hidden",
               pointerEvents: "none",
               color: COLORS.default,
-              zIndex: 1,
+              zIndex: 2,
               background: "transparent",
             }}
             dangerouslySetInnerHTML={{ __html: highlightedHtml + "\n" }}
@@ -331,11 +701,16 @@ export default function SceneEditor({
               color: "transparent",
               caretColor: "var(--text-primary)",
               outline: "none",
-              zIndex: 2,
+              zIndex: 3,
               overflow: "auto",
               border: "none",
             }}
             onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+                e.preventDefault();
+                openFindReplace();
+                return;
+              }
               if (e.key === "Tab") {
                 e.preventDefault();
                 const target = e.target as HTMLTextAreaElement;
@@ -360,7 +735,7 @@ export default function SceneEditor({
                 top: 20 + (errorLineIdx + 1) * 22.1,
                 left: 20,
                 right: 8,
-                zIndex: 3,
+                zIndex: 4,
                 pointerEvents: "none",
               }}
             >
