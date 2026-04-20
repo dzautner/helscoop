@@ -547,11 +547,27 @@ export default function Viewport3D({
     fillLight.position.set(-4, 3, -2);
     scene.add(fillLight);
 
-    // Grid floor
-    const gridHelper = new THREE.GridHelper(20, 20, 0x333333, 0x222222);
-    (gridHelper.material as THREE.Material).opacity = 0.15;
-    (gridHelper.material as THREE.Material).transparent = true;
-    scene.add(gridHelper);
+    // Grid floor — major lines every 5 units, minor every 1 unit
+    const gridMinor = new THREE.GridHelper(40, 40, 0x2a2a2a, 0x2a2a2a);
+    (gridMinor.material as THREE.Material).opacity = 0.12;
+    (gridMinor.material as THREE.Material).transparent = true;
+    scene.add(gridMinor);
+    const gridMajor = new THREE.GridHelper(40, 8, 0x3a3a3a, 0x3a3a3a);
+    (gridMajor.material as THREE.Material).opacity = 0.25;
+    (gridMajor.material as THREE.Material).transparent = true;
+    gridMajor.position.y = 0.001;
+    scene.add(gridMajor);
+
+    // XYZ axes at origin — warm-shifted colors matching the palette
+    const axesHelper = new THREE.AxesHelper(1.5);
+    axesHelper.setColors(
+      new THREE.Color(0xe05555),
+      new THREE.Color(0x55b855),
+      new THREE.Color(0x5588dd),
+    );
+    (axesHelper.material as THREE.Material).transparent = true;
+    (axesHelper.material as THREE.Material).opacity = 0.6;
+    scene.add(axesHelper);
 
     // Depth fog
     scene.fog = new THREE.Fog(0x1a1d22, 30, 120);
