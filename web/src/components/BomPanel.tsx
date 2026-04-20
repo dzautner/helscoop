@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { SkeletonPriceComparison } from "@/components/Skeleton";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -871,7 +872,7 @@ function BomItemCard({
   locale,
   index,
   isFocused,
-  onRemove,
+  onRequestRemove,
   onUpdateQty,
   onCompare,
   onNavigate,
@@ -882,7 +883,7 @@ function BomItemCard({
   locale: string;
   index: number;
   isFocused: boolean;
-  onRemove: (materialId: string) => void;
+  onRequestRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   onCompare: (id: string, name: string) => void;
   onNavigate: (direction: "up" | "down" | "next") => void;
@@ -998,12 +999,7 @@ function BomItemCard({
         // Only trigger remove if focus is on the card, not the input
         if (document.activeElement === cardRef.current) {
           e.preventDefault();
-          const confirmed = window.confirm(
-            t('editor.confirmRemoveItem', { name: materialName })
-          );
-          if (confirmed) {
-            onRemove(item.material_id);
-          }
+          onRequestRemove(item.material_id);
         }
         break;
       case " ":
@@ -1046,7 +1042,7 @@ function BomItemCard({
           className="bom-remove-btn"
           tabIndex={-1}
           aria-label={t('editor.removeMaterial', { name: materialName })}
-          onClick={(e) => { e.stopPropagation(); onRemove(item.material_id); }}
+          onClick={(e) => { e.stopPropagation(); onRequestRemove(item.material_id); }}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -1116,6 +1112,7 @@ export default function BomPanel({
   const [quickAddQty, setQuickAddQty] = useState(1);
   const [focusedBomIndex, setFocusedBomIndex] = useState(-1);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -1438,7 +1435,7 @@ export default function BomPanel({
               locale={locale}
               index={idx}
               isFocused={focusedBomIndex === idx}
-              onRemove={onRemove}
+              onRequestRemove={setPendingDelete}
               onUpdateQty={onUpdateQty}
               onCompare={(id, name) => setCompareMaterial({ id, name })}
               onNavigate={(dir) => handleBomNavigate(idx, dir)}
@@ -1704,6 +1701,29 @@ export default function BomPanel({
           onClose={() => setCompareMaterial(null)}
         />
       )}
+
+      {/* BOM item delete confirmation dialog */}
+      {(() => {
+        const pendingItem = pendingDelete ? bom.find((b) => b.material_id === pendingDelete) : null;
+        const pendingName = pendingItem
+          ? getLocalizedBomItemName(pendingItem, materials, locale)
+          : "";
+        return (
+          <ConfirmDialog
+            open={pendingDelete !== null}
+            title={t("dialog.deleteBomItemTitle")}
+            message={t("dialog.deleteBomItemMessage", { name: pendingName })}
+            confirmText={t("project.delete")}
+            cancelText={t("dialog.cancel")}
+            variant="danger"
+            onConfirm={() => {
+              if (pendingDelete) onRemove(pendingDelete);
+              setPendingDelete(null);
+            }}
+            onCancel={() => setPendingDelete(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -402,6 +402,8 @@ const translations = {
       permanentDeleteMessage: 'Haluatko varmasti poistaa tämän projektin pysyvästi? Tätä toimintoa ei voi kumota.',
       deleteAccountTitle: 'Poista tili',
       deleteAccountMessage: 'Haluatko varmasti poistaa tilisi? Kaikki projektisi ja tietosi poistetaan pysyvästi. Tätä toimintoa ei voi kumota.',
+      deleteBomItemTitle: 'Poista materiaali',
+      deleteBomItemMessage: 'Poistetaanko {{name}} materiaalilistasta?',
     },
     admin: {
       adminPanel: 'Hallintapaneeli',
@@ -1013,6 +1015,8 @@ const translations = {
       permanentDeleteMessage: 'Are you sure you want to permanently delete this project? This action cannot be undone.',
       deleteAccountTitle: 'Delete account',
       deleteAccountMessage: 'Are you sure you want to delete your account? All your projects and data will be permanently deleted. This cannot be undone.',
+      deleteBomItemTitle: 'Remove material',
+      deleteBomItemMessage: 'Remove {{name}} from the material list?',
     },
     admin: {
       adminPanel: 'Admin panel',
