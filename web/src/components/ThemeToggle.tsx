@@ -1,19 +1,26 @@
 "use client";
 
 import { useTheme } from "@/components/ThemeProvider";
+import { useTranslation } from "@/components/LocaleProvider";
 
 export function ThemeToggle() {
   const { theme, toggle } = useTheme();
+  const { t } = useTranslation();
 
-  const label =
-    theme === "dark" ? "Dark" : theme === "light" ? "Light" : "Auto";
+  const labelKey =
+    theme === "dark"
+      ? "aria.themeDark"
+      : theme === "light"
+        ? "aria.themeLight"
+        : "aria.themeAuto";
+  const label = t(labelKey);
 
   return (
     <button
       className="lang-switch"
       onClick={toggle}
-      title={`Theme: ${label}`}
-      aria-label={`Theme: ${label}`}
+      title={label}
+      aria-label={label}
       style={{ gap: 5 }}
     >
       {theme === "dark" && (

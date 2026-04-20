@@ -533,6 +533,8 @@ describe("exhaustive i18n key parity", () => {
     "validation.unmatchedCloser", "validation.unmatchedOpener", "validation.typoDetected",
     "validation.undefinedIdentifier", "validation.emptyScene", "validation.tooManyObjects",
     "validation.farFromOrigin", "validation.invalidDimension", "validation.warningsTitle",
+    // aria
+    "aria.switchLanguage", "aria.themeDark", "aria.themeLight", "aria.themeAuto",
     // errors
     "errors.notFoundTitle", "errors.notFoundMessage", "errors.backToProjects",
     "errors.searchAddress", "errors.serverErrorTitle", "errors.serverErrorMessage",
