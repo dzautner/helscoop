@@ -200,31 +200,41 @@ export default function ViewportContextMenu({ items, position, onClose }: Viewpo
                 <path d={item.icon} />
               </svg>
             </button>
-            {/* Label tooltip */}
-            {isHovered && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  top: y < 0 ? -8 : BUTTON_SIZE + 8,
-                  transform: "translateX(-50%)",
-                  whiteSpace: "nowrap",
-                  fontSize: 11,
-                  fontFamily: "var(--font-body)",
-                  fontWeight: 500,
-                  color: "var(--text-primary)",
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border-strong)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "4px 8px",
-                  boxShadow: "var(--shadow-md)",
-                  pointerEvents: "none",
-                  animation: "fadeIn 0.1s ease",
-                }}
-              >
-                {item.label}
-              </div>
-            )}
+            {/* Label tooltip — position based on quadrant */}
+            {isHovered && (() => {
+              const isTop = y < -BUTTON_SIZE / 4;
+              const isBottom = y > BUTTON_SIZE / 4;
+              const isLeft = x < -BUTTON_SIZE / 4;
+              const isRight = x > BUTTON_SIZE / 4;
+              const tooltipStyle: React.CSSProperties = {
+                position: "absolute",
+                whiteSpace: "nowrap",
+                maxWidth: 160,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                fontSize: 11,
+                fontFamily: "var(--font-body)",
+                fontWeight: 500,
+                color: "var(--text-primary)",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--radius-sm)",
+                padding: "4px 8px",
+                boxShadow: "var(--shadow-md)",
+                pointerEvents: "none",
+                animation: "fadeIn 0.1s ease",
+              };
+              if (isLeft && !isTop && !isBottom) {
+                Object.assign(tooltipStyle, { right: BUTTON_SIZE + 8, top: "50%", transform: "translateY(-50%)" });
+              } else if (isRight && !isTop && !isBottom) {
+                Object.assign(tooltipStyle, { left: BUTTON_SIZE + 8, top: "50%", transform: "translateY(-50%)" });
+              } else if (isTop) {
+                Object.assign(tooltipStyle, { left: "50%", bottom: BUTTON_SIZE + 8, transform: "translateX(-50%)" });
+              } else {
+                Object.assign(tooltipStyle, { left: "50%", top: BUTTON_SIZE + 8, transform: "translateX(-50%)" });
+              }
+              return <div style={tooltipStyle}>{item.label}</div>;
+            })()}
           </div>
         );
       })}
