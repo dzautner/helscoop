@@ -6,6 +6,9 @@ let token: string | null = null;
 // Set when we receive `token_expires_at` from the API (login, register, refresh).
 let tokenExpiresAt: number | null = null;
 
+// Background refresh timer handle — see scheduleProactiveRefresh() below.
+let _refreshTimerId: ReturnType<typeof setTimeout> | null = null;
+
 export function setToken(t: string | null, expiresAt?: number) {
   token = t;
   tokenExpiresAt = expiresAt ?? null;
@@ -16,6 +19,8 @@ export function setToken(t: string | null, expiresAt?: number) {
     localStorage.removeItem("helscoop_token");
     localStorage.removeItem("helscoop_token_expires_at");
   }
+  // (Re-)schedule the background refresh timer whenever the token changes.
+  _scheduleProactiveRefresh();
 }
 
 export function getToken(): string | null {
@@ -103,6 +108,52 @@ function tokenNeedsRefresh(): boolean {
   if (!tokenExpiresAt) return false;
   const nowSeconds = Math.floor(Date.now() / 1000);
   return tokenExpiresAt - nowSeconds < REFRESH_THRESHOLD_SECONDS;
+}
+
+// ---------------------------------------------------------------------------
+// Background refresh timer — proactively refreshes the token at ~80% of its
+// lifetime so the session stays alive even during long idle editing sessions.
+// This fires even when no API requests are being made (e.g. user is editing
+// scene code for 15+ minutes without saving).  The timer is automatically
+// (re-)scheduled every time setToken is called (login, register, refresh).
+// ---------------------------------------------------------------------------
+
+/** Schedule a background refresh based on the current token's expiry. */
+function _scheduleProactiveRefresh(): void {
+  // Clear any existing timer first
+  if (_refreshTimerId !== null) {
+    clearTimeout(_refreshTimerId);
+    _refreshTimerId = null;
+  }
+
+  // Nothing to schedule if there's no token or no expiry info
+  if (!token || !tokenExpiresAt) return;
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const ttl = tokenExpiresAt - nowSeconds; // seconds until expiry
+  if (ttl <= 0) return; // already expired, nothing to schedule
+
+  // Fire at 80% of lifetime (e.g. 12 min into a 15 min token).
+  // The callback will call refreshOnce() which calls setToken() on success,
+  // which in turn re-schedules this timer — creating a self-sustaining cycle.
+  const refreshInMs = Math.max(ttl * 0.8, 1) * 1000;
+
+  _refreshTimerId = setTimeout(async () => {
+    _refreshTimerId = null;
+    if (getToken()) {
+      await refreshOnce();
+      // If refresh succeeded, setToken was called and a new timer is already scheduled.
+      // If refresh failed, no new timer — the next apiFetch will attempt a 401 refresh.
+    }
+  }, refreshInMs);
+}
+
+/** Stop the background refresh timer (e.g. on logout). */
+export function stopRefreshTimer(): void {
+  if (_refreshTimerId !== null) {
+    clearTimeout(_refreshTimerId);
+    _refreshTimerId = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
