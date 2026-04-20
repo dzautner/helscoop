@@ -78,7 +78,7 @@ export default function ProjectCard({
           </div>
         </div>
         <div className="project-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: 10 }}>
-          <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => (router.push(`/project/${project.id}`))}>
+          <button className="btn btn-ghost" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", fontSize: 11, gap: 4 }} aria-label={t('project.openAriaLabel', { name: project.name })} onClick={() => (router.push(`/project/${project.id}`))}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               <polyline points="15 3 21 3 21 9" />
@@ -86,14 +86,14 @@ export default function ProjectCard({
             </svg>
             {t('project.open')}
           </button>
-          <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => onDuplicate(project.id)}>
+          <button className="btn btn-ghost" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", fontSize: 11, gap: 4 }} aria-label={t('project.copyAriaLabel', { name: project.name })} onClick={() => onDuplicate(project.id)}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
             {t('project.copy')}
           </button>
-          <button className="btn btn-danger" style={{ padding: "5px 10px", fontSize: 11, gap: 4 }} onClick={() => onDelete(project.id)}>
+          <button className="btn btn-danger" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", fontSize: 11, gap: 4 }} aria-label={t('project.deleteAriaLabel', { name: project.name })} onClick={() => onDelete(project.id)}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6" />
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
