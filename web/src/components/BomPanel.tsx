@@ -240,6 +240,10 @@ function CostBreakdownChart({
       >
         {/* Donut */}
         <div
+          role="img"
+          aria-label={t('bom.donutChartAriaLabel', {
+            categories: slices.map((s) => `${s.name} ${s.pct.toFixed(0)}%`).join(', '),
+          })}
           style={{
             width: 100,
             height: 100,
@@ -348,7 +352,7 @@ function Sparkline({
     .join(" ");
 
   return (
-    <svg width={width} height={height} style={{ display: "block", flexShrink: 0 }}>
+    <svg width={width} height={height} aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
       <polyline
         points={points}
         fill="none"
