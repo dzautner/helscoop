@@ -110,6 +110,11 @@ export const api = {
     apiFetch(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteProject: (id: string) =>
     apiFetch(`/projects/${id}`, { method: "DELETE" }),
+  getTrashProjects: () => apiFetch("/projects/trash"),
+  restoreProject: (id: string) =>
+    apiFetch(`/projects/${id}/restore`, { method: "POST" }),
+  permanentDeleteProject: (id: string) =>
+    apiFetch(`/projects/${id}/permanent`, { method: "DELETE" }),
   duplicateProject: (id: string) =>
     apiFetch(`/projects/${id}/duplicate`, { method: "POST" }),
   saveThumbnail: (id: string, thumbnail: string) =>

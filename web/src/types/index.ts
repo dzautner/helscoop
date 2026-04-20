@@ -18,6 +18,7 @@ export interface Project {
   estimated_cost: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   scene_js?: string | null;
   display_scale?: number;
   thumbnail_url?: string | null;
