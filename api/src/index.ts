@@ -22,6 +22,7 @@ import adminRouter from "./routes/admin";
 import affiliatesRouter from "./routes/affiliates";
 import complianceRouter from "./routes/compliance";
 import carbonRouter from "./routes/carbon";
+import huoltokirjaRouter from "./routes/huoltokirja";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -618,8 +619,11 @@ app.use("/roles", authenticatedLimiter, rolesRouter);
 app.use("/audit", authenticatedLimiter, auditRouter);
 app.use("/admin", authenticatedLimiter, adminRouter);
 app.use("/affiliates", authenticatedLimiter, affiliatesRouter);
+<<<<<<< HEAD
 app.use("/compliance", authenticatedLimiter, complianceRouter);
+<<<<<<< HEAD
 app.use("/carbon", authenticatedLimiter, carbonRouter);
+app.use("/huoltokirja", authenticatedLimiter, huoltokirjaRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
