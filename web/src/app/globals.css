@@ -477,7 +477,7 @@ body::before {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 14px;
   background: none;
   border: none;
@@ -863,7 +863,7 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 16px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--amber);
@@ -1325,7 +1325,7 @@ select:focus {
 }
 
 .select {
-  padding: 11px 32px 11px 14px;
+  padding: 12px 32px 12px 16px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -1703,7 +1703,7 @@ select:focus {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  padding: 5px 10px;
+  padding: 4px 12px;
   border-radius: var(--radius-sm);
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
@@ -2059,7 +2059,7 @@ select:focus {
 .chat-apply-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex: 1;
   justify-content: center;
   padding: 6px 12px;
@@ -2170,7 +2170,7 @@ select:focus {
 }
 
 .chat-suggestion-chip {
-  padding: 5px 12px;
+  padding: 4px 12px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(30, 30, 34, 0.6);
@@ -2330,7 +2330,7 @@ select:focus {
 .editor-save-status {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-size: 11px;
   font-family: var(--font-mono);
   letter-spacing: 0.02em;
@@ -2375,7 +2375,7 @@ select:focus {
 }
 
 .viewport-toolbar-btn {
-  padding: 5px 10px;
+  padding: 4px 12px;
   font-size: 11px;
   font-weight: 500;
   background: transparent;
@@ -2385,7 +2385,7 @@ select:focus {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-family: var(--font-body);
   transition: color 0.1s ease, background 0.1s ease, border-color 0.1s ease;
   -webkit-tap-highlight-color: transparent;
@@ -3127,7 +3127,7 @@ select:focus {
 
 .api-ref-search {
   width: 100%;
-  padding: 7px 28px 7px 30px;
+  padding: 8px 28px 8px 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
