@@ -163,8 +163,9 @@ export default function LoginForm({
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {isRegister && (
               <div>
-                <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.name')}</label>
+                <label htmlFor="login-name" className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.name')}</label>
                 <input
+                  id="login-name"
                   className="input"
                   placeholder={t('auth.namePlaceholder')}
                   value={name}
@@ -175,8 +176,9 @@ export default function LoginForm({
               </div>
             )}
             <div>
-              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.email')}</label>
+              <label htmlFor="login-email" className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.email')}</label>
               <input
+                id="login-email"
                 className="input"
                 type="email"
                 placeholder={t('auth.emailPlaceholder')}
@@ -187,8 +189,9 @@ export default function LoginForm({
               />
             </div>
             <div>
-              <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.password')}</label>
+              <label htmlFor="login-password" className="label-mono" style={{ display: "block", marginBottom: 8 }}>{t('auth.password')}</label>
               <input
+                id="login-password"
                 className="input"
                 type="password"
                 placeholder={t('auth.passwordPlaceholder')}
