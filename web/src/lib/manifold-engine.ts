@@ -39,6 +39,10 @@ export async function initManifold(): Promise<ManifoldToplevel> {
   return initPromise;
 }
 
+export function __setWasmForTesting(instance: ManifoldToplevel): void {
+  wasm = instance;
+}
+
 export function getManifold(): ManifoldToplevel {
   if (!wasm) throw new Error("Manifold WASM not initialized. Call initManifold() first.");
   return wasm;
