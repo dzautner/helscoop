@@ -104,7 +104,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("[ErrorBoundary] Caught error:", error, errorInfo);
+    // Report to Sentry if configured
+    if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      import("@sentry/nextjs").then(({ captureException }) => {
+        captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+      });
+    }
   }
 
   reset = () => {

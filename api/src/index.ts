@@ -1,11 +1,13 @@
+import * as Sentry from "@sentry/node";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { login, register, signToken, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, AuthUser } from "./auth";
-import { query } from "./db";
+import { query, pool } from "./db";
 import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
@@ -13,6 +15,20 @@ import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
 import chatRouter from "./routes/chat";
 import buildingRouter from "./routes/building";
+import logger from "./logger";
+import { logAuditEvent } from "./audit";
+
+// ---------------------------------------------------------------------------
+// Sentry — initialize before anything else so it can instrument the app
+// ---------------------------------------------------------------------------
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || "development",
+    release: process.env.APP_VERSION,
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 0,
+  });
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
@@ -39,6 +55,15 @@ app.use(
 
 // Request body size limit
 app.use(express.json({ limit: "1mb" }));
+
+// ---------------------------------------------------------------------------
+// Request ID middleware — tags every request with a unique ID for correlation
+// ---------------------------------------------------------------------------
+app.use((req, _res, next) => {
+  (req as express.Request & { requestId: string }).requestId =
+    (req.headers["x-request-id"] as string) || crypto.randomUUID();
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // Rate limiters — per-route instead of a single global limiter
@@ -122,7 +147,7 @@ const buildingLimiter = rateLimit({
     return req.ip || "unknown";
   },
   handler: (req, res) => {
-    console.warn(`[RATE_LIMIT] Building endpoint rate limit hit by IP=${req.ip}, user=${extractUserId(req) || "anonymous"}`);
+    logger.warn({ ip: req.ip, userId: extractUserId(req) || "anonymous" }, "Building endpoint rate limit hit");
     res.status(429).json({ error: "Too many building lookup requests, please try again later" });
   },
   skip: (req) => {
@@ -149,19 +174,59 @@ const buildingLimiterAuthenticated = rateLimit({
     return extractUserId(req) || req.ip || "unknown";
   },
   handler: (req, res) => {
-    console.warn(`[RATE_LIMIT] Building endpoint rate limit hit by user=${extractUserId(req)}`);
+    logger.warn({ userId: extractUserId(req) }, "Building endpoint rate limit hit (authenticated)");
     res.status(429).json({ error: "Too many building lookup requests, please try again later" });
   },
 });
 
 // Health check — no rate limit
 // Served at both /health (legacy) and /api/health (standard prefix)
-const healthHandler = (_req: express.Request, res: express.Response) =>
-  res.json({
-    status: "ok",
+const healthHandler = async (_req: express.Request, res: express.Response) => {
+  let dbStatus: "ok" | "error" = "error";
+  let redisStatus: "ok" | "error" | "unconfigured" = "unconfigured";
+
+  // Check database connectivity
+  try {
+    await pool.query("SELECT 1");
+    dbStatus = "ok";
+  } catch {
+    dbStatus = "error";
+  }
+
+  // Check Redis connectivity if configured (simple TCP probe)
+  if (process.env.REDIS_URL) {
+    try {
+      const redisUrl = new URL(process.env.REDIS_URL);
+      const host = redisUrl.hostname;
+      const port = parseInt(redisUrl.port || "6379");
+      await new Promise<void>((resolve, reject) => {
+        const net = require("net") as typeof import("net");
+        const socket = net.connect(port, host, () => {
+          socket.destroy();
+          resolve();
+        });
+        socket.on("error", reject);
+        socket.setTimeout(2000, () => {
+          socket.destroy();
+          reject(new Error("Redis TCP timeout"));
+        });
+      });
+      redisStatus = "ok";
+    } catch {
+      redisStatus = "error";
+    }
+  }
+
+  const overallStatus = dbStatus === "ok" ? "ok" : "degraded";
+
+  res.status(overallStatus === "ok" ? 200 : 503).json({
+    status: overallStatus,
     version: process.env.APP_VERSION || "dev",
     uptime: Math.floor((Date.now() - startedAt) / 1000),
+    db: dbStatus,
+    redis: redisStatus,
   });
+};
 
 app.get("/health", healthHandler);
 app.get("/api/health", healthHandler);
@@ -206,7 +271,8 @@ app.post("/auth/register", authLimiter, async (req, res) => {
     const user = await register(email, password, sanitizedName);
     res.status(201).json({ token: signToken(user), user });
   } catch (e: unknown) {
-    console.error("Registration error:", e);
+    logger.error({ err: e }, "Registration error");
+    Sentry.captureException(e);
     const msg = e instanceof Error ? e.message : "Registration failed";
     if (msg.includes("duplicate key")) {
       return res.status(409).json({ error: "Email already registered" });
@@ -293,25 +359,29 @@ app.put("/auth/password", authenticatedLimiter, requireAuth, async (req, res) =>
     await query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.user!.id]);
     res.json({ message: "Password updated successfully" });
   } catch (e) {
-    console.error("Password change error:", e);
+    logger.error({ err: e }, "Password change error");
+    Sentry.captureException(e);
     res.status(500).json({ error: "Failed to change password" });
   }
 });
 
 app.delete("/auth/account", authenticatedLimiter, requireAuth, async (req, res) => {
   try {
+    const userId = req.user!.id;
     // Delete all BOM entries for user's projects
     await query(
       "DELETE FROM project_bom WHERE project_id IN (SELECT id FROM projects WHERE user_id = $1)",
-      [req.user!.id]
+      [userId]
     );
     // Delete all user's projects
-    await query("DELETE FROM projects WHERE user_id = $1", [req.user!.id]);
+    await query("DELETE FROM projects WHERE user_id = $1", [userId]);
     // Delete the user
-    await query("DELETE FROM users WHERE id = $1", [req.user!.id]);
+    await query("DELETE FROM users WHERE id = $1", [userId]);
+    logAuditEvent(userId, "account.delete", { ip: req.ip });
     res.json({ message: "Account deleted successfully" });
   } catch (e) {
-    console.error("Account deletion error:", e);
+    logger.error({ err: e }, "Account deletion error");
+    Sentry.captureException(e);
     res.status(500).json({ error: "Failed to delete account" });
   }
 });
@@ -329,7 +399,7 @@ app.post("/auth/forgot-password", authLimiter, async (req, res) => {
     await forgotPassword(email);
   } catch (e) {
     // Log but don't reveal errors to the client
-    console.error("Forgot password error:", e);
+    logger.error({ err: e }, "Forgot password error");
   }
   // Always return success to avoid revealing whether email exists
   res.json({ message: "If the email is registered, a reset link has been sent." });
@@ -350,7 +420,8 @@ app.post("/auth/reset-password", authLimiter, async (req, res) => {
     }
     res.json({ message: "Password has been reset successfully" });
   } catch (e) {
-    console.error("Reset password error:", e);
+    logger.error({ err: e }, "Reset password error");
+    Sentry.captureException(e);
     res.status(500).json({ error: "Failed to reset password" });
   }
 });
@@ -368,7 +439,8 @@ app.get("/auth/verify-email", authLimiter, async (req, res) => {
     }
     res.json({ message: "Email verified successfully" });
   } catch (e) {
-    console.error("Email verification error:", e);
+    logger.error({ err: e }, "Email verification error");
+    Sentry.captureException(e);
     res.status(500).json({ error: "Failed to verify email" });
   }
 });
@@ -439,7 +511,8 @@ app.get("/auth/export-data", exportDataLimiter, requireAuth, async (req, res) =>
       projects,
     });
   } catch (e) {
-    console.error("Data export error:", e);
+    logger.error({ err: e }, "Data export error");
+    Sentry.captureException(e);
     res.status(500).json({ error: "Failed to export data" });
   }
 });
@@ -453,7 +526,8 @@ app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (
     }
     res.json({ message: "Verification email sent" });
   } catch (e) {
-    console.error("Resend verification error:", e);
+    logger.error({ err: e }, "Resend verification error");
+    Sentry.captureException(e);
     res.status(500).json({ error: "Failed to resend verification email" });
   }
 });
@@ -801,10 +875,23 @@ app.get("/bom/export/:projectId", authenticatedLimiter, requireAuth, async (req,
   res.json(rows);
 });
 
+// Sentry error handler — must be after routes, before generic error handler
+if (process.env.SENTRY_DSN) {
+  // Cast to any to avoid @types/express overload resolution issues with Sentry's handler
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.use(Sentry.expressErrorHandler() as any);
+}
+
+// Generic error handler
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ err }, "Unhandled error");
+  res.status(500).json({ error: "Internal server error" });
+});
+
 // Only start listening when run directly, not when imported for testing
 if (!IS_TEST) {
   app.listen(PORT, () => {
-    console.log(`Helscoop API running on port ${PORT}`);
+    logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Helscoop API running");
   });
 }
 
