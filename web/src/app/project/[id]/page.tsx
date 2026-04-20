@@ -130,6 +130,7 @@ export default function ProjectPage() {
   const [showParams, setShowParams] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
@@ -954,15 +955,31 @@ export default function ProjectPage() {
             )}
           </button>
           <div style={{ position: "relative" }} data-tour="export-btn">
-            <button className="btn btn-ghost" data-tooltip={t('editor.export')} aria-label={t('editor.export')} onClick={() => setShowExportMenu(v => !v)} style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+            <button
+              className="btn btn-ghost"
+              data-tooltip={exportingFormat ? t('toast.exportingBom') : t('editor.export')}
+              aria-label={exportingFormat ? t('toast.exportingBom') : t('editor.export')}
+              aria-busy={exportingFormat !== null}
+              disabled={exportingFormat !== null}
+              onClick={() => setShowExportMenu(v => !v)}
+              style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}
+            >
+              {exportingFormat ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </>
+              )}
             </button>
             {showExportMenu && (
               <div className="dropdown-menu" style={{
@@ -979,50 +996,72 @@ export default function ProjectPage() {
               }}>
                 <button
                   className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
                   onClick={async () => {
                     setShowExportMenu(false);
+                    setExportingFormat("pdf");
                     try {
                       track("bom_exported", { format: "pdf" });
                       generateQuotePdf({ projectName, projectDescription: projectDesc, bom, locale });
                       toast(t('toast.bomExported'), "success");
                     } catch (err) {
                       toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    } finally {
+                      setExportingFormat(null);
                     }
                   }}
-                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "pdf" ? 0.4 : 1 }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
+                  {exportingFormat === "pdf" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  )}
                   PDF
                 </button>
                 <button
                   className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
                   onClick={async () => {
                     setShowExportMenu(false);
+                    setExportingFormat("csv");
                     try {
                       track("bom_exported", { format: "csv" });
                       await api.exportBOMCsv(projectId, projectName);
                       toast(t('toast.bomExported'), "success");
                     } catch (err) {
                       toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    } finally {
+                      setExportingFormat(null);
                     }
                   }}
-                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "csv" ? 0.4 : 1 }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <line x1="3" y1="9" x2="21" y2="9" />
-                    <line x1="3" y1="15" x2="21" y2="15" />
-                    <line x1="9" y1="3" x2="9" y2="21" />
-                  </svg>
+                  {exportingFormat === "csv" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <line x1="3" y1="9" x2="21" y2="9" />
+                      <line x1="3" y1="15" x2="21" y2="15" />
+                      <line x1="9" y1="3" x2="9" y2="21" />
+                    </svg>
+                  )}
                   CSV
                 </button>
                 <button
                   className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
                   onClick={async () => {
                     setShowExportMenu(false);
+                    setExportingFormat("json");
                     try {
                       track("bom_exported", { format: "json" });
                       const res = await api.exportBOM(projectId);
@@ -1036,14 +1075,22 @@ export default function ProjectPage() {
                       toast(t('toast.bomExported'), "success");
                     } catch (err) {
                       toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
+                    } finally {
+                      setExportingFormat(null);
                     }
                   }}
-                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "json" ? 0.4 : 1 }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z" />
-                    <polyline points="16 3 16 8 21 8" />
-                  </svg>
+                  {exportingFormat === "json" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z" />
+                      <polyline points="16 3 16 8 21 8" />
+                    </svg>
+                  )}
                   JSON
                 </button>
                 <div style={{ height: 1, background: "var(--border)", margin: "2px 8px" }} />
