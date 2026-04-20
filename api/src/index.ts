@@ -552,7 +552,8 @@ app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (
 
 // Refresh token endpoint — accepts a valid or recently-expired JWT and returns
 // a new access token.  Uses authLimiter to prevent abuse.
-app.post("/auth/refresh", authLimiter, (req, res) => {
+// Validates that the user still exists in the database before issuing a new token.
+app.post("/auth/refresh", authLimiter, async (req, res) => {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Missing authorization header" });
@@ -562,7 +563,23 @@ app.post("/auth/refresh", authLimiter, (req, res) => {
   if (!user) {
     return res.status(401).json({ error: "Token expired or invalid" });
   }
-  res.json({ token: signToken(user), token_expires_at: tokenExpiresAt() });
+
+  // Verify the user still exists and is active in the database
+  try {
+    const result = await query(
+      "SELECT id, email, role FROM users WHERE id = $1",
+      [user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "User no longer exists" });
+    }
+    // Use the latest user data from DB (role/email may have changed)
+    const dbUser = result.rows[0];
+    res.json({ token: signToken(dbUser), token_expires_at: tokenExpiresAt() });
+  } catch (e) {
+    logger.error({ err: e }, "Token refresh error");
+    res.status(500).json({ error: "Failed to refresh token" });
+  }
 });
 
 // Authenticated routes get the relaxed rate limiter (500 req/15min per user)
