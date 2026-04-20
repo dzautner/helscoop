@@ -3,7 +3,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { evaluateScene, initManifold, type TessellatedObject, type EvaluateOptions } from "@/lib/manifold-engine";
+import { evaluateSceneWorker, initWorker } from "@/lib/manifold-worker-client";
+import type { TessellatedObject, EvaluateOptions } from "@/lib/manifold-engine";
 import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
 import ScreenshotPopover from "@/components/ScreenshotPopover";
@@ -289,7 +290,7 @@ export default function Viewport3D({
 
   // Pre-load Manifold WASM on mount
   useEffect(() => {
-    initManifold().catch(() => {});
+    initWorker().catch(() => {});
   }, []);
 
   // Initialize Three.js scene
@@ -450,7 +451,8 @@ export default function Viewport3D({
   const updateScene = useCallback(
     async (script: string, wf: boolean) => {
       const group = objectGroupRef.current;
-      if (!group) return;
+      const parentScene = sceneRef.current;
+      if (!group || !parentScene) return;
 
       const thisId = ++updateIdRef.current;
       setIsComputing(true);
@@ -459,45 +461,49 @@ export default function Viewport3D({
       await new Promise((r) => setTimeout(r, 0));
       if (thisId !== updateIdRef.current) { setIsComputing(false); return; }
 
-      // Clear old scene before starting progressive render
-      while (group.children.length > 0) {
-        const child = group.children[0];
-        disposeObject(child);
-        group.remove(child);
-      }
+      // Build new meshes into a staging group — old scene stays visible
+      const stagingGroup = new THREE.Group();
+      stagingGroup.rotation.x = -Math.PI / 2;
 
       let addedCount = 0;
       const progressOptions: EvaluateOptions = {
         onProgress: (meshes, done, total) => {
           if (thisId !== updateIdRef.current) return;
           for (let i = addedCount; i < meshes.length; i++) {
-            addSingleTessellatedMesh(group, meshes[i], wf);
+            addSingleTessellatedMesh(stagingGroup, meshes[i], wf);
           }
           addedCount = meshes.length;
           onObjectCount?.(addedCount);
         },
       };
 
-      const result = await evaluateScene(script, progressOptions);
+      const result = await evaluateSceneWorker(script, progressOptions);
 
       // Stale update — a newer one has started
-      if (thisId !== updateIdRef.current) return;
+      if (thisId !== updateIdRef.current) {
+        disposeObject(stagingGroup);
+        setIsComputing(false);
+        return;
+      }
 
       onWarnings?.(result.warnings);
 
       if (result.error) {
         onError?.(result.error);
         onErrorLine?.(result.errorLine);
+        disposeObject(stagingGroup);
         if (script !== lastValidSceneRef.current) {
-          while (group.children.length > 0) {
-            const child = group.children[0];
-            disposeObject(child);
-            group.remove(child);
-          }
-          const fallback = await evaluateScene(lastValidSceneRef.current);
+          const fallback = await evaluateSceneWorker(lastValidSceneRef.current);
           if (thisId !== updateIdRef.current) { setIsComputing(false); return; }
           if (!fallback.error) {
-            const count = addTessellatedMeshes(group, fallback.meshes, wf);
+            const freshGroup = new THREE.Group();
+            freshGroup.rotation.x = -Math.PI / 2;
+            const count = addTessellatedMeshes(freshGroup, fallback.meshes, wf);
+            // Atomic swap
+            parentScene.remove(group);
+            disposeObject(group);
+            parentScene.add(freshGroup);
+            objectGroupRef.current = freshGroup;
             onObjectCount?.(count);
           }
         }
@@ -505,13 +511,19 @@ export default function Viewport3D({
         return;
       }
 
+      // Atomic swap — remove old group, add new one in same frame
+      parentScene.remove(group);
+      disposeObject(group);
+      parentScene.add(stagingGroup);
+      objectGroupRef.current = stagingGroup;
+
       lastValidSceneRef.current = script;
       onError?.(null);
       onErrorLine?.(null);
       onObjectCount?.(result.meshes.length);
       setIsComputing(false);
 
-      const box = new THREE.Box3().setFromObject(group);
+      const box = new THREE.Box3().setFromObject(stagingGroup);
       if (!box.isEmpty()) {
         const center = box.getCenter(new THREE.Vector3());
         const sizeVec = box.getSize(new THREE.Vector3());
@@ -711,21 +723,19 @@ export default function Viewport3D({
     >
       {isComputing && (
         <div style={{
-          position: "absolute", inset: 0, display: "flex",
-          alignItems: "center", justifyContent: "center",
-          background: "rgba(0,0,0,0.35)", zIndex: 5,
-          pointerEvents: "none",
+          position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
+          display: "flex", alignItems: "center", gap: 8,
+          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+          borderRadius: 20, padding: "6px 16px",
+          zIndex: 5, pointerEvents: "none",
+          animation: "fadeIn 0.3s ease",
         }}>
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-          }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation: "spin 1s linear infinite" }}>
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-            </svg>
-            <span style={{ color: "var(--text-secondary)", fontSize: 13, fontFamily: "var(--font-sans)" }}>
-              Computing geometry…
-            </span>
-          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
+            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+          </svg>
+          <span style={{ color: "var(--text-secondary)", fontSize: 12, fontFamily: "var(--font-sans)" }}>
+            Computing…
+          </span>
         </div>
       )}
       <CameraToolbar
