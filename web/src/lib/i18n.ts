@@ -104,6 +104,10 @@ const translations = {
       emptyTitle: 'Ei projekteja viela',
       emptyHint: 'Luo ensimmainen projektisi kirjoittamalla nimi yllaolevaan kenttaan tai valitsemalla valmis malli.',
       emptyCta: 'Luo ensimmainen projekti',
+      emptyOnboardingHeading: 'Aloita ensimmäinen projektisi',
+      emptyOnboardingSubtitle: 'Syötä osoitteesi ja näe talosi 3D-mallina',
+      emptyOnboardingOr: 'tai',
+      emptyOnboardingTemplate: 'Luo mallista',
       noSearchResultsCta: 'Tyhjenna haku',
     },
     toast: {
@@ -579,6 +583,10 @@ const translations = {
       emptyTitle: 'No projects yet',
       emptyHint: 'Create your first project by typing a name above or picking a template.',
       emptyCta: 'Create your first project',
+      emptyOnboardingHeading: 'Start your first project',
+      emptyOnboardingSubtitle: 'Enter your address to see your house in 3D',
+      emptyOnboardingOr: 'or',
+      emptyOnboardingTemplate: 'Create from template',
       noSearchResultsCta: 'Clear search',
     },
     toast: {

@@ -2512,6 +2512,66 @@ select:focus {
   font-size: 13px;
 }
 
+/* ── Empty onboarding card ─────────────────────── */
+.dash-empty-onboarding {
+  padding: 56px 32px 48px;
+  text-align: center;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--amber-border);
+  background: linear-gradient(
+    180deg,
+    var(--amber-glow) 0%,
+    var(--bg-secondary) 60%
+  );
+  box-shadow: 0 0 40px rgba(229, 160, 75, 0.06), var(--shadow-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.empty-onboarding-heading {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.empty-onboarding-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 28px;
+  max-width: 380px;
+}
+
+.empty-onboarding-search {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 24px;
+}
+
+.empty-onboarding-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.empty-onboarding-divider::before,
+.empty-onboarding-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+
 .dash-search-bar {
   display: flex;
   gap: 8px;
