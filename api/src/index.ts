@@ -155,13 +155,16 @@ const buildingLimiterAuthenticated = rateLimit({
 });
 
 // Health check — no rate limit
-app.get("/health", (_req, res) =>
+// Served at both /health (legacy) and /api/health (standard prefix)
+const healthHandler = (_req: express.Request, res: express.Response) =>
   res.json({
     status: "ok",
     version: process.env.APP_VERSION || "dev",
     uptime: Math.floor((Date.now() - startedAt) / 1000),
-  })
-);
+  });
+
+app.get("/health", healthHandler);
+app.get("/api/health", healthHandler);
 
 // Email validation regex
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
