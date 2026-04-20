@@ -34,19 +34,28 @@ const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
   loading: () => <Viewport3DLoading />,
 });
 
-const BUILDING_TYPE_LABELS: Record<string, Record<string, string>> = {
-  fi: { omakotitalo: "Omakotitalo", rivitalo: "Rivitalo", kerrostalo: "Kerrostalo", paritalo: "Paritalo" },
-  en: { omakotitalo: "Detached house", rivitalo: "Terraced house", kerrostalo: "Apartment block", paritalo: "Semi-detached" },
+/** Map building type API keys to i18n keys */
+const BUILDING_TYPE_I18N: Record<string, string> = {
+  omakotitalo: "building.omakotitalo",
+  rivitalo: "building.rivitalo",
+  kerrostalo: "building.kerrostalo",
+  paritalo: "building.paritalo",
 };
 
-const MATERIAL_LABELS: Record<string, Record<string, string>> = {
-  fi: { puu: "Puu", tiili: "Tiili", betoni: "Betoni", hirsi: "Hirsi" },
-  en: { puu: "Wood", tiili: "Brick", betoni: "Concrete", hirsi: "Log" },
+/** Map material API keys to i18n keys */
+const MATERIAL_I18N: Record<string, string> = {
+  puu: "building.materialWood",
+  tiili: "building.materialBrick",
+  betoni: "building.materialConcrete",
+  hirsi: "building.materialLog",
 };
 
-const HEATING_LABELS: Record<string, Record<string, string>> = {
-  fi: { kaukolampo: "Kaukolämpö", sahko: "Sähkö", maalampopumppu: "Maalämpöpumppu", oljy: "Öljy" },
-  en: { kaukolampo: "District heating", sahko: "Electric", maalampopumppu: "Ground source heat pump", oljy: "Oil" },
+/** Map heating API keys to i18n keys */
+const HEATING_I18N: Record<string, string> = {
+  kaukolampo: "building.heatingDistrict",
+  sahko: "building.heatingElectric",
+  maalampopumppu: "building.heatingGroundSource",
+  oljy: "building.heatingOil",
 };
 
 function DataSourcesSection({ label, sources }: { label: string; sources: string[] }) {
@@ -127,9 +136,9 @@ export default function AddressSearch({
     setLoading(false);
   }, [query, track]);
 
-  const buildingTypeLabels = BUILDING_TYPE_LABELS[locale] || BUILDING_TYPE_LABELS.fi;
-  const materialLabels = MATERIAL_LABELS[locale] || MATERIAL_LABELS.fi;
-  const heatingLabels = HEATING_LABELS[locale] || HEATING_LABELS.fi;
+  const resolveBuildingType = (type: string) => BUILDING_TYPE_I18N[type] ? t(BUILDING_TYPE_I18N[type]) : type;
+  const resolveMaterial = (mat: string) => MATERIAL_I18N[mat] ? t(MATERIAL_I18N[mat]) : mat;
+  const resolveHeating = (heat: string) => HEATING_I18N[heat] ? t(HEATING_I18N[heat]) : heat;
 
   if (compact) {
     return (
@@ -191,7 +200,7 @@ export default function AddressSearch({
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span className="badge badge-amber" style={{ fontSize: 11 }}>
-                      {buildingTypeLabels[result.building_info.type] || result.building_info.type}
+                      {resolveBuildingType(result.building_info.type)}
                     </span>
                     <ConfidenceBadge provenance={buildingResultToProvenance(result)} />
                     <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
@@ -332,7 +341,7 @@ export default function AddressSearch({
                   </h3>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <span className="badge badge-amber">
-                      {buildingTypeLabels[result.building_info.type] || result.building_info.type}
+                      {resolveBuildingType(result.building_info.type)}
                     </span>
                     <ConfidenceBadge provenance={buildingResultToProvenance(result)} />
                   </div>
@@ -355,8 +364,8 @@ export default function AddressSearch({
                   { label: t('search.yearBuilt'), value: String(result.building_info.year_built) },
                   { label: t('search.area'), value: `${result.building_info.area_m2} m\u00B2` },
                   { label: t('search.floors'), value: String(result.building_info.floors) },
-                  { label: t('search.material'), value: materialLabels[result.building_info.material] || result.building_info.material },
-                  { label: t('search.heating'), value: heatingLabels[result.building_info.heating] || result.building_info.heating },
+                  { label: t('search.material'), value: resolveMaterial(result.building_info.material) },
+                  { label: t('search.heating'), value: resolveHeating(result.building_info.heating) },
                   { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
                 ].map((item, i) => (
                   <div key={i} style={{

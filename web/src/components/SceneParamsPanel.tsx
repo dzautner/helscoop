@@ -135,6 +135,7 @@ function ParamSlider({
   param: SceneParam;
   onChange: (name: string, value: number) => void;
 }) {
+  const { t } = useTranslation();
   const [localValue, setLocalValue] = useState(param.value);
   const [dragging, setDragging] = useState(false);
 
@@ -186,7 +187,7 @@ function ParamSlider({
           step={param.step}
           value={localValue}
           disabled={param.max === param.min}
-          aria-label={`${param.label} slider`}
+          aria-label={t("editor.paramSliderLabel", { name: param.label })}
           aria-valuemin={param.min}
           aria-valuemax={param.max}
           aria-valuenow={localValue}
