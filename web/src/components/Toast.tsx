@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "@/components/LocaleProvider";
 
 export type ToastType = "success" | "error" | "info" | "warning" | "progress";
 
@@ -65,6 +66,7 @@ const TYPE_STYLES: Record<ToastType, { bg: string; color: string; border: string
 const MAX_VISIBLE = 5;
 
 export function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
+  const { t } = useTranslation();
   const grouped = groupToasts(toasts);
   const visible = grouped.slice(0, MAX_VISIBLE);
   const overflowCount = grouped.length - MAX_VISIBLE;
@@ -101,14 +103,14 @@ export function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onD
             backdropFilter: "blur(12px)",
           }}
         >
-          +{overflowCount} more
+          {t('toast.overflowMore', { count: overflowCount })}
         </div>
       )}
-      {visible.map((t) =>
-        t.type === "progress" ? (
-          <ProgressToast key={t.id} toast={t} onDismiss={onDismiss} />
+      {visible.map((item) =>
+        item.type === "progress" ? (
+          <ProgressToast key={item.id} toast={item} onDismiss={onDismiss} />
         ) : (
-          <ToastMessage key={t.id} toast={t} onDismiss={onDismiss} />
+          <ToastMessage key={item.id} toast={item} onDismiss={onDismiss} />
         )
       )}
     </div>
