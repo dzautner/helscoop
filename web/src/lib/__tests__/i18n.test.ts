@@ -130,7 +130,7 @@ describe("getTranslation — Finnish (fi)", () => {
 
   it("resolves deeply nested keys", () => {
     expect(t("auth.login")).toBe("Kirjaudu");
-    expect(t("auth.loginTitle")).toBe("Kirjaudu sisaan");
+    expect(t("auth.loginTitle")).toBe("Kirjaudu sisään");
   });
 
   it("resolves brand keys", () => {

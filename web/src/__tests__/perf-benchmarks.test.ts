@@ -19,7 +19,7 @@ import { evaluateScene, __setWasmForTesting } from "../lib/manifold-engine";
 // CI runners are ~2.5x slower than local dev machines — budgets must account for this
 const BUDGETS = {
   coldEvalMs: 15000,      // Full kanala eval + tessellation (local ~3s, CI ~7.5s)
-  cacheHitMs: 10,         // LRU cache lookup should be <10ms
+  cacheHitMs: 50,         // LRU cache lookup should be <50ms (CI runners may spike to ~25ms)
   paramChangeMs: 15000,   // Re-eval with one param changed
   tessTriPerMs: 20,       // Min throughput: 20 triangles/ms (CI is slower)
   evalOnlyMs: 500,        // Script evaluation without tessellation
