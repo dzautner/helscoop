@@ -222,9 +222,22 @@ export function WelcomeModal({
 export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
+  const [displayStep, setDisplayStep] = useState(0);
+  const [contentFade, setContentFade] = useState(true);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [tooltipSize, setTooltipSize] = useState({ width: 320, height: 150 });
+
+  useEffect(() => {
+    if (currentStep !== displayStep) {
+      setContentFade(false);
+      const timer = setTimeout(() => {
+        setDisplayStep(currentStep);
+        setContentFade(true);
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, displayStep]);
 
   // Find visible steps (elements that exist in the DOM)
   const visibleSteps = TOUR_STEPS.filter(
@@ -372,28 +385,33 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
           animation: "fadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
         }}
       >
-        {/* Step counter */}
-        <div
-          className="label-mono"
-          style={{ marginBottom: 10, color: "var(--amber)" }}
-        >
-          {t("onboarding.stepOf", {
-            current: currentStep + 1,
-            total: visibleSteps.length,
-          })}
-        </div>
+        <div style={{
+          opacity: contentFade ? 1 : 0,
+          transition: "opacity 0.12s ease",
+        }}>
+          {/* Step counter */}
+          <div
+            className="label-mono"
+            style={{ marginBottom: 10, color: "var(--amber)" }}
+          >
+            {t("onboarding.stepOf", {
+              current: displayStep + 1,
+              total: visibleSteps.length,
+            })}
+          </div>
 
-        {/* Content */}
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 13,
-            lineHeight: 1.6,
-            marginBottom: 18,
-          }}
-        >
-          {t(step.contentKey)}
-        </p>
+          {/* Content */}
+          <p
+            style={{
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              lineHeight: 1.6,
+              marginBottom: 18,
+            }}
+          >
+            {t(visibleSteps[displayStep]?.contentKey || step.contentKey)}
+          </p>
+        </div>
 
         {/* Actions */}
         <div
