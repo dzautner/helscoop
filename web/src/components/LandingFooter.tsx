@@ -30,9 +30,12 @@ export default function LandingFooter() {
         </div>
 
         <div className="landing-footer-sources">
-          <div className="label-mono" style={{ color: "var(--text-muted)", marginBottom: 12, fontSize: 9 }}>
+          <div className="label-mono" style={{ color: "var(--text-muted)", marginBottom: 4, fontSize: 9 }}>
             {t("landing.dataSources")}
           </div>
+          <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5, maxWidth: 260 }}>
+            {t("landing.dataSourcesDisclaimer")}
+          </p>
           <div className="landing-footer-source-grid">
             {dataSources.map((s) => (
               <div key={s.name} className="landing-footer-source">

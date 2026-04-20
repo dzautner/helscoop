@@ -32,6 +32,8 @@ import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project } from "@/types";
 import { shortcutLabel } from "@/lib/shortcut-label";
+import ConfidenceBadge from "@/components/ConfidenceBadge";
+import type { DataProvenance } from "@/lib/confidence";
 
 /** Parse a validation warning key like "validation.typoDetected:scene" into
  *  an i18n key and parameters, then resolve via the translation function. */
@@ -1229,6 +1231,54 @@ export default function ProjectPage() {
           </div>
         </div>
       )}
+
+      {/* Building provenance bar — shown when project was created from address search */}
+      {project?.building_info?.address && (() => {
+        const bi = project.building_info!;
+        const confidence = bi.confidence ?? "estimated";
+        const mappedConfidence: DataProvenance["confidence"] =
+          confidence === "template" ? "demo" :
+          confidence === "verified" ? "verified" :
+          confidence === "manual" ? "manual" :
+          "estimated";
+        const provenance: DataProvenance = {
+          confidence: mappedConfidence,
+          source: bi.data_sources?.[0] ?? (confidence === "verified" ? "DVV/MML" : "heuristic"),
+        };
+        const fields: { label: string; value: string }[] = [
+          ...(bi.year_built ? [{ label: t("search.yearBuilt"), value: String(bi.year_built) }] : []),
+          ...(bi.area_m2 ? [{ label: t("search.area"), value: `${bi.area_m2} m\u00B2` }] : []),
+          ...(bi.floors ? [{ label: t("search.floors"), value: String(bi.floors) }] : []),
+        ];
+        return (
+          <div
+            style={{
+              padding: "5px 16px",
+              background: "var(--bg-tertiary)",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              fontSize: 11,
+              flexWrap: "wrap",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 10 }}>
+              {bi.address}
+            </span>
+            {fields.map((f) => (
+              <span key={f.label} style={{ display: "flex", gap: 4, color: "var(--text-secondary)" }}>
+                <span style={{ color: "var(--text-muted)" }}>{f.label}:</span>
+                <strong>{f.value}</strong>
+              </span>
+            ))}
+            <span style={{ marginLeft: "auto" }}>
+              <ConfidenceBadge provenance={provenance} compact />
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Main content */}
       <div className="editor-main">

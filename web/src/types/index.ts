@@ -9,6 +9,8 @@ export interface BuildingInfo {
   roof_type?: string;
   roof_material?: string;
   units?: number;
+  confidence?: string;
+  data_sources?: string[];
 }
 
 export interface Project {
@@ -89,6 +91,8 @@ export interface Material {
   supplier_skus?: SupplierSku[];
   /** Grouping key for interchangeable materials */
   substitution_group?: string;
+  /** ISO date string of last catalog update */
+  last_updated?: string | null;
 }
 
 export interface BomItem {
