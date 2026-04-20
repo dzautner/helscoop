@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useToast } from "@/components/ToastProvider";
 
 interface ScreenshotPopoverProps {
   /** Base64 data URL of the captured screenshot */
@@ -21,6 +22,7 @@ export default function ScreenshotPopover({
   const [copied, setCopied] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (imageDataUrl) {
@@ -82,10 +84,10 @@ export default function ScreenshotPopover({
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch {
-        // Silently fail
+        toast(t('toast.copyFailed'), "error");
       }
     }
-  }, [imageDataUrl]);
+  }, [imageDataUrl, toast, t]);
 
   if (!imageDataUrl) return null;
 
