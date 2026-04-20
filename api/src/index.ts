@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, AuthUser } from "./auth";
+import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, verifyGoogleToken, googleLogin, AuthUser } from "./auth";
 import { query, pool } from "./db";
 import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
@@ -298,6 +298,26 @@ app.post("/auth/register", authLimiter, async (req, res) => {
       return res.status(409).json({ error: "Email already registered" });
     }
     res.status(400).json({ error: msg || "Registration failed" });
+  }
+});
+
+app.post("/auth/google", authLimiter, async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    return res.status(400).json({ error: "Google credential is required" });
+  }
+  try {
+    const payload = await verifyGoogleToken(credential);
+    if (!payload) {
+      return res.status(401).json({ error: "Invalid Google credential" });
+    }
+    const user = await googleLogin(payload);
+    res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
+  } catch (e: unknown) {
+    logger.error({ err: e }, "Google auth error");
+    Sentry.captureException(e);
+    const msg = e instanceof Error ? e.message : "Google authentication failed";
+    res.status(500).json({ error: msg });
   }
 });
 

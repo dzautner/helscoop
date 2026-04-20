@@ -224,6 +224,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
+  googleLogin: (credential: string) =>
+    apiFetch("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    }),
   me: () => apiFetch("/auth/me"),
   updateProfile: (data: { name?: string; email?: string }) =>
     apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),

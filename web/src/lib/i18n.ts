@@ -47,6 +47,9 @@ const translations = {
       passwordMedium: 'Keskiverto',
       passwordStrong: 'Vahva',
       passwordStrength: 'Salasanan vahvuus',
+      googleSignIn: 'Kirjaudu Google-tilill\u00e4',
+      googleSignInError: 'Google-kirjautuminen ep\u00e4onnistui',
+      orContinueWith: 'tai jatka',
     },
     brand: {
       tagline: 'N\u00c4E TALOSI \u00b7 MUUTA \u00b7 RAKENNA',
@@ -746,6 +749,9 @@ const translations = {
       passwordMedium: 'Medium',
       passwordStrong: 'Strong',
       passwordStrength: 'Password strength',
+      googleSignIn: 'Sign in with Google',
+      googleSignInError: 'Google sign-in failed',
+      orContinueWith: 'or continue with',
     },
     brand: {
       tagline: 'SEE YOUR HOUSE \u00b7 CHANGE IT \u00b7 BUILD',
