@@ -123,6 +123,9 @@ const translations = {
       permanentDelete: 'Poista pysyvasti',
       showTrash: 'Nayta roskakori',
       hideTrash: 'Piilota roskakori',
+      openAriaLabel: 'Avaa projekti {{name}}',
+      copyAriaLabel: 'Kopioi projekti {{name}}',
+      deleteAriaLabel: 'Poista projekti {{name}}',
     },
     toast: {
       projectCreated: 'Projekti luotu',
@@ -675,6 +678,9 @@ const translations = {
       permanentDelete: 'Delete permanently',
       showTrash: 'Show trash',
       hideTrash: 'Hide trash',
+      openAriaLabel: 'Open project {{name}}',
+      copyAriaLabel: 'Copy project {{name}}',
+      deleteAriaLabel: 'Delete project {{name}}',
     },
     toast: {
       projectCreated: 'Project created',
