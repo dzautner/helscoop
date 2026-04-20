@@ -473,7 +473,7 @@ export default function SettingsPage() {
 
         {/* Account section */}
         <div
-          className="card anim-up delay-3 settings-card"
+          className="card anim-up delay-4 settings-card"
         >
           <h2
             className="heading-display"
@@ -536,7 +536,7 @@ export default function SettingsPage() {
               padding: "16px 20px",
               borderRadius: "var(--radius-sm)",
               background: "var(--danger-dim)",
-              border: "1px solid rgba(199, 95, 95, 0.12)",
+              border: "1px solid var(--danger-border)",
               marginBottom: 16,
             }}
           >
