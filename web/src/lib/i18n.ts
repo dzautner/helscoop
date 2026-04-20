@@ -534,6 +534,8 @@ const translations = {
       projectNotFoundMessage: 'Tama projekti on voitu poistaa tai linkki on virheellinen.',
       connectionLost: 'Yhteys katkesi. Yritetaan uudelleen...',
       reconnected: 'Yhteys palautettu',
+      errorBoundaryTitle: '3D-virhe',
+      errorBoundaryReset: 'Nollaa',
     },
   },
   en: {
@@ -1069,6 +1071,8 @@ const translations = {
       projectNotFoundMessage: 'This project may have been deleted or the link is incorrect.',
       connectionLost: 'Connection lost. Retrying...',
       reconnected: 'Reconnected',
+      errorBoundaryTitle: '3D Error',
+      errorBoundaryReset: 'Reset',
     },
   },
 } as const;
