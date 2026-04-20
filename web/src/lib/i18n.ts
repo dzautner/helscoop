@@ -784,6 +784,16 @@ const translations = {
       generatedAt: 'Luotu',
       downloadJson: 'Lataa JSON',
     },
+    compliance: {
+      title: 'Rakennusmääräystarkistus',
+      minCeilingHeight: 'Huonekorkeus {{height}}mm on alle vaaditun 2500mm (RakMK G1)',
+      minDoorWidth: 'Oviaukon leveys {{width}}mm on alle vaaditun 800mm (RakMK F1)',
+      handrailRequired: 'Kaide vaaditaan — taso on {{elevation}}mm korkeudella (RakMK F2)',
+      maxBuildingHeight: 'Rakennuksen korkeus {{height}}mm ylittää sallitun {{limit}}mm (MRL 115§)',
+      minRoomArea: 'Huoneen pinta-ala {{area}}m\u00B2 on alle vaaditun {{limit}}m\u00B2 (RakMK G1)',
+      passed: '{{count}} / {{total}} tarkistusta läpäisty',
+      allPassed: 'Kaikki tarkistukset läpäisty',
+    },
   },
   en: {
     nav: {
@@ -1567,6 +1577,16 @@ const translations = {
       noComponents: 'No materials \u2014 add materials first',
       generatedAt: 'Generated',
       downloadJson: 'Download JSON',
+    },
+    compliance: {
+      title: 'Building code compliance',
+      minCeilingHeight: 'Ceiling height {{height}}mm is below the required 2500mm (RakMK G1)',
+      minDoorWidth: 'Door opening width {{width}}mm is below the required 800mm (RakMK F1)',
+      handrailRequired: 'Handrail required — platform is at {{elevation}}mm elevation (RakMK F2)',
+      maxBuildingHeight: 'Building height {{height}}mm exceeds the allowed {{limit}}mm (MRL 115\u00A7)',
+      minRoomArea: 'Room area {{area}}m\u00B2 is below the required {{limit}}m\u00B2 (RakMK G1)',
+      passed: '{{count}} / {{total}} checks passed',
+      allPassed: 'All checks passed',
     },
   },
 } as const;
