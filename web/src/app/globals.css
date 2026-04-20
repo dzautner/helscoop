@@ -2568,7 +2568,7 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 6px 12px;
+  padding: 2px 12px;
   background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
@@ -2578,6 +2578,8 @@ select:focus {
 
 .viewport-toolbar-btn {
   padding: 4px 12px;
+  min-height: 44px;
+  min-width: 44px;
   font-size: 11px;
   font-weight: 500;
   background: transparent;
@@ -2587,6 +2589,7 @@ select:focus {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   font-family: var(--font-body);
   transition: color var(--transition-micro), background var(--transition-micro), border-color var(--transition-micro);
@@ -3219,6 +3222,8 @@ select:focus {
 
 .viewport-cam-btn {
   padding: 4px 8px;
+  min-height: 44px;
+  min-width: 44px;
   font-size: 11px;
   font-family: var(--font-mono);
   background: transparent;
@@ -3230,6 +3235,7 @@ select:focus {
   transition: background var(--transition-micro), color var(--transition-micro);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   -webkit-tap-highlight-color: transparent;
 }
