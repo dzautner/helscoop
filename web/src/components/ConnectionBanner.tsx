@@ -192,6 +192,7 @@ export default function ConnectionBanner() {
         <button
           onClick={handleRetryNow}
           className="connection-banner-retry"
+          style={{ minHeight: 44, minWidth: 44 }}
         >
           {t("errors.retryNow")}
         </button>
