@@ -407,7 +407,7 @@ describe("exhaustive i18n key parity", () => {
     "project.searchPlaceholder", "project.sortByName", "project.sortByModified",
     "project.sortByCreated", "project.sortByCost", "project.noSearchResults",
     "project.noSearchResultsDesc", "project.emptyTitle", "project.emptyHint",
-    "project.emptyCta", "project.noSearchResultsCta",
+    "project.emptyCta", "project.noSearchResultsCta", "project.useTemplate",
     "project.openAriaLabel", "project.copyAriaLabel", "project.deleteAriaLabel",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
