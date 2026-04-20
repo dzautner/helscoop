@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useTranslation } from "@/components/LocaleProvider";
 
 interface Props {
   emailVerified: boolean;
 }
 
 export default function EmailVerificationBanner({ emailVerified }: Props) {
+  const { t } = useTranslation();
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -40,14 +42,12 @@ export default function EmailVerificationBanner({ emailVerified }: Props) {
       marginBottom: 16,
     }}>
       <span>
-        Vahvista sahkopostiosoitteesi. Tarkista postilaatikkosi.
-        {" / "}
-        Please verify your email. Check your inbox.
+        {t('emailVerification.banner')}
       </span>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
         {resent ? (
           <span style={{ color: "var(--success, #4ade80)", fontSize: 12 }}>
-            Lahetetty! / Sent!
+            {t('emailVerification.resent')}
           </span>
         ) : (
           <button
@@ -56,7 +56,7 @@ export default function EmailVerificationBanner({ emailVerified }: Props) {
             className="btn btn-ghost"
             style={{ fontSize: 12, padding: "4px 12px" }}
           >
-            {resending ? <span className="btn-spinner" /> : "Lähetä uudelleen / Resend"}
+            {resending ? <span className="btn-spinner" /> : t('emailVerification.resend')}
           </button>
         )}
         <button
@@ -75,7 +75,7 @@ export default function EmailVerificationBanner({ emailVerified }: Props) {
             padding: 0,
             lineHeight: 1,
           }}
-          aria-label="Sulje / Dismiss"
+          aria-label={t('emailVerification.dismiss')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
