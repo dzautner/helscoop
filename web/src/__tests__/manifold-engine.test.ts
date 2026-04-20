@@ -15,8 +15,8 @@ import { resolve } from "path";
 async function loadManifold() {
   const Module = (await import("manifold-3d")).default;
   const wasm = await Module({
-    locateFile: (path: string) =>
-      resolve(__dirname, "../../node_modules/manifold-3d", path),
+    locateFile: () =>
+      resolve(__dirname, "../../node_modules/manifold-3d/manifold.wasm"),
   });
   wasm.setup();
   wasm.setMinCircularAngle(10);
