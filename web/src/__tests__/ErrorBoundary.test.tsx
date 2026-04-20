@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
+// Mock useTranslation so t() returns the key (consistent with other tests)
+vi.mock("@/components/LocaleProvider", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
 // A component that throws on demand
 function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) {
@@ -31,9 +38,9 @@ describe("ErrorBoundary", () => {
         <ThrowingChild shouldThrow={true} />
       </ErrorBoundary>
     );
-    expect(screen.getByText("3D Error")).toBeDefined();
+    expect(screen.getByText("errors.errorBoundaryTitle")).toBeDefined();
     expect(screen.getByText("Test explosion")).toBeDefined();
-    expect(screen.getByText("Reset")).toBeDefined();
+    expect(screen.getByText("errors.errorBoundaryReset")).toBeDefined();
   });
 
   it("renders custom fallback when provided", () => {
@@ -68,7 +75,7 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("Test explosion")).toBeDefined();
 
     // Click reset - onReset callback should fire
-    fireEvent.click(screen.getByText("Reset"));
+    fireEvent.click(screen.getByText("errors.errorBoundaryReset"));
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
