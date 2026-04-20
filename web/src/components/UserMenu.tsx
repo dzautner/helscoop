@@ -50,24 +50,74 @@ export default function UserMenu({ userName }: { userName: string }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const triggerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = useCallback(() => {
     setOpen(false);
+    // Return focus to the trigger button when closing via keyboard
+    const triggerBtn = triggerRef.current?.querySelector<HTMLElement>(".avatar-btn");
+    triggerBtn?.focus();
   }, []);
 
+  const getMenuItems = useCallback((): HTMLElement[] => {
+    if (!menuRef.current) return [];
+    return Array.from(menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+  }, []);
+
+  const focusItem = useCallback((index: number) => {
+    const items = getMenuItems();
+    if (items.length === 0) return;
+    const clamped = (index + items.length) % items.length;
+    items[clamped]?.focus();
+  }, [getMenuItems]);
+
+  // Focus the first menu item whenever the menu opens
+  useEffect(() => {
+    if (!open) return;
+    // Defer so the DOM is rendered before we query items
+    const id = requestAnimationFrame(() => {
+      const items = getMenuItems();
+      items[0]?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open, getMenuItems]);
+
+  // Arrow-key / Home / End / Escape navigation (WAI-ARIA menu widget pattern)
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        closeMenu();
+      const items = getMenuItems();
+      const focused = document.activeElement as HTMLElement;
+      const currentIndex = items.indexOf(focused);
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          focusItem(currentIndex < 0 ? 0 : currentIndex + 1);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          focusItem(currentIndex <= 0 ? items.length - 1 : currentIndex - 1);
+          break;
+        case "Home":
+          e.preventDefault();
+          focusItem(0);
+          break;
+        case "End":
+          e.preventDefault();
+          focusItem(items.length - 1);
+          break;
+        case "Escape":
+          e.preventDefault();
+          closeMenu();
+          break;
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, closeMenu]);
+  }, [open, closeMenu, getMenuItems, focusItem]);
 
   return (
     <div style={{ position: "relative" }} ref={triggerRef}>
@@ -83,6 +133,7 @@ export default function UserMenu({ userName }: { userName: string }) {
             className="card anim-fade"
             role="menu"
             aria-label={`${userName} menu`}
+            ref={menuRef}
             style={{
               position: "absolute",
               right: 0,
@@ -109,6 +160,7 @@ export default function UserMenu({ userName }: { userName: string }) {
               href="/settings"
               className="menu-item"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => setOpen(false)}
             >
               {t("nav.settings")}
@@ -116,6 +168,7 @@ export default function UserMenu({ userName }: { userName: string }) {
             <button
               className="menu-item"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => {
                 setToken(null);
                 window.location.reload();
