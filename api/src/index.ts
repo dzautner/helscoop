@@ -15,6 +15,7 @@ import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
 import chatRouter from "./routes/chat";
 import buildingRouter from "./routes/building";
+import entitlementsRouter from "./routes/entitlements";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -538,6 +539,7 @@ app.use("/projects", authenticatedLimiter, projectsRouter);
 app.use("/suppliers", authenticatedLimiter, suppliersRouter);
 app.use("/pricing", authenticatedLimiter, pricingRouter);
 app.use("/chat", chatLimiter, chatRouter);
+app.use("/entitlements", authenticatedLimiter, entitlementsRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 

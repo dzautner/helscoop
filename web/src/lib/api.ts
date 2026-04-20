@@ -214,4 +214,14 @@ export const api = {
 
   getBuilding: (address: string) =>
     apiFetch(`/building?address=${encodeURIComponent(address)}`),
+
+  // Entitlements
+  getEntitlements: () => apiFetch("/entitlements"),
+  getEntitlementUsage: () => apiFetch("/entitlements/usage"),
+  getPlans: () => apiFetch("/entitlements/plans"),
+  setAdminOverride: (userId: string, feature: string, allow: boolean) =>
+    apiFetch("/entitlements/admin/override", {
+      method: "POST",
+      body: JSON.stringify({ userId, feature, allow }),
+    }),
 };
