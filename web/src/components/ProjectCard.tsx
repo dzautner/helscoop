@@ -61,16 +61,16 @@ export default function ProjectCard({
       </div>
       <div style={{ padding: "14px 22px 18px" }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-            <h3 className="heading-display" style={{ fontSize: 18 }}>{project.name}</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, minWidth: 0 }}>
+            <h3 className="heading-display" style={{ fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{project.name}</h3>
             {project.estimated_cost > 0 && (
               <span className="badge badge-amber">
                 {Number(project.estimated_cost).toFixed(0)} &euro;
               </span>
             )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)", fontSize: 13 }}>
-            <span>{project.description || t('project.emptyDescription')}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)", fontSize: 13, minWidth: 0 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{project.description || t('project.emptyDescription')}</span>
             <span style={{ opacity: 0.5 }}>&middot;</span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
               {new Date(project.updated_at).toLocaleDateString(locale === 'fi' ? 'fi-FI' : 'en-GB')}

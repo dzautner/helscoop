@@ -45,7 +45,7 @@ const MATERIAL_LABELS: Record<string, Record<string, string>> = {
 };
 
 const HEATING_LABELS: Record<string, Record<string, string>> = {
-  fi: { kaukolampo: "Kaukolampo", sahko: "Sahko", maalampopumppu: "Maalampopumppu", oljy: "Oljy" },
+  fi: { kaukolampo: "Kaukolämpö", sahko: "Sähkö", maalampopumppu: "Maalämpöpumppu", oljy: "Öljy" },
   en: { kaukolampo: "District heating", sahko: "Electric", maalampopumppu: "Ground source heat pump", oljy: "Oil" },
 };
 
