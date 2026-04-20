@@ -196,7 +196,7 @@ export default function ConfirmDialog({
               ...(isDanger
                 ? {
                     background: "var(--danger)",
-                    color: "var(--text-primary)",
+                    color: "#09090b",
                     border: "1px solid var(--danger)",
                   }
                 : {}),
