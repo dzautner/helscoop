@@ -285,6 +285,7 @@ export default function Viewport3D({
   const sceneBoundsRef = useRef<{ center: THREE.Vector3; size: number } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [isComputing, setIsComputing] = useState(false);
+  const [tessProgress, setTessProgress] = useState<{ done: number; total: number } | null>(null);
   const updateIdRef = useRef(0);
   const { t } = useTranslation();
 
@@ -456,10 +457,11 @@ export default function Viewport3D({
 
       const thisId = ++updateIdRef.current;
       setIsComputing(true);
+      setTessProgress(null);
 
       // Yield to browser so the spinner renders before heavy WASM work
       await new Promise((r) => setTimeout(r, 0));
-      if (thisId !== updateIdRef.current) { setIsComputing(false); return; }
+      if (thisId !== updateIdRef.current) { setIsComputing(false); setTessProgress(null); return; }
 
       // Build new meshes into a staging group — old scene stays visible
       const stagingGroup = new THREE.Group();
@@ -474,6 +476,7 @@ export default function Viewport3D({
           }
           addedCount = meshes.length;
           onObjectCount?.(addedCount);
+          setTessProgress({ done, total });
         },
       };
 
@@ -483,6 +486,7 @@ export default function Viewport3D({
       if (thisId !== updateIdRef.current) {
         disposeObject(stagingGroup);
         setIsComputing(false);
+        setTessProgress(null);
         return;
       }
 
@@ -494,7 +498,7 @@ export default function Viewport3D({
         disposeObject(stagingGroup);
         if (script !== lastValidSceneRef.current) {
           const fallback = await evaluateSceneWorker(lastValidSceneRef.current);
-          if (thisId !== updateIdRef.current) { setIsComputing(false); return; }
+          if (thisId !== updateIdRef.current) { setIsComputing(false); setTessProgress(null); return; }
           if (!fallback.error) {
             const freshGroup = new THREE.Group();
             freshGroup.rotation.x = -Math.PI / 2;
@@ -508,6 +512,7 @@ export default function Viewport3D({
           }
         }
         setIsComputing(false);
+        setTessProgress(null);
         return;
       }
 
@@ -522,6 +527,7 @@ export default function Viewport3D({
       onErrorLine?.(null);
       onObjectCount?.(result.meshes.length);
       setIsComputing(false);
+      setTessProgress(null);
 
       const box = new THREE.Box3().setFromObject(stagingGroup);
       if (!box.isEmpty()) {
@@ -722,21 +728,31 @@ export default function Viewport3D({
       }}
     >
       {isComputing && (
-        <div style={{
-          position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
-          display: "flex", alignItems: "center", gap: 8,
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
-          borderRadius: 20, padding: "6px 16px",
-          zIndex: 5, pointerEvents: "none",
-          animation: "fadeIn 0.3s ease",
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
-            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-          </svg>
-          <span style={{ color: "var(--text-secondary)", fontSize: 12, fontFamily: "var(--font-sans)" }}>
-            Computing…
-          </span>
-        </div>
+        <>
+          <div
+            className="viewport-progress-bar"
+            style={{ animation: "fadeIn 0.3s ease" }}
+          >
+            <div
+              className="viewport-progress-fill"
+              style={{
+                width: tessProgress && tessProgress.total > 0
+                  ? `${Math.round((tessProgress.done / tessProgress.total) * 100)}%`
+                  : "0%",
+              }}
+            />
+          </div>
+          <div className="viewport-computing-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+            <span style={{ color: "var(--text-secondary)", fontSize: 12, fontFamily: "var(--font-sans)" }}>
+              {tessProgress && tessProgress.total > 0
+                ? `${Math.round((tessProgress.done / tessProgress.total) * 100)}%`
+                : "Computing\u2026"}
+            </span>
+          </div>
+        </>
       )}
       <CameraToolbar
         cameraRef={cameraRef}
