@@ -154,4 +154,51 @@ describe("SceneParamsPanel", () => {
     );
     expect(sectionCounts[0].textContent).toBe("2");
   });
+
+  it("toggle button has aria-expanded=true when section is open", () => {
+    const params = [makeParam()];
+    render(<SceneParamsPanel params={params} onParamChange={vi.fn()} />);
+
+    const toggle = document.querySelector(
+      ".scene-params-section-toggle"
+    ) as HTMLButtonElement;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("toggle button has aria-expanded=false after collapsing section", () => {
+    const params = [makeParam()];
+    render(<SceneParamsPanel params={params} onParamChange={vi.fn()} />);
+
+    const toggle = document.querySelector(
+      ".scene-params-section-toggle"
+    ) as HTMLButtonElement;
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("toggle button aria-controls matches the section body id", () => {
+    const params = [makeParam({ section: "Dimensions" })];
+    render(<SceneParamsPanel params={params} onParamChange={vi.fn()} />);
+
+    const toggle = document.querySelector(
+      ".scene-params-section-toggle"
+    ) as HTMLButtonElement;
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+
+    const sectionBody = document.getElementById(controlsId!);
+    expect(sectionBody).not.toBeNull();
+    expect(sectionBody!.classList.contains("scene-params-section-body")).toBe(true);
+  });
+
+  it("section body id is derived from section name", () => {
+    const params = [makeParam({ section: "Roof Angles" })];
+    render(<SceneParamsPanel params={params} onParamChange={vi.fn()} />);
+
+    const sectionBody = document.getElementById(
+      "scene-params-section-roof-angles"
+    );
+    expect(sectionBody).not.toBeNull();
+  });
 });

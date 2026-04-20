@@ -66,10 +66,15 @@ export default function SceneParamsPanel({
         <span className="scene-params-count">{params.length}</span>
       </div>
       <div className="scene-params-body">
-        {Array.from(sections.entries()).map(([section, sectionParams]) => (
+        {Array.from(sections.entries()).map(([section, sectionParams]) => {
+          const sectionId = `scene-params-section-${section.toLowerCase().replace(/\s+/g, "-")}`;
+          const isOpen = !collapsed[section];
+          return (
           <div key={section} className="scene-params-section">
             <button
               className="scene-params-section-toggle"
+              aria-expanded={isOpen}
+              aria-controls={sectionId}
               onClick={() =>
                 setCollapsed((prev) => ({
                   ...prev,
@@ -99,8 +104,9 @@ export default function SceneParamsPanel({
               </span>
             </button>
             <div
+              id={sectionId}
               className="scene-params-section-body"
-              data-open={!collapsed[section]}
+              data-open={isOpen}
             >
               <div className="scene-params-section-body-inner">
                 <div className="scene-params-items">
@@ -115,7 +121,8 @@ export default function SceneParamsPanel({
               </div>
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
