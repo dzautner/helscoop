@@ -61,6 +61,7 @@ export default function TemplateGrid({
               className="card card-interactive anim-up"
               disabled={creating}
               onClick={() => onCreateFromTemplate(tmpl)}
+              aria-label={t('project.useTemplate', { name: tmpl.name })}
               style={{
                 animationDelay: `${i * 0.06}s`,
                 padding: "24px 20px",
@@ -93,6 +94,7 @@ export default function TemplateGrid({
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    aria-hidden="true"
                     style={{ transition: "stroke 0.15s ease" }}
                   >
                     <path d={TEMPLATE_ICONS[tmpl.icon] || TEMPLATE_ICONS.shed} />
