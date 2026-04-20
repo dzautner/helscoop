@@ -31,6 +31,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project } from "@/types";
+import { shortcutLabel } from "@/lib/shortcut-label";
 
 /** Parse a validation warning key like "validation.typoDetected:scene" into
  *  an i18n key and parameters, then resolve via the translation function. */
@@ -840,8 +841,8 @@ export default function ProjectPage() {
             className="btn btn-ghost"
             onClick={undo}
             disabled={!canUndo}
-            data-tooltip={t('editor.undoShortcut')}
-            aria-label={t('editor.undoShortcut')}
+            data-tooltip={`${t('editor.undo')} (${shortcutLabel('Cmd+Z')})`}
+            aria-label={`${t('editor.undo')} (${shortcutLabel('Cmd+Z')})`}
             style={{ padding: "5px 7px", opacity: canUndo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -853,8 +854,8 @@ export default function ProjectPage() {
             className="btn btn-ghost"
             onClick={redo}
             disabled={!canRedo}
-            data-tooltip={t('editor.redoShortcut')}
-            aria-label={t('editor.redoShortcut')}
+            data-tooltip={`${t('editor.redo')} (${shortcutLabel('Cmd+Shift+Z')})`}
+            aria-label={`${t('editor.redo')} (${shortcutLabel('Cmd+Shift+Z')})`}
             style={{ padding: "5px 7px", opacity: canRedo ? 1 : 0.3 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

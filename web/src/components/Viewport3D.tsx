@@ -8,6 +8,7 @@ import type { TessellatedObject, EvaluateOptions } from "@/lib/manifold-engine";
 import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
 import ScreenshotPopover from "@/components/ScreenshotPopover";
+import { shortcutLabel } from "@/lib/shortcut-label";
 
 interface Viewport3DProps {
   sceneJs: string;
@@ -245,7 +246,7 @@ function CameraToolbar({
           className="viewport-cam-btn"
           data-active={screenshotDataUrl !== null}
           onClick={handleScreenshot}
-          data-tooltip={`${t("editor.screenshot")} (Cmd+Shift+S)`}
+          data-tooltip={`${t("editor.screenshot")} (${shortcutLabel("Cmd+Shift+S")})`}
           aria-label={t("editor.screenshotAriaLabel")}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

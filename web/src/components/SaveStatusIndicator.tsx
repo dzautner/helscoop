@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/components/LocaleProvider";
+import { shortcutLabel } from "@/lib/shortcut-label";
 
 export type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
@@ -28,6 +29,7 @@ export default function SaveStatusIndicator({
     <div
       className="save-status-pill"
       data-status={status}
+      data-tooltip={`${t("editor.save")} (${shortcutLabel("Cmd+S")})`}
       role="status"
       aria-live="polite"
       aria-label={
