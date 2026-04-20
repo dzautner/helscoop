@@ -56,8 +56,12 @@
   --warning: #eab308;
   --shadow-sm: var(--shadow-subtle);
 
+  --transition-micro: 0.08s ease;
+  --transition-quick: 0.12s ease;
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;
+  --transition-moderate: 0.25s ease;
+  --transition-slow: 0.3s ease;
 
   /* ── Z-index scale ─────────────────────────────────────────────── */
   --z-sticky: 100;
@@ -319,11 +323,11 @@
 .theme-transitioning *,
 .theme-transitioning *::before,
 .theme-transitioning *::after {
-  transition: background-color 0.3s ease,
-              color 0.3s ease,
-              border-color 0.3s ease,
-              box-shadow 0.3s ease,
-              backdrop-filter 0.3s ease !important;
+  transition: background-color var(--transition-slow),
+              color var(--transition-slow),
+              border-color var(--transition-slow),
+              box-shadow var(--transition-slow),
+              backdrop-filter var(--transition-slow) !important;
 }
 
 /* 3D viewport stays dark */
@@ -489,7 +493,7 @@ body::before {
   letter-spacing: 0.04em;
   line-height: 1.2;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: color var(--transition-fast);
 }
 
 .scene-params-section-toggle:hover {
@@ -505,7 +509,7 @@ body::before {
 .scene-params-section-body {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.2s ease;
+  transition: grid-template-rows var(--transition-normal);
 }
 
 .scene-params-section-body[data-open="true"] {
@@ -557,7 +561,7 @@ body::before {
   text-align: right;
   outline: none;
   -moz-appearance: textfield;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .scene-param-value::-webkit-inner-spin-button,
@@ -595,7 +599,7 @@ body::before {
   background: var(--amber);
   border: 2px solid var(--bg-primary);
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  transition: transform var(--transition-micro), box-shadow var(--transition-fast);
   box-shadow: 0 0 0 0 transparent;
 }
 
@@ -616,7 +620,7 @@ body::before {
   background: var(--amber);
   border: 2px solid var(--bg-primary);
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  transition: transform var(--transition-micro), box-shadow var(--transition-fast);
   box-shadow: 0 0 0 0 transparent;
 }
 
@@ -647,7 +651,7 @@ body::before {
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--transition-quick);
   transform: translateX(-50%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   z-index: 2;
@@ -712,7 +716,7 @@ body::before {
 }
 
 .dropdown-menu {
-  animation: dropdownIn 0.12s ease-out both;
+  animation: dropdownIn var(--transition-quick)-out both;
 }
 
 /* ── Category filter chip ───────────────────────── */
@@ -725,7 +729,7 @@ body::before {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  transition: border-color var(--transition-quick), color var(--transition-quick), background var(--transition-quick);
   white-space: nowrap;
 }
 .category-chip:hover {
@@ -769,7 +773,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+  transition: border-color var(--transition-moderate), box-shadow var(--transition-moderate), transform var(--transition-moderate);
 }
 
 .empty-state:hover .empty-state-illustration {
@@ -806,7 +810,7 @@ body::before {
   letter-spacing: 0.02em;
   border: none;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .empty-state-cta:hover {
@@ -835,7 +839,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+  transition: border-color var(--transition-moderate), box-shadow var(--transition-moderate), transform var(--transition-moderate);
 }
 
 .bom-empty:hover .bom-empty-icon {
@@ -872,7 +876,7 @@ body::before {
   letter-spacing: 0.02em;
   border: 1px solid var(--amber-border);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .bom-empty-cta:hover {
@@ -893,7 +897,7 @@ body::before {
   font-size: 13px;
   border: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-quick);
 }
 .bom-item-card:hover {
   border-color: var(--amber-border);
@@ -999,7 +1003,7 @@ body::before {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color var(--transition-quick), background var(--transition-quick);
 }
 .material-browse-card:hover {
   border-color: var(--amber-border);
@@ -1024,7 +1028,7 @@ body::before {
   padding: 10px;
   opacity: 0.5;
   border-radius: var(--radius-sm);
-  transition: opacity 0.12s ease, background 0.12s ease;
+  transition: opacity var(--transition-quick), background var(--transition-quick);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1103,7 +1107,7 @@ body::before {
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
 }
 .lang-switch:hover {
   border-color: var(--amber-border);
@@ -1290,12 +1294,12 @@ body::before {
   font-family: var(--font-body);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1), background 0.15s ease;
+  transition: border-color 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1), background var(--transition-fast);
 }
 
 .input::placeholder {
   color: var(--text-muted);
-  transition: color 0.2s ease;
+  transition: color var(--transition-normal);
 }
 
 .input:hover:not(:focus) {
@@ -1313,7 +1317,7 @@ body::before {
 }
 
 select {
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 select:hover:not(:disabled) {
   border-color: var(--border-strong);
@@ -1339,7 +1343,7 @@ select:focus {
   background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236f6860' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .select:hover {
@@ -1583,7 +1587,7 @@ select:focus {
   padding: 14px 12px;
   border-bottom: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .brand-feature-item:hover {
@@ -1604,7 +1608,7 @@ select:focus {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .brand-feature-item:hover .brand-feature-icon {
@@ -1708,7 +1712,7 @@ select:focus {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   white-space: nowrap;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .trust-logo:hover {
@@ -1856,7 +1860,7 @@ select:focus {
   z-index: 10;
   margin: 0 -2px;
   background: transparent;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
 }
 .resize-handle-v:hover,
 .resize-handle-v:active {
@@ -1873,7 +1877,7 @@ select:focus {
   border-radius: 2px;
   background: var(--border);
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
 }
 .resize-handle-v:hover::after {
   opacity: 1;
@@ -1912,7 +1916,7 @@ select:focus {
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   border-bottom: none;
-  animation: chatMsgIn 0.2s ease-out both;
+  animation: chatMsgIn var(--transition-normal)-out both;
 }
 
 .chat-messages-scroll {
@@ -1977,7 +1981,7 @@ select:focus {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  animation: chatMsgIn 0.25s ease-out both;
+  animation: chatMsgIn var(--transition-moderate)-out both;
 }
 
 .chat-msg:nth-last-child(2) { animation-delay: 0.03s; }
@@ -2034,7 +2038,7 @@ select:focus {
   justify-content: center;
   flex-shrink: 0;
   margin-top: 2px;
-  transition: box-shadow 0.3s ease;
+  transition: box-shadow var(--transition-slow);
 }
 
 .chat-avatar-active {
@@ -2108,7 +2112,7 @@ select:focus {
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  transition: border-color var(--transition-quick), box-shadow var(--transition-quick), background var(--transition-quick);
 }
 
 .chat-input-bar-focused,
@@ -2195,7 +2199,7 @@ select:focus {
   font-size: 11px;
   font-family: var(--font-body);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), transform var(--transition-quick);
   white-space: nowrap;
 }
 .chat-suggestion-chip:hover {
@@ -2233,7 +2237,7 @@ select:focus {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  animation: pageIn 0.25s ease-out both;
+  animation: pageIn var(--transition-moderate)-out both;
 }
 
 @keyframes pageIn {
@@ -2272,7 +2276,7 @@ select:focus {
   max-width: calc(100vw - 600px);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -2310,7 +2314,7 @@ select:focus {
   color: var(--text-muted);
   pointer-events: none;
   opacity: 0.7;
-  transition: color 0.15s ease, opacity 0.15s ease;
+  transition: color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .editor-header-name-count[data-near-limit="true"] {
@@ -2327,7 +2331,7 @@ select:focus {
   width: 160px;
   padding: 4px 6px;
   border-radius: var(--radius-sm);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .editor-header-desc:hover {
@@ -2356,7 +2360,7 @@ select:focus {
   letter-spacing: 0.02em;
   padding: 4px 10px;
   border-radius: var(--radius-sm);
-  transition: color 0.15s ease, opacity 0.15s ease;
+  transition: color var(--transition-fast), opacity var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -2365,7 +2369,7 @@ select:focus {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .editor-save-dot[data-status="saved"] {
@@ -2407,7 +2411,7 @@ select:focus {
   align-items: center;
   gap: 4px;
   font-family: var(--font-body);
-  transition: color 0.1s ease, background 0.1s ease, border-color 0.1s ease;
+  transition: color var(--transition-micro), background var(--transition-micro), border-color var(--transition-micro);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -2431,7 +2435,7 @@ select:focus {
   font-family: var(--font-mono);
   color: var(--text-muted);
   letter-spacing: 0.02em;
-  transition: color 0.2s ease;
+  transition: color var(--transition-normal);
 }
 
 .viewport-status[data-error="true"] {
@@ -2535,7 +2539,7 @@ select:focus {
   display: flex;
   gap: 4px;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--transition-quick);
 }
 
 .project-card-grid:hover .project-card-actions {
@@ -2687,7 +2691,7 @@ select:focus {
   border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+  transition: border-color var(--transition-moderate), box-shadow var(--transition-moderate), transform var(--transition-moderate);
 }
 
 .feature-card--hero {
@@ -2748,7 +2752,7 @@ select:focus {
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow var(--transition-normal);
 }
 
 .feature-card:hover .feature-card-icon {
@@ -2984,7 +2988,7 @@ select:focus {
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: background var(--transition-micro), color var(--transition-micro);
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -3155,7 +3159,7 @@ select:focus {
   font-family: var(--font-mono);
   font-size: 12px;
   outline: none;
-  transition: border-color 0.12s ease;
+  transition: border-color var(--transition-quick);
 }
 
 .api-ref-search:focus {
@@ -3207,7 +3211,7 @@ select:focus {
   border-bottom: 2px solid transparent;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.12s ease, border-color 0.12s ease;
+  transition: color var(--transition-quick), border-color var(--transition-quick);
 }
 
 .api-ref-tab:hover {
@@ -3331,7 +3335,7 @@ select:focus {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  transition: color 0.12s ease, background 0.12s ease;
+  transition: color var(--transition-quick), background var(--transition-quick);
 }
 
 .api-ref-copy-btn:hover {
@@ -3474,7 +3478,7 @@ select:focus {
   align-items: flex-start;
   justify-content: center;
   padding-top: min(20vh, 160px);
-  animation: fadeIn 0.1s ease both;
+  animation: fadeIn var(--transition-micro) both;
 }
 
 .cmd-palette-backdrop {
@@ -3594,7 +3598,7 @@ select:focus {
   font-family: var(--font-body);
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.08s ease, color 0.08s ease;
+  transition: background var(--transition-micro), color var(--transition-micro);
   text-align: left;
 }
 
@@ -3619,7 +3623,7 @@ select:focus {
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  transition: color 0.08s ease;
+  transition: color var(--transition-micro);
 }
 
 .cmd-palette-item-labels {
@@ -3737,7 +3741,7 @@ select:focus {
   border: 1px solid var(--border-strong);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
   z-index: 10000;
 }
 
@@ -3751,7 +3755,7 @@ select:focus {
   border-top-color: var(--bg-elevated);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
   z-index: 10000;
 }
 
