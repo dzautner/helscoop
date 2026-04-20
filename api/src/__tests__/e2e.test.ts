@@ -66,7 +66,7 @@ describe.skipIf(!process.env.E2E)("E2E Integration Tests", () => {
     const { status, body } = await apiFetch("/auth/me", { token });
     expect(status).toBe(200);
     expect(body.email).toBe(testEmail);
-    expect(body.role).toBe("user");
+    expect(body.role).toBe("homeowner");
   });
 
   it("rejects requests without auth", async () => {
