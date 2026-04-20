@@ -7,6 +7,8 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
+import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
+import type { QuoteConfig } from "@/lib/quote-engine";
 import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
@@ -74,6 +76,37 @@ function designToPurchasable(
   const unitsNeeded = designQty / conversionFactor;
   const packs = packSize && packSize > 1 ? unitsNeeded / packSize : unitsNeeded;
   return Math.ceil(packs);
+}
+
+/**
+ * Compute the purchasable buy quantity from a design quantity.
+ *
+ * Returns null when the material has no conversion metadata (e.g. preview
+ * materials that are not purchasable). When designUnit === purchasableUnit the
+ * function still returns a value so the caller can decide whether to display it.
+ *
+ * Examples:
+ *   osb_9mm, designQty=10 m² → { buyQty: 4, purchasableUnit: "sheet", packSize: 2.88 }
+ *   pine_48x98_c24, designQty=15 m → { buyQty: 15, purchasableUnit: "m", packSize: null }
+ */
+function computeBuyQty(
+  materialId: string,
+  designQty: number,
+  materials: Material[],
+): { buyQty: number; purchasableUnit: string; packSize: number | null } | null {
+  const mat = materials.find((m) => m.id === materialId);
+  if (!mat || mat.conversion_factor == null || mat.conversion_factor <= 0) return null;
+  const rawBuyQty = designQty * mat.conversion_factor;
+  // Round up to the nearest whole unit for pack-based items; otherwise keep 2dp
+  const buyQty =
+    mat.pack_size != null && mat.pack_size > 0
+      ? Math.ceil(rawBuyQty)
+      : Math.round(rawBuyQty * 100) / 100;
+  return {
+    buyQty,
+    purchasableUnit: mat.purchasable_unit ?? mat.design_unit ?? "kpl",
+    packSize: mat.pack_size ?? null,
+  };
 }
 
 /* ── Category color palette ─────────────────────────────────── */
@@ -903,6 +936,157 @@ function PriceComparisonPopup({
   );
 }
 
+/* ── Quote summary sub-component ──────────────────────────── */
+function QuoteSummary({
+  bom,
+  materials,
+}: {
+  bom: BomItem[];
+  materials: Material[];
+}) {
+  const { t } = useTranslation();
+  const [quoteMode, setQuoteMode] = useState<"homeowner" | "contractor">("homeowner");
+
+  const quote = useMemo(() => {
+    if (bom.length === 0) return null;
+    const config: QuoteConfig = defaultQuoteConfig(quoteMode);
+    return calculateQuote(bom, materials, config);
+  }, [bom, materials, quoteMode]);
+
+  if (!quote) return null;
+
+  const vatPct = Math.round(quote.config.vatRate * 100 * 10) / 10;
+
+  const rowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    fontSize: 12,
+    padding: "3px 0",
+  };
+
+  const labelStyle: React.CSSProperties = {
+    color: "var(--text-muted)",
+    fontFamily: "var(--font-body)",
+  };
+
+  const valueStyle: React.CSSProperties = {
+    fontFamily: "var(--font-mono)",
+    fontSize: 12,
+    color: "var(--text-primary)",
+    fontVariantNumeric: "tabular-nums",
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    borderTop: "1px solid var(--border)",
+    margin: "6px 0",
+  };
+
+  const formatEur = (n: number) =>
+    n.toLocaleString("fi-FI", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20ac";
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "14px 16px",
+        background: "var(--bg-tertiary)",
+        borderRadius: "var(--radius-md)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      {/* Header with mode toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
+          {t("quote.sectionLabel")}
+        </div>
+        <div style={{ display: "flex", gap: 2, background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: 2 }}>
+          {(["homeowner", "contractor"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setQuoteMode(mode)}
+              style={{
+                padding: "2px 8px",
+                fontSize: 10,
+                fontWeight: quoteMode === mode ? 600 : 400,
+                background: quoteMode === mode ? "var(--bg-elevated)" : "transparent",
+                border: quoteMode === mode ? "1px solid var(--border)" : "1px solid transparent",
+                borderRadius: "var(--radius-sm)",
+                color: quoteMode === mode ? "var(--text-primary)" : "var(--text-muted)",
+                cursor: "pointer",
+                fontFamily: "var(--font-body)",
+                transition: "all 0.12s ease",
+              }}
+            >
+              {t(`quote.${mode}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Line items */}
+      <div>
+        <div style={rowStyle}>
+          <span style={labelStyle}>{t("quote.materials")}</span>
+          <span style={valueStyle}>{formatEur(quote.materialSubtotal)}</span>
+        </div>
+        <div style={rowStyle}>
+          <span style={labelStyle}>
+            {t("quote.labour")}&nbsp;
+            <span style={{ fontSize: 10, opacity: 0.7 }}>
+              ({t("quote.labourRate", { rate: quote.config.labourRatePerHour })})
+            </span>
+          </span>
+          <span style={valueStyle}>{formatEur(quote.labourSubtotal)}</span>
+        </div>
+        <div style={rowStyle}>
+          <span style={labelStyle}>
+            {t("quote.wastage")}&nbsp;
+            <span style={{ fontSize: 10, opacity: 0.7 }}>
+              ({t("quote.wastageRate", { pct: Math.round(quote.config.wastagePercent * 100) })})
+            </span>
+          </span>
+          <span style={{ ...valueStyle, color: "var(--text-muted)" }}>{formatEur(quote.wastageTotal)}</span>
+        </div>
+
+        <div style={dividerStyle} />
+
+        <div style={rowStyle}>
+          <span style={labelStyle}>{t("quote.subtotalExVat")}</span>
+          <span style={valueStyle}>{formatEur(quote.subtotalExVat)}</span>
+        </div>
+        <div style={rowStyle}>
+          <span style={labelStyle}>{t("quote.vat", { rate: vatPct })}</span>
+          <span style={valueStyle}>{formatEur(quote.vatTotal)}</span>
+        </div>
+
+        {quote.contractorMargin != null && (
+          <div style={rowStyle}>
+            <span style={labelStyle}>
+              {t("quote.contractorMargin")}&nbsp;
+              <span style={{ fontSize: 10, opacity: 0.7 }}>
+                ({Math.round((quote.config.contractorMarginPercent ?? 0) * 100)}%)
+              </span>
+            </span>
+            <span style={valueStyle}>{formatEur(quote.contractorMargin)}</span>
+          </div>
+        )}
+
+        <div style={dividerStyle} />
+
+        <div style={{ ...rowStyle, marginTop: 4 }}>
+          <span style={{ ...labelStyle, fontWeight: 600, color: "var(--text-primary)", fontSize: 13 }}>
+            {t("quote.grandTotal")}
+          </span>
+          <span style={{ ...valueStyle, fontWeight: 700, fontSize: 15, color: "var(--amber)" }}>
+            {formatEur(quote.grandTotal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── BOM item card with debounced quantity input ──────────── */
 function BomItemCard({
   item,
@@ -1051,6 +1235,18 @@ function BomItemCard({
 
   const materialName = getLocalizedBomItemName(item, materials, locale);
 
+  // Compute purchasable buy quantity for display alongside the design quantity
+  const designQty = parseFloat(localQty) || 0;
+  const buyInfo = computeBuyQty(item.material_id, designQty, materials);
+  const mat = materials.find((m) => m.id === item.material_id);
+  // Only show the buy-qty line when designUnit differs from purchasableUnit
+  // (e.g. "10 m² → 4 sheets × 2.88 m²") but not for 1:1 continuous units
+  const showBuyQty =
+    buyInfo != null &&
+    mat != null &&
+    mat.design_unit != null &&
+    mat.purchasable_unit != null &&
+    mat.design_unit !== mat.purchasable_unit;
 
   return (
     <div
@@ -1141,6 +1337,30 @@ function BomItemCard({
           </div>
         );
       })()}
+      {/* Buy quantity line: e.g. "45 m² → 16 sheets × 2.88 m²" */}
+      {showBuyQty && buyInfo && (
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-mono)",
+            marginTop: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <span>
+            {buyInfo.buyQty} {buyInfo.purchasableUnit}
+            {buyInfo.packSize != null && (
+              <> &times; {buyInfo.packSize} {mat?.design_unit ?? item.unit}</>
+            )}
+          </span>
+        </div>
+      )}
       {item.supplier && (
         <div className="bom-item-supplier">
           {item.supplier}
@@ -1414,6 +1634,9 @@ export default function BomPanel({
         )}
         {bom.length > 0 && total > 0 && (
           <CostBreakdownChart bom={bom} materials={materials} total={total} />
+        )}
+        {bom.length > 0 && (
+          <QuoteSummary bom={bom} materials={materials} />
         )}
       </div>
 
