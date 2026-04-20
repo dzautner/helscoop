@@ -7,20 +7,34 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type ConnectionState = "connected" | "disconnected" | "reconnecting" | "reconnected";
 
+/**
+ * Saved once at module level so the wrapper can never stack.
+ * Even if React strict-mode double-fires the effect, the guard
+ * below ensures we only wrap `window.fetch` a single time.
+ */
+let nativeFetch: typeof window.fetch | null = null;
+
 export default function ConnectionBanner() {
   const [state, setState] = useState<ConnectionState>("connected");
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const { t } = useTranslation();
 
+  // Use a ref so the fetch wrapper always reads the latest state
+  // without needing to be in the useEffect dependency array.
+  const stateRef = useRef<ConnectionState>(state);
+  stateRef.current = state;
+
   const checkConnection = useCallback(async () => {
+    // Always call the real fetch for the health check, not the wrapper
+    const fetchFn = nativeFetch ?? window.fetch;
     try {
-      const res = await fetch(`${API_URL}/health`, {
+      const res = await fetchFn.call(window, `${API_URL}/health`, {
         method: "GET",
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
-        if (state === "disconnected" || state === "reconnecting") {
+        if (stateRef.current === "disconnected" || stateRef.current === "reconnecting") {
           setState("reconnected");
           retryCountRef.current = 0;
           // Auto-hide after 3 seconds
@@ -32,7 +46,7 @@ export default function ConnectionBanner() {
       // Network error
     }
     return false;
-  }, [state]);
+  }, []); // no deps -- reads stateRef
 
   const startRetrying = useCallback(() => {
     setState("reconnecting");
@@ -50,34 +64,84 @@ export default function ConnectionBanner() {
     retry();
   }, [checkConnection]);
 
-  useEffect(() => {
-    // Listen for fetch errors globally by overriding fetch
-    const originalFetch = window.fetch;
-
-    window.fetch = async (...args) => {
-      try {
-        const response = await originalFetch(...args);
-        return response;
-      } catch (error) {
-        // Only trigger for API calls
-        const url = typeof args[0] === "string" ? args[0] : (args[0] as Request)?.url || "";
-        if (url.startsWith(API_URL)) {
-          if (state === "connected") {
-            setState("disconnected");
-            startRetrying();
-          }
-        }
-        throw error;
+  const handleRetryNow = useCallback(() => {
+    // Cancel any pending retry timer and check immediately
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    retryCountRef.current = 0;
+    setState("reconnecting");
+    checkConnection().then((ok) => {
+      if (!ok) {
+        startRetrying();
       }
-    };
+    });
+  }, [checkConnection, startRetrying]);
 
+  useEffect(() => {
+    // Save the native fetch exactly once and install the wrapper once.
+    if (nativeFetch === null) {
+      nativeFetch = window.fetch;
+
+      const wrappedFetch: typeof window.fetch = async (...args) => {
+        try {
+          // Always delegate to the original native fetch
+          const response = await nativeFetch!.apply(window, args);
+          return response;
+        } catch (error) {
+          // Only trigger disconnect for API calls
+          const url = typeof args[0] === "string" ? args[0] : (args[0] as Request)?.url || "";
+          if (url.startsWith(API_URL)) {
+            if (stateRef.current === "connected") {
+              setState("disconnected");
+              // Inline start-retrying to avoid stale closure over startRetrying
+              retryCountRef.current = 0;
+              setState("reconnecting");
+
+              const retry = async () => {
+                const fetchFn = nativeFetch ?? window.fetch;
+                let ok = false;
+                try {
+                  const res = await fetchFn.call(window, `${API_URL}/health`, {
+                    method: "GET",
+                    signal: AbortSignal.timeout(5000),
+                  });
+                  ok = res.ok;
+                } catch {
+                  // still offline
+                }
+                if (ok) {
+                  setState("reconnected");
+                  retryCountRef.current = 0;
+                  setTimeout(() => setState("connected"), 3000);
+                } else {
+                  retryCountRef.current++;
+                  const delay = Math.min(2000 * Math.pow(2, retryCountRef.current - 1), 30000);
+                  retryTimeoutRef.current = setTimeout(retry, delay);
+                }
+              };
+              retry();
+            }
+          }
+          throw error;
+        }
+      };
+
+      window.fetch = wrappedFetch;
+    }
+
+    // Cleanup: restore native fetch and cancel pending retries
     return () => {
-      window.fetch = originalFetch;
+      if (nativeFetch !== null) {
+        window.fetch = nativeFetch;
+        nativeFetch = null;
+      }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [state, startRetrying]);
+  }, []); // runs once on mount, cleans up on unmount
 
   if (state === "connected") return null;
 
@@ -143,6 +207,25 @@ export default function ConnectionBanner() {
       {isReconnected
         ? t("errors.reconnected")
         : t("errors.connectionLost")}
+      {!isReconnected && (
+        <button
+          onClick={handleRetryNow}
+          style={{
+            marginLeft: 8,
+            padding: "2px 10px",
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: "var(--font-body)",
+            background: "var(--bg-primary)",
+            color: "var(--amber)",
+            border: "none",
+            borderRadius: 4,
+            cursor: "pointer",
+          }}
+        >
+          {t("errors.retryNow")}
+        </button>
+      )}
     </div>
   );
 }

@@ -536,6 +536,7 @@ const translations = {
       reconnected: 'Yhteys palautettu',
       errorBoundaryTitle: '3D-virhe',
       errorBoundaryReset: 'Nollaa',
+      retryNow: 'Yrita nyt',
     },
   },
   en: {
@@ -1073,6 +1074,7 @@ const translations = {
       reconnected: 'Reconnected',
       errorBoundaryTitle: '3D Error',
       errorBoundaryReset: 'Reset',
+      retryNow: 'Retry now',
     },
   },
 } as const;
