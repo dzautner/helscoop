@@ -99,7 +99,8 @@ export default function ScreenshotPopover({
     <div
       ref={popoverRef}
       role="dialog"
-      aria-label={t("screenshot.dialogTitle")}
+      aria-label={t("screenshot.popoverLabel")}
+      aria-modal="true"
       tabIndex={-1}
       style={{
         position: "absolute",
@@ -131,8 +132,10 @@ export default function ScreenshotPopover({
           alt="Screenshot preview"
           style={{
             width: "100%",
+            aspectRatio: "16 / 9",
             borderRadius: "var(--radius-md)",
             display: "block",
+            background: "var(--surface-base, #1a1a1a)",
           }}
         />
       </div>
