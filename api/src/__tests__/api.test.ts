@@ -262,8 +262,8 @@ describe("Building endpoint security", () => {
     expect(src).toContain("buildingLimiter");
     expect(src).toContain("buildingLimiterAuthenticated");
 
-    // Abuse logging
-    expect(src).toContain("RATE_LIMIT");
+    // Abuse logging (rate limit handler logs via logger.warn)
+    expect(src).toContain("logger.warn");
     expect(src).toContain("Building endpoint rate limit hit");
   });
 
