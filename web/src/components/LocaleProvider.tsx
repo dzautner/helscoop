@@ -16,13 +16,16 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setLocaleState(detectLocale());
+    const detected = detectLocale();
+    setLocaleState(detected);
+    document.documentElement.lang = detected;
     setMounted(true);
   }, []);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
     persistLocale(newLocale);
+    document.documentElement.lang = newLocale;
   }, []);
 
   const t = useCallback(
