@@ -155,6 +155,7 @@ const translations = {
       loadPricingFailed: 'Hintatietojen lataus epaonnistui',
       materialRemoved: 'Materiaali poistettu',
       undo: 'Kumoa',
+      overflowMore: '+{{count}} lisaa',
     },
     editor: {
       scene: 'Kohtaus',
@@ -693,6 +694,7 @@ const translations = {
       loadPricingFailed: 'Failed to load pricing',
       materialRemoved: 'Material removed',
       undo: 'Undo',
+      overflowMore: '+{{count}} more',
     },
     editor: {
       scene: 'Scene',
