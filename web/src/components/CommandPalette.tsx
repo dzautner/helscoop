@@ -21,6 +21,8 @@ export interface Command {
   action: () => void;
   /** Category for grouped display */
   category?: CommandCategory;
+  /** Whether this toggle command is currently active/on (undefined = not a toggle) */
+  isActive?: boolean;
 }
 
 const RECENT_COMMANDS_KEY = "helscoop_recent_commands";
@@ -396,11 +398,29 @@ export default function CommandPalette({
                     )}
                   </div>
                 </div>
-                {cmd.shortcut && (
-                  <kbd className="cmd-palette-kbd">
-                    {formatShortcutDisplay(cmd.shortcut)}
-                  </kbd>
-                )}
+                <div className="cmd-palette-item-right">
+                  {cmd.isActive !== undefined && (
+                    <span
+                      className={`cmd-palette-toggle-state${cmd.isActive ? " cmd-palette-toggle-on" : ""}`}
+                      aria-label={cmd.isActive ? t("commandPalette.stateOn") : t("commandPalette.stateOff")}
+                    >
+                      {cmd.isActive ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <span className="cmd-palette-toggle-off-label">
+                          {t("commandPalette.stateOff")}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {cmd.shortcut && (
+                    <kbd className="cmd-palette-kbd">
+                      {formatShortcutDisplay(cmd.shortcut)}
+                    </kbd>
+                  )}
+                </div>
               </button>
             );
           })}

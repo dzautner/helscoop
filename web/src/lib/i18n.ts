@@ -502,6 +502,8 @@ const translations = {
       categoryScene: 'Nakyma',
       categoryProject: 'Projekti',
       categoryPreferences: 'Asetukset',
+      stateOn: 'Paalla',
+      stateOff: 'Pois',
     },
     validation: {
       unmatchedCloser: 'Sulkumerkilla {{char}} ei ole paria (rivi {{line}})',
@@ -1047,6 +1049,8 @@ const translations = {
       categoryScene: 'Scene',
       categoryProject: 'Project',
       categoryPreferences: 'Preferences',
+      stateOn: 'On',
+      stateOff: 'Off',
     },
     validation: {
       unmatchedCloser: 'Unmatched closing {{char}} on line {{line}}',
