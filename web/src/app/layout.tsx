@@ -92,6 +92,8 @@ export default function RootLayout({
             __html: `(function(){try{var l=localStorage.getItem("helscoop_locale")||"fi";document.documentElement.lang=l}catch(e){}})()`
           }}
         />
+        {/* Google Identity Services — for Google Sign-In */}
+        <script src="https://accounts.google.com/gsi/client" async defer />
         {/* Plausible Analytics — privacy-first, no cookies, GDPR-compliant */}
         <script
           defer
