@@ -68,7 +68,7 @@ export default function SettingsPage() {
       const result = await api.updateProfile({ name, email });
       setUser(result.user);
       if (result.token) {
-        setToken(result.token);
+        setToken(result.token, result.token_expires_at);
       }
       toast(t("settings.profileUpdated"), "success");
     } catch (err) {

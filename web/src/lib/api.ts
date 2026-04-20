@@ -2,16 +2,28 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 let token: string | null = null;
 
-export function setToken(t: string | null) {
+// Epoch-seconds timestamp of when the current access token expires.
+// Set when we receive `token_expires_at` from the API (login, register, refresh).
+let tokenExpiresAt: number | null = null;
+
+export function setToken(t: string | null, expiresAt?: number) {
   token = t;
-  if (t) localStorage.setItem("helscoop_token", t);
-  else localStorage.removeItem("helscoop_token");
+  tokenExpiresAt = expiresAt ?? null;
+  if (t) {
+    localStorage.setItem("helscoop_token", t);
+    if (expiresAt) localStorage.setItem("helscoop_token_expires_at", String(expiresAt));
+  } else {
+    localStorage.removeItem("helscoop_token");
+    localStorage.removeItem("helscoop_token_expires_at");
+  }
 }
 
 export function getToken(): string | null {
   if (token) return token;
   if (typeof window !== "undefined") {
     token = localStorage.getItem("helscoop_token");
+    const exp = localStorage.getItem("helscoop_token_expires_at");
+    if (exp) tokenExpiresAt = parseInt(exp, 10);
   }
   return token;
 }
@@ -39,7 +51,71 @@ const ERROR_MESSAGES: Record<number, string> = {
   500: "Palvelinvirhe / Server error",
 };
 
+// ---------------------------------------------------------------------------
+// Token refresh helpers
+// ---------------------------------------------------------------------------
+
+// Proactive refresh threshold: refresh if the token expires within 5 minutes.
+const REFRESH_THRESHOLD_SECONDS = 5 * 60;
+
+// Serialize concurrent refresh attempts — only one in-flight at a time.
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Call POST /auth/refresh with the current token.
+ * Returns true if the token was successfully refreshed, false otherwise.
+ */
+async function refreshAccessToken(): Promise<boolean> {
+  const t = getToken();
+  if (!t) return false;
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${t}`,
+      },
+    });
+    if (!res.ok) return false;
+    const body = await res.json();
+    if (body.token) {
+      setToken(body.token, body.token_expires_at);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/** Deduplicated refresh: multiple callers share a single in-flight refresh. */
+function refreshOnce(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+/** Returns true if the current token is about to expire. */
+function tokenNeedsRefresh(): boolean {
+  if (!tokenExpiresAt) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return tokenExpiresAt - nowSeconds < REFRESH_THRESHOLD_SECONDS;
+}
+
+// ---------------------------------------------------------------------------
+// Core fetch wrapper with automatic token refresh
+// ---------------------------------------------------------------------------
+
 async function apiFetch(path: string, opts?: RequestInit) {
+  // Proactive refresh: if token expires soon, refresh before the request.
+  const isRefreshEndpoint = path === "/auth/refresh";
+  if (!isRefreshEndpoint && getToken() && tokenNeedsRefresh()) {
+    await refreshOnce();
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(opts?.headers as Record<string, string>),
@@ -50,8 +126,27 @@ async function apiFetch(path: string, opts?: RequestInit) {
   const res = await fetch(`${API_URL}${path}`, { ...opts, headers });
 
   if (!res.ok) {
-    const isAuthEndpoint = path.startsWith("/auth/login") || path.startsWith("/auth/register");
+    const isAuthEndpoint =
+      path.startsWith("/auth/login") ||
+      path.startsWith("/auth/register") ||
+      isRefreshEndpoint;
+
+    // On 401 for a non-auth endpoint, attempt a single token refresh
     if (res.status === 401 && !isAuthEndpoint) {
+      const refreshed = await refreshOnce();
+      if (refreshed) {
+        // Retry the original request with the new token
+        const retryHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+          ...(opts?.headers as Record<string, string>),
+        };
+        const newToken = getToken();
+        if (newToken) retryHeaders.Authorization = `Bearer ${newToken}`;
+        const retryRes = await fetch(`${API_URL}${path}`, { ...opts, headers: retryHeaders });
+        if (retryRes.ok) return retryRes.json();
+        // Retry also failed — fall through to logout
+      }
+
       setToken(null);
       if (typeof window !== "undefined") {
         window.location.href = "/";

@@ -3,9 +3,9 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
-// Import the auth module - signToken and requireAuth are pure functions
-// that don't need a database connection
-import { signToken, requireAuth, requireAdmin } from "../auth";
+// Import the auth module - signToken, requireAuth, and verifyForRefresh
+// are pure functions that don't need a database connection
+import { signToken, tokenExpiresAt, verifyForRefresh, requireAuth, requireAdmin } from "../auth";
 import type { AuthUser } from "../auth";
 
 describe("signToken", () => {
@@ -25,12 +25,12 @@ describe("signToken", () => {
     expect(decoded.role).toBe("admin");
   });
 
-  it("sets a 7-day expiration", () => {
+  it("sets a 15-minute expiration", () => {
     const user: AuthUser = { id: "user-1", email: "test@test.com", role: "user" };
     const token = signToken(user);
     const decoded = jwt.verify(token, JWT_SECRET) as { iat: number; exp: number };
-    const days = (decoded.exp - decoded.iat) / (60 * 60 * 24);
-    expect(days).toBe(7);
+    const minutes = (decoded.exp - decoded.iat) / 60;
+    expect(minutes).toBe(15);
   });
 
   it("produces different tokens for different users", () => {
@@ -180,6 +180,81 @@ describe("requireAdmin middleware", () => {
     requireAdmin(req, res, next);
     expect(res._status).toBe(403);
     expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe("tokenExpiresAt", () => {
+  it("returns an epoch-seconds value ~15 minutes in the future", () => {
+    const before = Math.floor(Date.now() / 1000);
+    const exp = tokenExpiresAt();
+    const after = Math.floor(Date.now() / 1000);
+    // Should be between 14 and 16 minutes from now (allowing 1 min clock tolerance)
+    expect(exp).toBeGreaterThanOrEqual(before + 14 * 60);
+    expect(exp).toBeLessThanOrEqual(after + 16 * 60);
+  });
+});
+
+describe("verifyForRefresh", () => {
+  it("accepts a valid (non-expired) token", () => {
+    const user: AuthUser = { id: "user-1", email: "test@test.com", role: "user" };
+    const token = signToken(user);
+    const result = verifyForRefresh(token);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe("user-1");
+    expect(result!.email).toBe("test@test.com");
+    expect(result!.role).toBe("user");
+  });
+
+  it("strips extra JWT fields and returns only id, email, role", () => {
+    const user: AuthUser = { id: "user-1", email: "test@test.com", role: "user" };
+    const token = signToken(user);
+    const result = verifyForRefresh(token);
+    expect(result).toEqual({ id: "user-1", email: "test@test.com", role: "user" });
+    // Should not have iat, exp, etc.
+    expect(result).not.toHaveProperty("iat");
+    expect(result).not.toHaveProperty("exp");
+  });
+
+  it("accepts a token that expired within the 60-second grace window", () => {
+    // Create a token that expired 30 seconds ago
+    const token = jwt.sign(
+      { id: "user-1", email: "test@test.com", role: "user" },
+      JWT_SECRET,
+      { expiresIn: "-30s" }  // Expired 30 seconds ago — within 60s grace
+    );
+    // Normal verify should reject it
+    expect(() => jwt.verify(token, JWT_SECRET)).toThrow();
+    // But refresh verify should accept it
+    const result = verifyForRefresh(token);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe("user-1");
+  });
+
+  it("rejects a token that expired beyond the grace window", () => {
+    // Create a token that expired 2 minutes ago
+    const token = jwt.sign(
+      { id: "user-1", email: "test@test.com", role: "user" },
+      JWT_SECRET,
+      { expiresIn: "-120s" }
+    );
+    const result = verifyForRefresh(token);
+    expect(result).toBeNull();
+  });
+
+  it("rejects a token signed with the wrong secret", () => {
+    const token = jwt.sign(
+      { id: "user-1", email: "test@test.com", role: "user" },
+      "wrong-secret",
+      { expiresIn: "15m" }
+    );
+    const result = verifyForRefresh(token);
+    expect(result).toBeNull();
+  });
+
+  it("rejects a completely invalid token", () => {
+    expect(verifyForRefresh("not.a.valid.token")).toBeNull();
+    expect(verifyForRefresh("")).toBeNull();
+    expect(verifyForRefresh("abc")).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { login, register, signToken, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, AuthUser } from "./auth";
+import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, AuthUser } from "./auth";
 import { query, pool } from "./db";
 import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
@@ -266,7 +266,7 @@ app.post("/auth/login", authLimiter, async (req, res) => {
   }
   const user = await login(email, password);
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
-  res.json({ token: signToken(user), user });
+  res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
 });
 
 app.post("/auth/register", authLimiter, async (req, res) => {
@@ -286,7 +286,7 @@ app.post("/auth/register", authLimiter, async (req, res) => {
   const sanitizedName = sanitize(name);
   try {
     const user = await register(email, password, sanitizedName);
-    res.status(201).json({ token: signToken(user), user });
+    res.status(201).json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
   } catch (e: unknown) {
     logger.error({ err: e }, "Registration error");
     Sentry.captureException(e);
@@ -342,7 +342,7 @@ app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => 
     }
     // Return a fresh token with updated user info
     const user = result.rows[0];
-    res.json({ user, token: signToken(user) });
+    res.json({ user, token: signToken(user), token_expires_at: tokenExpiresAt() });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Update failed";
     if (msg.includes("duplicate key")) {
@@ -547,6 +547,21 @@ app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (
     Sentry.captureException(e);
     res.status(500).json({ error: "Failed to resend verification email" });
   }
+});
+
+// Refresh token endpoint — accepts a valid or recently-expired JWT and returns
+// a new access token.  Uses authLimiter to prevent abuse.
+app.post("/auth/refresh", authLimiter, (req, res) => {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing authorization header" });
+  }
+  const oldToken = header.slice(7);
+  const user = verifyForRefresh(oldToken);
+  if (!user) {
+    return res.status(401).json({ error: "Token expired or invalid" });
+  }
+  res.json({ token: signToken(user), token_expires_at: tokenExpiresAt() });
 });
 
 // Authenticated routes get the relaxed rate limiter (500 req/15min per user)
