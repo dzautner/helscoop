@@ -171,6 +171,28 @@ describe("Chat endpoint", () => {
     expect(src).toContain("box(");
     expect(src).toContain("translate(");
   });
+
+  it("chatLimiter is keyed by user ID, not IP, and limit is 40 req/15min", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const indexPath = path.resolve(__dirname, "../index.ts");
+    const src = fs.readFileSync(indexPath, "utf-8");
+
+    // The limiter must use extractUserId for key generation
+    const chatLimiterBlock = src.slice(
+      src.indexOf("// Chat endpoint rate limiter"),
+      src.indexOf("// Building lookup rate limiter")
+    );
+
+    expect(chatLimiterBlock).toContain("extractUserId");
+    expect(chatLimiterBlock).toContain("keyGenerator");
+    // Limit raised to 40 for power users
+    expect(chatLimiterBlock).toContain("40");
+    // 429 handler must expose retry timing for the frontend
+    expect(chatLimiterBlock).toContain("retryAfter");
+    expect(chatLimiterBlock).toContain("resetAt");
+    expect(chatLimiterBlock).toContain("Retry-After");
+  });
 });
 
 describe("Web app", () => {

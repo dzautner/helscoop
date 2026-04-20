@@ -73,7 +73,7 @@ app.use((req, _res, next) => {
 //   - publicLimiter:         100 req/15min per IP   — anonymous/public endpoints
 //   - authenticatedLimiter:  500 req/15min per user  — project saves, BOM, etc.
 //   - authLimiter:            10 req/15min per IP   — login/register/reset
-//   - chatLimiter:            20 req/15min per IP   — AI chat endpoint
+//   - chatLimiter:            40 req/15min per user  — AI chat endpoint
 // ---------------------------------------------------------------------------
 
 // Try to extract user ID from JWT for rate-limit keying (does NOT enforce auth)
@@ -123,13 +123,29 @@ const authLimiter = rateLimit({
   message: { error: "Too many auth attempts, please try again later" },
 });
 
-// Stricter rate limiter for chat endpoint: 20 requests per 15 minutes per IP
+// Chat endpoint rate limiter: 40 requests per 15 minutes keyed by user ID.
+// Falls back to IP for unauthenticated requests so shared networks (offices,
+// universities) don't exhaust a single bucket for all their users.
 const chatLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: IS_TEST ? 10000 : IS_DEV ? 200 : 20,
+  max: IS_TEST ? 10000 : IS_DEV ? 400 : 40,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many chat requests, please try again later" },
+  validate: false,
+  keyGenerator: (req) => {
+    return extractUserId(req) || req.ip || "unknown";
+  },
+  handler: (req, res, _next, options) => {
+    // Expose when the window resets so the frontend can show a countdown.
+    const resetMs = (req as express.Request & { rateLimit?: { resetTime?: Date } }).rateLimit?.resetTime?.getTime();
+    const retryAfter = resetMs ? Math.ceil((resetMs - Date.now()) / 1000) : options.windowMs / 1000;
+    res.setHeader("Retry-After", retryAfter);
+    res.status(429).json({
+      error: "Too many chat requests, please try again later",
+      retryAfter,
+      resetAt: resetMs ? new Date(resetMs).toISOString() : null,
+    });
+  },
 });
 
 // Building lookup rate limiter: unauthenticated gets 10 req/min,
