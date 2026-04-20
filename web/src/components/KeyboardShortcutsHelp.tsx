@@ -182,7 +182,7 @@ export default function KeyboardShortcutsHelp({
           </h2>
           <button
             ref={closeButtonRef}
-            aria-label="Close"
+            aria-label={t("shortcuts.close")}
             onClick={onClose}
             style={{
               background: "none",
@@ -191,6 +191,11 @@ export default function KeyboardShortcutsHelp({
               cursor: "pointer",
               fontSize: 18,
               padding: "4px 8px",
+              minWidth: 44,
+              minHeight: 44,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               lineHeight: 1,
             }}
           >

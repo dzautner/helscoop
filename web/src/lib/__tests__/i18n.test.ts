@@ -457,7 +457,7 @@ describe("exhaustive i18n key parity", () => {
     "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
     "share.signUpCta", "share.materials", "share.total",
     // shortcuts
-    "shortcuts.title", "shortcuts.save", "shortcuts.toggleBom", "shortcuts.applyCode",
+    "shortcuts.title", "shortcuts.close", "shortcuts.save", "shortcuts.toggleBom", "shortcuts.applyCode",
     "shortcuts.closePanel", "shortcuts.showShortcuts", "shortcuts.undo", "shortcuts.redo",
     "shortcuts.commandPalette", "shortcuts.escToClose",
     // settings
