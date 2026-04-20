@@ -20,6 +20,7 @@ import rolesRouter from "./routes/roles";
 import auditRouter from "./routes/audit";
 import adminRouter from "./routes/admin";
 import affiliatesRouter from "./routes/affiliates";
+import complianceRouter from "./routes/compliance";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -616,6 +617,7 @@ app.use("/roles", authenticatedLimiter, rolesRouter);
 app.use("/audit", authenticatedLimiter, auditRouter);
 app.use("/admin", authenticatedLimiter, adminRouter);
 app.use("/affiliates", authenticatedLimiter, affiliatesRouter);
+app.use("/compliance", authenticatedLimiter, complianceRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
