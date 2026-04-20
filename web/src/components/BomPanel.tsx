@@ -1047,6 +1047,7 @@ function BomItemCard({
 
   const materialName = getLocalizedBomItemName(item, materials, locale);
 
+
   return (
     <div
       ref={cardRef}

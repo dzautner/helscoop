@@ -5,7 +5,20 @@ import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import ConfidenceBadge from "@/components/ConfidenceBadge";
+import type { DataProvenance } from "@/lib/confidence";
 import type { BuildingResult } from "@/types";
+
+/** Map a BuildingResult confidence string to a DataProvenance object */
+function buildingResultToProvenance(result: BuildingResult): DataProvenance {
+  if (result.confidence === "verified") {
+    return { confidence: "verified", source: result.data_sources?.[0] ?? "DVV/MML" };
+  }
+  if (result.confidence === "template") {
+    return { confidence: "demo", source: "template" };
+  }
+  return { confidence: "estimated", source: result.data_sources?.[0] ?? "heuristic" };
+}
 
 function Viewport3DLoading() {
   const { t } = useTranslation();
@@ -180,14 +193,7 @@ export default function AddressSearch({
                     <span className="badge badge-amber" style={{ fontSize: 11 }}>
                       {buildingTypeLabels[result.building_info.type] || result.building_info.type}
                     </span>
-                    <span className="badge" style={{
-                      fontSize: 10,
-                      background: result.confidence === "verified" ? "rgba(34,197,94,0.1)" : "var(--amber-glow)",
-                      color: result.confidence === "verified" ? "rgb(34,197,94)" : "var(--amber)",
-                      border: `1px solid ${result.confidence === "verified" ? "rgba(34,197,94,0.2)" : "var(--amber-border)"}`,
-                    }}>
-                      {result.confidence === "verified" ? t('search.verified') : t('search.estimated')}
-                    </span>
+                    <ConfidenceBadge provenance={buildingResultToProvenance(result)} />
                     <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
                       {result.building_info.year_built} &middot; {result.building_info.area_m2} m&sup2;
                     </span>
@@ -328,20 +334,7 @@ export default function AddressSearch({
                     <span className="badge badge-amber">
                       {buildingTypeLabels[result.building_info.type] || result.building_info.type}
                     </span>
-                    <span
-                      className="badge"
-                      style={{
-                        background: result.confidence === "verified"
-                          ? "var(--forest-dim)"
-                          : "var(--amber-glow)",
-                        color: result.confidence === "verified"
-                          ? "var(--forest)"
-                          : "var(--amber)",
-                        border: `1px solid ${result.confidence === "verified" ? "rgba(34,197,94,0.2)" : "var(--amber-border)"}`,
-                      }}
-                    >
-                      {result.confidence === "verified" ? t('search.verified') : t('search.estimated')}
-                    </span>
+                    <ConfidenceBadge provenance={buildingResultToProvenance(result)} />
                   </div>
                 </div>
                 <div style={{
