@@ -209,7 +209,7 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
       `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
     );
     if (!res.ok) return null;
-    const payload = await res.json();
+    const payload = (await res.json()) as Record<string, unknown>;
 
     // Verify the token was issued for our application
     if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
@@ -219,11 +219,11 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
     if (!payload.email || !payload.sub) return null;
 
     return {
-      sub: payload.sub,
-      email: payload.email,
+      sub: payload.sub as string,
+      email: payload.email as string,
       email_verified: payload.email_verified === "true" || payload.email_verified === true,
-      name: payload.name || payload.email.split("@")[0],
-      picture: payload.picture,
+      name: (payload.name as string) || (payload.email as string).split("@")[0],
+      picture: payload.picture as string | undefined,
     };
   } catch {
     return null;
