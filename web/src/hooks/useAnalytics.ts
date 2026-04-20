@@ -27,6 +27,7 @@ export type AnalyticsEvent =
   | "chat_code_applied"
   | "auth_register"
   | "auth_login"
+  | "auth_google_login"
   | "page_view";
 
 // ── Property maps per event ────────────────────────────────────────
@@ -44,6 +45,7 @@ export interface AnalyticsEventProps {
   chat_code_applied: Record<string, never>;
   auth_register: Record<string, never>;
   auth_login: Record<string, never>;
+  auth_google_login: Record<string, never>;
   page_view: { path: string };
 }
 
