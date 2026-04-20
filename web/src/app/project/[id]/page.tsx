@@ -540,6 +540,48 @@ export default function ProjectPage() {
         },
       },
       {
+        id: "export-project",
+        labelKey: "commandPalette.exportProject",
+        labelSecondaryKey: "commandPalette.exportProjectEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        ),
+        action: () => {
+          try {
+            track("project_exported", { format: "helscoop" });
+            const exportData = {
+              version: 1,
+              name: projectName,
+              description: projectDesc,
+              scene_js: sceneJs,
+              bom: bom.map((b) => ({
+                material_id: b.material_id,
+                material_name: b.material_name,
+                quantity: b.quantity,
+                unit: b.unit,
+                unit_price: b.unit_price,
+                total: b.total,
+              })),
+              exportedAt: new Date().toISOString(),
+            };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${projectName.replace(/\s+/g, '_')}.helscoop`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast(t("toast.projectExported"), "success");
+          } catch (err) {
+            toast(err instanceof Error ? err.message : t("toast.projectExportFailed"), "error");
+          }
+        },
+      },
+      {
         id: "share-project",
         labelKey: "commandPalette.shareProject",
         labelSecondaryKey: "commandPalette.shareProjectEn",
@@ -947,6 +989,49 @@ export default function ProjectPage() {
                     <polyline points="16 3 16 8 21 8" />
                   </svg>
                   JSON
+                </button>
+                <div style={{ height: 1, background: "var(--border)", margin: "2px 8px" }} />
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    try {
+                      track("project_exported", { format: "helscoop" });
+                      const exportData = {
+                        version: 1,
+                        name: projectName,
+                        description: projectDesc,
+                        scene_js: sceneJs,
+                        bom: bom.map((b) => ({
+                          material_id: b.material_id,
+                          material_name: b.material_name,
+                          quantity: b.quantity,
+                          unit: b.unit,
+                          unit_price: b.unit_price,
+                          total: b.total,
+                        })),
+                        exportedAt: new Date().toISOString(),
+                      };
+                      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${projectName.replace(/\s+/g, '_')}.helscoop`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast(t('toast.projectExported'), "success");
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : t('toast.projectExportFailed'), "error");
+                    }
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  {t('editor.exportProject')}
                 </button>
               </div>
             )}
