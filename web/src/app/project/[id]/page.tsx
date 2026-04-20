@@ -104,7 +104,7 @@ export default function ProjectPage() {
   const projectId = params.id as string;
   const { toast } = useToast();
   const { t, locale } = useTranslation();
-  const { toggle: toggleTheme } = useTheme();
+  const { toggle: toggleTheme, resolved: resolvedTheme } = useTheme();
   const { track } = useAnalytics();
   const { markCodeEditor, markChat } = useEditorSession();
 
@@ -486,6 +486,7 @@ export default function ProjectPage() {
         labelSecondaryKey: "commandPalette.toggleWireframeEn",
         icon: icon("M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"),
         action: () => setWireframe((v) => !v),
+        isActive: wireframe,
       },
       {
         id: "reset-camera",
@@ -511,6 +512,7 @@ export default function ProjectPage() {
           </svg>
         ),
         action: () => { if (!showCode) markCodeEditor(); setShowCode((v) => !v); },
+        isActive: showCode,
       },
       {
         id: "toggle-bom",
@@ -528,6 +530,7 @@ export default function ProjectPage() {
           </svg>
         ),
         action: () => setShowBom((v) => !v),
+        isActive: showBom,
       },
       {
         id: "export-pdf",
@@ -638,6 +641,7 @@ export default function ProjectPage() {
           </svg>
         ),
         action: toggleTheme,
+        isActive: resolvedTheme === "dark",
       },
       {
         id: "show-shortcuts",
@@ -682,9 +686,10 @@ export default function ProjectPage() {
           </svg>
         ),
         action: () => setShowDocs((v) => !v),
+        isActive: showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, markCodeEditor]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, markCodeEditor, wireframe, showBom, showDocs, resolvedTheme]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);

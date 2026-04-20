@@ -3952,6 +3952,38 @@ select:focus {
   color: var(--text-muted);
 }
 
+.cmd-palette-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cmd-palette-toggle-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  color: var(--text-muted);
+  transition: color var(--transition-micro);
+}
+
+.cmd-palette-toggle-on {
+  color: var(--amber);
+}
+
+.cmd-palette-toggle-off-label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+}
+
+.cmd-palette-item[data-selected="true"] .cmd-palette-toggle-on {
+  color: var(--amber);
+}
+
 /* Light theme overrides */
 [data-theme="light"] .cmd-palette {
   background: rgba(255, 255, 255, 0.88);

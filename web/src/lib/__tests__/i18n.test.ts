@@ -523,6 +523,7 @@ describe("exhaustive i18n key parity", () => {
     "commandPalette.showShortcuts", "commandPalette.showShortcutsEn",
     "commandPalette.save", "commandPalette.saveEn",
     "commandPalette.showDocs", "commandPalette.showDocsEn",
+    "commandPalette.stateOn", "commandPalette.stateOff",
     // validation
     "validation.unmatchedCloser", "validation.unmatchedOpener", "validation.typoDetected",
     "validation.undefinedIdentifier", "validation.emptyScene", "validation.tooManyObjects",
