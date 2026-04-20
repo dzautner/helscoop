@@ -370,6 +370,33 @@ export default function ProjectPage() {
     document.addEventListener("mouseup", onUp);
   }, [bomWidth]);
 
+  const startTouchResize = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.touches[0].clientX;
+    const startWidth = bomWidth;
+    const onMove = (ev: TouchEvent) => {
+      if (ev.touches.length !== 1) return;
+      const delta = startX - ev.touches[0].clientX;
+      const next = Math.max(260, Math.min(600, startWidth + delta));
+      setBomWidth(next);
+    };
+    const onEnd = () => {
+      resizingRef.current = false;
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onEnd);
+      setBomWidth((w) => {
+        localStorage.setItem("helscoop_bom_width", String(w));
+        return w;
+      });
+    };
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+    document.addEventListener("touchcancel", onEnd);
+  }, [bomWidth]);
+
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
 
   const handleParamChange = useCallback(
@@ -1443,7 +1470,11 @@ export default function ProjectPage() {
           <>
             <div
               className="resize-handle-v"
+              role="separator"
+              aria-label="Resize BOM panel"
+              aria-orientation="vertical"
               onMouseDown={startResize}
+              onTouchStart={startTouchResize}
             />
             <BomPanel
               bom={bom}

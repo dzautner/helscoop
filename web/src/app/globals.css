@@ -1906,6 +1906,7 @@ select:focus {
 }
 
 .resize-handle-v {
+  /* Visible hit-zone: 5px wide, touch pseudo-element expands to 44px (WCAG 2.5.5) */
   width: 5px;
   cursor: col-resize;
   flex-shrink: 0;
@@ -1914,26 +1915,54 @@ select:focus {
   margin: 0 -2px;
   background: transparent;
   transition: background var(--transition-fast);
+  touch-action: none; /* let JS handle all touch interactions on this element */
 }
+
+/* Expand interactive area to 44px touch target without affecting layout */
+.resize-handle-v::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  pointer-events: none;
+}
+
 .resize-handle-v:hover,
 .resize-handle-v:active {
   background: var(--amber);
 }
+
+/* Grab indicator: three dots centred on the handle (always visible, amber on hover) */
 .resize-handle-v::after {
   content: "";
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 3px;
-  height: 32px;
-  border-radius: 2px;
-  background: var(--border);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  width: 4px;
+  height: 24px;
+  background-image:
+    radial-gradient(circle, var(--text-muted) 1.5px, transparent 1.5px),
+    radial-gradient(circle, var(--text-muted) 1.5px, transparent 1.5px),
+    radial-gradient(circle, var(--text-muted) 1.5px, transparent 1.5px);
+  background-size: 4px 8px;
+  background-repeat: no-repeat;
+  background-position: center 0px, center 8px, center 16px;
+  opacity: 0.4;
+  transition: opacity var(--transition-fast), background-image var(--transition-fast);
+  pointer-events: none;
 }
-.resize-handle-v:hover::after {
+
+.resize-handle-v:hover::after,
+.resize-handle-v:active::after {
   opacity: 1;
+  background-image:
+    radial-gradient(circle, var(--amber) 1.5px, transparent 1.5px),
+    radial-gradient(circle, var(--amber) 1.5px, transparent 1.5px),
+    radial-gradient(circle, var(--amber) 1.5px, transparent 1.5px);
 }
 
 .editor-bom-panel {
