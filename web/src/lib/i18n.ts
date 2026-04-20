@@ -709,6 +709,7 @@ const translations = {
       emptyDescription: 'No description',
       descriptionPlaceholder: 'Description...',
       orStartFromTemplate: 'Or start from a template',
+      useTemplate: 'Use template: {{name}}',
       searchPlaceholder: 'Search projects...',
       sortByName: 'Name (A\u2013Z)',
       sortByModified: 'Last modified',
