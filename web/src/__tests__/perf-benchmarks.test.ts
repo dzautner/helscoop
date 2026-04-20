@@ -16,13 +16,14 @@ import { resolve } from "path";
 import { evaluateScene, __setWasmForTesting } from "../lib/manifold-engine";
 
 // Budget thresholds — tighten these as we optimize
+// CI runners are ~2.5x slower than local dev machines — budgets must account for this
 const BUDGETS = {
-  coldEvalMs: 6000,       // Full kanala eval + tessellation
-  cacheHitMs: 5,          // LRU cache lookup should be <5ms
-  paramChangeMs: 6000,    // Re-eval with one param changed
-  tessTriPerMs: 50,       // Min throughput: 50 triangles/ms
-  evalOnlyMs: 200,        // Script evaluation without tessellation
-  wasmInitMs: 2000,       // WASM module initialization
+  coldEvalMs: 15000,      // Full kanala eval + tessellation (local ~3s, CI ~7.5s)
+  cacheHitMs: 10,         // LRU cache lookup should be <10ms
+  paramChangeMs: 15000,   // Re-eval with one param changed
+  tessTriPerMs: 20,       // Min throughput: 20 triangles/ms (CI is slower)
+  evalOnlyMs: 500,        // Script evaluation without tessellation
+  wasmInitMs: 5000,       // WASM module initialization
 };
 
 let kanalaScript: string;
