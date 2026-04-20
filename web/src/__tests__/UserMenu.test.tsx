@@ -4,12 +4,20 @@ import UserMenu from "@/components/UserMenu";
 
 vi.mock("@/components/LocaleProvider", () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, params?: Record<string, string | number>) => {
       const translations: Record<string, string> = {
         "nav.settings": "Settings",
         "nav.logout": "Log out",
+        "userMenu.avatarAriaLabel": "User menu for {{name}}",
+        "userMenu.menuAriaLabel": "{{name}} menu",
       };
-      return translations[key] ?? key;
+      let value = translations[key] ?? key;
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          value = value.replace(`{{${k}}}`, String(v));
+        }
+      }
+      return value;
     },
   }),
 }));
