@@ -469,6 +469,10 @@ const translations = {
       showDocsEn: 'Show/hide docs',
       exportProject: 'Vie projekti (.helscoop)',
       exportProjectEn: 'Export project (.helscoop)',
+      categoryRecent: 'Viimeisin',
+      categoryScene: 'Nakyma',
+      categoryProject: 'Projekti',
+      categoryPreferences: 'Asetukset',
     },
     validation: {
       unmatchedCloser: 'Sulkumerkilla {{char}} ei ole paria (rivi {{line}})',
@@ -966,6 +970,10 @@ const translations = {
       showDocsEn: 'Show/hide docs',
       exportProject: 'Export project (.helscoop)',
       exportProjectEn: 'Export project (.helscoop)',
+      categoryRecent: 'Recent',
+      categoryScene: 'Scene',
+      categoryProject: 'Project',
+      categoryPreferences: 'Preferences',
     },
     validation: {
       unmatchedCloser: 'Unmatched closing {{char}} on line {{line}}',

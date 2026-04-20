@@ -3749,13 +3749,31 @@ select:focus {
   font-size: 13px;
 }
 
+.cmd-palette-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 10px 12px 4px;
+  line-height: 1.2;
+  font-family: var(--font-mono);
+}
+
+.cmd-palette-group-header:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
 .cmd-palette-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 14px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
@@ -3770,6 +3788,21 @@ select:focus {
 .cmd-palette-item[data-selected="true"] {
   background: var(--amber-glow);
   color: var(--text-primary);
+}
+
+/* Amber left accent bar on selected item */
+.cmd-palette-item[data-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 2px;
+  background: var(--amber);
+  opacity: 1;
+  transition: opacity var(--transition-micro);
 }
 
 .cmd-palette-item[data-selected="true"] .cmd-palette-item-icon {

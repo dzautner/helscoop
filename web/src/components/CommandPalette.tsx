@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 
+/** Command category for grouping in the palette */
+export type CommandCategory = "scene" | "project" | "preferences";
+
 export interface Command {
   /** Unique identifier */
   id: string;
@@ -16,7 +19,47 @@ export interface Command {
   icon?: React.ReactNode;
   /** Action to run when the command is selected */
   action: () => void;
+  /** Category for grouped display */
+  category?: CommandCategory;
 }
+
+const RECENT_COMMANDS_KEY = "helscoop_recent_commands";
+const MAX_RECENT = 3;
+
+/** Category display order */
+const CATEGORY_ORDER: CommandCategory[] = ["scene", "project", "preferences"];
+
+/** Infer category from command id if not explicitly set */
+function inferCategory(id: string): CommandCategory {
+  if (
+    id === "toggle-wireframe" ||
+    id === "reset-camera" ||
+    id === "toggle-code-editor" ||
+    id === "show-docs"
+  ) return "scene";
+  if (
+    id === "save" ||
+    id === "share-project" ||
+    id === "export-pdf" ||
+    id === "export-project" ||
+    id === "toggle-bom"
+  ) return "project";
+  return "preferences";
+}
+
+/** Category label i18n keys */
+const CATEGORY_LABEL_KEYS: Record<CommandCategory, string> = {
+  scene: "commandPalette.categoryScene",
+  project: "commandPalette.categoryProject",
+  preferences: "commandPalette.categoryPreferences",
+};
+
+/** Fallback category labels */
+const CATEGORY_LABELS_FALLBACK: Record<CommandCategory, string> = {
+  scene: "Scene",
+  project: "Project",
+  preferences: "Preferences",
+};
 
 /**
  * Detect whether the user is on macOS to show the correct modifier symbol.
@@ -61,6 +104,29 @@ function fuzzyMatch(query: string, target: string): number {
   return qi === q.length ? score : -1;
 }
 
+function getRecentCommandIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_COMMANDS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENT) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentCommandId(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = getRecentCommandIds().filter((x) => x !== id);
+    const updated = [id, ...existing].slice(0, MAX_RECENT);
+    localStorage.setItem(RECENT_COMMANDS_KEY, JSON.stringify(updated));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export default function CommandPalette({
   open,
   onClose,
@@ -77,40 +143,101 @@ export default function CommandPalette({
   const listRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  // Filter + sort commands by fuzzy match
-  const filtered = useMemo(() => {
-    if (!query.trim()) return commands;
+  // Recent command ids from localStorage
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
-    const results: { command: Command; score: number }[] = [];
-    for (const cmd of commands) {
-      const primary = t(cmd.labelKey);
-      const secondary = cmd.labelSecondaryKey ? t(cmd.labelSecondaryKey) : "";
-      const scorePrimary = fuzzyMatch(query, primary);
-      const scoreSecondary = secondary ? fuzzyMatch(query, secondary) : -1;
+  // Load recent commands when palette opens
+  useEffect(() => {
+    if (open) {
+      setRecentIds(getRecentCommandIds());
+    }
+  }, [open]);
 
-      // Also match against the command id
-      const scoreId = fuzzyMatch(query, cmd.id);
+  // Build the display list: when no query, show Recent + grouped categories
+  // When searching, show flat filtered results
+  const { displayItems, flatCommands } = useMemo(() => {
+    if (query.trim()) {
+      // Fuzzy search mode: flat list, no groups
+      const results: { command: Command; score: number }[] = [];
+      for (const cmd of commands) {
+        const primary = t(cmd.labelKey);
+        const secondary = cmd.labelSecondaryKey ? t(cmd.labelSecondaryKey) : "";
+        const scorePrimary = fuzzyMatch(query, primary);
+        const scoreSecondary = secondary ? fuzzyMatch(query, secondary) : -1;
+        const scoreId = fuzzyMatch(query, cmd.id);
 
-      const bestScore = Math.min(
-        ...[scorePrimary, scoreSecondary, scoreId].filter((s) => s >= 0),
-        Infinity
-      );
+        const bestScore = Math.min(
+          ...[scorePrimary, scoreSecondary, scoreId].filter((s) => s >= 0),
+          Infinity
+        );
 
-      if (bestScore < Infinity) {
-        results.push({ command: cmd, score: bestScore });
+        if (bestScore < Infinity) {
+          results.push({ command: cmd, score: bestScore });
+        }
+      }
+      results.sort((a, b) => a.score - b.score);
+      const flat = results.map((r) => r.command);
+      return {
+        displayItems: flat.map((cmd) => ({ type: "command" as const, command: cmd })),
+        flatCommands: flat,
+      };
+    }
+
+    // No query: show Recent section + categorized groups
+    const items: Array<
+      | { type: "header"; label: string }
+      | { type: "command"; command: Command }
+    > = [];
+    const flat: Command[] = [];
+
+    // Recent section
+    const recentCommands = recentIds
+      .map((id) => commands.find((c) => c.id === id))
+      .filter((c): c is Command => !!c);
+
+    if (recentCommands.length > 0) {
+      items.push({ type: "header", label: t("commandPalette.categoryRecent") || "Recent" });
+      for (const cmd of recentCommands) {
+        items.push({ type: "command", command: cmd });
+        flat.push(cmd);
       }
     }
 
-    results.sort((a, b) => a.score - b.score);
-    return results.map((r) => r.command);
-  }, [query, commands, t]);
+    // Group commands by category
+    const grouped = new Map<CommandCategory, Command[]>();
+    for (const cat of CATEGORY_ORDER) {
+      grouped.set(cat, []);
+    }
+    for (const cmd of commands) {
+      const cat = cmd.category || inferCategory(cmd.id);
+      const list = grouped.get(cat);
+      if (list) {
+        // Skip if already shown in recents
+        if (!recentIds.includes(cmd.id)) {
+          list.push(cmd);
+        }
+      }
+    }
+
+    for (const cat of CATEGORY_ORDER) {
+      const cmds = grouped.get(cat) || [];
+      if (cmds.length === 0) continue;
+      const label = t(CATEGORY_LABEL_KEYS[cat]) || CATEGORY_LABELS_FALLBACK[cat];
+      items.push({ type: "header", label });
+      for (const cmd of cmds) {
+        items.push({ type: "command", command: cmd });
+        flat.push(cmd);
+      }
+    }
+
+    return { displayItems: items, flatCommands: flat };
+  }, [query, commands, t, recentIds]);
 
   // Reset state when opening
   useEffect(() => {
     if (open) {
       setQuery("");
       setSelectedIndex(0);
-      // Focus input on next frame
       requestAnimationFrame(() => {
         inputRef.current?.focus();
       });
@@ -120,7 +247,7 @@ export default function CommandPalette({
   // Reset selection when filter changes
   useEffect(() => {
     setSelectedIndex(0);
-  }, [filtered.length, query]);
+  }, [flatCommands.length, query]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -132,8 +259,8 @@ export default function CommandPalette({
 
   const executeCommand = useCallback(
     (cmd: Command) => {
+      saveRecentCommandId(cmd.id);
       onClose();
-      // Delay action slightly so the palette closes first
       requestAnimationFrame(() => {
         cmd.action();
       });
@@ -146,18 +273,18 @@ export default function CommandPalette({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((i) => (i + 1) % Math.max(filtered.length, 1));
+          setSelectedIndex((i) => (i + 1) % Math.max(flatCommands.length, 1));
           break;
         case "ArrowUp":
           e.preventDefault();
           setSelectedIndex((i) =>
-            i <= 0 ? Math.max(filtered.length - 1, 0) : i - 1
+            i <= 0 ? Math.max(flatCommands.length - 1, 0) : i - 1
           );
           break;
         case "Enter":
           e.preventDefault();
-          if (filtered[selectedIndex]) {
-            executeCommand(filtered[selectedIndex]);
+          if (flatCommands[selectedIndex]) {
+            executeCommand(flatCommands[selectedIndex]);
           }
           break;
         case "Escape":
@@ -166,12 +293,15 @@ export default function CommandPalette({
           break;
       }
     },
-    [filtered, selectedIndex, executeCommand, onClose]
+    [flatCommands, selectedIndex, executeCommand, onClose]
   );
 
   if (!open) return null;
 
   const isFi = locale === "fi";
+
+  // Map flatCommands index to display items
+  let commandIndex = 0;
 
   return (
     <div
@@ -222,44 +352,61 @@ export default function CommandPalette({
 
         {/* Command list */}
         <div className="cmd-palette-list" ref={listRef}>
-          {filtered.length === 0 && (
+          {flatCommands.length === 0 && (
             <div className="cmd-palette-empty">
               {t("commandPalette.noResults")}
             </div>
           )}
-          {filtered.map((cmd, i) => (
-            <button
-              key={cmd.id}
-              data-cmd-item
-              className="cmd-palette-item"
-              data-selected={i === selectedIndex}
-              onMouseEnter={() => setSelectedIndex(i)}
-              onClick={() => executeCommand(cmd)}
-            >
-              <div className="cmd-palette-item-left">
-                {cmd.icon && (
-                  <span className="cmd-palette-item-icon">{cmd.icon}</span>
-                )}
-                <div className="cmd-palette-item-labels">
-                  <span className="cmd-palette-item-label">
-                    {t(cmd.labelKey)}
-                  </span>
-                  {cmd.labelSecondaryKey && (
-                    <span className="cmd-palette-item-label-secondary">
-                      {isFi
-                        ? t(cmd.labelSecondaryKey)
-                        : t(cmd.labelKey)}
-                    </span>
-                  )}
+          {displayItems.map((item, displayIdx) => {
+            if (item.type === "header") {
+              return (
+                <div
+                  key={`header-${displayIdx}`}
+                  className="cmd-palette-group-header"
+                >
+                  {item.label}
                 </div>
-              </div>
-              {cmd.shortcut && (
-                <kbd className="cmd-palette-kbd">
-                  {formatShortcutDisplay(cmd.shortcut)}
-                </kbd>
-              )}
-            </button>
-          ))}
+              );
+            }
+
+            const cmd = item.command;
+            const idx = commandIndex++;
+            const isSelected = idx === selectedIndex;
+
+            return (
+              <button
+                key={cmd.id + "-" + idx}
+                data-cmd-item
+                className={`cmd-palette-item${isSelected ? " cmd-palette-item-selected" : ""}`}
+                data-selected={isSelected}
+                onMouseEnter={() => setSelectedIndex(idx)}
+                onClick={() => executeCommand(cmd)}
+              >
+                <div className="cmd-palette-item-left">
+                  {cmd.icon && (
+                    <span className="cmd-palette-item-icon">{cmd.icon}</span>
+                  )}
+                  <div className="cmd-palette-item-labels">
+                    <span className="cmd-palette-item-label">
+                      {t(cmd.labelKey)}
+                    </span>
+                    {cmd.labelSecondaryKey && (
+                      <span className="cmd-palette-item-label-secondary">
+                        {isFi
+                          ? t(cmd.labelSecondaryKey)
+                          : t(cmd.labelKey)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {cmd.shortcut && (
+                  <kbd className="cmd-palette-kbd">
+                    {formatShortcutDisplay(cmd.shortcut)}
+                  </kbd>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Footer hint */}
