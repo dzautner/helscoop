@@ -53,6 +53,18 @@ export interface TessellatedObject {
   objectId?: string;
 }
 
+// LRU cache for evaluation results — avoids re-tessellation on undo/redo
+const CACHE_SIZE = 4;
+const resultCache = new Map<string, ManifoldSceneResult>();
+
+function simpleHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return h.toString(36);
+}
+
 interface ColoredManifold {
   manifold: Manifold;
   color: [number, number, number];
@@ -168,6 +180,15 @@ export interface ManifoldSceneResult {
 }
 
 export async function evaluateScene(script: string, options?: EvaluateOptions): Promise<ManifoldSceneResult> {
+  const hash = simpleHash(script);
+  const cached = resultCache.get(hash);
+  if (cached) {
+    if (options?.onProgress) {
+      options.onProgress(cached.meshes, cached.meshes.length, cached.meshes.length);
+    }
+    return cached;
+  }
+
   const warnings: string[] = [];
   const wasm = await initManifold();
   const { Manifold } = wasm;
@@ -557,12 +578,12 @@ if (typeof displayScale !== "undefined") { __result__.displayScale = displayScal
       }
 
       if (options?.onProgress) {
-        const expensive = sorted[i].tris > 5000;
-        const batchDone = (i + 1) % 20 === 0;
+        const expensive = sorted[i].tris > 50000;
+        const batchDone = (i + 1) % 40 === 0;
         const last = i === sorted.length - 1;
         if (expensive || batchDone || last) {
           options.onProgress(meshes, i + 1, sorted.length);
-          await new Promise(r => setTimeout(r, 0));
+          if (expensive) await new Promise(r => setTimeout(r, 0));
         }
       }
     }
@@ -571,13 +592,22 @@ if (typeof displayScale !== "undefined") { __result__.displayScale = displayScal
       warnings.push("validation.emptyScene");
     }
 
-    return {
+    const result: ManifoldSceneResult = {
       meshes,
       error: null,
       errorLine: null,
       warnings,
       displayScale: resultBag.displayScale,
     };
+
+    // Cache successful results (evict oldest when full)
+    if (resultCache.size >= CACHE_SIZE) {
+      const oldest = resultCache.keys().next().value;
+      if (oldest !== undefined) resultCache.delete(oldest);
+    }
+    resultCache.set(hash, result);
+
+    return result;
   } catch (err) {
     const errorLine = extractErrorLine(err, script);
     return {

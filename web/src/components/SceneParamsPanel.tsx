@@ -32,7 +32,7 @@ export default function SceneParamsPanel({
       if (debounceRefs.current[name]) clearTimeout(debounceRefs.current[name]);
       debounceRefs.current[name] = setTimeout(() => {
         onParamChange(name, value);
-      }, 60);
+      }, 16);
     },
     [onParamChange],
   );
