@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { api, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard } from "@/components/Skeleton";
@@ -34,6 +34,7 @@ export default function ProjectList({
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
+  const templateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -248,6 +249,7 @@ export default function ProjectList({
           </div>
 
           {/* Template picker */}
+          <div ref={templateRef} />
           <TemplateGrid
             templates={templates}
             loading={loading}
@@ -273,25 +275,39 @@ export default function ProjectList({
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="anim-up delay-1 dash-empty">
+          <div className="anim-up delay-1 dash-empty-onboarding">
             <div className="empty-state-illustration">
-              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="12" width="24" height="16" rx="1" />
-                <polyline points="4,12 16,4 28,12" />
-                <line x1="13" y1="20" x2="19" y2="20" />
-                <line x1="16" y1="17" x2="16" y2="23" />
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
             </div>
-            <div className="empty-state-title">{t('project.emptyTitle')}</div>
-            <div className="empty-state-hint">{t('project.emptyHint')}</div>
+            <h2 className="empty-onboarding-heading">{t('project.emptyOnboardingHeading')}</h2>
+            <p className="empty-onboarding-subtitle">{t('project.emptyOnboardingSubtitle')}</p>
+
+            {onCreateFromBuilding && (
+              <div className="empty-onboarding-search">
+                <AddressSearch onCreateProject={onCreateFromBuilding} compact />
+              </div>
+            )}
+
+            <div className="empty-onboarding-divider">
+              <span>{t('project.emptyOnboardingOr')}</span>
+            </div>
+
             <button
               className="empty-state-cta"
               onClick={() => {
-                const input = document.querySelector<HTMLInputElement>('.input[placeholder]');
-                if (input) input.focus();
+                templateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             >
-              {t('project.emptyCta')}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              {t('project.emptyOnboardingTemplate')}
             </button>
           </div>
         ) : (
