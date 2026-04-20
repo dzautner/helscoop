@@ -385,6 +385,7 @@ describe("exhaustive i18n key parity", () => {
     "auth.resetPasswordNewPlaceholder", "auth.resetPasswordConfirm",
     "auth.resetPasswordConfirmPlaceholder", "auth.resetPasswordSubmit",
     "auth.resetPasswordSuccess", "auth.resetPasswordMismatch", "auth.resetPasswordInvalid",
+    "auth.passwordWeak", "auth.passwordMedium", "auth.passwordStrong",
     // brand
     "brand.tagline", "brand.trustProducts", "brand.trustSuppliers", "brand.trustFree",
     "brand.description", "brand.featureMaterials", "brand.featureMaterialsDesc",
