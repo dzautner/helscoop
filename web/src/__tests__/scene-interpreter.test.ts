@@ -108,7 +108,7 @@ describe("interpretScene", () => {
     expect(result.objects[0].children![1].position).toEqual([2, 0, 0]);
   });
 
-  it("subtract returns first argument (CSG not implemented in interpreter)", () => {
+  it("subtract creates difference type with children", () => {
     const result = interpretScene(`
       const wall = box(4, 3, 0.15);
       const door = translate(box(1, 2, 0.15), 0, 1, 0);
@@ -116,21 +116,23 @@ describe("interpretScene", () => {
       scene.add(wallWithDoor, { material: "lumber" });
     `);
     expect(result.error).toBeNull();
-    // differenceImpl returns the first argument unchanged
-    expect(result.objects[0].geometry).toBe("box");
-    expect(result.objects[0].args).toEqual([4, 3, 0.15]);
+    expect(result.objects[0].geometry).toBe("difference");
+    expect(result.objects[0].children).toHaveLength(2);
+    expect(result.objects[0].children![0].geometry).toBe("box");
+    expect(result.objects[0].children![0].args).toEqual([4, 3, 0.15]);
   });
 
-  it("intersect returns first argument (CSG not implemented in interpreter)", () => {
+  it("intersect creates intersection type with children", () => {
     const result = interpretScene(`
       const a = box(2, 2, 2);
       const b = translate(box(2, 2, 2), 1, 0, 0);
       scene.add(intersect(a, b));
     `);
     expect(result.error).toBeNull();
-    // intersectionImpl returns the first argument unchanged
-    expect(result.objects[0].geometry).toBe("box");
-    expect(result.objects[0].args).toEqual([2, 2, 2]);
+    expect(result.objects[0].geometry).toBe("intersection");
+    expect(result.objects[0].children).toHaveLength(2);
+    expect(result.objects[0].children![0].geometry).toBe("box");
+    expect(result.objects[0].children![0].args).toEqual([2, 2, 2]);
   });
 
   it("handles multiple scene.add calls", () => {

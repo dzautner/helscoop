@@ -18,7 +18,7 @@ import jwt from "jsonwebtoken";
 import http from "http";
 import type { AddressInfo } from "net";
 
-const JWT_SECRET = "helscoop-dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
 // Mock the database module BEFORE any app import
 vi.mock("../db", () => ({

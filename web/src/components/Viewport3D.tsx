@@ -3,9 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
-import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from "three-bvh-csg";
-import { interpretScene, SceneObject } from "@/lib/scene-interpreter";
+import { evaluateScene, initManifold, type TessellatedObject, type EvaluateOptions } from "@/lib/manifold-engine";
 import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
 import ScreenshotPopover from "@/components/ScreenshotPopover";
@@ -15,12 +13,10 @@ interface Viewport3DProps {
   wireframe?: boolean;
   onObjectCount?: (count: number) => void;
   onError?: (error: string | null) => void;
-  /** 1-based line number of the error in the original script, or null. */
   onErrorLine?: (line: number | null) => void;
   onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
   onToggleWireframe?: () => void;
-  /** Project name for screenshot filenames */
   projectName?: string;
 }
 
@@ -37,8 +33,6 @@ const CAMERA_PRESETS: CameraPreset[] = [
   { position: [5, 4, 5], target: [0, 1.5, 0], key: "editor.cameraIso" },
 ];
 
-
-/** Recursively dispose all geometries and materials in an Object3D tree */
 function disposeObject(obj: THREE.Object3D) {
   while (obj.children.length > 0) {
     const child = obj.children[0];
@@ -52,42 +46,6 @@ function disposeObject(obj: THREE.Object3D) {
     } else if (obj.material) {
       obj.material.dispose();
     }
-  }
-}
-
-function createGeometry(obj: SceneObject): THREE.BufferGeometry {
-  switch (obj.geometry) {
-    case "box":
-      return new THREE.BoxGeometry(
-        obj.args[0] || 1,
-        obj.args[1] || 1,
-        obj.args[2] || 1
-      );
-    case "cylinder":
-      return new THREE.CylinderGeometry(
-        obj.args[0] || 0.5,
-        obj.args[0] || 0.5,
-        obj.args[1] || 1,
-        16
-      );
-    case "sphere":
-      return new THREE.SphereGeometry(obj.args[0] || 0.5, 16, 8);
-    case "hull": {
-      if (obj.hullVertices && obj.hullVertices.length >= 12) {
-        const points: THREE.Vector3[] = [];
-        for (let i = 0; i < obj.hullVertices.length; i += 3) {
-          points.push(new THREE.Vector3(
-            obj.hullVertices[i],
-            obj.hullVertices[i + 1],
-            obj.hullVertices[i + 2]
-          ));
-        }
-        return new ConvexGeometry(points);
-      }
-      return new THREE.BoxGeometry(1, 1, 1);
-    }
-    default:
-      return new THREE.BoxGeometry(1, 1, 1);
   }
 }
 
@@ -123,173 +81,42 @@ function getMaterialPBR(materialId: string): MaterialPBR {
   return MATERIAL_PBR[materialId] || { roughness: 0.7, metalness: 0.05 };
 }
 
-const csgEvaluator = new Evaluator();
-
-function applyTransform(obj: SceneObject): THREE.Matrix4 {
-  const m = new THREE.Matrix4();
-  const pos = new THREE.Vector3(obj.position[0], obj.position[1], obj.position[2]);
-  const rot = new THREE.Euler(
-    obj.rotation[0] * Math.PI / 180,
-    obj.rotation[1] * Math.PI / 180,
-    obj.rotation[2] * Math.PI / 180
-  );
-  const scl = new THREE.Vector3(obj.scale[0], obj.scale[1], obj.scale[2]);
-  m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scl);
-  return m;
-}
-
-function resolveToGeometry(obj: SceneObject, parentMatrix?: THREE.Matrix4): THREE.BufferGeometry | null {
-  const localMatrix = applyTransform(obj);
-  const worldMatrix = parentMatrix ? parentMatrix.clone().multiply(localMatrix) : localMatrix;
-
-  if (obj.geometry === "difference" || obj.geometry === "intersection") {
-    if (!obj.children || obj.children.length < 2) return null;
-    const opType = obj.geometry === "difference" ? SUBTRACTION : INTERSECTION;
-
-    const geomA = resolveToGeometry(obj.children[0], worldMatrix);
-    const geomB = resolveToGeometry(obj.children[1], worldMatrix);
-    if (!geomA || !geomB) return geomA || null;
-
-    const brushA = new Brush(geomA);
-    brushA.updateMatrixWorld(true);
-    const brushB = new Brush(geomB);
-    brushB.updateMatrixWorld(true);
-
-    try {
-      const result = csgEvaluator.evaluate(brushA, brushB, opType);
-      return result.geometry;
-    } catch {
-      return geomA;
-    }
-  }
-
-  if (obj.geometry === "group" && obj.children) {
-    const geometries: THREE.BufferGeometry[] = [];
-    for (const child of obj.children) {
-      const g = resolveToGeometry(child, worldMatrix);
-      if (g) geometries.push(g);
-    }
-    if (geometries.length === 0) return null;
-    if (geometries.length === 1) return geometries[0];
-    return mergeGeometries(geometries);
-  }
-
-  const geom = createGeometry(obj);
-  geom.applyMatrix4(worldMatrix);
-  return geom;
-}
-
-function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  let totalVerts = 0;
-  let totalIdx = 0;
-  for (const g of geometries) {
-    totalVerts += g.attributes.position.count;
-    totalIdx += g.index ? g.index.count : g.attributes.position.count;
-  }
-  const positions = new Float32Array(totalVerts * 3);
-  const normals = new Float32Array(totalVerts * 3);
-  const indices: number[] = [];
-  let vertOffset = 0;
-  for (const g of geometries) {
-    const pos = g.attributes.position;
-    const nrm = g.attributes.normal;
-    for (let i = 0; i < pos.count; i++) {
-      positions[(vertOffset + i) * 3] = pos.getX(i);
-      positions[(vertOffset + i) * 3 + 1] = pos.getY(i);
-      positions[(vertOffset + i) * 3 + 2] = pos.getZ(i);
-      if (nrm) {
-        normals[(vertOffset + i) * 3] = nrm.getX(i);
-        normals[(vertOffset + i) * 3 + 1] = nrm.getY(i);
-        normals[(vertOffset + i) * 3 + 2] = nrm.getZ(i);
-      }
-    }
-    if (g.index) {
-      for (let i = 0; i < g.index.count; i++) {
-        indices.push(g.index.getX(i) + vertOffset);
-      }
-    } else {
-      for (let i = 0; i < pos.count; i++) {
-        indices.push(vertOffset + i);
-      }
-    }
-    vertOffset += pos.count;
-  }
-  const merged = new THREE.BufferGeometry();
-  merged.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  merged.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-  merged.setIndex(indices);
-  return merged;
-}
-
-function addSceneObjects(
+function addSingleTessellatedMesh(
   parent: THREE.Group,
-  objects: SceneObject[],
+  tess: TessellatedObject,
+  wireframe: boolean
+): void {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(tess.positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(tess.normals, 3));
+  geometry.setIndex(new THREE.BufferAttribute(tess.indices, 1));
+
+  const pbr = getMaterialPBR(tess.material);
+  const material = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(tess.color[0], tess.color[1], tess.color[2]),
+    roughness: pbr.roughness,
+    metalness: pbr.metalness,
+    wireframe,
+    ...(pbr.transparent ? { transparent: true, opacity: pbr.opacity ?? 1 } : {}),
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+}
+
+function addTessellatedMeshes(
+  parent: THREE.Group,
+  meshes: TessellatedObject[],
   wireframe: boolean
 ): number {
-  let count = 0;
-
-  for (const obj of objects) {
-    if (obj.geometry === "group" && obj.children) {
-      const group = new THREE.Group();
-      group.position.set(obj.position[0], obj.position[1], obj.position[2]);
-      const s = obj.scale;
-      group.scale.set(s[0], s[1], s[2]);
-      const r = obj.rotation;
-      group.rotation.set(
-        r[0] * Math.PI / 180,
-        r[1] * Math.PI / 180,
-        r[2] * Math.PI / 180
-      );
-      count += addSceneObjects(group, obj.children, wireframe);
-      parent.add(group);
-    } else if (obj.geometry === "difference" || obj.geometry === "intersection") {
-      const geometry = resolveToGeometry(obj);
-      if (geometry) {
-        const pbr = getMaterialPBR(obj.material);
-        const material = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(obj.color[0], obj.color[1], obj.color[2]),
-          roughness: pbr.roughness,
-          metalness: pbr.metalness,
-          wireframe,
-          ...(pbr.transparent ? { transparent: true, opacity: pbr.opacity ?? 1 } : {}),
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        parent.add(mesh);
-        count++;
-      }
-    } else {
-      const geometry = createGeometry(obj);
-      const pbr = getMaterialPBR(obj.material);
-      const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(obj.color[0], obj.color[1], obj.color[2]),
-        roughness: pbr.roughness,
-        metalness: pbr.metalness,
-        wireframe,
-        ...(pbr.transparent ? { transparent: true, opacity: pbr.opacity ?? 1 } : {}),
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(obj.position[0], obj.position[1], obj.position[2]);
-      const s = obj.scale;
-      mesh.scale.set(s[0], s[1], s[2]);
-      const r = obj.rotation;
-      mesh.rotation.set(
-        r[0] * Math.PI / 180,
-        r[1] * Math.PI / 180,
-        r[2] * Math.PI / 180
-      );
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      parent.add(mesh);
-      count++;
-    }
+  for (const tess of meshes) {
+    addSingleTessellatedMesh(parent, tess, wireframe);
   }
-
-  return count;
+  return meshes.length;
 }
 
-/** Smoothly animate camera + controls target to a new position over ~400ms */
 function animateCamera(
   camera: THREE.PerspectiveCamera,
   controls: OrbitControls,
@@ -306,7 +133,6 @@ function animateCamera(
   function step() {
     const elapsed = performance.now() - startTime;
     const raw = Math.min(elapsed / duration, 1);
-    // ease-out cubic
     const t = 1 - Math.pow(1 - raw, 3);
 
     camera.position.lerpVectors(startPos, endPos, t);
@@ -377,18 +203,15 @@ function CameraToolbar({
     const camera = cameraRef.current;
     if (!renderer || !scene || !camera) return;
 
-    // Render one clean frame
     renderer.render(scene, camera);
 
     const canvas = renderer.domElement;
-    // Create an offscreen canvas to composite watermark
     const offscreen = document.createElement("canvas");
     offscreen.width = canvas.width;
     offscreen.height = canvas.height;
     const ctx = offscreen.getContext("2d")!;
     ctx.drawImage(canvas, 0, 0);
 
-    // Watermark
     const fontSize = Math.max(12, Math.round(canvas.height * 0.018));
     ctx.font = `${fontSize}px "SF Mono", "Fira Code", "Cascadia Code", monospace`;
     ctx.fillStyle = "rgba(255,255,255,0.25)";
@@ -400,7 +223,6 @@ function CameraToolbar({
       canvas.height - fontSize * 0.6
     );
 
-    // Show popover instead of directly downloading
     setScreenshotDataUrl(offscreen.toDataURL("image/png"));
   }, [rendererRef, sceneRef, cameraRef]);
 
@@ -461,18 +283,24 @@ export default function Viewport3D({
   const lastValidSceneRef = useRef<string>(sceneJs);
   const sceneBoundsRef = useRef<{ center: THREE.Vector3; size: number } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [isComputing, setIsComputing] = useState(false);
+  const updateIdRef = useRef(0);
   const { t } = useTranslation();
+
+  // Pre-load Manifold WASM on mount
+  useEffect(() => {
+    initManifold().catch(() => {});
+  }, []);
 
   // Initialize Three.js scene
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Sky gradient background — Nordic twilight atmosphere
+    // Sky gradient background
     const canvas = document.createElement("canvas");
     canvas.width = 2;
     canvas.height = 512;
@@ -490,14 +318,12 @@ export default function Viewport3D({
     bgTexture.magFilter = THREE.LinearFilter;
     scene.background = bgTexture;
 
-    // Camera — default to Iso preset
     const aspect = container.clientWidth / container.clientHeight;
     const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 500);
     camera.position.set(5, 4, 5);
     camera.lookAt(0, 1.5, 0);
     cameraRef.current = camera;
 
-    // Renderer — preserveDrawingBuffer for screenshot support
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
@@ -512,7 +338,6 @@ export default function Viewport3D({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Orbit Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -523,14 +348,12 @@ export default function Viewport3D({
     controls.update();
     controlsRef.current = controls;
 
-    // Lights — three-point setup for architectural visualization
     const ambientLight = new THREE.AmbientLight(0xe8e4df, 0.35);
     scene.add(ambientLight);
 
     const hemisphereLight = new THREE.HemisphereLight(0x7799cc, 0x3d3528, 0.45);
     scene.add(hemisphereLight);
 
-    // Key light — warm sun from upper right
     const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.3);
     dirLight.position.set(5, 8, 4);
     dirLight.castShadow = true;
@@ -545,12 +368,10 @@ export default function Viewport3D({
     dirLight.shadow.bias = -0.001;
     scene.add(dirLight);
 
-    // Fill light — cool bounce from left
     const fillLight = new THREE.DirectionalLight(0xc4d4e8, 0.3);
     fillLight.position.set(-4, 3, -2);
     scene.add(fillLight);
 
-    // Grid floor — major lines every 5 units, minor every 1 unit
     const gridMinor = new THREE.GridHelper(40, 40, 0x2a2a2a, 0x2a2a2a);
     (gridMinor.material as THREE.Material).opacity = 0.12;
     (gridMinor.material as THREE.Material).transparent = true;
@@ -561,7 +382,6 @@ export default function Viewport3D({
     gridMajor.position.y = 0.001;
     scene.add(gridMajor);
 
-    // XYZ axes at origin — warm-shifted colors matching the palette
     const axesHelper = new THREE.AxesHelper(1.5);
     axesHelper.setColors(
       new THREE.Color(0xe05555),
@@ -572,10 +392,8 @@ export default function Viewport3D({
     (axesHelper.material as THREE.Material).opacity = 0.6;
     scene.add(axesHelper);
 
-    // Depth fog
     scene.fog = new THREE.Fog(0x1a1d22, 30, 120);
 
-    // Ground plane (receives shadows)
     const groundGeom = new THREE.PlaneGeometry(100, 100);
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x1f1e1c,
@@ -594,7 +412,6 @@ export default function Viewport3D({
     scene.add(objectGroup);
     objectGroupRef.current = objectGroup;
 
-    // Animation loop
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
       controls.update();
@@ -602,7 +419,6 @@ export default function Viewport3D({
     }
     animate();
 
-    // Resize handler
     const resizeObserver = new ResizeObserver(() => {
       if (!container) return;
       const w = container.clientWidth;
@@ -631,41 +447,70 @@ export default function Viewport3D({
 
   const hasAutoFitRef = useRef(false);
 
-  // Update scene objects when sceneJs or wireframe changes
   const updateScene = useCallback(
-    (script: string, wf: boolean) => {
+    async (script: string, wf: boolean) => {
       const group = objectGroupRef.current;
       if (!group) return;
 
+      const thisId = ++updateIdRef.current;
+      setIsComputing(true);
+
+      // Yield to browser so the spinner renders before heavy WASM work
+      await new Promise((r) => setTimeout(r, 0));
+      if (thisId !== updateIdRef.current) { setIsComputing(false); return; }
+
+      // Clear old scene before starting progressive render
       while (group.children.length > 0) {
         const child = group.children[0];
         disposeObject(child);
         group.remove(child);
       }
 
-      const result = interpretScene(script);
+      let addedCount = 0;
+      const progressOptions: EvaluateOptions = {
+        onProgress: (meshes, done, total) => {
+          if (thisId !== updateIdRef.current) return;
+          for (let i = addedCount; i < meshes.length; i++) {
+            addSingleTessellatedMesh(group, meshes[i], wf);
+          }
+          addedCount = meshes.length;
+          onObjectCount?.(addedCount);
+        },
+      };
+
+      const result = await evaluateScene(script, progressOptions);
+
+      // Stale update — a newer one has started
+      if (thisId !== updateIdRef.current) return;
+
       onWarnings?.(result.warnings);
 
       if (result.error) {
         onError?.(result.error);
         onErrorLine?.(result.errorLine);
         if (script !== lastValidSceneRef.current) {
-          const fallback = interpretScene(lastValidSceneRef.current);
+          while (group.children.length > 0) {
+            const child = group.children[0];
+            disposeObject(child);
+            group.remove(child);
+          }
+          const fallback = await evaluateScene(lastValidSceneRef.current);
+          if (thisId !== updateIdRef.current) { setIsComputing(false); return; }
           if (!fallback.error) {
-            const count = addSceneObjects(group, fallback.objects, wf);
+            const count = addTessellatedMeshes(group, fallback.meshes, wf);
             onObjectCount?.(count);
           }
         }
+        setIsComputing(false);
         return;
       }
 
       lastValidSceneRef.current = script;
       onError?.(null);
       onErrorLine?.(null);
-      const count = addSceneObjects(group, result.objects, wf);
-      onObjectCount?.(count);
+      onObjectCount?.(result.meshes.length);
+      setIsComputing(false);
 
-      // Compute scene bounds and auto-fit camera on first load
       const box = new THREE.Box3().setFromObject(group);
       if (!box.isEmpty()) {
         const center = box.getCenter(new THREE.Vector3());
@@ -673,7 +518,7 @@ export default function Viewport3D({
         const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
         sceneBoundsRef.current = { center: center.clone(), size: maxDim };
 
-        if (!hasAutoFitRef.current && count > 10) {
+        if (!hasAutoFitRef.current && result.meshes.length > 10) {
           hasAutoFitRef.current = true;
           const camera = cameraRef.current;
           const controls = controlsRef.current;
@@ -694,15 +539,14 @@ export default function Viewport3D({
     [onObjectCount, onError, onErrorLine, onWarnings]
   );
 
-  // Debounced scene update
+  // Debounced scene update — 400ms to coalesce rapid param slider changes
   useEffect(() => {
     const timer = setTimeout(() => {
       updateScene(sceneJs, wireframe);
-    }, 150);
+    }, 400);
     return () => clearTimeout(timer);
   }, [sceneJs, wireframe, updateScene]);
 
-  // Expose reset camera function via ref on container
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -717,7 +561,6 @@ export default function Viewport3D({
       };
   }, []);
 
-  // Expose thumbnail capture function via captureRef
   useEffect(() => {
     if (!captureRef) return;
     captureRef.current = () => {
@@ -727,7 +570,6 @@ export default function Viewport3D({
       if (!renderer || !scene || !camera) return null;
       renderer.render(scene, camera);
       const canvas = renderer.domElement;
-      // Create a small thumbnail (320x180) to keep payload under 200KB
       const thumbW = 320;
       const thumbH = 180;
       const offscreen = document.createElement("canvas");
@@ -743,7 +585,6 @@ export default function Viewport3D({
     };
   }, [captureRef]);
 
-  // Right-click context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -754,7 +595,6 @@ export default function Viewport3D({
     setContextMenuPos(null);
   }, []);
 
-  // Screenshot handler for context menu
   const handleScreenshot = useCallback(() => {
     const renderer = rendererRef.current;
     const scene = sceneRef.current;
@@ -779,7 +619,6 @@ export default function Viewport3D({
     link.click();
   }, []);
 
-  // Build context menu items
   const contextMenuItems: ContextMenuItem[] = [
     {
       id: "camera-front",
@@ -870,6 +709,25 @@ export default function Viewport3D({
         position: "relative",
       }}
     >
+      {isComputing && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex",
+          alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.35)", zIndex: 5,
+          pointerEvents: "none",
+        }}>
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+          }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ animation: "spin 1s linear infinite" }}>
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+            <span style={{ color: "var(--text-secondary)", fontSize: 13, fontFamily: "var(--font-sans)" }}>
+              Computing geometry…
+            </span>
+          </div>
+        </div>
+      )}
       <CameraToolbar
         cameraRef={cameraRef}
         controlsRef={controlsRef}

@@ -473,7 +473,7 @@ describe("unionImpl — edge cases", () => {
 // ---------------------------------------------------------------------------
 
 describe("differenceImpl", () => {
-  it("returns the first argument unchanged", () => {
+  it("creates difference type with children", () => {
     const result = interpretScene(`
       const a = translate(box(4, 4, 4), 1, 2, 3);
       const b = box(1, 1, 1);
@@ -481,9 +481,10 @@ describe("differenceImpl", () => {
       scene.add(d);
     `);
     expect(result.error).toBeNull();
-    expect(result.objects[0].geometry).toBe("box");
-    expect(result.objects[0].args).toEqual([4, 4, 4]);
-    expect(result.objects[0].position).toEqual([1, 2, 3]);
+    expect(result.objects[0].geometry).toBe("difference");
+    expect(result.objects[0].children).toHaveLength(2);
+    expect(result.objects[0].children![0].geometry).toBe("box");
+    expect(result.objects[0].children![0].args).toEqual([4, 4, 4]);
   });
 });
 

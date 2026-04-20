@@ -80,6 +80,7 @@ describe("WelcomeModal", () => {
 
 describe("TourOverlay", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     // Set up DOM elements that match TOUR_STEPS selectors
     const targets = [
       { attr: "address-input", id: "t1" },
@@ -109,6 +110,7 @@ describe("TourOverlay", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     // Clean up tour target elements
     document
       .querySelectorAll("[data-tour]")
@@ -132,6 +134,8 @@ describe("TourOverlay", () => {
 
     // Click Next to go to step 2
     fireEvent.click(screen.getByText("onboarding.next"));
+    // Advance past the 120ms displayStep animation timer
+    act(() => { vi.advanceTimersByTime(150); });
     expect(
       screen.getByText("onboarding.stepOf current=2 total=5")
     ).toBeDefined();
@@ -145,6 +149,7 @@ describe("TourOverlay", () => {
     // Steps 1-4: click Next
     for (let i = 0; i < 4; i++) {
       fireEvent.click(screen.getByText("onboarding.next"));
+      act(() => { vi.advanceTimersByTime(150); });
     }
 
     // Step 5 (last): button should say "done"

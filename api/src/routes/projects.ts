@@ -144,11 +144,11 @@ router.put("/:id/bom", async (req, res) => {
 
     if (
       item.material_id == null ||
-      !Number.isInteger(Number(item.material_id)) ||
-      Number(item.material_id) <= 0
+      typeof item.material_id !== "string" ||
+      item.material_id.trim().length === 0
     ) {
       return res.status(400).json({
-        error: `Item ${idx}: material_id must be a positive integer`,
+        error: `Item ${idx}: material_id must be a non-empty string`,
       });
     }
 
