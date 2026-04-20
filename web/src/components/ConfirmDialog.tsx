@@ -166,6 +166,7 @@ export default function ConfirmDialog({
             lineHeight: 1.6,
             color: "var(--text-secondary)",
             margin: "0 0 24px",
+            whiteSpace: "pre-wrap",
           }}
         >
           {message}

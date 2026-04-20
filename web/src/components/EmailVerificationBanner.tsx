@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useToast } from "@/components/ToastProvider";
 
 interface Props {
   emailVerified: boolean;
@@ -10,6 +11,7 @@ interface Props {
 
 export default function EmailVerificationBanner({ emailVerified }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -22,7 +24,7 @@ export default function EmailVerificationBanner({ emailVerified }: Props) {
       await api.resendVerification();
       setResent(true);
     } catch {
-      // Silently fail — user can try again
+      toast(t('emailVerification.resendFailed'), "error");
     }
     setResending(false);
   }

@@ -687,11 +687,13 @@ function PriceComparisonPopup({
           background: "var(--bg-secondary)",
           border: "1px solid var(--border-strong)",
           borderRadius: "var(--radius-lg)",
-          width: 480,
+          width: "100%",
+          maxWidth: 480,
           maxHeight: "80vh",
           display: "flex",
           flexDirection: "column",
           boxShadow: "var(--shadow-lg)",
+          margin: "0 16px",
         }}
       >
         {/* Header */}

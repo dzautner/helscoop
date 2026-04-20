@@ -36,9 +36,10 @@ export default function Home() {
   async function createProjectFromBuilding(building: BuildingResult) {
     track("project_created", { source: "address", building_type: building.building_info.type });
     const buildingTypeLabel = t(`building.${building.building_info.type}`) || building.building_info.type;
+    const materialLabel = t(`building.material.${building.building_info.material}`) || building.building_info.material;
     const project = await api.createProject({
       name: building.address,
-      description: `${buildingTypeLabel}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
+      description: `${buildingTypeLabel}, ${materialLabel}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
       scene_js: building.scene_js,
     });
     if (building.bom_suggestion.length > 0) {

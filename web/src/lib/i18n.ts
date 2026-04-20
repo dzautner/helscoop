@@ -561,6 +561,7 @@ const translations = {
       banner: 'Vahvista sähköpostiosoitteesi. Tarkista postilaatikkosi.',
       resent: 'Lähetetty!',
       resend: 'Lähetä uudelleen',
+      resendFailed: 'Vahvistusviestin lähetys epäonnistui. Yritä uudelleen.',
       dismiss: 'Sulje',
     },
     aria: {
@@ -616,6 +617,12 @@ const translations = {
       rivitalo: 'Rivitalo',
       kerrostalo: 'Kerrostalo',
       paritalo: 'Paritalo',
+      material: {
+        puu: 'Puu',
+        tiili: 'Tiili',
+        betoni: 'Betoni',
+        hirsi: 'Hirsi',
+      },
     },
     viewport: {
       contextMenuLabel: 'Näkymän toiminnot',
@@ -1210,6 +1217,7 @@ const translations = {
       banner: 'Please verify your email. Check your inbox.',
       resent: 'Sent!',
       resend: 'Resend',
+      resendFailed: 'Failed to resend verification email. Please try again.',
       dismiss: 'Dismiss',
     },
     aria: {
@@ -1265,6 +1273,12 @@ const translations = {
       rivitalo: 'Terraced house',
       kerrostalo: 'Apartment block',
       paritalo: 'Semi-detached',
+      material: {
+        puu: 'Wood',
+        tiili: 'Brick',
+        betoni: 'Concrete',
+        hirsi: 'Log',
+      },
     },
     viewport: {
       contextMenuLabel: 'Viewport actions',
