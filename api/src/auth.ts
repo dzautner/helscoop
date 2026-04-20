@@ -185,6 +185,91 @@ export async function resendVerification(userId: string): Promise<boolean> {
   return sendVerificationEmail(result.rows[0].email, token);
 }
 
+// ---------------------------------------------------------------------------
+// Google OAuth
+// ---------------------------------------------------------------------------
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+
+interface GoogleTokenPayload {
+  sub: string;       // Google unique user ID
+  email: string;
+  email_verified: boolean;
+  name?: string;
+  picture?: string;
+}
+
+/**
+ * Verify a Google ID token via Google's tokeninfo endpoint.
+ * Returns the decoded payload or null if verification fails.
+ */
+export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | null> {
+  try {
+    const res = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+    );
+    if (!res.ok) return null;
+    const payload = await res.json();
+
+    // Verify the token was issued for our application
+    if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
+      return null;
+    }
+
+    if (!payload.email || !payload.sub) return null;
+
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      email_verified: payload.email_verified === "true" || payload.email_verified === true,
+      name: payload.name || payload.email.split("@")[0],
+      picture: payload.picture,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find or create a user from a verified Google token payload.
+ * - If a user with the same google_id exists, return them.
+ * - If a user with the same email exists (local signup), link the Google account.
+ * - Otherwise, create a new user.
+ */
+export async function googleLogin(payload: GoogleTokenPayload) {
+  // 1. Check by google_id first (returning Google user)
+  const byGoogleId = await query(
+    "SELECT id, email, name, role FROM users WHERE google_id = $1",
+    [payload.sub]
+  );
+  if (byGoogleId.rows.length > 0) {
+    return byGoogleId.rows[0];
+  }
+
+  // 2. Check by email (existing local user signing in with Google for the first time)
+  const byEmail = await query(
+    "SELECT id, email, name, role FROM users WHERE email = $1",
+    [payload.email]
+  );
+  if (byEmail.rows.length > 0) {
+    // Link Google account to existing user
+    await query(
+      "UPDATE users SET google_id = $1, email_verified = true WHERE id = $2",
+      [payload.sub, byEmail.rows[0].id]
+    );
+    return byEmail.rows[0];
+  }
+
+  // 3. Create new user
+  const result = await query(
+    `INSERT INTO users (email, name, google_id, auth_provider, email_verified, accepted_terms_at)
+     VALUES ($1, $2, $3, 'google', true, NOW())
+     RETURNING id, email, name, role`,
+    [payload.email, payload.name || payload.email.split("@")[0], payload.sub]
+  );
+  return result.rows[0];
+}
+
 // Validate a reset token and update the user's password. Returns true on success.
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   const result = await query(
