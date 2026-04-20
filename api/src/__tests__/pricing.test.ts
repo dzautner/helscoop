@@ -121,7 +121,9 @@ describe("GET /pricing/compare/:materialId", () => {
     ];
     mockQuery.mockResolvedValueOnce({ rows: priceRows } as never);
 
-    const res = await makeRequest("GET", "/pricing/compare/pine_48x98_c24");
+    const res = await makeRequest("GET", "/pricing/compare/pine_48x98_c24", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
     expect(res.status).toBe(200);
     const body = res.body as typeof priceRows;
     expect(body.length).toBe(3);
@@ -135,16 +137,18 @@ describe("GET /pricing/compare/:materialId", () => {
   it("returns empty array when no pricing exists for material", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
 
-    const res = await makeRequest("GET", "/pricing/compare/nonexistent");
+    const res = await makeRequest("GET", "/pricing/compare/nonexistent", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
-  it("does not require authentication", async () => {
+  it("requires authentication", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
 
     const res = await makeRequest("GET", "/pricing/compare/mat1");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 });
 
@@ -255,7 +259,9 @@ describe("GET /pricing/history/:materialId", () => {
     ];
     mockQuery.mockResolvedValueOnce({ rows: historyRows } as never);
 
-    const res = await makeRequest("GET", "/pricing/history/pine_48x98_c24");
+    const res = await makeRequest("GET", "/pricing/history/pine_48x98_c24", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
     expect(res.status).toBe(200);
     const body = res.body as typeof historyRows;
     expect(body.length).toBe(2);
@@ -266,16 +272,18 @@ describe("GET /pricing/history/:materialId", () => {
   it("returns empty array when no history exists", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
 
-    const res = await makeRequest("GET", "/pricing/history/nonexistent");
+    const res = await makeRequest("GET", "/pricing/history/nonexistent", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
-  it("does not require authentication", async () => {
+  it("requires authentication", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
 
     const res = await makeRequest("GET", "/pricing/history/mat1");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 });
 
