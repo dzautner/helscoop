@@ -26,6 +26,10 @@ export default function ScreenshotPopover({
     if (imageDataUrl) {
       requestAnimationFrame(() => setVisible(true));
       setCopied(false);
+      // Move focus into the popover when it opens
+      requestAnimationFrame(() => {
+        popoverRef.current?.focus();
+      });
     } else {
       setVisible(false);
     }
@@ -92,6 +96,9 @@ export default function ScreenshotPopover({
   return (
     <div
       ref={popoverRef}
+      role="dialog"
+      aria-label={t("screenshot.dialogTitle")}
+      tabIndex={-1}
       style={{
         position: "absolute",
         top: 48,

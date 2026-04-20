@@ -459,6 +459,7 @@ const translations = {
       termsChangesBody: 'Voimme paivittaa naita ehtoja. Olennaisista muutoksista ilmoitetaan sahkopostitse. Jatkamalla palvelun kayttoa hyvaksyt muutokset.',
     },
     screenshot: {
+      dialogTitle: 'Kuvakaappaus',
       download: 'Lataa',
       copy: 'Kopioi',
       copied: 'Kopioitu!',
@@ -998,6 +999,7 @@ const translations = {
       termsChangesBody: 'We may update these terms. Material changes will be communicated via email. Continued use of the service constitutes acceptance of changes.',
     },
     screenshot: {
+      dialogTitle: 'Screenshot',
       download: 'Download',
       copy: 'Copy',
       copied: 'Copied!',

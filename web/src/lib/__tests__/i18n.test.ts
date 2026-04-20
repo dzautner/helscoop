@@ -510,7 +510,7 @@ describe("exhaustive i18n key parity", () => {
     "legal.termsLiability", "legal.termsLiabilityBody", "legal.termsChanges",
     "legal.termsChangesBody",
     // screenshot
-    "screenshot.download", "screenshot.copy", "screenshot.copied",
+    "screenshot.dialogTitle", "screenshot.download", "screenshot.copy", "screenshot.copied",
     // commandPalette
     "commandPalette.title", "commandPalette.placeholder", "commandPalette.noResults",
     "commandPalette.navigate", "commandPalette.execute", "commandPalette.close",
