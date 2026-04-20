@@ -542,6 +542,15 @@ describe("exhaustive i18n key parity", () => {
     "errors.tryAgain", "errors.backToDashboard", "errors.showDetails", "errors.hideDetails",
     "errors.projectNotFoundTitle", "errors.projectNotFoundMessage",
     "errors.connectionLost", "errors.reconnected", "errors.retryNow",
+    // landing
+    "landing.footerDescription", "landing.dataSources", "landing.dataSourceDvv",
+    "landing.dataSourceMml", "landing.dataSourceBuildingMaterials",
+    "landing.dataSourceTimber", "landing.dataSourceRoofing",
+    "landing.links", "landing.privacyPolicy", "landing.termsOfService",
+    "landing.dataInEu", "landing.featuresHeading", "landing.featuresLabel",
+    "landing.featuresTitle", "landing.feature1Title", "landing.feature1Desc",
+    "landing.feature2Title", "landing.feature2Desc",
+    "landing.feature3Title", "landing.feature3Desc",
     // viewport
     "viewport.contextMenuLabel",
   ];

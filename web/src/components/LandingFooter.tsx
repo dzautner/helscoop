@@ -4,16 +4,16 @@ import { useTranslation } from "@/components/LocaleProvider";
 import ScrollReveal from "@/components/ScrollReveal";
 
 export default function LandingFooter() {
-  const { locale } = useTranslation();
+  const { t } = useTranslation();
   const year = new Date().getFullYear();
 
   const dataSources = [
-    { name: "DVV", desc: locale === "fi" ? "Vaestorekisterikeskus" : "Population Register Centre" },
-    { name: "MML", desc: locale === "fi" ? "Maanmittauslaitos" : "National Land Survey" },
-    { name: "K-Rauta", desc: locale === "fi" ? "Rakennustarvikkeet" : "Building materials" },
-    { name: "Stark", desc: locale === "fi" ? "Rakennustarvikkeet" : "Building materials" },
-    { name: "Sarokas", desc: locale === "fi" ? "Puutavara" : "Timber products" },
-    { name: "Ruukki", desc: locale === "fi" ? "Kattomateriaalit" : "Roofing materials" },
+    { name: "DVV", desc: t("landing.dataSourceDvv") },
+    { name: "MML", desc: t("landing.dataSourceMml") },
+    { name: "K-Rauta", desc: t("landing.dataSourceBuildingMaterials") },
+    { name: "Stark", desc: t("landing.dataSourceBuildingMaterials") },
+    { name: "Sarokas", desc: t("landing.dataSourceTimber") },
+    { name: "Ruukki", desc: t("landing.dataSourceRoofing") },
   ];
 
   return (
@@ -25,15 +25,13 @@ export default function LandingFooter() {
             <span>Hel</span><span style={{ color: "var(--amber)" }}>scoop</span>
           </div>
           <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, maxWidth: 280 }}>
-            {locale === "fi"
-              ? "Parametrinen suunnittelutyokalu rakennusprojekteihin. Reaaliaikaiset hinnat, 3D-mallinnus ja AI-avustaja."
-              : "Parametric design tool for building projects. Real-time prices, 3D modeling, and AI assistant."}
+            {t("landing.footerDescription")}
           </p>
         </div>
 
         <div className="landing-footer-sources">
           <div className="label-mono" style={{ color: "var(--text-muted)", marginBottom: 12, fontSize: 9 }}>
-            {locale === "fi" ? "TIETOLAHTEET" : "DATA SOURCES"}
+            {t("landing.dataSources")}
           </div>
           <div className="landing-footer-source-grid">
             {dataSources.map((s) => (
@@ -47,13 +45,13 @@ export default function LandingFooter() {
 
         <div className="landing-footer-links">
           <div className="label-mono" style={{ color: "var(--text-muted)", marginBottom: 12, fontSize: 9 }}>
-            {locale === "fi" ? "LINKIT" : "LINKS"}
+            {t("landing.links")}
           </div>
           <a href="/privacy" className="link-muted" style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
-            {locale === "fi" ? "Tietosuojakäytäntö" : "Privacy Policy"}
+            {t("landing.privacyPolicy")}
           </a>
           <a href="/terms" className="link-muted" style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
-            {locale === "fi" ? "Käyttöehdot" : "Terms of Service"}
+            {t("landing.termsOfService")}
           </a>
         </div>
       </div>
@@ -63,9 +61,7 @@ export default function LandingFooter() {
       <div className="landing-footer-bottom">
         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
           &copy; {year} Helscoop.{" "}
-          {locale === "fi"
-            ? "Tietosi pysyvat EU:ssa."
-            : "Your data stays in the EU."}
+          {t("landing.dataInEu")}
         </span>
         <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
           Helsinki, Finland
