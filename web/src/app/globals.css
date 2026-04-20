@@ -54,6 +54,8 @@
   --success: var(--forest);
   --success-muted: var(--forest-dim);
   --warning: #eab308;
+  --warning-dim: rgba(234, 179, 8, 0.1);
+  --warning-border: rgba(234, 179, 8, 0.2);
   --shadow-sm: var(--shadow-subtle);
 
   --transition-micro: 0.08s ease;
@@ -116,6 +118,8 @@
   --danger-dim: rgba(220, 38, 38, 0.06);
 
   --warning: #ca8a04;
+  --warning-dim: rgba(202, 138, 4, 0.08);
+  --warning-border: rgba(202, 138, 4, 0.2);
 
   --border: rgba(0, 0, 0, 0.06);
   --border-strong: rgba(0, 0, 0, 0.12);

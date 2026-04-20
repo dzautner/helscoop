@@ -48,9 +48,9 @@ const TYPE_STYLES: Record<ToastType, { bg: string; color: string; border: string
     icon: "M12 2v10M12 16v2",
   },
   warning: {
-    bg: "rgba(234, 179, 8, 0.1)",
+    bg: "var(--warning-dim)",
     color: "var(--warning)",
-    border: "rgba(234, 179, 8, 0.2)",
+    border: "var(--warning-border)",
     icon: "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01",
   },
   progress: {
