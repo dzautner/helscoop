@@ -520,6 +520,13 @@ function PriceComparisonPopup({
   const [showChart, setShowChart] = useState(false);
   const { t } = useTranslation();
   const popupRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<Element | null>(null);
+
+  // Capture the element that triggered the popup so we can return focus on close
+  useEffect(() => {
+    triggerRef.current = document.activeElement;
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -537,14 +544,49 @@ function PriceComparisonPopup({
       });
   }, [materialId]);
 
+  // Return focus to the trigger element when the popup closes
+  const handleClose = useCallback(() => {
+    if (triggerRef.current && triggerRef.current instanceof HTMLElement) {
+      triggerRef.current.focus();
+    }
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        onClose();
+        handleClose();
       }
     };
     const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+        return;
+      }
+
+      // Focus trap: cycle through focusable elements within the popup
+      if (e.key === "Tab" && popupRef.current) {
+        const focusable = popupRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     };
     document.addEventListener("mousedown", handler);
     document.addEventListener("keydown", keyHandler);
@@ -552,7 +594,12 @@ function PriceComparisonPopup({
       document.removeEventListener("mousedown", handler);
       document.removeEventListener("keydown", keyHandler);
     };
-  }, [onClose]);
+  }, [handleClose]);
+
+  // Focus the close button when the popup opens
+  useEffect(() => {
+    requestAnimationFrame(() => closeBtnRef.current?.focus());
+  }, []);
 
   // Build supplier color map
   const supplierColors = useMemo(() => {
@@ -618,8 +665,10 @@ function PriceComparisonPopup({
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{materialName}</div>
           </div>
           <button
-            onClick={onClose}
+            ref={closeBtnRef}
+            onClick={handleClose}
             className="popup-close-btn"
+            aria-label={t('dialog.close') || 'Close'}
             style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "4px 8px", lineHeight: 1, borderRadius: "var(--radius-sm)", transition: "color 0.15s ease, background 0.15s ease", display: "flex", alignItems: "center", justifyContent: "center" }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--bg-tertiary)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "none"; }}
