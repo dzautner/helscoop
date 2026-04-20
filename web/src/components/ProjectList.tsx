@@ -33,6 +33,10 @@ export default function ProjectList({
   const [sortKey, setSortKey] = useState<SortKey>("modified");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [trashProjects, setTrashProjects] = useState<Project[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<string | null>(null);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
@@ -123,7 +127,6 @@ export default function ProjectList({
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    // Reset the input so the same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
 
@@ -132,7 +135,6 @@ export default function ProjectList({
       const text = await file.text();
       const data = JSON.parse(text);
 
-      // Validate required fields
       if (!data.name || typeof data.name !== "string" || !data.scene_js || typeof data.scene_js !== "string") {
         toast(t("toast.projectImportInvalid"), "error");
         setImporting(false);
@@ -147,7 +149,6 @@ export default function ProjectList({
         scene_js: data.scene_js,
       });
 
-      // Import BOM items if present (only material_id, quantity, unit)
       if (Array.isArray(data.bom) && data.bom.length > 0) {
         const bomItems = data.bom
           .filter((b: Record<string, unknown>) => b.material_id && b.quantity)
@@ -173,11 +174,66 @@ export default function ProjectList({
     setImporting(false);
   }
 
+  async function loadTrash() {
+    setTrashLoading(true);
+    try {
+      const items = await api.getTrashProjects();
+      setTrashProjects(items);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t('toast.deleteFailed'), "error");
+    }
+    setTrashLoading(false);
+  }
+
+  async function toggleTrash() {
+    if (!showTrash) {
+      await loadTrash();
+    }
+    setShowTrash(!showTrash);
+  }
+
+  async function restoreProject(id: string) {
+    try {
+      await api.restoreProject(id);
+      setTrashProjects(trashProjects.filter((p) => p.id !== id));
+      const refreshed = await api.getProjects();
+      setProjects(refreshed);
+      toast(t('toast.projectRestored'), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t('toast.restoreFailed'), "error");
+    }
+  }
+
+  function requestPermanentDelete(id: string) {
+    setPermanentDeleteTarget(id);
+  }
+
+  async function confirmPermanentDelete() {
+    if (!permanentDeleteTarget) return;
+    const id = permanentDeleteTarget;
+    setPermanentDeleteTarget(null);
+    try {
+      await api.permanentDeleteProject(id);
+      setTrashProjects(trashProjects.filter((p) => p.id !== id));
+      toast(t('toast.projectPermanentlyDeleted'), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t('toast.permanentDeleteFailed'), "error");
+    }
+  }
+
   function projectCountText(count: number): string {
     if (locale === 'fi') {
       return `${count} projekti${count !== 1 ? "a" : ""}`;
     }
     return `${count} project${count !== 1 ? "s" : ""}`;
+  }
+
+  function trashDaysInfo(deletedAt: string): { days: number; remaining: number } {
+    const deleted = new Date(deletedAt);
+    const now = new Date();
+    const days = Math.floor((now.getTime() - deleted.getTime()) / (1000 * 60 * 60 * 24));
+    const remaining = Math.max(0, 30 - days);
+    return { days, remaining };
   }
 
   const filteredProjects = useMemo(() => {
@@ -472,6 +528,93 @@ export default function ProjectList({
         )}
       </div>
 
+      {/* Trash section */}
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px 80px" }}>
+        <button
+          className="btn btn-ghost"
+          onClick={toggleTrash}
+          style={{ fontSize: 13, gap: 6, marginBottom: showTrash ? 20 : 0 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          {showTrash ? t('project.hideTrash') : t('project.showTrash')}
+          {trashProjects.length > 0 && showTrash && (
+            <span className="badge badge-amber" style={{ marginLeft: 4 }}>{trashProjects.length}</span>
+          )}
+        </button>
+
+        {showTrash && (
+          <div>
+            {trashLoading ? (
+              <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "20px 0" }}>
+                {t('project.loadingProjects')}
+              </div>
+            ) : trashProjects.length === 0 ? (
+              <div style={{ padding: "24px 0", textAlign: "center" }}>
+                <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 4 }}>
+                  {t('project.trashEmpty')}
+                </p>
+                <p style={{ color: "var(--text-muted)", fontSize: 12, opacity: 0.7 }}>
+                  {t('project.trashEmptyDesc')}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {trashProjects.map((p) => {
+                  const info = trashDaysInfo(p.deleted_at!);
+                  return (
+                    <div
+                      key={p.id}
+                      className="card"
+                      style={{ padding: "16px 20px", opacity: 0.75 }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h3 className="heading-display" style={{ fontSize: 16, marginBottom: 4 }}>
+                            {p.name}
+                          </h3>
+                          <p style={{ color: "var(--text-muted)", fontSize: 12, margin: 0 }}>
+                            {t('project.trashInfo', { days: info.days, remaining: info.remaining })}
+                          </p>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                          <button
+                            className="btn btn-ghost"
+                            style={{ padding: "6px 14px", fontSize: 12, gap: 4 }}
+                            onClick={() => restoreProject(p.id)}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="1 4 1 10 7 10" />
+                              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                            </svg>
+                            {t('project.restore')}
+                          </button>
+                          <button
+                            className="btn btn-danger"
+                            style={{ padding: "6px 14px", fontSize: 12, gap: 4 }}
+                            onClick={() => requestPermanentDelete(p.id)}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                            {t('project.permanentDelete')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <ConfirmDialog
         open={deleteTarget !== null}
         title={t('dialog.deleteProjectTitle')}
@@ -481,6 +624,17 @@ export default function ProjectList({
         variant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={permanentDeleteTarget !== null}
+        title={t('dialog.permanentDeleteTitle')}
+        message={t('dialog.permanentDeleteMessage')}
+        confirmText={t('project.permanentDelete')}
+        cancelText={t('dialog.cancel')}
+        variant="danger"
+        onConfirm={confirmPermanentDelete}
+        onCancel={() => setPermanentDeleteTarget(null)}
       />
     </div>
   );

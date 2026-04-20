@@ -16,7 +16,21 @@ router.get("/", async (req, res) => {
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
        WHERE pb.project_id = projects.id) AS estimated_cost
-     FROM projects WHERE user_id = $1 ORDER BY updated_at DESC`,
+     FROM projects WHERE user_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC`,
+    [req.user!.id]
+  );
+  res.json(result.rows);
+});
+
+router.get("/trash", async (req, res) => {
+  const result = await query(
+    `SELECT id, name, description, is_public, created_at, updated_at, deleted_at, thumbnail_url,
+      (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
+       FROM project_bom pb
+       JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
+       JOIN materials m ON pb.material_id = m.id
+       WHERE pb.project_id = projects.id) AS estimated_cost
+     FROM projects WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC`,
     [req.user!.id]
   );
   res.json(result.rows);
@@ -40,7 +54,7 @@ router.post("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const result = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
@@ -79,10 +93,28 @@ router.put("/:id", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
-  await query("DELETE FROM projects WHERE id=$1 AND user_id=$2", [
-    req.params.id,
-    req.user!.id,
-  ]);
+  await query(
+    "UPDATE projects SET deleted_at = NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id]
+  );
+  res.json({ ok: true });
+});
+
+router.post("/:id/restore", async (req, res) => {
+  const result = await query(
+    "UPDATE projects SET deleted_at = NULL, updated_at = NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NOT NULL RETURNING id",
+    [req.params.id, req.user!.id]
+  );
+  if (result.rows.length === 0)
+    return res.status(404).json({ error: "Project not found in trash" });
+  res.json({ ok: true });
+});
+
+router.delete("/:id/permanent", async (req, res) => {
+  await query(
+    "DELETE FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NOT NULL",
+    [req.params.id, req.user!.id]
+  );
   res.json({ ok: true });
 });
 
@@ -207,7 +239,7 @@ router.put("/:id/thumbnail", async (req, res) => {
 
 router.post("/:id/duplicate", async (req, res) => {
   const src = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
   if (src.rows.length === 0)
@@ -289,7 +321,7 @@ router.get("/:id/pdf", async (req, res) => {
 
   // Fetch project
   const projResult = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
     [req.params.id, req.user!.id]
   );
   if (projResult.rows.length === 0) {
