@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
+import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
@@ -65,6 +66,62 @@ function getCategoryColor(name: string, idx: number): string {
     if (name.toLowerCase().includes(key.toLowerCase())) return color;
   }
   return FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+}
+
+/* ── Scene material name normalization ─────────────────────── */
+const MATERIAL_ALIASES: Record<string, string[]> = {
+  sahatavara: ["lumber", "wood", "puu", "sahatavara", "timber"],
+  perustus: ["foundation", "concrete", "betoni", "perustus"],
+  eristys: ["insulation", "eriste", "eristys", "insulate"],
+  katto: ["roofing", "katto", "roof", "shingle"],
+  kalvo: ["membrane", "kalvo", "vapor", "barrier"],
+  kiinnitys: ["fasteners", "kiinnitys", "screw", "nail", "bolt"],
+  sisä: ["interior", "sisä", "finish", "drywall", "gypsum"],
+};
+
+/**
+ * Match a scene material name against the materials catalog using
+ * fuzzy name + category matching. Returns the best matching Material or null.
+ */
+function matchSceneMaterial(
+  sceneName: string,
+  materials: Material[],
+): Material | null {
+  const lower = sceneName.toLowerCase().trim();
+
+  // 1. Exact match on material name/id
+  const exact = materials.find(
+    (m) =>
+      m.id.toLowerCase() === lower ||
+      m.name.toLowerCase() === lower ||
+      m.name_fi?.toLowerCase() === lower ||
+      m.name_en?.toLowerCase() === lower
+  );
+  if (exact) return exact;
+
+  // 2. Match via known aliases -> category
+  for (const [category, aliases] of Object.entries(MATERIAL_ALIASES)) {
+    if (aliases.some((a) => lower.includes(a) || a.includes(lower))) {
+      // Find first material in that category
+      const catMatch = materials.find((m) =>
+        m.category_name?.toLowerCase().includes(category) ||
+        (m.category_name_fi?.toLowerCase() || "").includes(category)
+      );
+      if (catMatch) return catMatch;
+    }
+  }
+
+  // 3. Substring match on material name
+  const partial = materials.find(
+    (m) =>
+      m.name.toLowerCase().includes(lower) ||
+      (m.name_fi?.toLowerCase() || "").includes(lower) ||
+      (m.name_en?.toLowerCase() || "").includes(lower) ||
+      lower.includes(m.name.toLowerCase())
+  );
+  if (partial) return partial;
+
+  return null;
 }
 
 /* ── Donut chart sub-component ──────────────────────────────── */
@@ -991,6 +1048,7 @@ export default function BomPanel({
   onRemove,
   onUpdateQty,
   style,
+  sceneJs,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -998,6 +1056,8 @@ export default function BomPanel({
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   style?: React.CSSProperties;
+  /** Scene script for extracting material declarations */
+  sceneJs?: string;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -1035,6 +1095,34 @@ export default function BomPanel({
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const animatedTotal = useAnimatedNumber(total);
+
+  // Extract scene material names that are not yet in the BOM
+  const unmatchedSceneMaterials = useMemo(() => {
+    if (!sceneJs) return [];
+    try {
+      const result = interpretScene(sceneJs);
+      if (result.error) return [];
+      const sceneMatNames = extractSceneMaterials(result.objects);
+      const bomMaterialIds = new Set(bom.map((b) => b.material_id));
+      const unmatched: { sceneName: string; matched: Material | null }[] = [];
+      for (const name of sceneMatNames) {
+        const matched = matchSceneMaterial(name, materials);
+        if (matched && bomMaterialIds.has(matched.id)) continue; // already in BOM
+        unmatched.push({ sceneName: name, matched });
+      }
+      return unmatched;
+    } catch {
+      return [];
+    }
+  }, [sceneJs, bom, materials]);
+
+  const handleSyncFromScene = useCallback(() => {
+    for (const { matched } of unmatchedSceneMaterials) {
+      if (matched) {
+        onAdd(matched.id, 1);
+      }
+    }
+  }, [unmatchedSceneMaterials, onAdd]);
 
   // Fetch categories on mount
   useEffect(() => {
@@ -1215,6 +1303,51 @@ export default function BomPanel({
           <CostBreakdownChart bom={bom} materials={materials} total={total} />
         )}
       </div>
+
+      {/* Scene material sync banner */}
+      {unmatchedSceneMaterials.length > 0 && unmatchedSceneMaterials.some((u) => u.matched) && (
+        <div
+          style={{
+            margin: "0 12px 4px",
+            padding: "8px 10px",
+            background: "var(--amber-glow)",
+            border: "1px solid var(--amber-border)",
+            borderRadius: "var(--radius-sm)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11,
+            animation: "fadeIn 0.2s ease both",
+          }}
+        >
+          <span style={{ color: "var(--text-secondary)", lineHeight: 1.4 }}>
+            {t('editor.sceneMaterialsDetected', {
+              count: unmatchedSceneMaterials.filter((u) => u.matched).length,
+            }) || `${unmatchedSceneMaterials.filter((u) => u.matched).length} scene materials not in BOM`}
+          </span>
+          <button
+            onClick={handleSyncFromScene}
+            style={{
+              background: "none",
+              border: "1px solid var(--amber-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--amber)",
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "3px 8px",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              fontFamily: "var(--font-body)",
+              transition: "background 0.15s ease",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--amber-glow)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+          >
+            {t('editor.syncFromScene') || 'Add them'}
+          </button>
+        </div>
+      )}
 
       <div className="bom-list" role="grid" aria-label={t('editor.materialList')}>
         {bom.length === 0 ? (

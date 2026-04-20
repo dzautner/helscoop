@@ -1419,6 +1419,7 @@ export default function ProjectPage() {
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
               style={{ width: bomWidth }}
+              sceneJs={sceneJs}
             />
           </>
         )}

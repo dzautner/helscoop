@@ -900,3 +900,19 @@ function hasOwnSceneOffset(script: string): number {
   const hasOwnScene = /\b(?:const|let|var)\s+scene\b/.test(processed);
   return hasOwnScene ? 0 : 1;
 }
+
+/**
+ * Extract unique material names from an array of scene objects.
+ * Walks the full object tree (including children) and filters out "default".
+ */
+export function extractSceneMaterials(objects: SceneObject[]): string[] {
+  const names = new Set<string>();
+  function walk(obj: SceneObject) {
+    if (obj.material && obj.material !== "default") {
+      names.add(obj.material);
+    }
+    obj.children?.forEach(walk);
+  }
+  objects.forEach(walk);
+  return Array.from(names);
+}
