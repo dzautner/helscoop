@@ -493,6 +493,12 @@ const translations = {
       invalidDimension: '{{geometry}}-objektilla on nolla- tai negatiivinen mitta',
       warningsTitle: 'Varoitukset',
     },
+    emailVerification: {
+      banner: 'Vahvista sahkopostiosoitteesi. Tarkista postilaatikkosi.',
+      resent: 'Lahetetty!',
+      resend: 'Laheta uudelleen',
+      dismiss: 'Sulje',
+    },
     errors: {
       notFoundTitle: 'Sivua ei loytynyt',
       notFoundMessage: 'Etsimasi sivu ei ole olemassa tai se on siirretty.',
@@ -1001,6 +1007,12 @@ const translations = {
       farFromOrigin: 'Object is {{distance}} units from origin — check position',
       invalidDimension: '{{geometry}} has zero or negative dimensions',
       warningsTitle: 'Warnings',
+    },
+    emailVerification: {
+      banner: 'Please verify your email. Check your inbox.',
+      resent: 'Sent!',
+      resend: 'Resend',
+      dismiss: 'Dismiss',
     },
     errors: {
       notFoundTitle: 'Page not found',
