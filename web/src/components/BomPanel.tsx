@@ -2046,9 +2046,24 @@ export default function BomPanel({
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
-          <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            {t('editor.bomRowCount', { count: bom.length, suffix: bom.length === 1 ? '' : (locale === 'fi' ? 'a' : 's') })}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              className="bom-print-btn no-print"
+              onClick={() => window.print()}
+              title={t('editor.printBom')}
+              aria-label={t('editor.printBom')}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text-muted)", display: "inline-flex" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+            </button>
+            <span className="label-mono no-print" style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              {t('editor.bomRowCount', { count: bom.length, suffix: bom.length === 1 ? '' : (locale === 'fi' ? 'a' : 's') })}
+            </span>
+          </div>
         </div>
         <div style={{
           padding: "14px 16px",

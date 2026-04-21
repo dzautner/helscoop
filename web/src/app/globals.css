@@ -4724,3 +4724,31 @@ select:focus {
   outline: none;
   box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }
+
+/* ── Print styles ──────────────────────────────────────────── */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .nav-bar, .chat-embedded, .editor-code-panel, .editor-viewport-area,
+  .editor-toolbar, .no-print, .bom-print-btn, .toast-container,
+  .command-palette-overlay, .bom-remove-btn, .bom-browse-btn,
+  .bom-item-qty-input, .bom-empty-cta { display: none !important; }
+  .editor-bom-panel {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    border: none !important;
+    color: #000 !important;
+  }
+  .bom-item-card {
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    color: #000 !important;
+    page-break-inside: avoid;
+  }
+  .bom-item-name { color: #000 !important; }
+  .bom-item-total { color: #333 !important; }
+  .bom-item-unit, .bom-item-supplier { color: #555 !important; }
+}
