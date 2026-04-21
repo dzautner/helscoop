@@ -99,6 +99,87 @@ function stockTooltip(
   return parts.join(" · ");
 }
 
+type PackageTierId = "basic" | "standard" | "premium";
+
+interface PackageTier {
+  id: PackageTierId;
+  labelKey: string;
+  tone: string;
+}
+
+interface PackageReplacement {
+  fromMaterialId: string;
+  toMaterial: Material;
+  currentCost: number;
+  packageCost: number;
+  locked: boolean;
+}
+
+interface PackageSummary {
+  tier: PackageTier;
+  total: number;
+  delta: number;
+  changedCount: number;
+  replacements: PackageReplacement[];
+}
+
+const PACKAGE_TIERS: PackageTier[] = [
+  { id: "basic", labelKey: "bom.packageBasic", tone: "var(--text-secondary)" },
+  { id: "standard", labelKey: "bom.packageStandard", tone: "var(--amber)" },
+  { id: "premium", labelKey: "bom.packagePremium", tone: "var(--success)" },
+];
+
+function getPrimaryMaterialPrice(material: Material | null | undefined): number {
+  const primary = material?.pricing?.find((p) => p.is_primary) ?? material?.pricing?.[0];
+  return Number(primary?.unit_price ?? 0);
+}
+
+function getMaterialUnit(material: Material | null | undefined, fallback: string): string {
+  const primary = material?.pricing?.find((p) => p.is_primary) ?? material?.pricing?.[0];
+  return material?.design_unit ?? primary?.unit ?? fallback;
+}
+
+function getLineCost(item: BomItem, material: Material | null | undefined): number {
+  const unitPrice = getPrimaryMaterialPrice(material) || Number(item.unit_price ?? 0);
+  return unitPrice * Number(item.quantity || 0);
+}
+
+function getReplacementCandidates(
+  item: BomItem,
+  currentMaterial: Material | null,
+  materials: Material[],
+  bomMaterialIds: Set<string>,
+): Material[] {
+  const group = currentMaterial?.substitution_group;
+  const category = currentMaterial?.category_name ?? item.category_name;
+  const currentUnit = getMaterialUnit(currentMaterial, item.unit);
+
+  let candidates = materials.filter((material) => {
+    if (material.id !== item.material_id && bomMaterialIds.has(material.id)) return false;
+    if (group) return material.substitution_group === group;
+    return category != null && material.category_name === category;
+  });
+
+  const sameUnit = candidates.filter((material) => getMaterialUnit(material, item.unit) === currentUnit);
+  if (sameUnit.length >= 2) candidates = sameUnit;
+
+  const priced = candidates.filter((material) => getPrimaryMaterialPrice(material) > 0);
+  return (priced.length > 0 ? priced : candidates).sort(
+    (a, b) => getPrimaryMaterialPrice(a) - getPrimaryMaterialPrice(b),
+  );
+}
+
+function pickPackageMaterial(candidates: Material[], tier: PackageTierId): Material | null {
+  if (candidates.length === 0) return null;
+  if (tier === "basic") return candidates[0];
+  if (tier === "premium") return candidates[candidates.length - 1];
+  return candidates[Math.round((candidates.length - 1) / 2)];
+}
+
+function formatPackageCurrency(amount: number, locale: string): string {
+  return `${Math.round(amount).toLocaleString(locale, { maximumFractionDigits: 0 })} €`;
+}
+
 /* ── Unit conversion helpers ───────────────────────────────── */
 
 /** VAT multiplier for Finnish VAT classes (as of 2024-09) */
@@ -1187,6 +1268,8 @@ function BomItemCard({
   onCompare,
   onNavigate,
   onFocusIndex,
+  isPackageLocked = false,
+  onTogglePackageLock,
 }: {
   item: BomItem;
   materials: Material[];
@@ -1198,6 +1281,8 @@ function BomItemCard({
   onCompare: (id: string, name: string) => void;
   onNavigate: (direction: "up" | "down" | "next") => void;
   onFocusIndex: (index: number) => void;
+  isPackageLocked?: boolean;
+  onTogglePackageLock?: (materialId: string) => void;
 }) {
   const { t } = useTranslation();
   const [localQty, setLocalQty] = useState(String(item.quantity));
@@ -1364,17 +1449,46 @@ function BomItemCard({
           )}
           <strong className="bom-item-name">{materialName}</strong>
         </div>
-        <button
-          className="bom-remove-btn"
-          tabIndex={-1}
-          aria-label={t('editor.removeMaterial', { name: materialName })}
-          onClick={(e) => { e.stopPropagation(); onRequestRemove(item.material_id); }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div className="bom-item-actions">
+          {onTogglePackageLock && (
+            <button
+              className="bom-package-lock-btn"
+              data-locked={isPackageLocked}
+              tabIndex={-1}
+              aria-pressed={isPackageLocked}
+              aria-label={t(isPackageLocked ? 'bom.packageUnlock' : 'bom.packageLock', { name: materialName })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePackageLock(item.material_id);
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isPackageLocked ? (
+                  <>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </>
+                ) : (
+                  <>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                  </>
+                )}
+              </svg>
+            </button>
+          )}
+          <button
+            className="bom-remove-btn"
+            tabIndex={-1}
+            aria-label={t('editor.removeMaterial', { name: materialName })}
+            onClick={(e) => { e.stopPropagation(); onRequestRemove(item.material_id); }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="bom-item-qty-row">
         <input
@@ -1581,6 +1695,7 @@ export default function BomPanel({
   materials,
   onAdd,
   onAddImported,
+  onReplaceMaterial,
   onRemove,
   onUpdateQty,
   style,
@@ -1593,6 +1708,7 @@ export default function BomPanel({
   materials: Material[];
   onAdd: (materialId: string, qty: number) => void;
   onAddImported?: (item: BomItem, material: Material) => void;
+  onReplaceMaterial?: (fromMaterialId: string, toMaterialId: string) => void;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   style?: React.CSSProperties;
@@ -1621,6 +1737,10 @@ export default function BomPanel({
   const [focusedBomIndex, setFocusedBomIndex] = useState(-1);
   const [searchFocused, setSearchFocused] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [activePackage, setActivePackage] = useState<PackageTierId>("standard");
+  const [packageDelta, setPackageDelta] = useState<number | null>(null);
+  const [packageFlashKey, setPackageFlashKey] = useState(0);
+  const [lockedPackageMaterials, setLockedPackageMaterials] = useState<Set<string>>(() => new Set());
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -1648,6 +1768,48 @@ export default function BomPanel({
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const animatedTotal = useAnimatedNumber(total);
+  const packageSummaries = useMemo<PackageSummary[]>(() => {
+    const materialMap = new Map(materials.map((material) => [material.id, material]));
+    const bomMaterialIds = new Set(bom.map((item) => item.material_id));
+
+    return PACKAGE_TIERS.map((tier) => {
+      let tierTotal = 0;
+      let changedCount = 0;
+      const replacements: PackageReplacement[] = [];
+
+      for (const item of bom) {
+        const currentMaterial = materialMap.get(item.material_id) ?? null;
+        const currentCost = getLineCost(item, currentMaterial);
+        const locked = lockedPackageMaterials.has(item.material_id);
+        const candidates = getReplacementCandidates(item, currentMaterial, materials, bomMaterialIds);
+        const picked = locked ? currentMaterial : pickPackageMaterial(candidates, tier.id);
+        const toMaterial = picked ?? currentMaterial;
+        const packageCost = getLineCost(item, toMaterial);
+
+        tierTotal += packageCost;
+        if (toMaterial && toMaterial.id !== item.material_id && !locked) changedCount += 1;
+        if (toMaterial) {
+          replacements.push({
+            fromMaterialId: item.material_id,
+            toMaterial,
+            currentCost,
+            packageCost,
+            locked,
+          });
+        }
+      }
+
+      return {
+        tier,
+        total: tierTotal,
+        delta: tierTotal - total,
+        changedCount,
+        replacements,
+      };
+    });
+  }, [bom, lockedPackageMaterials, materials, total]);
+  const hasPackageChoices = packageSummaries.some((summary) => summary.changedCount > 0);
+  const activePackageSummary = packageSummaries.find((summary) => summary.tier.id === activePackage);
   const stockSummary = useMemo(() => {
     const levels = bom.map((item) => normalizeStockLevel(item.stock_level));
     return {
@@ -1657,6 +1819,29 @@ export default function BomPanel({
       known: levels.filter((level) => level !== "unknown").length,
     };
   }, [bom]);
+
+  const togglePackageLock = useCallback((materialId: string) => {
+    setLockedPackageMaterials((prev) => {
+      const next = new Set(prev);
+      if (next.has(materialId)) next.delete(materialId);
+      else next.add(materialId);
+      return next;
+    });
+  }, []);
+
+  const applyPackage = useCallback((tierId: PackageTierId) => {
+    const summary = packageSummaries.find((candidate) => candidate.tier.id === tierId);
+    if (!summary || !onReplaceMaterial) return;
+
+    for (const replacement of summary.replacements) {
+      if (replacement.locked || replacement.fromMaterialId === replacement.toMaterial.id) continue;
+      onReplaceMaterial(replacement.fromMaterialId, replacement.toMaterial.id);
+    }
+
+    setActivePackage(tierId);
+    setPackageDelta(summary.delta);
+    setPackageFlashKey((key) => key + 1);
+  }, [onReplaceMaterial, packageSummaries]);
 
   // Extract scene material names that are not yet in the BOM
   const unmatchedSceneMaterials = useMemo(() => {
@@ -1886,6 +2071,72 @@ export default function BomPanel({
             )}
           </div>
         </div>
+        {bom.length > 0 && (
+          <div className="package-switcher" data-has-choices={hasPackageChoices}>
+            <div className="package-switcher-head">
+              <div>
+                <div className="label-mono package-switcher-label">{t("bom.packageSwitcher")}</div>
+                <div className="package-switcher-desc">
+                  {hasPackageChoices ? t("bom.packageSwitcherDesc") : t("bom.packageNoAlternatives")}
+                </div>
+              </div>
+              {packageDelta !== null && (
+                <div
+                  key={packageFlashKey}
+                  className="package-delta-flash"
+                  data-positive={packageDelta > 0}
+                >
+                  {packageDelta > 0 ? "+" : ""}
+                  {formatPackageCurrency(packageDelta, locale)}
+                </div>
+              )}
+            </div>
+
+            <div className="package-tier-grid" role="radiogroup" aria-label={t("bom.packageSwitcher")}>
+              {packageSummaries.map((summary) => {
+                const isActive = activePackage === summary.tier.id;
+                const isDisabled = !onReplaceMaterial || summary.changedCount === 0;
+                return (
+                  <button
+                    key={summary.tier.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    className="package-tier-card"
+                    data-active={isActive}
+                    disabled={isDisabled}
+                    onClick={() => applyPackage(summary.tier.id)}
+                  >
+                    <span className="package-tier-name" style={{ color: summary.tier.tone }}>
+                      {t(summary.tier.labelKey)}
+                    </span>
+                    <span className="package-tier-total">
+                      {formatPackageCurrency(summary.total, locale)}
+                    </span>
+                    <span className="package-tier-delta" data-positive={summary.delta > 0}>
+                      {summary.delta > 0 ? "+" : ""}
+                      {formatPackageCurrency(summary.delta, locale)}
+                    </span>
+                    <span className="package-tier-changes">
+                      {t("bom.packageChanges", { count: summary.changedCount })}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activePackageSummary && (
+              <div className="package-switcher-foot">
+                <span>
+                  {t("bom.packageLocked", { count: lockedPackageMaterials.size })}
+                </span>
+                <span>
+                  {t("bom.packageCurrent")}: {t(activePackageSummary.tier.labelKey)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
         {bom.length > 0 && (
           <div
             style={{
@@ -2132,6 +2383,8 @@ export default function BomPanel({
               onCompare={(id, name) => setCompareMaterial({ id, name })}
               onNavigate={(dir) => handleBomNavigate(idx, dir)}
               onFocusIndex={setFocusedBomIndex}
+              isPackageLocked={lockedPackageMaterials.has(item.material_id)}
+              onTogglePackageLock={togglePackageLock}
             />
           ))
         )}

@@ -1057,6 +1057,45 @@ export default function ProjectPage() {
     [track],
   );
 
+  const replaceBomMaterial = useCallback(
+    (fromMaterialId: string, toMaterialId: string) => {
+      const mat = materials.find((m) => m.id === toMaterialId);
+      if (!mat) return;
+      const pricing = mat.pricing?.find((p) => p.is_primary) || mat.pricing?.[0];
+      const unitPrice = Number(pricing?.unit_price ?? 0);
+
+      track("bom_package_material_replaced", {
+        from_material_id: fromMaterialId,
+        to_material_id: toMaterialId,
+        category: mat.category_name || "",
+      });
+
+      setBom((prev) =>
+        prev.map((item) =>
+          item.material_id === fromMaterialId
+            ? {
+                ...item,
+                material_id: toMaterialId,
+                material_name: mat.name,
+                category_name: mat.category_name,
+                image_url: mat.image_url,
+                unit: mat.design_unit || pricing?.unit || item.unit,
+                unit_price: unitPrice,
+                total: unitPrice * item.quantity,
+                supplier: pricing?.supplier_name,
+                link: pricing?.link,
+                in_stock: pricing?.in_stock,
+                stock_level: pricing?.stock_level ?? "unknown",
+                store_location: pricing?.store_location,
+                stock_last_checked_at: pricing?.last_checked_at,
+              }
+            : item
+        )
+      );
+    },
+    [materials, track],
+  );
+
   const removeBomItem = useCallback((materialId: string) => {
     let removedItem: BomItem | undefined;
     setBom((prev) => {
@@ -1992,6 +2031,7 @@ export default function ProjectPage() {
               materials={materials}
               onAdd={addBomItem}
               onAddImported={addImportedBomItem}
+              onReplaceMaterial={replaceBomMaterial}
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
               style={isMobileEditor ? undefined : { width: bomWidth }}

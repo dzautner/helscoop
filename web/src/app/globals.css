@@ -995,6 +995,7 @@ body::before {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .bom-item-thumb {
@@ -1016,6 +1017,16 @@ body::before {
 .bom-item-name {
   font-size: 13px;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bom-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .bom-item-qty-row {
@@ -1111,6 +1122,168 @@ body::before {
   outline: none;
   box-shadow: var(--focus-ring-danger), var(--focus-ring-danger-offset);
   opacity: 1;
+}
+
+.bom-package-lock-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  opacity: 0.55;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--transition-quick), background var(--transition-quick), color var(--transition-quick);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bom-package-lock-btn:hover,
+.bom-package-lock-btn[data-locked="true"] {
+  opacity: 1;
+  color: var(--amber);
+  background: var(--amber-glow);
+}
+
+.bom-package-lock-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
+  opacity: 1;
+}
+
+/* ── Renovation package switcher ───────────────────── */
+.package-switcher {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at top right, rgba(229,160,75,0.12), transparent 42%),
+    var(--bg-tertiary);
+}
+
+.package-switcher[data-has-choices="false"] {
+  opacity: 0.76;
+}
+
+.package-switcher-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.package-switcher-label {
+  font-size: 10px;
+  color: var(--amber);
+  margin-bottom: 4px;
+}
+
+.package-switcher-desc {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.package-delta-flash {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success);
+  background: rgba(74, 124, 89, 0.12);
+  animation: packageDeltaPulse 0.9s ease both;
+}
+
+.package-delta-flash[data-positive="true"] {
+  color: var(--amber);
+  background: var(--amber-glow);
+}
+
+@keyframes packageDeltaPulse {
+  0% { transform: scale(0.92); opacity: 0; }
+  35% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.package-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.package-tier-card {
+  min-width: 0;
+  min-height: 92px;
+  padding: 8px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(9,9,11,0.22);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  transition: border-color var(--transition-quick), background var(--transition-quick), transform var(--transition-quick);
+}
+
+.package-tier-card:hover:not(:disabled),
+.package-tier-card[data-active="true"] {
+  border-color: var(--amber-border);
+  background: var(--amber-glow);
+}
+
+.package-tier-card:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.package-tier-card:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.package-tier-name {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.package-tier-total {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.package-tier-delta {
+  color: var(--success);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.package-tier-delta[data-positive="true"] {
+  color: var(--amber);
+}
+
+.package-tier-changes,
+.package-switcher-foot {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.package-switcher-foot {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 /* ── Link styles ─────────────────────────────────── */
