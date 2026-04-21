@@ -238,8 +238,8 @@ export default function ChatPanel({
         </button>
       )}
 
-      {/* Suggestion chips when empty */}
-      {messages.length === 0 && !loading && (
+      {/* Suggestion chips — visible when input is empty */}
+      {!input && !loading && (
         <div style={{
           display: "flex",
           gap: 6,
