@@ -8,6 +8,7 @@ import SubsidyCalculator from "@/components/SubsidyCalculator";
 import WasteEstimatePanel from "@/components/WasteEstimatePanel";
 import RyhtiSubmissionPanel from "@/components/RyhtiSubmissionPanel";
 import MaterialPicker from "@/components/MaterialPicker";
+import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsPanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1718,6 +1719,7 @@ export default function BomPanel({
   onAdd,
   onAddImported,
   onReplaceMaterial,
+  onApplySupplierPrice,
   onRemove,
   onUpdateQty,
   style,
@@ -1730,7 +1732,8 @@ export default function BomPanel({
   materials: Material[];
   onAdd: (materialId: string, qty: number) => void;
   onAddImported?: (item: BomItem, material: Material) => void;
-  onReplaceMaterial?: (fromMaterialId: string, toMaterialId: string) => void;
+  onReplaceMaterial?: (fromMaterialId: string, toMaterialId: string, options?: { undo?: boolean; source?: string }) => void;
+  onApplySupplierPrice?: (override: BomPriceOverride) => void;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   style?: React.CSSProperties;
@@ -2266,6 +2269,18 @@ export default function BomPanel({
               -{totalSavings.toFixed(2)} &euro;
             </span>
           </div>
+        )}
+        {bom.length > 0 && (
+          <BomSavingsPanel
+            bom={bom}
+            materials={materials}
+            onApplySupplierPrice={onApplySupplierPrice}
+            onReplaceMaterial={onReplaceMaterial}
+            onCompareMaterial={(id, name) => setCompareMaterial({ id, name })}
+            onOpenMaterialPicker={(id) => {
+              if (onReplaceMaterial) setMaterialPickerId(id);
+            }}
+          />
         )}
         {bom.length > 0 && total > 0 && (
           <CostBreakdownChart bom={bom} materials={materials} total={total} />

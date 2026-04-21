@@ -21,6 +21,9 @@ export type AnalyticsEvent =
   | "bom_item_removed"
   | "bom_item_undo_remove"
   | "bom_package_material_replaced"
+  | "bom_optimization_applied"
+  | "bom_optimization_undo"
+  | "bom_supplier_price_applied"
   | "bom_exported"
   | "project_exported"
   | "project_imported"
@@ -40,7 +43,10 @@ export interface AnalyticsEventProps {
   bom_item_added: { material_id: string; category?: string };
   bom_item_removed: { material_id: string };
   bom_item_undo_remove: { material_id: string };
-  bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string };
+  bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string; source?: string };
+  bom_optimization_applied: { type: string; material_id: string; savings_amount: number };
+  bom_optimization_undo: { type: string; material_id: string };
+  bom_supplier_price_applied: { material_id: string; supplier: string; unit_price: number };
   bom_exported: { format: "pdf" | "csv" | "json" };
   project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" };
   project_imported: { format: "helscoop" };
