@@ -103,6 +103,10 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
+const EDITOR_FONT_SIZE = 13;
+const EDITOR_LINE_HEIGHT = Math.round(EDITOR_FONT_SIZE * 1.7 * 10) / 10;
+const EDITOR_PADDING_TOP = 20;
+
 /* ── Component ───────────────────────────────────────────────────── */
 export default function SceneEditor({
   sceneJs,
@@ -210,7 +214,7 @@ export default function SceneEditor({
     if (!ta) return;
     // Compute line number of the match
     const linesBefore = sceneJs.slice(0, match.start).split("\n").length - 1;
-    const targetScrollTop = linesBefore * 22.1 - ta.clientHeight / 2 + 22.1;
+    const targetScrollTop = linesBefore * EDITOR_LINE_HEIGHT - ta.clientHeight / 2 + EDITOR_LINE_HEIGHT;
     ta.scrollTop = Math.max(0, targetScrollTop);
     syncScroll();
   }, [currentMatchIdx, findMatches, sceneJs, syncScroll]);
@@ -262,8 +266,8 @@ export default function SceneEditor({
   /* ── Shared text style (keep textarea + overlay pixel-identical) */
   const sharedStyle: React.CSSProperties = {
     fontFamily: "var(--font-mono)",
-    fontSize: 13,
-    lineHeight: "22.1px",  // 13 * 1.7
+    fontSize: EDITOR_FONT_SIZE,
+    lineHeight: `${EDITOR_LINE_HEIGHT}px`,
     padding: "20px 20px 20px 0",
     margin: 0,
     border: "none",
@@ -299,7 +303,7 @@ export default function SceneEditor({
     const ta = textareaRef.current;
     if (!ta) return;
     // Scroll so the error line is roughly centred in the visible area
-    const lineHeight = 22.1;
+    const lineHeight = EDITOR_LINE_HEIGHT;
     const paddingTop = 20;
     const targetScrollTop = paddingTop + errorLineIdx * lineHeight - ta.clientHeight / 2 + lineHeight;
     ta.scrollTop = Math.max(0, targetScrollTop);
@@ -591,7 +595,7 @@ export default function SceneEditor({
             <div
               key={i}
               style={{
-                height: "22.1px",
+                height: `${EDITOR_LINE_HEIGHT}px`,
                 ...(i === errorLineIdx
                   ? { color: "var(--error, #e05555)", fontWeight: 600 }
                   : i === cursorLine
@@ -610,10 +614,10 @@ export default function SceneEditor({
           <div
             style={{
               position: "absolute",
-              top: 20 + cursorLine * 22.1,
+              top: EDITOR_PADDING_TOP + cursorLine * EDITOR_LINE_HEIGHT,
               left: 0,
               right: 0,
-              height: 22.1,
+              height: EDITOR_LINE_HEIGHT,
               background: "rgba(255, 255, 255, 0.03)",
               pointerEvents: "none",
               zIndex: 0,
@@ -625,10 +629,10 @@ export default function SceneEditor({
             <div
               style={{
                 position: "absolute",
-                top: 20 + errorLineIdx * 22.1,
+                top: EDITOR_PADDING_TOP + errorLineIdx * EDITOR_LINE_HEIGHT,
                 left: 0,
                 right: 0,
-                height: 22.1,
+                height: EDITOR_LINE_HEIGHT,
                 background: "rgba(224, 85, 85, 0.1)",
                 borderBottom: "2px solid rgba(224, 85, 85, 0.5)",
                 pointerEvents: "none",
@@ -738,7 +742,7 @@ export default function SceneEditor({
               aria-live="polite"
               style={{
                 position: "absolute",
-                top: 20 + (errorLineIdx + 1) * 22.1,
+                top: EDITOR_PADDING_TOP + (errorLineIdx + 1) * EDITOR_LINE_HEIGHT,
                 left: 20,
                 right: 8,
                 zIndex: 4,
