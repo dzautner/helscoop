@@ -28,6 +28,7 @@ import wasteRouter from "./routes/waste";
 import ifcExportRouter from "./routes/ifc-export";
 import stockRouter from "./routes/stock";
 import subsidiesRouter from "./routes/subsidies";
+import keskoRouter from "./routes/kesko";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -632,6 +633,7 @@ app.use("/waste", authenticatedLimiter, wasteRouter);
 app.use("/ifc-export", authenticatedLimiter, ifcExportRouter);
 app.use("/stock", authenticatedLimiter, stockRouter);
 app.use("/subsidies", authenticatedLimiter, subsidiesRouter);
+app.use("/kesko", authenticatedLimiter, keskoRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
