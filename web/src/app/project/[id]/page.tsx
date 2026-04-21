@@ -152,6 +152,7 @@ export default function ProjectPage() {
   const [sceneErrorLine, setSceneErrorLine] = useState<number | null>(null);
   const [viewportKey, setViewportKey] = useState(0);
   const [sceneWarnings, setSceneWarnings] = useState<string[]>([]);
+  const [chatMessageCount, setChatMessageCount] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
   const shareDialogRef = useRef<HTMLDivElement>(null);
   const araDialogRef = useRef<HTMLDivElement>(null);
@@ -306,13 +307,13 @@ export default function ProjectPage() {
   // Block navigation when there are unsaved changes
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (saveStatus === "unsaved" || saveStatus === "saving" || saveStatus === "error") {
+      if (saveStatus === "unsaved" || saveStatus === "saving" || saveStatus === "error" || chatMessageCount > 3) {
         e.preventDefault();
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [saveStatus]);
+  }, [saveStatus, chatMessageCount]);
 
   // Intercept browser back button (popstate) when there are unsaved changes
   useEffect(() => {
@@ -1565,6 +1566,11 @@ export default function ProjectPage() {
                 ? `${t('editor.sceneErrorPrefix')}: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
                 : t('editor.objectCount', { count: objectCount })}
             </span>
+            {sceneJs.length > 100 * 1024 && (
+              <span className="viewport-status" data-error style={{ marginLeft: 8 }} title={t('editor.scriptSizeWarning')}>
+                {Math.round(sceneJs.length / 1024)} KB
+              </span>
+            )}
           </div>
 
           {/* 3D Viewport */}
@@ -1756,6 +1762,7 @@ export default function ProjectPage() {
             projectName={projectName}
             projectDescription={projectDesc}
             buildingInfo={project?.building_info ?? undefined}
+            onMessageCountChange={setChatMessageCount}
           />
         </div>
 
