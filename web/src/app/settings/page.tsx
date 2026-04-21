@@ -312,7 +312,7 @@ export default function SettingsPage() {
               <button
                 className="btn btn-primary"
                 type="submit"
-                disabled={savingProfile}
+                disabled={savingProfile || (name === (user?.name || "") && email === (user?.email || ""))}
                 style={{ padding: "11px 24px" }}
               >
                 {savingProfile ? <span className="btn-spinner" /> : t("settings.saveProfile")}

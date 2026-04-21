@@ -238,6 +238,7 @@ function CameraToolbar({
             data-active={i === activePreset}
             onClick={() => handlePreset(preset, i)}
             data-tooltip={t(preset.key)}
+            aria-label={t(preset.key)}
           >
             {t(preset.key)}
           </button>

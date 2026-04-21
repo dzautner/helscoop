@@ -24,7 +24,7 @@ export interface PlanFeatures {
 
 export interface PlanConfig {
   tier: PlanTier;
-  name: string;
+  nameKey: string;
   monthlyPrice: number;
   features: PlanFeatures;
 }
@@ -36,7 +36,7 @@ export interface PlanConfig {
 const PLANS: PlanConfig[] = [
   {
     tier: "free",
-    name: "Ilmainen / Free",
+    nameKey: "upgrade.free",
     monthlyPrice: 0,
     features: {
       maxProjects: 3,
@@ -48,7 +48,7 @@ const PLANS: PlanConfig[] = [
   },
   {
     tier: "pro",
-    name: "Pro",
+    nameKey: "upgrade.pro",
     monthlyPrice: 19,
     features: {
       maxProjects: 20,
@@ -60,7 +60,7 @@ const PLANS: PlanConfig[] = [
   },
   {
     tier: "enterprise",
-    name: "Yritys / Enterprise",
+    nameKey: "upgrade.enterprise",
     monthlyPrice: 49,
     features: {
       maxProjects: -1,
@@ -227,7 +227,7 @@ export default function UpgradeGate({
               textAlign: "center",
               color: p.tier === currentPlan ? "var(--amber, #c4915c)" : "inherit",
             }}>
-              {p.tier === "free" ? t("upgrade.free") : p.tier === "pro" ? t("upgrade.pro") : t("upgrade.enterprise")}
+              {t(p.nameKey)}
             </span>
           ))}
         </div>
