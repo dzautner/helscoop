@@ -596,6 +596,25 @@ if (typeof displayScale !== "undefined") { __result__.displayScale = displayScal
       warnings.push("validation.emptyScene");
     }
 
+    // Scene validation warnings
+    let totalTris = 0;
+    let unmaterializedCount = 0;
+    for (const s of sorted) {
+      totalTris += s.tris;
+      if (!s.cm.material) {
+        unmaterializedCount++;
+      }
+    }
+    if (totalTris > 500000) {
+      warnings.push(`validation.highTriCount:${totalTris}`);
+    }
+    if (unmaterializedCount > 0) {
+      warnings.push(`validation.unmaterialized:${unmaterializedCount}`);
+    }
+    if (coloredManifolds.length > 100) {
+      warnings.push(`validation.highObjectCount:${coloredManifolds.length}`);
+    }
+
     const result: ManifoldSceneResult = {
       meshes,
       error: null,
