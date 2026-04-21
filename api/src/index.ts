@@ -651,6 +651,7 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   const bom = await query(
     `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
       p.unit_price, p.link, s.name AS supplier_name,
+      p.in_stock, p.stock_level, p.store_location, p.last_checked_at AS stock_last_checked_at,
       (pb.quantity * p.unit_price * m.waste_factor) AS total
      FROM project_bom pb
      JOIN materials m ON pb.material_id = m.id

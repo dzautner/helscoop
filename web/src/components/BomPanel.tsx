@@ -9,7 +9,7 @@ import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
 import type { QuoteConfig } from "@/lib/quote-engine";
-import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass } from "@/types";
+import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass, StockLevel } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
 
@@ -42,6 +42,45 @@ function localizeUnit(unit: string, t: (key: string) => string): string {
   // If the translation key resolves to itself, return original
   if (translated === `units.${normalized}`) return unit;
   return translated;
+}
+
+function normalizeStockLevel(level?: string | null): StockLevel {
+  if (level === "in_stock" || level === "low_stock" || level === "out_of_stock") return level;
+  return "unknown";
+}
+
+function stockMeta(level: StockLevel, t: (key: string) => string): { label: string; color: string } {
+  switch (level) {
+    case "in_stock":
+      return { label: t("bom.inStock"), color: "var(--forest)" };
+    case "low_stock":
+      return { label: t("bom.lowStock"), color: "var(--amber)" };
+    case "out_of_stock":
+      return { label: t("bom.outOfStock"), color: "var(--danger)" };
+    default:
+      return { label: t("bom.stockUnknown"), color: "var(--text-muted)" };
+  }
+}
+
+function stockTooltip(
+  item: {
+    stock_level?: string | null;
+    store_location?: string | null;
+    stock_last_checked_at?: string | null;
+    last_checked_at?: string | null;
+    link?: string | null;
+  },
+  t: (key: string) => string,
+): string {
+  const meta = stockMeta(normalizeStockLevel(item.stock_level), t);
+  const checkedAt = item.stock_last_checked_at ?? item.last_checked_at;
+  const parts = [meta.label];
+  if (item.store_location) parts.push(item.store_location);
+  if (checkedAt) {
+    parts.push(`${t("bom.lastChecked")}: ${new Date(checkedAt).toLocaleDateString()}`);
+  }
+  if (item.link) parts.push(item.link);
+  return parts.join(" · ");
 }
 
 /* ── Unit conversion helpers ───────────────────────────────── */
@@ -786,6 +825,9 @@ function PriceComparisonPopup({
                 const spark = sparklineData.get(price.supplier_id);
                 const trend = computeTrend(priceHistory, price.supplier_id, 30);
                 const sparkColor = supplierColors.get(price.supplier_id) || "var(--text-muted)";
+                const priceStockLevel = normalizeStockLevel(price.stock_level);
+                const priceStock = stockMeta(priceStockLevel, t);
+                const priceStockTooltip = stockTooltip(price, t);
                 return (
                   <div
                     key={price.id}
@@ -798,6 +840,18 @@ function PriceComparisonPopup({
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          title={priceStockTooltip}
+                          aria-label={priceStockTooltip}
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: priceStock.color,
+                            boxShadow: "0 0 0 2px rgba(0,0,0,0.04)",
+                            flexShrink: 0,
+                          }}
+                        />
                         <span style={{ fontSize: 13, fontWeight: 500 }}>{price.supplier_name}</span>
                         {isCheapest && (
                           <span
@@ -1264,6 +1318,9 @@ function BomItemCard({
     mat.design_unit != null &&
     mat.purchasable_unit != null &&
     mat.design_unit !== mat.purchasable_unit;
+  const stockLevel = normalizeStockLevel(item.stock_level);
+  const stock = stockMeta(stockLevel, t);
+  const stockTooltipText = stockTooltip(item, t);
 
   return (
     <div
@@ -1321,6 +1378,18 @@ function BomItemCard({
         <span className="bom-item-unit">
           {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
         </span>
+        <span
+          title={stockTooltipText}
+          aria-label={stockTooltipText}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: stock.color,
+            boxShadow: "0 0 0 2px rgba(0,0,0,0.04)",
+            flexShrink: 0,
+          }}
+        />
         <span className="bom-item-total">
           {Number(item.total || 0).toFixed(2)}
         </span>
@@ -1385,6 +1454,29 @@ function BomItemCard({
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </div>
+      )}
+      {stockLevel === "out_of_stock" && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCompare(item.material_id, materialName);
+          }}
+          style={{
+            marginTop: 6,
+            padding: "4px 7px",
+            border: "1px solid rgba(239, 68, 68, 0.22)",
+            borderRadius: "var(--radius-sm)",
+            background: "rgba(239, 68, 68, 0.06)",
+            color: "var(--danger)",
+            fontSize: 10,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "var(--font-body)",
+          }}
+        >
+          {t("bom.alternativeAvailable")}
+        </button>
       )}
     </div>
   );
@@ -1525,6 +1617,15 @@ export default function BomPanel({
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const animatedTotal = useAnimatedNumber(total);
+  const stockSummary = useMemo(() => {
+    const levels = bom.map((item) => normalizeStockLevel(item.stock_level));
+    return {
+      total: levels.length,
+      available: levels.filter((level) => level === "in_stock" || level === "low_stock").length,
+      outOfStock: levels.filter((level) => level === "out_of_stock").length,
+      known: levels.filter((level) => level !== "unknown").length,
+    };
+  }, [bom]);
 
   // Extract scene material names that are not yet in the BOM
   const unmatchedSceneMaterials = useMemo(() => {
@@ -1702,6 +1803,71 @@ export default function BomPanel({
             )}
           </div>
         </div>
+        {bom.length > 0 && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: "8px 10px",
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              fontSize: 11,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--text-muted)" }}>
+                {t("bom.stockSummary", { available: stockSummary.available, total: stockSummary.total })}
+              </span>
+              <span
+                style={{
+                  color: stockSummary.outOfStock > 0 ? "var(--danger)" : stockSummary.known > 0 ? "var(--success)" : "var(--text-muted)",
+                  fontWeight: 600,
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                {stockSummary.outOfStock > 0
+                  ? t("bom.outOfStockCount", { count: stockSummary.outOfStock })
+                  : stockSummary.known > 0
+                    ? t("bom.inStock")
+                    : t("bom.stockUnknown")}
+              </span>
+            </div>
+            <div
+              style={{
+                marginTop: 6,
+                height: 4,
+                borderRadius: 999,
+                overflow: "hidden",
+                background: "rgba(0,0,0,0.08)",
+              }}
+            >
+              <div
+                style={{
+                  width: `${stockSummary.total > 0 ? Math.round((stockSummary.available / stockSummary.total) * 100) : 0}%`,
+                  height: "100%",
+                  borderRadius: 999,
+                  background: stockSummary.outOfStock > 0 ? "var(--amber)" : "var(--success)",
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {stockSummary.outOfStock > 0 && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: "7px 10px",
+              background: "rgba(239, 68, 68, 0.06)",
+              border: "1px solid rgba(239, 68, 68, 0.2)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--danger)",
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            {t("bom.stockWarning", { count: stockSummary.outOfStock })}
+          </div>
+        )}
         {totalSavings > 0 && (
           <div
             title={t('pricing.savingsTooltip')}
@@ -1983,6 +2149,9 @@ export default function BomPanel({
               const price = getPrimaryPrice(m);
               const isSelected = quickAddId === m.id;
               const displayName = getLocalizedMaterialName(m, locale);
+              const priceStockLevel = normalizeStockLevel(price?.stock_level);
+              const priceStock = stockMeta(priceStockLevel, t);
+              const priceStockTooltip = price ? stockTooltip(price, t) : "";
               return (
                 <div
                   key={m.id}
@@ -2051,16 +2220,36 @@ export default function BomPanel({
                       </div>
                     </div>
                     {price ? (
-                      <span style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: "var(--success)",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
-                        {Number(price.unit_price).toFixed(2)} &euro;
+                      <span
+                        title={priceStockTooltip}
+                        aria-label={priceStockTooltip}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: priceStock.color,
+                            boxShadow: "0 0 0 2px rgba(0,0,0,0.04)",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "var(--success)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}>
+                          {Number(price.unit_price).toFixed(2)} &euro;
+                        </span>
                       </span>
                     ) : (
                       <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>

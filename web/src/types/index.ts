@@ -73,6 +73,7 @@ export interface SupplierSku {
 }
 
 export type VatClass = 'standard' | 'reduced' | 'zero';
+export type StockLevel = "in_stock" | "low_stock" | "out_of_stock" | "unknown";
 
 export interface Material {
   id: string;
@@ -82,7 +83,17 @@ export interface Material {
   category_name: string;
   category_name_fi: string | null;
   image_url: string | null;
-  pricing: { unit_price: number; unit: string; supplier_name: string; is_primary: boolean }[] | null;
+  pricing: {
+    unit_price: number;
+    unit: string;
+    supplier_name: string;
+    link?: string | null;
+    is_primary: boolean;
+    in_stock?: boolean | null;
+    stock_level?: StockLevel | null;
+    store_location?: string | null;
+    last_checked_at?: string | null;
+  }[] | null;
   /** How many design_units fit in one purchasable_unit (e.g. 1 pack = 1.8 m2) */
   conversion_factor?: number;
   /** Number of items in one purchasable pack */
@@ -112,6 +123,11 @@ export interface BomItem {
   unit_price?: number;
   total?: number;
   supplier?: string;
+  link?: string | null;
+  in_stock?: boolean | null;
+  stock_level?: StockLevel | null;
+  store_location?: string | null;
+  stock_last_checked_at?: string | null;
 }
 
 export interface PriceRow {
@@ -125,6 +141,10 @@ export interface PriceRow {
   ean: string | null;
   link: string | null;
   is_primary: boolean;
+  in_stock?: boolean | null;
+  stock_level?: StockLevel | null;
+  store_location?: string | null;
+  last_checked_at?: string | null;
   last_scraped_at: string | null;
   last_verified_at: string | null;
   supplier_name: string;

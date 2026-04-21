@@ -12,14 +12,17 @@ interface PricingRow {
   material_id: string;
   supplier_id: string;
   unit: string;
-  unit_price: number;
+  unit_price: number | string;
   link: string | null;
 }
+
+type StockLevel = "in_stock" | "low_stock" | "out_of_stock" | "unknown";
 
 interface ScrapeResult {
   materialId: string;
   oldPrice: number;
   newPrice: number | null;
+  stockLevel?: StockLevel;
   error?: string;
 }
 
@@ -71,6 +74,103 @@ function extractPrice(html: string, config: Record<string, string>): number | nu
   return null;
 }
 
+function classifyStockText(text: string): { stockLevel: StockLevel; inStock: boolean | null } {
+  const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalized) return { stockLevel: "unknown", inStock: null };
+
+  const outOfStock = [
+    "ei saatavilla",
+    "ei varastossa",
+    "loppu",
+    "tilapäisesti loppu",
+    "out of stock",
+    "unavailable",
+    "sold out",
+  ];
+  if (outOfStock.some((term) => normalized.includes(term))) {
+    return { stockLevel: "out_of_stock", inStock: false };
+  }
+
+  const lowStock = [
+    "vähän varastossa",
+    "rajoitetusti",
+    "niukasti",
+    "low stock",
+    "limited stock",
+    "few left",
+  ];
+  if (lowStock.some((term) => normalized.includes(term))) {
+    return { stockLevel: "low_stock", inStock: true };
+  }
+
+  const inStock = [
+    "varastossa",
+    "saatavilla",
+    "noutettavissa",
+    "toimitettavissa",
+    "in stock",
+    "available",
+  ];
+  if (inStock.some((term) => normalized.includes(term))) {
+    return { stockLevel: "in_stock", inStock: true };
+  }
+
+  return { stockLevel: "unknown", inStock: null };
+}
+
+function extractStock(
+  html: string,
+  config: Record<string, string>,
+): { stockLevel: StockLevel; inStock: boolean | null; storeLocation: string | null; checked: boolean } {
+  const $ = cheerio.load(html);
+  const stockSelectors = [
+    config.stockSelector,
+    "[data-stock-status]",
+    "[data-availability]",
+    ".availability",
+    ".stock-status",
+    ".product-availability",
+    ".store-availability",
+    ".availability__text",
+  ].filter(Boolean) as string[];
+  const storeSelectors = [
+    config.storeSelector,
+    "[data-store-name]",
+    ".store-name",
+    ".selected-store",
+    ".pickup-store",
+  ].filter(Boolean) as string[];
+
+  let stockText = "";
+  for (const sel of stockSelectors) {
+    const el = $(sel).first();
+    if (!el.length) continue;
+    stockText = [
+      el.attr("content"),
+      el.attr("data-stock-status"),
+      el.attr("data-availability"),
+      el.text(),
+    ].filter(Boolean).join(" ");
+    if (stockText.trim()) break;
+  }
+
+  let storeLocation: string | null = null;
+  for (const sel of storeSelectors) {
+    const text = $(sel).first().text().replace(/\s+/g, " ").trim();
+    if (text) {
+      storeLocation = text;
+      break;
+    }
+  }
+
+  const classified = classifyStockText(stockText);
+  return {
+    ...classified,
+    storeLocation,
+    checked: classified.stockLevel !== "unknown" || storeLocation !== null,
+  };
+}
+
 async function scrapeSupplier(supplierId: string): Promise<ScrapeResult[]> {
   const supplierResult = await pool.query(
     "SELECT * FROM suppliers WHERE id = $1 AND scrape_enabled = true",
@@ -99,13 +199,14 @@ async function scrapeSupplier(supplierId: string): Promise<ScrapeResult[]> {
   for (const row of pricingResult.rows as PricingRow[]) {
     if (!row.link) continue;
 
+    const oldPrice = Number(row.unit_price);
     console.log(`  Scraping ${row.material_id} from ${row.link}`);
     const html = await fetchPage(row.link);
 
     if (!html) {
       results.push({
         materialId: row.material_id,
-        oldPrice: row.unit_price,
+        oldPrice,
         newPrice: null,
         error: "Failed to fetch page",
       });
@@ -113,14 +214,16 @@ async function scrapeSupplier(supplierId: string): Promise<ScrapeResult[]> {
     }
 
     const newPrice = extractPrice(html, config);
+    const stock = extractStock(html, config);
     results.push({
       materialId: row.material_id,
-      oldPrice: row.unit_price,
+      oldPrice,
       newPrice,
+      stockLevel: stock.stockLevel,
       error: newPrice === null ? "Price not found on page" : undefined,
     });
 
-    if (newPrice !== null && newPrice !== row.unit_price) {
+    if (newPrice !== null && newPrice !== oldPrice) {
       await pool.query(
         "UPDATE pricing SET unit_price=$1, last_scraped_at=now(), updated_at=now() WHERE id=$2",
         [newPrice, row.id]
@@ -130,7 +233,7 @@ async function scrapeSupplier(supplierId: string): Promise<ScrapeResult[]> {
         [row.id, newPrice]
       );
       console.log(
-        `    Price updated: ${row.unit_price} → ${newPrice} EUR`
+        `    Price updated: ${oldPrice} → ${newPrice} EUR`
       );
     } else if (newPrice !== null) {
       await pool.query(
@@ -138,6 +241,17 @@ async function scrapeSupplier(supplierId: string): Promise<ScrapeResult[]> {
         [row.id]
       );
       console.log(`    Price unchanged: ${newPrice} EUR`);
+    }
+
+    if (stock.checked) {
+      await pool.query(
+        `UPDATE pricing
+         SET stock_level=$1, in_stock=$2, store_location=COALESCE($3, store_location),
+             last_checked_at=now(), updated_at=now()
+         WHERE id=$4`,
+        [stock.stockLevel, stock.inStock, stock.storeLocation, row.id]
+      );
+      console.log(`    Stock: ${stock.stockLevel}${stock.storeLocation ? ` (${stock.storeLocation})` : ""}`);
     }
 
     // Rate limit: 2s between requests

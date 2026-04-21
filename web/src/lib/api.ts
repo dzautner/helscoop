@@ -283,6 +283,8 @@ export const api = {
 
   comparePrices: (materialId: string) =>
     apiFetch(`/pricing/compare/${materialId}`),
+  getStock: (materialId: string) =>
+    apiFetch(`/pricing/stock/${materialId}`),
   getPriceHistory: (materialId: string) =>
     apiFetch(`/pricing/history/${materialId}`),
   getStalePrices: () => apiFetch("/pricing/stale"),

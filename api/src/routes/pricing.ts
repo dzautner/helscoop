@@ -5,6 +5,13 @@ import { requirePermission } from "../permissions";
 
 const router = Router();
 
+const STOCK_LEVELS = ["in_stock", "low_stock", "out_of_stock", "unknown"] as const;
+type StockLevel = typeof STOCK_LEVELS[number];
+
+function isStockLevel(value: unknown): value is StockLevel {
+  return typeof value === "string" && STOCK_LEVELS.includes(value as StockLevel);
+}
+
 // GET /pricing/compare/:materialId — price comparison (anyone with pricing:read)
 router.get("/compare/:materialId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
   const result = await query(
@@ -18,14 +25,76 @@ router.get("/compare/:materialId", requireAuth, requirePermission("pricing:read"
   res.json(result.rows);
 });
 
+// GET /pricing/stock/:materialId — supplier stock availability for one material
+router.get("/stock/:materialId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
+  const result = await query(
+    `SELECT p.material_id, p.supplier_id, s.name AS supplier_name, s.url AS supplier_url,
+      p.link, p.is_primary,
+      COALESCE(p.stock_level, 'unknown') AS stock_level,
+      CASE
+        WHEN p.stock_level IN ('in_stock', 'low_stock') THEN true
+        WHEN p.stock_level = 'out_of_stock' THEN false
+        ELSE p.in_stock
+      END AS in_stock,
+      p.store_location, p.last_checked_at
+     FROM pricing p
+     JOIN suppliers s ON p.supplier_id = s.id
+     WHERE p.material_id = $1
+     ORDER BY
+       CASE COALESCE(p.stock_level, 'unknown')
+         WHEN 'in_stock' THEN 0
+         WHEN 'low_stock' THEN 1
+         WHEN 'unknown' THEN 2
+         ELSE 3
+       END,
+       p.is_primary DESC,
+       p.unit_price ASC`,
+    [req.params.materialId]
+  );
+
+  const stock = result.rows;
+  const available = stock.filter((row: { stock_level?: string }) =>
+    row.stock_level === "in_stock" || row.stock_level === "low_stock"
+  ).length;
+
+  res.json({
+    material_id: req.params.materialId,
+    total: stock.length,
+    available,
+    stock,
+  });
+});
+
 // PUT /pricing/:materialId/:supplierId — update pricing (admin or partner with pricing:update)
 router.put(
   "/:materialId/:supplierId",
   requireAuth,
   requirePermission("pricing:update"),
   async (req, res) => {
-    const { unit_price, unit, sku, ean, link, is_primary } = req.body;
+    const {
+      unit_price,
+      unit,
+      sku,
+      ean,
+      link,
+      is_primary,
+      in_stock,
+      stock_level,
+      store_location,
+      last_checked_at,
+    } = req.body;
     const { materialId, supplierId } = req.params;
+    const normalizedStockLevel = stock_level === undefined ? undefined : stock_level;
+
+    if (normalizedStockLevel !== undefined && !isStockLevel(normalizedStockLevel)) {
+      return res.status(400).json({
+        error: `stock_level must be one of: ${STOCK_LEVELS.join(", ")}`,
+      });
+    }
+
+    if (in_stock !== undefined && typeof in_stock !== "boolean") {
+      return res.status(400).json({ error: "in_stock must be a boolean" });
+    }
 
     if (is_primary) {
       await query(
@@ -34,15 +103,42 @@ router.put(
       );
     }
 
+    const stockWasProvided =
+      in_stock !== undefined ||
+      normalizedStockLevel !== undefined ||
+      store_location !== undefined ||
+      last_checked_at !== undefined;
+    const checkedAt = stockWasProvided ? (last_checked_at ?? new Date().toISOString()) : null;
+
     const result = await query(
-      `INSERT INTO pricing (material_id, supplier_id, unit, unit_price, sku, ean, link, is_primary, last_verified_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())
+      `INSERT INTO pricing (
+         material_id, supplier_id, unit, unit_price, sku, ean, link, is_primary,
+         stock_level, in_stock, store_location, last_checked_at, last_verified_at
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, 'unknown'),$10,$11,$12,now())
        ON CONFLICT (material_id, supplier_id) DO UPDATE SET
          unit=$3, unit_price=$4, sku=$5, ean=$6, link=$7,
          is_primary=COALESCE($8, pricing.is_primary),
+         stock_level=COALESCE($9, pricing.stock_level),
+         in_stock=COALESCE($10, pricing.in_stock),
+         store_location=COALESCE($11, pricing.store_location),
+         last_checked_at=COALESCE($12, pricing.last_checked_at),
          last_verified_at=now(), updated_at=now()
        RETURNING *`,
-      [materialId, supplierId, unit, unit_price, sku, ean, link, is_primary ?? false]
+      [
+        materialId,
+        supplierId,
+        unit,
+        unit_price,
+        sku,
+        ean,
+        link,
+        is_primary ?? false,
+        normalizedStockLevel,
+        in_stock,
+        store_location,
+        checkedAt,
+      ]
     );
 
     await query(
