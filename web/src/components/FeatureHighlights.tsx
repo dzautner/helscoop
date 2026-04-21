@@ -25,7 +25,7 @@ export default function FeatureHighlights() {
           </h2>
         </div>
       </ScrollReveal>
-      <div className="feature-grid">
+      <div className="feature-grid feature-grid--stack">
         {features.map((f, i) => (
           <ScrollReveal key={i} delay={0.08 + i * 0.06}>
             <div className={`feature-card${f.hero ? ' feature-card--hero' : ''}`}>

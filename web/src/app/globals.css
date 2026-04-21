@@ -56,6 +56,23 @@
   --shadow-elevated: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px var(--border);  /* Level 4-5 */
   --shadow-amber: 0 0 24px rgba(229,160,75,0.06);
 
+  /* ── Glassmorphism depth tokens ────────────────────────────────── */
+  --glass-ground: rgba(17,17,19, 0.85);
+  --glass-ground-blur: blur(12px) saturate(1.1);
+  --glass-ground-border: rgba(255,255,255, 0.04);
+
+  --glass-mid: rgba(17,17,19, 0.68);
+  --glass-mid-blur: blur(20px) saturate(1.3);
+  --glass-mid-border: rgba(255,255,255, 0.06);
+
+  --glass-float: rgba(17,17,19, 0.55);
+  --glass-float-blur: blur(24px) saturate(1.5);
+  --glass-float-border: rgba(255,255,255, 0.10);
+
+  --shadow-depth-1: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-depth-2: 0 8px 32px rgba(0,0,0,0.36);
+  --shadow-depth-3: 0 12px 48px rgba(0,0,0,0.42);
+
   --font-body: 'Inter', -apple-system, system-ui, sans-serif;
   --font-display: 'Inter', -apple-system, system-ui, sans-serif;
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
@@ -498,9 +515,11 @@ body::before {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
-  backdrop-filter: blur(20px) saturate(1.3);
-  border-left: 1px solid var(--border);
+  background: var(--glass-ground);
+  backdrop-filter: var(--glass-ground-blur);
+  -webkit-backdrop-filter: var(--glass-ground-blur);
+  border-left: 1px solid var(--glass-ground-border);
+  box-shadow: var(--shadow-depth-1);
   overflow: hidden;
   transition: background var(--transition-normal);
 }
@@ -2613,12 +2632,13 @@ select:focus {
 
 .editor-bom-panel {
   width: 340px;
-  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  border-left: 1px solid var(--glass-mid-border);
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--surface-raised) 68%, transparent);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  background: var(--glass-mid);
+  backdrop-filter: var(--glass-mid-blur);
+  -webkit-backdrop-filter: var(--glass-mid-blur);
+  box-shadow: var(--shadow-depth-2);
   flex-shrink: 0;
   transition: background var(--transition-normal);
 }
@@ -2638,9 +2658,9 @@ select:focus {
   max-height: 240px;
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--bg-tertiary) 65%, transparent);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  background: var(--glass-float);
+  backdrop-filter: var(--glass-float-blur);
+  -webkit-backdrop-filter: var(--glass-float-blur);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   border-bottom: none;
@@ -5094,6 +5114,10 @@ select:focus {
 
 /* ── View Transitions API ──────────────────────────────── */
 
+@view-transition {
+  navigation: auto;
+}
+
 .nav-bar {
   view-transition-name: nav-bar;
 }
@@ -5266,4 +5290,85 @@ select:focus {
   .bom-item-name { color: #000 !important; }
   .bom-item-total { color: #333 !important; }
   .bom-item-unit, .bom-item-supplier { color: #555 !important; }
+}
+
+/* ── Scroll-driven stacking card reveal (#362) ────────────────── */
+
+@supports (animation-timeline: view()) {
+  .feature-grid--stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .feature-grid--stack .feature-card {
+    position: sticky;
+    top: 120px;
+    animation: cardStack linear both;
+    animation-timeline: view();
+    animation-range: exit 0% exit 100%;
+    box-shadow: 0 -2px 20px rgba(0,0,0,0.3);
+    margin-bottom: 16px;
+  }
+
+  .feature-grid--stack .feature-card--hero {
+    grid-row: auto;
+  }
+
+  @keyframes cardStack {
+    to {
+      transform: scale(0.95);
+      opacity: 0.85;
+      filter: brightness(0.9);
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .feature-grid--stack .feature-card {
+    position: static !important;
+    animation: none !important;
+  }
+}
+
+/* ── Address resolution glow burst (#366) ─────────────────────── */
+
+.address-result-glow {
+  position: relative;
+}
+
+.address-result-glow::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 400px;
+  height: 400px;
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(229,160,75,0.15), transparent 70%);
+  animation: glowBurst 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.address-result-glow > .card {
+  box-shadow: 0 0 32px rgba(229,160,75,0.2);
+  animation: glowFade 1s ease 0.3s forwards;
+}
+
+@keyframes glowBurst {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0.15; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+@keyframes glowFade {
+  to { box-shadow: 0 0 0 rgba(229,160,75,0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .address-result-glow::before { animation: none; display: none; }
+  .address-result-glow > .card { animation: none; box-shadow: none; }
 }
