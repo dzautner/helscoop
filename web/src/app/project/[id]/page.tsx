@@ -11,7 +11,7 @@ import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
-import MobileEditorTabs from "@/components/MobileEditorTabs";
+import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
@@ -113,6 +113,7 @@ const HISTORY_LIMIT = 50;
 const MOBILE_EDITOR_QUERY = "(max-width: 768px)";
 
 type MobileEditorPanel = "viewport" | "chat" | "bom" | "code" | "params" | "docs";
+type MobilePanelSize = "normal" | "expanded" | "minimized";
 
 function getBomWidthBounds(): { min: number; max: number } {
   if (typeof window === "undefined") return { min: 260, max: 600 };
@@ -164,6 +165,7 @@ export default function ProjectPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
+  const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showAraChecklist, setShowAraChecklist] = useState(false);
@@ -539,6 +541,7 @@ export default function ProjectPage() {
   const handleMobilePanelChange = useCallback(
     (panel: MobileEditorPanel) => {
       setActiveMobilePanel(panel);
+      setMobilePanelSize(panel === "viewport" ? "minimized" : "normal");
       if (panel === "chat") markChat();
       if (panel === "bom") setShowBom(true);
       if (panel === "code") {
@@ -550,6 +553,37 @@ export default function ProjectPage() {
     },
     [markChat, markCodeEditor, showCode]
   );
+
+  const mobilePanelOrder = useMemo<MobileEditorPanel[]>(() => [
+    "viewport",
+    "chat",
+    "bom",
+    "code",
+    ...(sceneParams.length > 0 ? (["params"] as MobileEditorPanel[]) : []),
+    ...(showDocs ? (["docs"] as MobileEditorPanel[]) : []),
+  ], [sceneParams.length, showDocs]);
+
+  const handleMobilePanelSwipe = useCallback((direction: MobileEditorSwipeDirection) => {
+    if (direction === "up") {
+      if (activeMobilePanel === "viewport") handleMobilePanelChange("chat");
+      setMobilePanelSize("expanded");
+      return;
+    }
+
+    if (direction === "down") {
+      setMobilePanelSize((size) => (size === "expanded" ? "normal" : "minimized"));
+      return;
+    }
+
+    const currentIndex = mobilePanelOrder.indexOf(activeMobilePanel);
+    if (currentIndex === -1) return;
+    const delta = direction === "left" ? 1 : -1;
+    const nextIndex = Math.max(0, Math.min(mobilePanelOrder.length - 1, currentIndex + delta));
+    const nextPanel = mobilePanelOrder[nextIndex];
+    if (nextPanel && nextPanel !== activeMobilePanel) {
+      handleMobilePanelChange(nextPanel);
+    }
+  }, [activeMobilePanel, handleMobilePanelChange, mobilePanelOrder]);
 
   const toggleCodePanel = useCallback(() => {
     if (!showCode) markCodeEditor();
@@ -593,6 +627,7 @@ export default function ProjectPage() {
   useEffect(() => {
     if (!isMobileEditor) {
       setBomWidth((width) => clampBomWidth(width));
+      setMobilePanelSize("normal");
       return;
     }
     if ((activeMobilePanel === "code" && !showCode) ||
@@ -1251,7 +1286,11 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="editor-page" data-mobile-panel={isMobileEditor ? activeMobilePanel : undefined}>
+    <div
+      className="editor-page"
+      data-mobile-panel={isMobileEditor ? activeMobilePanel : undefined}
+      data-mobile-panel-size={isMobileEditor ? mobilePanelSize : undefined}
+    >
 
       {/* Header */}
       <div className="editor-header">
@@ -2053,27 +2092,23 @@ export default function ProjectPage() {
             <MobileEditorTabs<MobileEditorPanel>
               active={activeMobilePanel}
               onChange={handleMobilePanelChange}
+              onSwipe={handleMobilePanelSwipe}
               ariaLabel={locale === "fi" ? "Editorin mobiilipaneelit" : "Editor mobile panels"}
-              tabs={[
-                { id: "viewport", label: t("editor.scene") },
-                {
-                  id: "chat",
-                  label: t("editor.assistant"),
-                  badge: chatMessageCount || undefined,
-                },
-                {
-                  id: "bom",
-                  label: t("editor.materialList"),
-                  badge: bom.length || undefined,
-                },
-                { id: "code", label: locale === "fi" ? "Koodi" : "Code" },
-                ...(sceneParams.length > 0
-                  ? [{ id: "params" as const, label: t("editor.params"), badge: sceneParams.length }]
-                  : []),
-                ...(showDocs
-                  ? [{ id: "docs" as const, label: t("editor.docs") || "Docs" }]
-                  : []),
-              ]}
+              tabs={mobilePanelOrder.map((id) => ({
+                id,
+                label:
+                  id === "viewport" ? t("editor.scene") :
+                  id === "chat" ? t("editor.assistant") :
+                  id === "bom" ? t("editor.materialList") :
+                  id === "code" ? (locale === "fi" ? "Koodi" : "Code") :
+                  id === "params" ? t("editor.params") :
+                  t("editor.docs") || "Docs",
+                badge:
+                  id === "chat" ? chatMessageCount || undefined :
+                  id === "bom" ? bom.length || undefined :
+                  id === "params" ? sceneParams.length :
+                  undefined,
+              }))}
             />
           )}
 
