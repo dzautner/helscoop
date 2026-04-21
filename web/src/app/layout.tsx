@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
@@ -51,6 +51,12 @@ export const metadata: Metadata = {
     description:
       "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa.",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 const jsonLd = {

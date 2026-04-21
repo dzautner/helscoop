@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { getToken } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const STORAGE_KEY = "helscoop_onboarding_completed";
 
@@ -270,6 +271,7 @@ export function WelcomeModal({
 /** Step-by-step tooltip tour overlay */
 export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   const { t } = useTranslation();
+  const isMobileTour = useMediaQuery("(max-width: 768px)");
   const [currentStep, setCurrentStep] = useState(0);
   const [displayStep, setDisplayStep] = useState(0);
   const [contentFade, setContentFade] = useState(true);
@@ -290,7 +292,9 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
 
   // Find visible steps (elements that exist in the DOM)
   const visibleSteps = TOUR_STEPS.filter(
-    (step) => document.querySelector(step.target) !== null
+    (step) =>
+      !(isMobileTour && step.target === "[data-tour='viewport']") &&
+      document.querySelector(step.target) !== null
   );
 
   const step = visibleSteps[currentStep];
@@ -300,6 +304,15 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     const rect = getElementRect(step.target);
     setTargetRect(rect);
   }, [step]);
+
+  useEffect(() => {
+    if (visibleSteps.length > 0 && currentStep >= visibleSteps.length) {
+      setCurrentStep(visibleSteps.length - 1);
+    }
+    if (visibleSteps.length > 0 && displayStep >= visibleSteps.length) {
+      setDisplayStep(visibleSteps.length - 1);
+    }
+  }, [currentStep, displayStep, visibleSteps.length]);
 
   useEffect(() => {
     updateRect();
@@ -342,14 +355,19 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
       }
     : {};
 
+  const tooltipWidth =
+    typeof window === "undefined"
+      ? 320
+      : Math.min(320, Math.max(240, window.innerWidth - 24));
+
   const tooltipPos = targetRect
     ? computeTooltipPosition(
         targetRect,
         step.placement,
-        tooltipSize.width,
+        Math.min(tooltipSize.width, tooltipWidth),
         tooltipSize.height
       )
-    : { top: window.innerHeight / 2 - 75, left: window.innerWidth / 2 - 160 };
+    : { top: window.innerHeight / 2 - 75, left: window.innerWidth / 2 - tooltipWidth / 2 };
 
   const handlePrev = useCallback(() => {
     if (currentStep > 0) {
@@ -397,7 +415,6 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   }, [currentStep]);
 
   const isLast = currentStep === visibleSteps.length - 1;
-
   return (
     <>
       {/* Backdrop overlay for click-blocking */}
@@ -423,7 +440,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
           zIndex: 1202,
           top: tooltipPos.top,
           left: tooltipPos.left,
-          width: 320,
+          width: tooltipWidth,
           background: "var(--surface-float)",
           border: "1px solid var(--surface-border-float)",
           borderRadius: "var(--radius-md)",
