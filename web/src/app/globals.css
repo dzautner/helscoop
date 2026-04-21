@@ -1720,6 +1720,192 @@ body::before {
   gap: 8px;
 }
 
+/* ── BOM savings recommendations ───────────────────── */
+.bom-savings-panel {
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(74, 124, 89, 0.14), transparent 38%),
+    var(--bg-tertiary);
+}
+
+.bom-savings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.bom-savings-eyebrow {
+  color: var(--success);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.bom-savings-total {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.bom-savings-total strong {
+  color: var(--success);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bom-savings-empty,
+.bom-savings-muted {
+  padding: 9px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.bom-savings-empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.bom-savings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bom-savings-group {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(9, 9, 11, 0.18);
+}
+
+.bom-savings-group-toggle {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.bom-savings-group-toggle:hover,
+.bom-savings-group-toggle:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.bom-savings-group-toggle code {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+}
+
+.bom-savings-items {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0 7px 7px;
+}
+
+.bom-savings-item {
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bom-savings-item[data-type="supplier_switch"],
+.bom-savings-item[data-type="material_substitution"],
+.bom-savings-item[data-type="bulk_discount"] {
+  border-color: rgba(74, 124, 89, 0.24);
+}
+
+.bom-savings-item[data-type="seasonal_stock"] {
+  border-color: var(--amber-border);
+}
+
+.bom-savings-item p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.bom-savings-item span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.bom-savings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.bom-savings-actions button {
+  min-height: 38px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.bom-savings-actions button:not(.btn-primary) {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.bom-savings-actions button:not(.btn-primary):hover,
+.bom-savings-actions button:not(.btn-primary):focus-visible {
+  border-color: var(--amber-border);
+  color: var(--amber);
+}
+
+@media (max-width: 480px) {
+  .bom-savings-head {
+    flex-direction: column;
+  }
+
+  .bom-savings-total {
+    align-items: flex-start;
+  }
+
+  .bom-savings-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Link styles ─────────────────────────────────── */
 .link-muted {
   color: var(--text-muted);

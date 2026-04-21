@@ -9,6 +9,7 @@ import { SkeletonProjectEditor } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
+import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
 import MobileEditorTabs from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
@@ -1059,9 +1060,10 @@ export default function ProjectPage() {
   );
 
   const replaceBomMaterial = useCallback(
-    (fromMaterialId: string, toMaterialId: string) => {
+    (fromMaterialId: string, toMaterialId: string, options?: { undo?: boolean; source?: string }) => {
       const mat = materials.find((m) => m.id === toMaterialId);
       if (!mat) return;
+      const previousItem = options?.undo ? bom.find((item) => item.material_id === fromMaterialId) : undefined;
       const pricing = mat.pricing?.find((p) => p.is_primary) || mat.pricing?.[0];
       const unitPrice = Number(pricing?.unit_price ?? 0);
 
@@ -1069,6 +1071,7 @@ export default function ProjectPage() {
         from_material_id: fromMaterialId,
         to_material_id: toMaterialId,
         category: mat.category_name || "",
+        source: options?.source ?? "package",
       });
 
       setSceneJs((prev) => {
@@ -1101,8 +1104,78 @@ export default function ProjectPage() {
             : item
         )
       );
+
+      if (options?.undo && previousItem) {
+        toast(t("bomSavings.swapApplied"), "success", {
+          duration: 5000,
+          action: {
+            label: t("toast.undo"),
+            onClick: () => {
+              track("bom_optimization_undo", { type: "material_substitution", material_id: fromMaterialId });
+              setBom((prev) =>
+                prev.map((item) =>
+                  item.material_id === toMaterialId ? previousItem : item
+                )
+              );
+              setSceneJs((prev) => {
+                const result = replaceSceneMaterialReferences(prev, toMaterialId, fromMaterialId);
+                if (result.replacements > 0) {
+                  pushHistory(result.code);
+                }
+                return result.code;
+              });
+            },
+          },
+        });
+      }
     },
-    [materials, pushHistory, track],
+    [bom, materials, pushHistory, t, toast, track],
+  );
+
+  const applyBomPriceOverride = useCallback(
+    (override: BomPriceOverride) => {
+      const previousItem = bom.find((item) => item.material_id === override.materialId);
+      if (!previousItem) return;
+
+      const unitPrice = Number(override.unitPrice || 0);
+      track("bom_supplier_price_applied", {
+        material_id: override.materialId,
+        supplier: override.supplier || "",
+        unit_price: unitPrice,
+      });
+
+      setBom((prev) =>
+        prev.map((item) =>
+          item.material_id === override.materialId
+            ? {
+                ...item,
+                unit: override.unit || item.unit,
+                unit_price: unitPrice,
+                total: unitPrice * item.quantity,
+                supplier: override.supplier || item.supplier,
+                link: override.link ?? item.link,
+                stock_level: override.stockLevel ?? item.stock_level,
+              }
+            : item
+        )
+      );
+
+      toast(t("bomSavings.priceApplied"), "success", {
+        duration: 5000,
+        action: {
+          label: t("toast.undo"),
+          onClick: () => {
+            track("bom_optimization_undo", { type: "supplier_price", material_id: override.materialId });
+            setBom((prev) =>
+              prev.map((item) =>
+                item.material_id === override.materialId ? previousItem : item
+              )
+            );
+          },
+        },
+      });
+    },
+    [bom, t, toast, track],
   );
 
   const removeBomItem = useCallback((materialId: string) => {
@@ -2041,6 +2114,7 @@ export default function ProjectPage() {
               onAdd={addBomItem}
               onAddImported={addImportedBomItem}
               onReplaceMaterial={replaceBomMaterial}
+              onApplySupplierPrice={applyBomPriceOverride}
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
               style={isMobileEditor ? undefined : { width: bomWidth }}

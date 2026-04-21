@@ -582,6 +582,15 @@ describe("exhaustive i18n key parity", () => {
     "bom.packageBasic", "bom.packageStandard", "bom.packagePremium",
     "bom.packageCurrent", "bom.packageChanges", "bom.packageLocked",
     "bom.packageLock", "bom.packageUnlock",
+    // BOM savings
+    "bomSavings.eyebrow", "bomSavings.title", "bomSavings.totalAvailable",
+    "bomSavings.noSavings", "bomSavings.supplier_switch", "bomSavings.material_substitution",
+    "bomSavings.bulk_discount", "bomSavings.seasonal_stock", "bomSavings.supplier_switchEmpty",
+    "bomSavings.material_substitutionEmpty", "bomSavings.bulk_discountEmpty", "bomSavings.seasonal_stockEmpty",
+    "bomSavings.supplierSwitchText", "bomSavings.substitutionText", "bomSavings.bulkText",
+    "bomSavings.stockText", "bomSavings.stockOnly", "bomSavings.applySupplier",
+    "bomSavings.applySwap", "bomSavings.applyBulk", "bomSavings.seeAlternatives",
+    "bomSavings.compare", "bomSavings.priceApplied", "bomSavings.swapApplied",
     // subsidy
     "subsidy.sectionLabel", "subsidy.eligibleTitle", "subsidy.maybeTitle",
     "subsidy.checkTitle", "subsidy.deadlineCountdown", "subsidy.deadlineTooltip",
