@@ -255,7 +255,7 @@ export const api = {
 
   getProjects: () => apiFetch("/projects"),
   getProject: (id: string) => apiFetch(`/projects/${id}`),
-  createProject: (data: { name: string; description?: string; scene_js?: string }) =>
+  createProject: (data: { name: string; description?: string; scene_js?: string; building_info?: Record<string, unknown> }) =>
     apiFetch("/projects", { method: "POST", body: JSON.stringify(data) }),
   updateProject: (id: string, data: Record<string, unknown>) =>
     apiFetch(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -348,7 +348,20 @@ export const api = {
     currentScene: string,
     context?: {
       bomSummary?: { material: string; qty: number; unit: string; total: number }[];
-      buildingInfo?: { address?: string; type?: string; year_built?: number; area_m2?: number; floors?: number; material?: string; heating?: string };
+      buildingInfo?: {
+        address?: string;
+        type?: string;
+        year_built?: number;
+        area_m2?: number;
+        floors?: number;
+        material?: string;
+        heating?: string;
+        confidence?: string;
+        data_sources?: string[];
+        climate_zone?: string;
+        heating_degree_days?: number;
+        data_source_error?: string;
+      };
       projectInfo?: { name?: string; description?: string };
     },
   ) =>

@@ -195,6 +195,11 @@ interface BuildingInfo {
   floors?: number;
   material?: string;
   heating?: string;
+  confidence?: string;
+  data_sources?: string[];
+  climate_zone?: string;
+  heating_degree_days?: number;
+  data_source_error?: string;
 }
 
 interface ProjectInfo {
@@ -226,6 +231,17 @@ function buildContextBlock(
     if (buildingInfo.floors) parts.push(`Floors: ${buildingInfo.floors}`);
     if (buildingInfo.material) parts.push(`Material: ${buildingInfo.material}`);
     if (buildingInfo.heating) parts.push(`Heating: ${buildingInfo.heating}`);
+    if (buildingInfo.climate_zone) parts.push(`Climate zone: ${buildingInfo.climate_zone}`);
+    if (buildingInfo.heating_degree_days) {
+      parts.push(`Heating degree days: ${buildingInfo.heating_degree_days}`);
+    }
+    if (buildingInfo.confidence) parts.push(`Data confidence: ${buildingInfo.confidence}`);
+    if (buildingInfo.data_sources?.length) {
+      parts.push(`Data sources: ${buildingInfo.data_sources.join(", ")}`);
+    }
+    if (buildingInfo.data_source_error) {
+      parts.push(`Data warning: ${buildingInfo.data_source_error}`);
+    }
     if (parts.length > 0) {
       context += `\n\nBuilding info:\n${parts.join(" | ")}`;
       context += `\nUse this info to give contextual renovation advice (e.g. building age affects insulation recommendations, heating type affects energy upgrade suggestions).`;

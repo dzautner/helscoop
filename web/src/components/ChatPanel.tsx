@@ -16,6 +16,11 @@ interface ChatContextBuildingInfo {
   floors?: number;
   material?: string;
   heating?: string;
+  confidence?: string;
+  data_sources?: string[];
+  climate_zone?: string;
+  heating_degree_days?: number;
+  data_source_error?: string;
 }
 
 /** Check if two messages are from the same role and should be visually grouped */

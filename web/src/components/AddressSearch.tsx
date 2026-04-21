@@ -105,6 +105,25 @@ function DataSourcesSection({ label, sources }: { label: string; sources: string
   );
 }
 
+function DataSourceWarning({ message }: { message?: string }) {
+  if (!message) return null;
+
+  return (
+    <div style={{
+      padding: "8px 12px",
+      marginBottom: 10,
+      background: "var(--warning-dim)",
+      border: "1px solid var(--warning-border)",
+      borderRadius: "var(--radius-sm)",
+      color: "var(--warning)",
+      fontSize: 12,
+      lineHeight: 1.5,
+    }}>
+      {message}
+    </div>
+  );
+}
+
 export default function AddressSearch({
   onCreateProject,
   compact = false,
@@ -214,6 +233,7 @@ export default function AddressSearch({
                   {t('search.createError')}
                 </div>
               )}
+              <DataSourceWarning message={result.data_source_error} />
               <button
                 className="btn btn-primary"
                 onClick={async () => {
@@ -386,6 +406,8 @@ export default function AddressSearch({
                   sources={result.data_sources}
                 />
               )}
+
+              <DataSourceWarning message={result.data_source_error} />
 
               {createError && (
                 <div className="inline-error-banner">
