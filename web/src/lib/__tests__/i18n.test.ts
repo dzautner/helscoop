@@ -562,6 +562,10 @@ describe("exhaustive i18n key parity", () => {
     "bom.inStock", "bom.lowStock", "bom.outOfStock", "bom.stockUnknown",
     "bom.stockSummary", "bom.outOfStockCount", "bom.stockWarning",
     "bom.alternativeAvailable", "bom.lastChecked",
+    "bom.packageSwitcher", "bom.packageSwitcherDesc", "bom.packageNoAlternatives",
+    "bom.packageBasic", "bom.packageStandard", "bom.packagePremium",
+    "bom.packageCurrent", "bom.packageChanges", "bom.packageLocked",
+    "bom.packageLock", "bom.packageUnlock",
     // subsidy
     "subsidy.sectionLabel", "subsidy.eligibleTitle", "subsidy.maybeTitle",
     "subsidy.checkTitle", "subsidy.deadlineCountdown", "subsidy.deadlineTooltip",

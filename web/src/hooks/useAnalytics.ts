@@ -20,6 +20,7 @@ export type AnalyticsEvent =
   | "bom_item_added"
   | "bom_item_removed"
   | "bom_item_undo_remove"
+  | "bom_package_material_replaced"
   | "bom_exported"
   | "project_exported"
   | "project_imported"
@@ -39,6 +40,7 @@ export interface AnalyticsEventProps {
   bom_item_added: { material_id: string; category?: string };
   bom_item_removed: { material_id: string };
   bom_item_undo_remove: { material_id: string };
+  bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string };
   bom_exported: { format: "pdf" | "csv" | "json" };
   project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" };
   project_imported: { format: "helscoop" };
