@@ -139,7 +139,7 @@ export default function SharedProjectContent({ token }: { token: string }) {
       </div>
 
       {/* Main content */}
-      <div style={{
+      <div className="shared-project-layout" style={{
         flex: 1,
         display: "flex",
         minHeight: 0,
@@ -170,7 +170,7 @@ export default function SharedProjectContent({ token }: { token: string }) {
 
         {/* BOM sidebar */}
         {bom.length > 0 && (
-          <div style={{
+          <div className="shared-project-sidebar" style={{
             width: 320,
             flexShrink: 0,
             borderLeft: "1px solid var(--border)",
