@@ -111,6 +111,10 @@ CREATE TABLE pricing (
   ean TEXT,        -- EAN/barcode
   link TEXT,       -- product page URL
   is_primary BOOLEAN NOT NULL DEFAULT false,  -- primary supplier for this material
+  in_stock BOOLEAN,
+  stock_level TEXT NOT NULL DEFAULT 'unknown' CHECK (stock_level IN ('in_stock', 'low_stock', 'out_of_stock', 'unknown')),
+  store_location TEXT,
+  last_checked_at TIMESTAMPTZ,
   last_scraped_at TIMESTAMPTZ,
   last_verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -121,6 +125,8 @@ CREATE TABLE pricing (
 
 CREATE INDEX idx_pricing_material ON pricing(material_id);
 CREATE INDEX idx_pricing_supplier ON pricing(supplier_id);
+CREATE INDEX idx_pricing_stock_level ON pricing(stock_level);
+CREATE INDEX idx_pricing_last_checked ON pricing(last_checked_at);
 
 -- ============================================================
 -- Pricing History (append-only log of price changes)
@@ -208,6 +214,10 @@ SELECT
   p.ean,
   p.link,
   p.is_primary,
+  p.in_stock,
+  p.stock_level,
+  p.store_location,
+  p.last_checked_at,
   p.last_scraped_at,
   m.waste_factor
 FROM materials m
@@ -224,6 +234,10 @@ SELECT
   pb.quantity,
   pb.unit,
   p.unit_price,
+  p.in_stock,
+  p.stock_level,
+  p.store_location,
+  p.last_checked_at,
   (pb.quantity * p.unit_price * m.waste_factor) AS total_cost,
   s.name AS supplier_name,
   p.link

@@ -4,7 +4,8 @@
  * Tests price comparison, price update with history tracking,
  * price history retrieval, stale price detection, and authorization boundaries.
  *
- * Covers: GET /pricing/compare/:materialId, PUT /pricing/:materialId/:supplierId,
+ * Covers: GET /pricing/compare/:materialId, GET /pricing/stock/:materialId,
+ *         PUT /pricing/:materialId/:supplierId,
  *         GET /pricing/history/:materialId, GET /pricing/stale
  *
  * Related issue: https://github.com/dzautner/helscoop/issues/685
@@ -203,6 +204,53 @@ describe("PUT /pricing/:materialId/:supplierId", () => {
     expect(body.material_id).toBe("mat1");
   });
 
+  it("accepts stock metadata with admin credentials", async () => {
+    const pricingRow = {
+      id: "pricing-1",
+      material_id: "mat1",
+      supplier_id: "sup1",
+      unit: "jm",
+      unit_price: 5.00,
+      stock_level: "low_stock",
+      in_stock: true,
+      store_location: "K-Rauta Vantaa",
+      last_checked_at: "2026-04-21T09:00:00.000Z",
+    };
+    mockQuery.mockResolvedValueOnce({ rows: [pricingRow] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("PUT", "/pricing/mat1/sup1", {
+      headers: { Authorization: `Bearer ${adminToken()}` },
+      body: {
+        unit_price: 5.00,
+        unit: "jm",
+        stock_level: "low_stock",
+        in_stock: true,
+        store_location: "K-Rauta Vantaa",
+        last_checked_at: "2026-04-21T09:00:00.000Z",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as typeof pricingRow;
+    expect(body.stock_level).toBe("low_stock");
+    expect(body.store_location).toBe("K-Rauta Vantaa");
+  });
+
+  it("rejects invalid stock metadata", async () => {
+    const res = await makeRequest("PUT", "/pricing/mat1/sup1", {
+      headers: { Authorization: `Bearer ${adminToken()}` },
+      body: {
+        unit_price: 5.00,
+        unit: "jm",
+        stock_level: "almost_available",
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("clears other primary flags when setting is_primary=true", async () => {
     // First call: clear existing primary flags
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
@@ -249,7 +297,56 @@ describe("PUT /pricing/:materialId/:supplierId", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. GET /pricing/history/:materialId — price history
+// 3. GET /pricing/stock/:materialId — supplier stock availability
+// ---------------------------------------------------------------------------
+describe("GET /pricing/stock/:materialId", () => {
+  it("returns stock rows and available supplier count", async () => {
+    const stockRows = [
+      {
+        material_id: "mat1",
+        supplier_id: "sup1",
+        supplier_name: "K-Rauta",
+        supplier_url: "https://k-rauta.fi",
+        link: "https://k-rauta.fi/pine",
+        stock_level: "in_stock",
+        in_stock: true,
+        store_location: "K-Rauta Vantaa",
+        last_checked_at: "2026-04-21T09:00:00.000Z",
+      },
+      {
+        material_id: "mat1",
+        supplier_id: "sup2",
+        supplier_name: "Bauhaus",
+        supplier_url: "https://bauhaus.fi",
+        link: "https://bauhaus.fi/pine",
+        stock_level: "out_of_stock",
+        in_stock: false,
+        store_location: "Bauhaus Espoo",
+        last_checked_at: "2026-04-21T08:30:00.000Z",
+      },
+    ];
+    mockQuery.mockResolvedValueOnce({ rows: stockRows } as never);
+
+    const res = await makeRequest("GET", "/pricing/stock/mat1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { material_id: string; total: number; available: number; stock: typeof stockRows };
+    expect(body.material_id).toBe("mat1");
+    expect(body.total).toBe(2);
+    expect(body.available).toBe(1);
+    expect(body.stock[0].stock_level).toBe("in_stock");
+  });
+
+  it("requires authentication", async () => {
+    const res = await makeRequest("GET", "/pricing/stock/mat1");
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. GET /pricing/history/:materialId — price history
 // ---------------------------------------------------------------------------
 describe("GET /pricing/history/:materialId", () => {
   it("returns price history for material", async () => {
@@ -288,7 +385,7 @@ describe("GET /pricing/history/:materialId", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. GET /pricing/stale — stale price detection (admin only)
+// 5. GET /pricing/stale — stale price detection (admin only)
 // ---------------------------------------------------------------------------
 describe("GET /pricing/stale", () => {
   it("rejects unauthenticated request", async () => {

@@ -559,6 +559,9 @@ describe("exhaustive i18n key parity", () => {
     "bom.donutChartAriaLabel", "bom.exportCsv",
     "bom.csvMaterial", "bom.csvQuantity", "bom.csvUnit",
     "bom.csvUnitPrice", "bom.csvTotal", "bom.csvSupplier", "bom.csvCategory",
+    "bom.inStock", "bom.lowStock", "bom.outOfStock", "bom.stockUnknown",
+    "bom.stockSummary", "bom.outOfStockCount", "bom.stockWarning",
+    "bom.alternativeAvailable", "bom.lastChecked",
     // viewport
     "viewport.contextMenuLabel",
   ];

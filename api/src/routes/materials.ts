@@ -104,6 +104,10 @@ router.get("/", async (_req, res) => {
         'ean', p.ean,
         'link', p.link,
         'is_primary', p.is_primary,
+        'in_stock', p.in_stock,
+        'stock_level', p.stock_level,
+        'store_location', p.store_location,
+        'last_checked_at', p.last_checked_at,
         'last_scraped_at', p.last_scraped_at
       ))
       FROM pricing p
@@ -159,7 +163,9 @@ router.get("/:id/prices", async (req, res) => {
 
   const result = await query(
     `SELECT p.id, p.material_id, p.supplier_id, p.unit, p.unit_price, p.currency,
-      p.sku, p.ean, p.link, p.is_primary, p.last_scraped_at, p.last_verified_at,
+      p.sku, p.ean, p.link, p.is_primary,
+      p.in_stock, p.stock_level, p.store_location, p.last_checked_at,
+      p.last_scraped_at, p.last_verified_at,
       s.name AS supplier_name, s.url AS supplier_url, s.logo_url AS supplier_logo
      FROM pricing p
      JOIN suppliers s ON p.supplier_id = s.id
