@@ -5,6 +5,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { SkeletonPriceComparison } from "@/components/Skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SubsidyCalculator from "@/components/SubsidyCalculator";
+import WasteEstimatePanel from "@/components/WasteEstimatePanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1570,6 +1571,7 @@ export default function BomPanel({
   sceneJs,
   projectName,
   buildingInfo,
+  projectId,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -1583,6 +1585,8 @@ export default function BomPanel({
   projectName?: string;
   /** Address-derived building context for subsidy eligibility defaults */
   buildingInfo?: BuildingInfo | null;
+  /** Project ID used by API-backed cost add-ons such as waste estimates */
+  projectId?: string;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -1907,6 +1911,9 @@ export default function BomPanel({
         )}
         {bom.length > 0 && total > 0 && (
           <SubsidyCalculator totalCost={total} buildingInfo={buildingInfo} />
+        )}
+        {bom.length > 0 && projectId && (
+          <WasteEstimatePanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
         )}
         {bom.length > 0 && (
           <button
