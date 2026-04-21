@@ -1475,7 +1475,11 @@ export default function ProjectPage() {
               </button>
             )}
             <div style={{ flex: 1 }} />
-            <span className="viewport-status" data-error={!!sceneError}>
+            <span
+              className="viewport-status"
+              data-error={!!sceneError}
+              title={sceneError && sceneError.length > 40 ? sceneError : undefined}
+            >
               {sceneError
                 ? `${t('editor.sceneErrorPrefix')}: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
                 : t('editor.objectCount', { count: objectCount })}
