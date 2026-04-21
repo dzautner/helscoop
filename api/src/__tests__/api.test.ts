@@ -8,12 +8,14 @@ describe("API structure", () => {
     const pricing = await import("../routes/pricing");
     const chat = await import("../routes/chat");
     const kesko = await import("../routes/kesko");
+    const ryhti = await import("../routes/ryhti");
     expect(materials.default).toBeDefined();
     expect(projects.default).toBeDefined();
     expect(suppliers.default).toBeDefined();
     expect(pricing.default).toBeDefined();
     expect(chat.default).toBeDefined();
     expect(kesko.default).toBeDefined();
+    expect(ryhti.default).toBeDefined();
   });
 
   it("auth module exports required functions", async () => {

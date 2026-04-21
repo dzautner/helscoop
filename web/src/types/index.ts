@@ -28,6 +28,7 @@ export interface Project {
   display_scale?: number;
   thumbnail_url?: string | null;
   building_info?: BuildingInfo | null;
+  permit_metadata?: RyhtiPermitMetadata | null;
   share_token?: string | null;
   bom?: BomItem[];
 }
@@ -276,6 +277,74 @@ export interface WasteEstimateResponse {
   };
   sortingGuide: WasteSortingGuideEntry[];
   totalDisposalCost: number;
+}
+
+export interface RyhtiPermitMetadata {
+  permanentPermitIdentifier?: string;
+  permanentBuildingIdentifier?: string;
+  municipalityNumber?: string;
+  propertyIdentifier?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  descriptionOfAction?: string;
+  constructionActionType?: string;
+  buildingPermitApplicationType?: string;
+  permitApplicationType?: string;
+  grossAreaM2?: number;
+  floorAreaM2?: number;
+  volumeM3?: number;
+  floors?: number;
+  energyClass?: string;
+  suomiFiAuthenticated?: boolean;
+  authorityPartner?: string;
+  authorityCaseId?: string;
+  siteOwnerConsent?: boolean;
+  applicantRole?: string;
+}
+
+export interface RyhtiValidationIssue {
+  level: "error" | "warning" | "info";
+  code: string;
+  field?: string;
+  message: string;
+  action: string;
+}
+
+export interface RyhtiValidationResult {
+  ready: boolean;
+  generatedAt: string;
+  mode: "dry_run" | "live";
+  remoteConfigured: boolean;
+  issues: RyhtiValidationIssue[];
+  summary: {
+    errors: number;
+    warnings: number;
+    info: number;
+  };
+}
+
+export interface RyhtiSubmission {
+  id: string;
+  project_id: string;
+  mode: "dry_run" | "live";
+  status: "draft" | "ready_for_authority" | "submitted" | "accepted" | "rejected" | "failed";
+  permit_identifier?: string | null;
+  ryhti_tracking_id?: string | null;
+  validation?: unknown;
+  response?: unknown;
+  error?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RyhtiPackageResponse {
+  package: unknown;
+  validation: RyhtiValidationResult;
+  permitMetadata: RyhtiPermitMetadata;
+  latestSubmission?: RyhtiSubmission | null;
 }
 
 export interface Category {
