@@ -6,6 +6,7 @@ import { SkeletonPriceComparison } from "@/components/Skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SubsidyCalculator from "@/components/SubsidyCalculator";
 import WasteEstimatePanel from "@/components/WasteEstimatePanel";
+import RyhtiSubmissionPanel from "@/components/RyhtiSubmissionPanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1988,6 +1989,9 @@ export default function BomPanel({
         )}
         {bom.length > 0 && projectId && (
           <WasteEstimatePanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
+        )}
+        {projectId && (
+          <RyhtiSubmissionPanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
         )}
         {bom.length > 0 && (
           <button

@@ -1,4 +1,4 @@
-import type { EnergySubsidyRequest, KeskoProduct } from "@/types";
+import type { EnergySubsidyRequest, KeskoProduct, RyhtiPermitMetadata } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -304,6 +304,19 @@ export const api = {
     apiFetch("/subsidies/energy/estimate", { method: "POST", body: JSON.stringify(data) }),
   getWasteEstimate: (projectId: string) =>
     apiFetch(`/waste/estimate?projectId=${encodeURIComponent(projectId)}`),
+  getRyhtiPackage: (projectId: string) =>
+    apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/package`),
+  updateRyhtiMetadata: (projectId: string, metadata: Partial<RyhtiPermitMetadata>) =>
+    apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/metadata`, {
+      method: "PUT",
+      body: JSON.stringify({ metadata }),
+    }),
+  validateRyhti: (projectId: string) =>
+    apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/validate`, { method: "POST" }),
+  submitRyhti: (projectId: string) =>
+    apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/submit`, { method: "POST" }),
+  getRyhtiStatus: (projectId: string) =>
+    apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/status`),
 
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),

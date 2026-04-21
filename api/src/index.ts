@@ -30,6 +30,7 @@ import stockRouter from "./routes/stock";
 import subsidiesRouter from "./routes/subsidies";
 import keskoRouter from "./routes/kesko";
 import araGrantRouter from "./routes/ara-grant";
+import ryhtiRouter from "./routes/ryhti";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -525,7 +526,7 @@ app.get("/auth/export-data", exportDataLimiter, requireAuth, async (req, res) =>
 
     // Fetch all projects
     const projectsResult = await query(
-      "SELECT id, name, description, scene_js, building_info, share_token, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY created_at",
+      "SELECT id, name, description, scene_js, building_info, permit_metadata, share_token, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY created_at",
       [userId]
     );
 
@@ -636,6 +637,7 @@ app.use("/stock", authenticatedLimiter, stockRouter);
 app.use("/subsidies", authenticatedLimiter, subsidiesRouter);
 app.use("/kesko", authenticatedLimiter, keskoRouter);
 app.use("/ara-grant", authenticatedLimiter, araGrantRouter);
+app.use("/ryhti", authenticatedLimiter, ryhtiRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
