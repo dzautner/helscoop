@@ -46,6 +46,9 @@ router.post("/", requirePermission("project:create"), async (req, res) => {
   if (name.length > 200) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
+  if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
+    return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
+  }
   const result = await query(
     `INSERT INTO projects (user_id, name, description, scene_js, building_info)
      VALUES ($1,$2,$3,$4,$5) RETURNING *`,
@@ -84,6 +87,9 @@ router.put("/:id", async (req, res) => {
   const { name, description, scene_js } = req.body;
   if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
+  }
+  if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
+    return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
   }
   const result = await query(
     `UPDATE projects SET name=COALESCE($1, name), description=COALESCE($2, description), scene_js=COALESCE($3, scene_js), updated_at=now()

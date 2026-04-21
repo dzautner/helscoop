@@ -36,6 +36,7 @@ export default function ChatPanel({
   projectName,
   projectDescription,
   buildingInfo,
+  onMessageCountChange,
 }: {
   sceneJs: string;
   onApplyCode: (code: string) => void;
@@ -43,6 +44,7 @@ export default function ChatPanel({
   projectName?: string;
   projectDescription?: string;
   buildingInfo?: ChatContextBuildingInfo;
+  onMessageCountChange?: (count: number) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -57,6 +59,10 @@ export default function ChatPanel({
   const { toast } = useToast();
   const { t } = useTranslation();
   const { track } = useAnalytics();
+
+  useEffect(() => {
+    onMessageCountChange?.(messages.length);
+  }, [messages.length, onMessageCountChange]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
