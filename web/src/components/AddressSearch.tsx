@@ -137,6 +137,7 @@ export default function AddressSearch({
   const [createError, setCreateError] = useState(false);
   const [result, setResult] = useState<BuildingResult | null>(null);
   const [searched, setSearched] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
 
@@ -144,12 +145,14 @@ export default function AddressSearch({
     if (!query.trim() || query.trim().length < 3) return;
     setLoading(true);
     setSearched(true);
+    setSearchError(false);
     try {
       const data = await api.getBuilding(query.trim());
       setResult(data);
       track("address_search", { query_length: query.trim().length, had_result: true });
     } catch {
       setResult(null);
+      setSearchError(true);
       track("address_search", { query_length: query.trim().length, had_result: false });
     }
     setLoading(false);
@@ -256,8 +259,8 @@ export default function AddressSearch({
         )}
 
         {searched && !loading && !result && (
-          <div className="anim-fade" style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
-            {t('search.notFound')}
+          <div className="anim-fade" role={searchError ? "alert" : undefined} style={{ marginTop: 16, color: searchError ? "var(--danger)" : "var(--text-muted)", fontSize: 12 }}>
+            {searchError ? t('search.searchError') : t('search.notFound')}
           </div>
         )}
       </div>
@@ -436,13 +439,13 @@ export default function AddressSearch({
         )}
 
         {searched && !loading && !result && (
-          <div className="anim-fade" style={{
+          <div className="anim-fade" role={searchError ? "alert" : undefined} style={{
             marginTop: 20,
             padding: "16px",
-            color: "var(--text-muted)",
+            color: searchError ? "var(--danger)" : "var(--text-muted)",
             fontSize: 13,
           }}>
-            {t('search.notFound')}
+            {searchError ? t('search.searchError') : t('search.notFound')}
           </div>
         )}
       </div>
