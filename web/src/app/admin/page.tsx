@@ -374,7 +374,6 @@ export default function AdminPage() {
       .me()
       .then((user) => {
         if (user.role !== "admin") {
-          alert("Admin access required");
           window.location.href = "/";
         } else {
           setAuthorized(true);

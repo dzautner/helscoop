@@ -2103,7 +2103,7 @@ export default function BomPanel({
             <button
               className="bom-empty-cta"
               onClick={() => {
-                const searchInput = document.querySelector<HTMLInputElement>('[placeholder="' + t('pricing.searchMaterials') + '"]');
+                const searchInput = document.querySelector<HTMLInputElement>('[data-bom-search]');
                 if (searchInput) searchInput.focus();
               }}
             >
@@ -2195,6 +2195,7 @@ export default function BomPanel({
                 }
               }}
               placeholder={t('pricing.searchMaterials')}
+              data-bom-search
               style={{
                 width: "100%",
                 padding: keskoMode ? "7px 86px 7px 28px" : "7px 8px 7px 28px",
