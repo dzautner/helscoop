@@ -442,8 +442,8 @@ export default function SceneEditor({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 26,
-                height: 26,
+                width: 32,
+                height: 32,
                 padding: 0,
                 background: "transparent",
                 border: "1px solid var(--border)",
@@ -464,8 +464,8 @@ export default function SceneEditor({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 26,
-                height: 26,
+                width: 32,
+                height: 32,
                 padding: 0,
                 background: "transparent",
                 border: "1px solid var(--border)",
@@ -485,8 +485,8 @@ export default function SceneEditor({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 26,
-                height: 26,
+                width: 32,
+                height: 32,
                 padding: 0,
                 background: "transparent",
                 border: "1px solid var(--border)",
@@ -526,7 +526,8 @@ export default function SceneEditor({
               title={t("editor.replaceOne")}
               aria-label={t("editor.replaceOne")}
               style={{
-                padding: "4px 10px",
+                padding: "6px 10px",
+                minHeight: 32,
                 background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
@@ -546,7 +547,8 @@ export default function SceneEditor({
               title={t("editor.replaceAll")}
               aria-label={t("editor.replaceAll")}
               style={{
-                padding: "4px 10px",
+                padding: "6px 10px",
+                minHeight: 32,
                 background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
