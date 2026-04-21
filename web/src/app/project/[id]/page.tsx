@@ -33,6 +33,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { SaveableFields } from "@/hooks/useAutoSave";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
+import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project } from "@/types";
 import { shortcutLabel } from "@/lib/shortcut-label";
@@ -2140,6 +2141,17 @@ export default function ProjectPage() {
           </div>
         )}
       </div>
+
+      {!isMobileEditor && (
+        <EditorStatusBar
+          objectCount={objectCount}
+          materialCount={bom.length}
+          scriptByteSize={new TextEncoder().encode(sceneJs).length}
+          saveStatus={saveStatus}
+          lastSavedAt={lastSaved ? new Date(lastSaved) : null}
+          warningCount={sceneWarnings.length}
+        />
+      )}
 
       {/* Share dialog */}
       {showShareDialog && shareToken && (
