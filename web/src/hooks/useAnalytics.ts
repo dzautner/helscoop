@@ -28,6 +28,7 @@ export type AnalyticsEvent =
   | "auth_register"
   | "auth_login"
   | "auth_google_login"
+  | "auth_apple_login"
   | "page_view";
 
 // ── Property maps per event ────────────────────────────────────────
@@ -46,6 +47,7 @@ export interface AnalyticsEventProps {
   auth_register: Record<string, never>;
   auth_login: Record<string, never>;
   auth_google_login: Record<string, never>;
+  auth_apple_login: Record<string, never>;
   page_view: { path: string };
 }
 

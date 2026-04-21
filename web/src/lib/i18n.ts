@@ -47,8 +47,10 @@ const translations = {
       passwordMedium: 'Keskiverto',
       passwordStrong: 'Vahva',
       passwordStrength: 'Salasanan vahvuus',
-      googleSignIn: 'Kirjaudu Google-tilill\u00e4',
+      googleSignIn: 'Jatka Googlella',
       googleSignInError: 'Google-kirjautuminen ep\u00e4onnistui',
+      appleSignIn: 'Jatka Applella',
+      appleSignInError: 'Apple-kirjautuminen ep\u00e4onnistui',
       orContinueWith: 'tai jatka',
     },
     brand: {
@@ -1058,8 +1060,10 @@ const translations = {
       passwordMedium: 'Medium',
       passwordStrong: 'Strong',
       passwordStrength: 'Password strength',
-      googleSignIn: 'Sign in with Google',
+      googleSignIn: 'Continue with Google',
       googleSignInError: 'Google sign-in failed',
+      appleSignIn: 'Continue with Apple',
+      appleSignInError: 'Apple sign-in failed',
       orContinueWith: 'or continue with',
     },
     brand: {

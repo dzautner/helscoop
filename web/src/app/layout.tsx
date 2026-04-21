@@ -94,6 +94,8 @@ export default function RootLayout({
         />
         {/* Google Identity Services — for Google Sign-In */}
         <script src="https://accounts.google.com/gsi/client" async defer />
+        {/* Apple JS SDK — for Sign in with Apple */}
+        <script src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js" async defer />
         {/* Plausible Analytics — privacy-first, no cookies, GDPR-compliant */}
         <script
           defer
