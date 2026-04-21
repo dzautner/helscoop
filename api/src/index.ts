@@ -29,6 +29,7 @@ import ifcExportRouter from "./routes/ifc-export";
 import stockRouter from "./routes/stock";
 import subsidiesRouter from "./routes/subsidies";
 import keskoRouter from "./routes/kesko";
+import araGrantRouter from "./routes/ara-grant";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -634,6 +635,7 @@ app.use("/ifc-export", authenticatedLimiter, ifcExportRouter);
 app.use("/stock", authenticatedLimiter, stockRouter);
 app.use("/subsidies", authenticatedLimiter, subsidiesRouter);
 app.use("/kesko", authenticatedLimiter, keskoRouter);
+app.use("/ara-grant", authenticatedLimiter, araGrantRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
