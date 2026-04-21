@@ -100,6 +100,10 @@ router.post("/products/import", async (req, res) => {
      VALUES ($1, 'k-rauta', $2, $3, $4, $5, $6, $7, true, $8, $9, $10, $11, now(), now())
      ON CONFLICT (material_id, supplier_id) DO UPDATE SET
        unit = EXCLUDED.unit,
+       previous_unit_price = CASE
+         WHEN pricing.unit_price IS DISTINCT FROM EXCLUDED.unit_price THEN pricing.unit_price
+         ELSE pricing.previous_unit_price
+       END,
        unit_price = EXCLUDED.unit_price,
        currency = EXCLUDED.currency,
        sku = EXCLUDED.sku,

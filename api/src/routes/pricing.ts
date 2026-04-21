@@ -117,7 +117,12 @@ router.put(
        )
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, 'unknown'),$10,$11,$12,now())
        ON CONFLICT (material_id, supplier_id) DO UPDATE SET
-         unit=$3, unit_price=$4, sku=$5, ean=$6, link=$7,
+         unit=$3,
+         previous_unit_price=CASE
+           WHEN pricing.unit_price IS DISTINCT FROM $4 THEN pricing.unit_price
+           ELSE pricing.previous_unit_price
+         END,
+         unit_price=$4, sku=$5, ean=$6, link=$7,
          is_primary=COALESCE($8, pricing.is_primary),
          stock_level=COALESCE($9, pricing.stock_level),
          in_stock=COALESCE($10, pricing.in_stock),

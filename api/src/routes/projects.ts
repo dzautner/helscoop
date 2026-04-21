@@ -17,7 +17,8 @@ router.get("/", async (req, res) => {
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
-       WHERE pb.project_id = projects.id) AS estimated_cost
+       WHERE pb.project_id = projects.id) AS estimated_cost,
+      (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count
      FROM projects WHERE user_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC`,
     [req.user!.id]
   );
@@ -59,7 +60,9 @@ router.post("/", requirePermission("project:create"), async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const result = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    `SELECT projects.*,
+      (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count
+     FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`,
     [req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)

@@ -69,6 +69,11 @@ export default function ProjectCard({
                 {Number(project.estimated_cost).toFixed(0)} &euro;
               </span>
             )}
+            {Number(project.view_count || 0) > 0 && (
+              <span className="badge badge-muted">
+                {t("project.viewCount", { count: Number(project.view_count || 0) })}
+              </span>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)", fontSize: 13, minWidth: 0 }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{project.description || t('project.emptyDescription')}</span>

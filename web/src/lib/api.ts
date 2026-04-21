@@ -239,6 +239,8 @@ export const api = {
   me: () => apiFetch("/auth/me"),
   updateProfile: (data: { name?: string; email?: string }) =>
     apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),
+  updateNotificationPreferences: (data: { email_notifications: boolean }) =>
+    apiFetch("/auth/notifications", { method: "PUT", body: JSON.stringify(data) }),
   changePassword: (currentPassword: string, newPassword: string) =>
     apiFetch("/auth/password", { method: "PUT", body: JSON.stringify({ currentPassword, newPassword }) }),
   deleteAccount: () =>

@@ -409,6 +409,7 @@ describe("exhaustive i18n key parity", () => {
     "project.noSearchResultsDesc", "project.emptyTitle", "project.emptyHint",
     "project.emptyCta", "project.noSearchResultsCta", "project.useTemplate",
     "project.openAriaLabel", "project.copyAriaLabel", "project.deleteAriaLabel",
+    "project.viewCount",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
     "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",
@@ -458,7 +459,7 @@ describe("exhaustive i18n key parity", () => {
     "share.title", "share.description", "share.generating", "share.copyLink",
     "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
     "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
-    "share.signUpCta", "share.materials", "share.total",
+    "share.signUpCta", "share.materials", "share.total", "share.viewCount",
     // presentation
     "presentation.eyebrow", "presentation.title", "presentation.description",
     "presentation.estimate", "presentation.cameraPresets", "presentation.front",
@@ -483,6 +484,8 @@ describe("exhaustive i18n key parity", () => {
     "settings.passwordChanged", "settings.passwordChangeFailed",
     "settings.accountDeleted", "settings.accountDeleteFailed",
     "settings.dataExported", "settings.dataExportFailed", "settings.backToProjects",
+    "settings.notifications", "settings.notificationsDesc", "settings.weeklyDigest",
+    "settings.notificationsSaved", "settings.notificationsSaveFailed",
     // pricing
     "pricing.compareTitle", "pricing.supplier", "pricing.unitPrice", "pricing.buyLink",
     "pricing.cheapest", "pricing.primary", "pricing.noSuppliers", "pricing.loading",
