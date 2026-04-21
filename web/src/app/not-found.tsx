@@ -64,7 +64,7 @@ export default function NotFound() {
             textAnchor="middle"
             fontSize="22"
             fontWeight="700"
-            fontFamily="var(--font-display)"
+            fontFamily="var(--font-display), sans-serif"
             fill="var(--amber)"
           >
             ?

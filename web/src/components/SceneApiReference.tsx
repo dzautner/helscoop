@@ -243,6 +243,7 @@ function FunctionCard({
           className="api-ref-copy-btn"
           onClick={() => onCopy(fn.example)}
           title="Copy to clipboard"
+          aria-label="Copy to clipboard"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -390,6 +391,7 @@ export default function SceneApiReference({
                         className="api-ref-copy-btn"
                         onClick={() => copyToClipboard(entry.code)}
                         title="Copy to editor"
+                    aria-label="Copy to editor"
                       >
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -487,6 +489,7 @@ export default function SceneApiReference({
                     className="api-ref-copy-btn"
                     onClick={() => copyToClipboard(entry.code)}
                     title="Copy to editor"
+                    aria-label="Copy to editor"
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />

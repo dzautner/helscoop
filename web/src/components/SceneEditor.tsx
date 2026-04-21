@@ -279,27 +279,13 @@ export default function SceneEditor({
     textareaRef.current?.focus();
   }, []);
 
-  /* ── Listen for cursor changes via interval while focused ───── */
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
   const startCursorTracking = useCallback(() => {
     setIsFocused(true);
-    if (intervalRef.current) return;
-    intervalRef.current = setInterval(updateCursorLine, 50);
+    updateCursorLine();
   }, [updateCursorLine]);
 
   const stopCursorTracking = useCallback(() => {
     setIsFocused(false);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
   }, []);
 
   /* ── Error line (0-based index, or -1 if no error line) ──────── */
