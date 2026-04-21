@@ -213,7 +213,7 @@ export default function AddressSearch({
         )}
 
         {result && (
-          <div className="anim-up" style={{ marginTop: 16 }}>
+          <div className="anim-up address-result-glow" style={{ marginTop: 16 }}>
             <div className="card" style={{ padding: "16px 18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div>
@@ -335,7 +335,7 @@ export default function AddressSearch({
         )}
 
         {result && (
-          <div className="anim-up building-result-grid" style={{
+          <div className="anim-up building-result-grid address-result-glow" style={{
             marginTop: 28,
             textAlign: "left",
           }}>
