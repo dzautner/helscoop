@@ -25,6 +25,7 @@ interface WasteCategory {
 
 interface WasteEstimateResponse {
   totalWeightKg: number;
+  totalVolumeM3: number;
   categories: WasteCategory[];
   containerRecommendation: {
     size: string;
@@ -146,6 +147,7 @@ router.get("/estimate", requireAuth, async (req, res) => {
 
   const response: WasteEstimateResponse = {
     totalWeightKg: Math.round(totalWeightKg * 100) / 100,
+    totalVolumeM3: Math.round(totalVolumeM3 * 1000) / 1000,
     categories,
     containerRecommendation: {
       size: `${container.size.sizeM3}m\u00B3`,

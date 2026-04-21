@@ -876,6 +876,7 @@ const translations = {
       totalWeight: 'Jätteen kokonaispaino',
       totalVolume: 'Kokonaistilavuus',
       totalDisposalCost: 'Hävityskustannukset yhteensä',
+      recyclingRate: '{{pct}}% kierrätettävissä',
       categories: 'Jätelajit',
       wasteType: 'Jätelajin',
       weight: 'Paino',
@@ -902,6 +903,7 @@ const translations = {
       eristejate: 'Eristejäte',
       estimateLoading: 'Ladataan jätearviota...',
       estimateFailed: 'Jätearvion lataus epäonnistui',
+      asbestosWarning: 'Rakennusvuosi {{year}}: ennen vuotta 1994 rakennetuissa kohteissa voi olla asbestia. Tee asbestikartoitus ennen purkutöitä.',
     },
   },
   en: {
@@ -1766,6 +1768,7 @@ const translations = {
       totalWeight: 'Total waste weight',
       totalVolume: 'Total volume',
       totalDisposalCost: 'Total disposal cost',
+      recyclingRate: '{{pct}}% recyclable',
       categories: 'Waste categories',
       wasteType: 'Waste type',
       weight: 'Weight',
@@ -1792,6 +1795,7 @@ const translations = {
       eristejate: 'Insulation waste',
       estimateLoading: 'Loading waste estimate...',
       estimateFailed: 'Failed to load waste estimate',
+      asbestosWarning: 'Built in {{year}}: pre-1994 Finnish buildings may contain asbestos. Complete an asbestos survey before demolition.',
     },
     stock: {
       title: 'Availability',

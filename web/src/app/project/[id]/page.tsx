@@ -1683,6 +1683,7 @@ export default function ProjectPage() {
               sceneJs={sceneJs}
               projectName={projectName}
               buildingInfo={project?.building_info ?? null}
+              projectId={projectId}
             />
           </>
         )}

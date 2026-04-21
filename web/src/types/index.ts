@@ -215,6 +215,34 @@ export interface EnergySubsidyResponse {
   disclaimer: string;
 }
 
+export interface WasteCategoryEstimate {
+  type: string;
+  weightKg: number;
+  volumeM3: number;
+  recyclable: boolean;
+  disposalCostEur: number;
+}
+
+export interface WasteSortingGuideEntry {
+  wasteType: string;
+  sortingInstruction_fi: string;
+  sortingInstruction_en: string;
+  acceptedAt: string;
+}
+
+export interface WasteEstimateResponse {
+  totalWeightKg: number;
+  totalVolumeM3: number;
+  categories: WasteCategoryEstimate[];
+  containerRecommendation: {
+    size: string;
+    count: number;
+    totalCost: number;
+  };
+  sortingGuide: WasteSortingGuideEntry[];
+  totalDisposalCost: number;
+}
+
 export interface Category {
   id: string;
   display_name: string;

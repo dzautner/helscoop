@@ -292,6 +292,8 @@ export const api = {
   getStalePrices: () => apiFetch("/pricing/stale"),
   estimateEnergySubsidy: (data: EnergySubsidyRequest) =>
     apiFetch("/subsidies/energy/estimate", { method: "POST", body: JSON.stringify(data) }),
+  getWasteEstimate: (projectId: string) =>
+    apiFetch(`/waste/estimate?projectId=${encodeURIComponent(projectId)}`),
 
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),

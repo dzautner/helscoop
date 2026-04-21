@@ -161,12 +161,14 @@ describe("GET /waste/estimate", () => {
 
     const body = res.body as {
       totalWeightKg: number;
+      totalVolumeM3: number;
       categories: unknown[];
       containerRecommendation: { size: string; count: number; totalCost: number };
       sortingGuide: unknown[];
       totalDisposalCost: number;
     };
     expect(body.totalWeightKg).toBe(0);
+    expect(body.totalVolumeM3).toBe(0);
     expect(body.categories).toHaveLength(0);
     expect(body.totalDisposalCost).toBe(0);
     // Even empty projects get a minimum container recommendation
@@ -315,6 +317,7 @@ describe("GET /waste/estimate", () => {
     const body = res.body as Record<string, unknown>;
     // Top-level fields
     expect(body).toHaveProperty("totalWeightKg");
+    expect(body).toHaveProperty("totalVolumeM3");
     expect(body).toHaveProperty("categories");
     expect(body).toHaveProperty("containerRecommendation");
     expect(body).toHaveProperty("sortingGuide");

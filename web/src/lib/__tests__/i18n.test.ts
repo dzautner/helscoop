@@ -577,6 +577,17 @@ describe("exhaustive i18n key parity", () => {
     "subsidy.heating.districtHeat", "subsidy.heating.airWater",
     "subsidy.heating.groundSource", "subsidy.heating.otherNonFossil",
     "subsidy.heating.fossil",
+    // waste
+    "waste.title", "waste.subtitle", "waste.totalWeight", "waste.totalVolume",
+    "waste.totalDisposalCost", "waste.recyclingRate", "waste.categories",
+    "waste.wasteType", "waste.weight", "waste.volume", "waste.recyclable",
+    "waste.notRecyclable", "waste.disposalCost", "waste.containerRecommendation",
+    "waste.containerSize", "waste.containerCount", "waste.containerCost",
+    "waste.sortingGuide", "waste.sortingInstruction", "waste.acceptedAt",
+    "waste.noWaste", "waste.noWasteDesc", "waste.puujate", "waste.metallijate",
+    "waste.kivijate", "waste.sekajate", "waste.vaarallinen_jate",
+    "waste.muovijate", "waste.lasijate", "waste.eristejate",
+    "waste.estimateLoading", "waste.estimateFailed", "waste.asbestosWarning",
     // viewport
     "viewport.contextMenuLabel",
   ];
