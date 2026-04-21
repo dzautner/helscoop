@@ -4724,6 +4724,35 @@ select:focus {
   opacity: 1;
 }
 
+/* === Scroll progress bar (landing page) === */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  z-index: 9999;
+  background: transparent;
+  pointer-events: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  .scroll-progress::after {
+    content: '';
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--amber-dim), var(--amber), var(--amber-light));
+    transform-origin: left;
+    transform: scaleX(0);
+    animation: scrollFill linear both;
+    animation-timeline: scroll(root);
+  }
+}
+
+@keyframes scrollFill {
+  to { transform: scaleX(1); }
+}
+
 /* === ConnectionBanner === */
 .connection-banner {
   position: fixed;
