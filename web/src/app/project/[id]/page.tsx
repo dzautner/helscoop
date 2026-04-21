@@ -10,6 +10,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel from "@/components/BomPanel";
 import ChatPanel from "@/components/ChatPanel";
+import MobileEditorTabs from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
@@ -26,6 +27,7 @@ import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { SaveableFields } from "@/hooks/useAutoSave";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
@@ -100,6 +102,24 @@ scene.add(wall4, { material: "lumber", color: [0.85, 0.75, 0.55] });
 `;
 
 const HISTORY_LIMIT = 50;
+const MOBILE_EDITOR_QUERY = "(max-width: 768px)";
+
+type MobileEditorPanel = "viewport" | "chat" | "bom" | "code" | "params" | "docs";
+
+function getBomWidthBounds(): { min: number; max: number } {
+  if (typeof window === "undefined") return { min: 260, max: 600 };
+  const isTabletOrNarrow = window.innerWidth <= 1024;
+  const min = isTabletOrNarrow ? 220 : 260;
+  const max = isTabletOrNarrow
+    ? Math.max(min, Math.min(430, Math.floor(window.innerWidth * 0.42)))
+    : 600;
+  return { min, max };
+}
+
+function clampBomWidth(width: number): number {
+  const { min, max } = getBomWidthBounds();
+  return Math.max(min, Math.min(max, width));
+}
 
 export default function ProjectPage() {
   const params = useParams();
@@ -110,6 +130,7 @@ export default function ProjectPage() {
   const { toggle: toggleTheme, resolved: resolvedTheme } = useTheme();
   const { track } = useAnalytics();
   const { markCodeEditor, markChat } = useEditorSession();
+  const isMobileEditor = useMediaQuery(MOBILE_EDITOR_QUERY);
 
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -132,6 +153,8 @@ export default function ProjectPage() {
   const [showParams, setShowParams] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showAraChecklist, setShowAraChecklist] = useState(false);
@@ -143,7 +166,7 @@ export default function ProjectPage() {
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("helscoop_bom_width");
-      if (saved) return Math.max(260, Math.min(600, parseInt(saved, 10)));
+      if (saved) return clampBomWidth(parseInt(saved, 10));
     }
     return 340;
   });
@@ -377,6 +400,23 @@ export default function ProjectPage() {
     };
   }, [showExportMenu]);
 
+  useEffect(() => {
+    if (!showHeaderMenu) return;
+    const close = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("[data-editor-mobile-actions]")) return;
+      setShowHeaderMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowHeaderMenu(false);
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showHeaderMenu]);
+
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     resizingRef.current = true;
@@ -384,7 +424,7 @@ export default function ProjectPage() {
     const startWidth = bomWidth;
     const onMove = (ev: MouseEvent) => {
       const delta = startX - ev.clientX;
-      const next = Math.max(260, Math.min(600, startWidth + delta));
+      const next = clampBomWidth(startWidth + delta);
       setBomWidth(next);
     };
     const onUp = () => {
@@ -413,7 +453,7 @@ export default function ProjectPage() {
     const onMove = (ev: TouchEvent) => {
       if (ev.touches.length !== 1) return;
       const delta = startX - ev.touches[0].clientX;
-      const next = Math.max(260, Math.min(600, startWidth + delta));
+      const next = clampBomWidth(startWidth + delta);
       setBomWidth(next);
     };
     const onEnd = () => {
@@ -483,13 +523,81 @@ export default function ProjectPage() {
     [pushHistory, markChat]
   );
 
+  const handleMobilePanelChange = useCallback(
+    (panel: MobileEditorPanel) => {
+      setActiveMobilePanel(panel);
+      if (panel === "chat") markChat();
+      if (panel === "bom") setShowBom(true);
+      if (panel === "code") {
+        if (!showCode) markCodeEditor();
+        setShowCode(true);
+      }
+      if (panel === "params") setShowParams(true);
+      if (panel === "docs") setShowDocs(true);
+    },
+    [markChat, markCodeEditor, showCode]
+  );
+
+  const toggleCodePanel = useCallback(() => {
+    if (!showCode) markCodeEditor();
+    setShowCode((visible) => {
+      const next = !visible;
+      if (isMobileEditor) setActiveMobilePanel(next ? "code" : "viewport");
+      return next;
+    });
+  }, [isMobileEditor, markCodeEditor, showCode]);
+
+  const toggleDocsPanel = useCallback(() => {
+    setShowDocs((visible) => {
+      const next = !visible;
+      if (isMobileEditor) setActiveMobilePanel(next ? "docs" : "viewport");
+      return next;
+    });
+  }, [isMobileEditor]);
+
+  const toggleParamsPanel = useCallback(() => {
+    setShowParams((visible) => {
+      const next = !visible;
+      if (isMobileEditor) setActiveMobilePanel(next ? "params" : "viewport");
+      return next;
+    });
+  }, [isMobileEditor]);
+
+  const duplicateProject = useCallback(async () => {
+    setShowHeaderMenu(false);
+    setDuplicating(true);
+    try {
+      const dup = await api.duplicateProject(projectId);
+      toast(t('toast.projectDuplicated'), "success");
+      router.push(`/project/${dup.id}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t('toast.duplicateFailed'), "error");
+    } finally {
+      setDuplicating(false);
+    }
+  }, [projectId, router, t, toast]);
+
+  useEffect(() => {
+    if (!isMobileEditor) {
+      setBomWidth((width) => clampBomWidth(width));
+      return;
+    }
+    if ((activeMobilePanel === "code" && !showCode) ||
+      (activeMobilePanel === "params" && !showParams) ||
+      (activeMobilePanel === "docs" && !showDocs)) {
+      setActiveMobilePanel("viewport");
+    }
+  }, [activeMobilePanel, isMobileEditor, showCode, showDocs, showParams]);
+
   /* ── Keyboard shortcuts ──────────────────────────────────────── */
   const closeAllPanels = useCallback(() => {
     setShowCode(false);
     setShowShortcutsHelp(false);
     setShowExportMenu(false);
+    setShowHeaderMenu(false);
     setShowDocs(false);
-  }, []);
+    if (isMobileEditor) setActiveMobilePanel("viewport");
+  }, [isMobileEditor]);
 
   const shortcuts = useMemo<KeyboardShortcut[]>(() => [
     {
@@ -660,7 +768,7 @@ export default function ProjectPage() {
             <polyline points="8 6 2 12 8 18" />
           </svg>
         ),
-        action: () => { if (!showCode) markCodeEditor(); setShowCode((v) => !v); },
+        action: toggleCodePanel,
         isActive: showCode,
       },
       {
@@ -868,7 +976,7 @@ export default function ProjectPage() {
         isActive: showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, markCodeEditor, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -977,7 +1085,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="editor-page">
+    <div className="editor-page" data-mobile-panel={isMobileEditor ? activeMobilePanel : undefined}>
 
       {/* Header */}
       <div className="editor-header">
@@ -986,7 +1094,7 @@ export default function ProjectPage() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
+        <div className="editor-header-divider" style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
         <div className="editor-header-name-wrapper">
           <input
             className="editor-header-name"
@@ -1015,7 +1123,7 @@ export default function ProjectPage() {
         <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
         <div className="editor-header-actions">
           <button
-            className="btn btn-ghost"
+            className="btn btn-ghost editor-action-secondary"
             onClick={undo}
             disabled={!canUndo}
             data-tooltip={`${t('editor.undo')} (${shortcutLabel('Cmd+Z')})`}
@@ -1028,7 +1136,7 @@ export default function ProjectPage() {
             </svg>
           </button>
           <button
-            className="btn btn-ghost"
+            className="btn btn-ghost editor-action-secondary"
             onClick={redo}
             disabled={!canRedo}
             data-tooltip={`${t('editor.redo')} (${shortcutLabel('Cmd+Shift+Z')})`}
@@ -1041,22 +1149,11 @@ export default function ProjectPage() {
             </svg>
           </button>
           <button
-            className="btn btn-ghost"
+            className="btn btn-ghost editor-action-secondary"
             data-tooltip={t('project.copy')}
             aria-label={t('editor.duplicateProject')}
             disabled={duplicating}
-            onClick={async () => {
-              setDuplicating(true);
-              try {
-                const dup = await api.duplicateProject(projectId);
-                toast(t('toast.projectDuplicated'), "success");
-                router.push(`/project/${dup.id}`);
-              } catch (err) {
-                toast(err instanceof Error ? err.message : t('toast.duplicateFailed'), "error");
-              } finally {
-                setDuplicating(false);
-              }
-            }}
+            onClick={duplicateProject}
             style={{ padding: "5px 7px" }}
           >
             {duplicating ? (
@@ -1070,7 +1167,57 @@ export default function ProjectPage() {
               </svg>
             )}
           </button>
-          <div style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
+          <div className="editor-action-divider" style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
+          <div className="editor-mobile-actions" data-editor-mobile-actions>
+            <button
+              className="btn btn-ghost editor-mobile-actions-btn"
+              type="button"
+              aria-label={t("toast.overflowMore", { count: 3 })}
+              aria-haspopup="menu"
+              aria-expanded={showHeaderMenu}
+              onClick={() => setShowHeaderMenu((v) => !v)}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="19" cy="12" r="1" />
+                <circle cx="5" cy="12" r="1" />
+              </svg>
+            </button>
+            {showHeaderMenu && (
+              <div className="editor-mobile-actions-menu dropdown-menu" role="menu">
+                <button
+                  role="menuitem"
+                  className="btn btn-ghost"
+                  disabled={!canUndo}
+                  onClick={() => {
+                    setShowHeaderMenu(false);
+                    undo();
+                  }}
+                >
+                  {t("editor.undo")}
+                </button>
+                <button
+                  role="menuitem"
+                  className="btn btn-ghost"
+                  disabled={!canRedo}
+                  onClick={() => {
+                    setShowHeaderMenu(false);
+                    redo();
+                  }}
+                >
+                  {t("editor.redo")}
+                </button>
+                <button
+                  role="menuitem"
+                  className="btn btn-ghost"
+                  disabled={duplicating}
+                  onClick={duplicateProject}
+                >
+                  {t("editor.duplicateProject")}
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className="btn btn-ghost"
             data-tooltip={t('editor.share')}
@@ -1491,7 +1638,7 @@ export default function ProjectPage() {
             <button
               className="viewport-toolbar-btn"
               data-active={showCode}
-              onClick={() => { if (!showCode) markCodeEditor(); setShowCode(!showCode); }}
+              onClick={toggleCodePanel}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="16 18 22 12 16 6" />
@@ -1530,7 +1677,7 @@ export default function ProjectPage() {
             <button
               className="viewport-toolbar-btn"
               data-active={showDocs}
-              onClick={() => setShowDocs(!showDocs)}
+              onClick={toggleDocsPanel}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -1543,7 +1690,7 @@ export default function ProjectPage() {
               <button
                 className="viewport-toolbar-btn"
                 data-active={showParams}
-                onClick={() => setShowParams(!showParams)}
+                onClick={toggleParamsPanel}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="4" y1="21" x2="4" y2="14" />
@@ -1576,6 +1723,7 @@ export default function ProjectPage() {
           {/* 3D Viewport */}
           <div
             ref={viewportRef}
+            className="editor-viewport-shell"
             data-tour="viewport"
             style={{
               flex: 1,
@@ -1734,9 +1882,38 @@ export default function ProjectPage() {
             </div>
           )}
 
+          {isMobileEditor && (
+            <MobileEditorTabs<MobileEditorPanel>
+              active={activeMobilePanel}
+              onChange={handleMobilePanelChange}
+              ariaLabel={locale === "fi" ? "Editorin mobiilipaneelit" : "Editor mobile panels"}
+              tabs={[
+                { id: "viewport", label: t("editor.scene") },
+                {
+                  id: "chat",
+                  label: t("editor.assistant"),
+                  badge: chatMessageCount || undefined,
+                },
+                {
+                  id: "bom",
+                  label: t("editor.materialList"),
+                  badge: bom.length || undefined,
+                },
+                { id: "code", label: locale === "fi" ? "Koodi" : "Code" },
+                ...(sceneParams.length > 0
+                  ? [{ id: "params" as const, label: t("editor.params"), badge: sceneParams.length }]
+                  : []),
+                ...(showDocs
+                  ? [{ id: "docs" as const, label: t("editor.docs") || "Docs" }]
+                  : []),
+              ]}
+            />
+          )}
+
           {/* Collapsible Code Editor */}
           {showCode && (
             <div
+              className="editor-code-panel"
               style={{
                 height: 260,
                 flexShrink: 0,
@@ -1777,14 +1954,16 @@ export default function ProjectPage() {
         {/* Resize handle + BOM panel */}
         {showBom && (
           <>
-            <div
-              className="resize-handle-v"
-              role="separator"
-              aria-label="Resize BOM panel"
-              aria-orientation="vertical"
-              onMouseDown={startResize}
-              onTouchStart={startTouchResize}
-            />
+            {!isMobileEditor && (
+              <div
+                className="resize-handle-v"
+                role="separator"
+                aria-label="Resize BOM panel"
+                aria-orientation="vertical"
+                onMouseDown={startResize}
+                onTouchStart={startTouchResize}
+              />
+            )}
             <BomPanel
               bom={bom}
               materials={materials}
@@ -1792,7 +1971,7 @@ export default function ProjectPage() {
               onAddImported={addImportedBomItem}
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
-              style={{ width: bomWidth }}
+              style={isMobileEditor ? undefined : { width: bomWidth }}
               sceneJs={sceneJs}
               projectName={projectName}
               buildingInfo={project?.building_info ?? null}
@@ -1803,12 +1982,13 @@ export default function ProjectPage() {
 
         {/* Scene API Reference panel */}
         {showDocs && (
-          <div style={{ width: 320, flexShrink: 0, height: "100%", overflow: "hidden" }}>
+          <div className="scene-docs-panel" style={{ width: 320, flexShrink: 0, height: "100%", overflow: "hidden" }}>
             <SceneApiReference
               onInsertCode={(code) => {
                 setSceneJs((prev) => prev + "\n" + code);
                 pushHistory(sceneJs + "\n" + code);
                 setShowCode(true);
+                if (isMobileEditor) setActiveMobilePanel("code");
               }}
             />
           </div>
