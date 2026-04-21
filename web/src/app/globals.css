@@ -2563,6 +2563,45 @@ select:focus {
   overflow: hidden;
 }
 
+/* ── Editor Status Bar ──────────────────────────────────────── */
+.editor-status-bar {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  user-select: none;
+  gap: 0;
+}
+
+.editor-status-segment {
+  padding: 0 10px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.editor-status-sep {
+  width: 1px;
+  height: 30%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-pulse {
+  animation: status-pulse 1s ease infinite;
+}
+
 .editor-viewport-area {
   flex: 1;
   display: flex;
