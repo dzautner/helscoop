@@ -28,6 +28,42 @@ interface CameraPreset {
   key: string;
 }
 
+type MeasurementUnit = "mm" | "cm" | "m";
+
+interface Measurement {
+  id: string;
+  start: THREE.Vector3;
+  end: THREE.Vector3;
+}
+
+const MEASUREMENT_UNITS: MeasurementUnit[] = ["mm", "cm", "m"];
+
+function formatMeasurementDistance(distanceMeters: number, unit: MeasurementUnit, locale: string): string {
+  const localeTag = locale === "fi" ? "fi-FI" : "en-GB";
+  if (unit === "mm") {
+    return `${Math.round(distanceMeters * 1000).toLocaleString(localeTag)} mm`;
+  }
+  if (unit === "cm") {
+    return `${(distanceMeters * 100).toLocaleString(localeTag, { maximumFractionDigits: 1 })} cm`;
+  }
+  return `${distanceMeters.toLocaleString(localeTag, { maximumFractionDigits: 3 })} m`;
+}
+
+function disposeMeasurementGroup(group: THREE.Group) {
+  while (group.children.length > 0) {
+    const child = group.children[0];
+    group.remove(child);
+    if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => material.dispose());
+      } else {
+        child.material.dispose();
+      }
+    }
+  }
+}
+
 const CAMERA_PRESETS: CameraPreset[] = [
   { position: [0, 2, 8], target: [0, 1.5, 0], key: "editor.cameraFront" },
   { position: [8, 2, 0], target: [0, 1.5, 0], key: "editor.cameraSide" },
@@ -175,6 +211,12 @@ function CameraToolbar({
   sceneRef,
   projectName,
   sceneBoundsRef,
+  measurementMode,
+  measurementUnit,
+  measurementCount,
+  onToggleMeasurementMode,
+  onClearMeasurements,
+  onCycleMeasurementUnit,
 }: {
   cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
   controlsRef: React.RefObject<OrbitControls | null>;
@@ -182,6 +224,12 @@ function CameraToolbar({
   sceneRef: React.RefObject<THREE.Scene | null>;
   projectName?: string;
   sceneBoundsRef: React.RefObject<{ center: THREE.Vector3; size: number } | null>;
+  measurementMode: boolean;
+  measurementUnit: MeasurementUnit;
+  measurementCount: number;
+  onToggleMeasurementMode: () => void;
+  onClearMeasurements: () => void;
+  onCycleMeasurementUnit: () => void;
 }) {
   const { t } = useTranslation();
   const [activePreset, setActivePreset] = useState(3);
@@ -255,6 +303,38 @@ function CameraToolbar({
             <circle cx="12" cy="13" r="4" />
           </svg>
         </button>
+        <button
+          className="viewport-cam-btn"
+          data-active={measurementMode}
+          onClick={onToggleMeasurementMode}
+          data-tooltip={`${t("editor.ruler")} (R)`}
+          aria-label={t("editor.rulerTooltip")}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 17L17 3l4 4L7 21l-4-4z" />
+            <path d="M14 6l4 4M11 9l2 2M8 12l4 4M5 15l2 2" />
+          </svg>
+        </button>
+        {measurementCount > 0 && (
+          <button
+            className="viewport-cam-btn"
+            onClick={onClearMeasurements}
+            data-tooltip={t("editor.measureClear")}
+            aria-label={t("editor.measureClear")}
+          >
+            {t("editor.measureClearShort")}
+          </button>
+        )}
+        {measurementMode && (
+          <button
+            className="viewport-cam-btn"
+            onClick={onCycleMeasurementUnit}
+            data-tooltip={t("editor.measureUnit")}
+            aria-label={t("editor.measureUnit")}
+          >
+            {measurementUnit}
+          </button>
+        )}
       </div>
       <ScreenshotPopover
         imageDataUrl={screenshotDataUrl}
@@ -282,19 +362,219 @@ export default function Viewport3D({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const objectGroupRef = useRef<THREE.Group | null>(null);
+  const measurementGroupRef = useRef<THREE.Group | null>(null);
+  const measurementsRef = useRef<Measurement[]>([]);
+  const previewMeasurementRef = useRef<Measurement | null>(null);
+  const measurementLabelRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const animFrameRef = useRef<number>(0);
   const lastValidSceneRef = useRef<string>(sceneJs);
   const sceneBoundsRef = useRef<{ center: THREE.Vector3; size: number } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [isComputing, setIsComputing] = useState(false);
   const [tessProgress, setTessProgress] = useState<{ done: number; total: number } | null>(null);
+  const [measurementMode, setMeasurementMode] = useState(false);
+  const [measurementUnit, setMeasurementUnit] = useState<MeasurementUnit>("mm");
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [measurementStart, setMeasurementStart] = useState<THREE.Vector3 | null>(null);
+  const [measurementPreviewEnd, setMeasurementPreviewEnd] = useState<THREE.Vector3 | null>(null);
   const updateIdRef = useRef(0);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   // Pre-load Manifold WASM on mount
   useEffect(() => {
     initWorker().catch(() => {});
   }, []);
+
+  const setMeasurementLabelRef = useCallback((id: string, node: HTMLDivElement | null) => {
+    if (node) measurementLabelRefs.current.set(id, node);
+    else measurementLabelRefs.current.delete(id);
+  }, []);
+
+  const updateMeasurementLabelPositions = useCallback(() => {
+    const camera = cameraRef.current;
+    const renderer = rendererRef.current;
+    const container = containerRef.current;
+    if (!camera || !renderer || !container) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const allMeasurements = previewMeasurementRef.current
+      ? [...measurementsRef.current, previewMeasurementRef.current]
+      : measurementsRef.current;
+
+    for (const measurement of allMeasurements) {
+      const node = measurementLabelRefs.current.get(measurement.id);
+      if (!node) continue;
+      const midpoint = measurement.start.clone().add(measurement.end).multiplyScalar(0.5);
+      const projected = midpoint.project(camera);
+      const x = (projected.x * 0.5 + 0.5) * rect.width;
+      const y = (-projected.y * 0.5 + 0.5) * rect.height;
+      node.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+      node.style.opacity = projected.z > 1 ? "0" : "1";
+    }
+  }, []);
+
+  const pickMeasurementPoint = useCallback((clientX: number, clientY: number): THREE.Vector3 | null => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    const group = objectGroupRef.current;
+    if (!renderer || !camera || !group) return null;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const intersections = raycaster.intersectObjects(group.children, true);
+    const hit = intersections[0];
+    if (!hit) return null;
+
+    const mesh = hit.object instanceof THREE.Mesh ? hit.object : null;
+    const position = mesh?.geometry.getAttribute("position");
+    if (!mesh || !position) return hit.point.clone();
+
+    let nearest: THREE.Vector3 | null = null;
+    let nearestDistanceSq = 25;
+    const vertex = new THREE.Vector3();
+    const projected = new THREE.Vector3();
+    const edgeA = new THREE.Vector3();
+    const edgeB = new THREE.Vector3();
+    const edgeC = new THREE.Vector3();
+    const screenA = new THREE.Vector2();
+    const screenB = new THREE.Vector2();
+    const step = Math.max(1, Math.ceil(position.count / 25000));
+    const toScreenPoint = (worldPoint: THREE.Vector3, target: THREE.Vector2) => {
+      projected.copy(worldPoint).project(camera);
+      target.set(
+        (projected.x * 0.5 + 0.5) * rect.width + rect.left,
+        (-projected.y * 0.5 + 0.5) * rect.height + rect.top,
+      );
+    };
+    const considerVertex = (worldPoint: THREE.Vector3) => {
+      toScreenPoint(worldPoint, screenA);
+      const dx = screenA.x - clientX;
+      const dy = screenA.y - clientY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistanceSq) {
+        nearestDistanceSq = distSq;
+        nearest = worldPoint.clone();
+      }
+    };
+    const considerEdge = (start: THREE.Vector3, end: THREE.Vector3) => {
+      toScreenPoint(start, screenA);
+      toScreenPoint(end, screenB);
+      const abx = screenB.x - screenA.x;
+      const aby = screenB.y - screenA.y;
+      const lengthSq = abx * abx + aby * aby;
+      if (lengthSq < 0.0001) return;
+      const ratio = Math.max(
+        0,
+        Math.min(1, ((clientX - screenA.x) * abx + (clientY - screenA.y) * aby) / lengthSq),
+      );
+      const sx = screenA.x + abx * ratio;
+      const sy = screenA.y + aby * ratio;
+      const dx = sx - clientX;
+      const dy = sy - clientY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistanceSq) {
+        nearestDistanceSq = distSq;
+        nearest = start.clone().lerp(end, ratio);
+      }
+    };
+
+    for (let i = 0; i < position.count; i += step) {
+      vertex.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      considerVertex(vertex);
+    }
+
+    const index = mesh.geometry.getIndex();
+    const triangleCount = index ? Math.floor(index.count / 3) : Math.floor(position.count / 3);
+    const triangleStep = Math.max(1, Math.ceil(triangleCount / 25000));
+    const readVertex = (vertexIndex: number, target: THREE.Vector3) => {
+      target.fromBufferAttribute(position, vertexIndex).applyMatrix4(mesh.matrixWorld);
+    };
+    for (let triangle = 0; triangle < triangleCount; triangle += triangleStep) {
+      const base = triangle * 3;
+      const ia = index ? index.getX(base) : base;
+      const ib = index ? index.getX(base + 1) : base + 1;
+      const ic = index ? index.getX(base + 2) : base + 2;
+      readVertex(ia, edgeA);
+      readVertex(ib, edgeB);
+      readVertex(ic, edgeC);
+      considerEdge(edgeA, edgeB);
+      considerEdge(edgeB, edgeC);
+      considerEdge(edgeC, edgeA);
+    }
+
+    return nearest ?? hit.point.clone();
+  }, []);
+
+  const rebuildMeasurementVisuals = useCallback(() => {
+    const group = measurementGroupRef.current;
+    if (!group) return;
+    disposeMeasurementGroup(group);
+
+    const allMeasurements = previewMeasurementRef.current
+      ? [...measurementsRef.current, previewMeasurementRef.current]
+      : measurementsRef.current;
+
+    for (const measurement of allMeasurements) {
+      const isPreview = measurement.id === "preview";
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints([measurement.start, measurement.end]);
+      const lineMaterial = new THREE.LineDashedMaterial({
+        color: isPreview ? 0xffffff : 0xe5a04b,
+        dashSize: 0.08,
+        gapSize: 0.04,
+        transparent: true,
+        opacity: isPreview ? 0.65 : 0.95,
+        depthTest: false,
+      });
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      line.computeLineDistances();
+      line.renderOrder = 999;
+      group.add(line);
+
+      const direction = measurement.end.clone().sub(measurement.start);
+      const distance = direction.length();
+      if (distance > 0.01) {
+        const normalized = direction.normalize();
+        const up = new THREE.Vector3(0, 1, 0);
+        const addArrowhead = (point: THREE.Vector3, vector: THREE.Vector3) => {
+          const height = 0.16;
+          const arrowGeometry = new THREE.ConeGeometry(0.055, height, 14);
+          const arrowMaterial = new THREE.MeshBasicMaterial({
+            color: isPreview ? 0xffffff : 0xe5a04b,
+            transparent: true,
+            opacity: isPreview ? 0.7 : 1,
+            depthTest: false,
+          });
+          const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
+          arrow.quaternion.setFromUnitVectors(up, vector);
+          arrow.position.copy(point).addScaledVector(vector, -height / 2);
+          arrow.renderOrder = 1000;
+          group.add(arrow);
+        };
+        addArrowhead(measurement.end, normalized);
+        addArrowhead(measurement.start, normalized.clone().multiplyScalar(-1));
+      }
+
+      for (const point of [measurement.start, measurement.end]) {
+        const markerGeometry = new THREE.SphereGeometry(0.045, 12, 12);
+        const markerMaterial = new THREE.MeshBasicMaterial({
+          color: isPreview ? 0xffffff : 0xe5a04b,
+          transparent: true,
+          opacity: isPreview ? 0.7 : 1,
+          depthTest: false,
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.copy(point);
+        marker.renderOrder = 1000;
+        group.add(marker);
+      }
+    }
+    updateMeasurementLabelPositions();
+  }, [updateMeasurementLabelPositions]);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -416,10 +696,15 @@ export default function Viewport3D({
     scene.add(objectGroup);
     objectGroupRef.current = objectGroup;
 
+    const measurementGroup = new THREE.Group();
+    scene.add(measurementGroup);
+    measurementGroupRef.current = measurementGroup;
+
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
+      updateMeasurementLabelPositions();
     }
     animate();
 
@@ -443,6 +728,11 @@ export default function Viewport3D({
       if (objectGroupRef.current) {
         disposeObject(objectGroupRef.current);
         objectGroupRef.current = null;
+      }
+      if (measurementGroupRef.current) {
+        disposeMeasurementGroup(measurementGroupRef.current);
+        scene.remove(measurementGroupRef.current);
+        measurementGroupRef.current = null;
       }
 
       // Dispose grid helpers, axes, lights, and their materials
@@ -641,11 +931,110 @@ export default function Viewport3D({
     };
   }, [captureRef]);
 
+  useEffect(() => {
+    measurementsRef.current = measurements;
+    previewMeasurementRef.current =
+      measurementStart && measurementPreviewEnd
+        ? { id: "preview", start: measurementStart, end: measurementPreviewEnd }
+        : null;
+    rebuildMeasurementVisuals();
+  }, [measurementPreviewEnd, measurementStart, measurements, rebuildMeasurementVisuals]);
+
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.enabled = !measurementMode;
+    }
+    if (!measurementMode) {
+      setMeasurementStart(null);
+      setMeasurementPreviewEnd(null);
+    }
+  }, [measurementMode]);
+
+  const clearMeasurements = useCallback(() => {
+    setMeasurements([]);
+    setMeasurementStart(null);
+    setMeasurementPreviewEnd(null);
+  }, []);
+
+  const toggleMeasurementMode = useCallback(() => {
+    setMeasurementMode((active) => !active);
+  }, []);
+
+  const cycleMeasurementUnit = useCallback(() => {
+    setMeasurementUnit((unit) => {
+      const index = MEASUREMENT_UNITS.indexOf(unit);
+      return MEASUREMENT_UNITS[(index + 1) % MEASUREMENT_UNITS.length];
+    });
+  }, []);
+
+  const handleMeasurementPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!measurementMode || e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("a")) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    const point = pickMeasurementPoint(e.clientX, e.clientY);
+    if (!point) return;
+
+    if (!measurementStart) {
+      setMeasurementStart(point);
+      setMeasurementPreviewEnd(point);
+      return;
+    }
+
+    const start = measurementStart.clone();
+    const end = point.clone();
+    if (start.distanceTo(end) < 0.001) return;
+
+    setMeasurements((prev) => [
+      ...prev,
+      { id: `measure-${Date.now()}-${prev.length}`, start, end },
+    ]);
+    setMeasurementStart(null);
+    setMeasurementPreviewEnd(null);
+  }, [measurementMode, measurementStart, pickMeasurementPoint]);
+
+  const handleMeasurementPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!measurementMode || !measurementStart) return;
+    const point = pickMeasurementPoint(e.clientX, e.clientY);
+    if (point) setMeasurementPreviewEnd(point);
+  }, [measurementMode, measurementStart, pickMeasurementPoint]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable;
+      if (isTyping) return;
+
+      if (e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        setMeasurementMode((active) => !active);
+      } else if (e.key === "Escape" && measurementMode) {
+        e.preventDefault();
+        if (measurementStart) {
+          setMeasurementStart(null);
+          setMeasurementPreviewEnd(null);
+        } else {
+          clearMeasurements();
+          setMeasurementMode(false);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [clearMeasurements, measurementMode, measurementStart]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (measurementMode) return;
     setContextMenuPos({ x: e.clientX, y: e.clientY });
-  }, []);
+  }, [measurementMode]);
 
   const closeContextMenu = useCallback(() => {
     setContextMenuPos(null);
@@ -755,6 +1144,9 @@ export default function Viewport3D({
     <div
       ref={containerRef}
       onContextMenu={handleContextMenu}
+      onPointerDown={handleMeasurementPointerDown}
+      onPointerMove={handleMeasurementPointerMove}
+      data-measuring={measurementMode}
       style={{
         width: "100%",
         height: "100%",
@@ -799,7 +1191,37 @@ export default function Viewport3D({
         sceneRef={sceneRef}
         projectName={projectName}
         sceneBoundsRef={sceneBoundsRef}
+        measurementMode={measurementMode}
+        measurementUnit={measurementUnit}
+        measurementCount={measurements.length}
+        onToggleMeasurementMode={toggleMeasurementMode}
+        onClearMeasurements={clearMeasurements}
+        onCycleMeasurementUnit={cycleMeasurementUnit}
       />
+      {measurementMode && (
+        <div className="viewport-measure-hint">
+          {measurementStart ? t("editor.measurePickSecond") : t("editor.measurePickFirst")}
+        </div>
+      )}
+      <div className="viewport-measure-label-layer" aria-hidden="true">
+        {measurements.map((measurement) => (
+          <div
+            key={measurement.id}
+            ref={(node) => setMeasurementLabelRef(measurement.id, node)}
+            className="viewport-measure-label"
+          >
+            {formatMeasurementDistance(measurement.start.distanceTo(measurement.end), measurementUnit, locale)}
+          </div>
+        ))}
+        {measurementStart && measurementPreviewEnd && (
+          <div
+            ref={(node) => setMeasurementLabelRef("preview", node)}
+            className="viewport-measure-label viewport-measure-label-preview"
+          >
+            {formatMeasurementDistance(measurementStart.distanceTo(measurementPreviewEnd), measurementUnit, locale)}
+          </div>
+        )}
+      </div>
       <ViewportContextMenu
         items={contextMenuItems}
         position={contextMenuPos}

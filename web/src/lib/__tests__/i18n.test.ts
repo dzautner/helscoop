@@ -442,6 +442,8 @@ describe("exhaustive i18n key parity", () => {
     "editor.cameraFront", "editor.cameraSide", "editor.cameraTop", "editor.cameraIso",
     "editor.screenshot", "editor.screenshotAriaLabel",
     "editor.ruler", "editor.rulerTooltip",
+    "editor.measurePickFirst", "editor.measurePickSecond",
+    "editor.measureClear", "editor.measureClearShort", "editor.measureUnit",
     "editor.measureWidth", "editor.measureHeight", "editor.measureDepth",
     "editor.measureRadius", "editor.measureDiameter",
     "editor.sceneErrorPrefix", "editor.objectCount", "editor.bomRowCount",
