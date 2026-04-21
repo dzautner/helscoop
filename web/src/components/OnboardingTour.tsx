@@ -290,14 +290,17 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     }
   }, [currentStep, displayStep]);
 
-  // Find visible steps (elements that exist in the DOM)
-  const visibleSteps = TOUR_STEPS.filter(
-    (step) =>
-      !(isMobileTour && step.target === "[data-tour='viewport']") &&
-      document.querySelector(step.target) !== null
-  );
+  const [visibleSteps, setVisibleSteps] = useState<TourStep[] | null>(null);
 
-  const step = visibleSteps[currentStep];
+  useEffect(() => {
+    setVisibleSteps(TOUR_STEPS.filter(
+      (s) =>
+        !(isMobileTour && s.target === "[data-tour='viewport']") &&
+        document.querySelector(s.target) !== null
+    ));
+  }, [isMobileTour]);
+
+  const step = visibleSteps?.[currentStep];
 
   const updateRect = useCallback(() => {
     if (!step) return;
@@ -306,13 +309,14 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   }, [step]);
 
   useEffect(() => {
+    if (!visibleSteps) return;
     if (visibleSteps.length > 0 && currentStep >= visibleSteps.length) {
       setCurrentStep(visibleSteps.length - 1);
     }
     if (visibleSteps.length > 0 && displayStep >= visibleSteps.length) {
       setDisplayStep(visibleSteps.length - 1);
     }
-  }, [currentStep, displayStep, visibleSteps.length]);
+  }, [currentStep, displayStep, visibleSteps]);
 
   useEffect(() => {
     updateRect();
@@ -338,12 +342,13 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   }, [currentStep]);
 
   const handleNext = useCallback(() => {
+    if (!visibleSteps) return;
     if (currentStep < visibleSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       onComplete();
     }
-  }, [currentStep, visibleSteps.length, onComplete]);
+  }, [currentStep, visibleSteps, onComplete]);
 
   const handleSkip = useCallback(() => {
     onComplete();
@@ -374,8 +379,15 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     }
   }, [currentStep]);
 
-  if (visibleSteps.length === 0 || !step) {
-    onComplete();
+  const shouldComplete = visibleSteps !== null && (visibleSteps.length === 0 || !step);
+
+  useEffect(() => {
+    if (shouldComplete) {
+      onComplete();
+    }
+  }, [shouldComplete, onComplete]);
+
+  if (!visibleSteps || visibleSteps.length === 0 || !step) {
     return null;
   }
 
