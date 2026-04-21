@@ -571,6 +571,7 @@ body::before {
 
 .scene-params-panel:focus-within {
   background: color-mix(in srgb, var(--surface-raised) 72%, var(--surface-tint));
+  box-shadow: var(--shadow-depth-1), inset 0 1px 0 rgba(229, 160, 75, 0.08);
 }
 
 .scene-params-header {
@@ -2870,6 +2871,14 @@ select:focus {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 40% at 30% 60%, rgba(229,160,75,0.02) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 75% 25%, rgba(229,160,75,0.012) 0%, transparent 60%),
+    var(--bg-base);
+}
+
+[data-theme="light"] .editor-viewport-area {
+  background: var(--bg-base);
 }
 
 .resize-handle-v {
@@ -2947,6 +2956,7 @@ select:focus {
 
 .editor-bom-panel:focus-within {
   background: color-mix(in srgb, var(--surface-raised) 68%, var(--surface-tint));
+  box-shadow: var(--shadow-depth-2), inset 0 1px 0 rgba(229, 160, 75, 0.08);
 }
 
 /* Embedded chat */
