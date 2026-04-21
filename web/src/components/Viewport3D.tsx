@@ -9,6 +9,17 @@ import { useTranslation } from "@/components/LocaleProvider";
 import ViewportContextMenu, { type ContextMenuItem } from "@/components/ViewportContextMenu";
 import ScreenshotPopover from "@/components/ScreenshotPopover";
 import { shortcutLabel } from "@/lib/shortcut-label";
+import { getPresentationPreset, type PresentationPresetId } from "@/lib/presentation-export";
+
+export interface ViewportPresentationApi {
+  captureFrame: (options?: {
+    presetId?: PresentationPresetId;
+    width?: number;
+    height?: number;
+    watermark?: boolean;
+  }) => string | null;
+  focusPreset: (presetId: PresentationPresetId) => void;
+}
 
 interface Viewport3DProps {
   sceneJs: string;
@@ -18,6 +29,8 @@ interface Viewport3DProps {
   onErrorLine?: (line: number | null) => void;
   onWarnings?: (warnings: string[]) => void;
   captureRef?: React.MutableRefObject<(() => string | null) | null>;
+  presentationRef?: React.MutableRefObject<ViewportPresentationApi | null>;
+  initialPresentationPreset?: PresentationPresetId;
   onToggleWireframe?: () => void;
   projectName?: string;
 }
@@ -204,6 +217,25 @@ function computePresets(bounds: { center: THREE.Vector3; size: number } | null):
   ];
 }
 
+function applyCameraPreset(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  bounds: { center: THREE.Vector3; size: number } | null,
+  presetId: PresentationPresetId,
+  animated = true,
+) {
+  const preset = getPresentationPreset(presetId);
+  const cameraPreset = computePresets(bounds)[preset.cameraIndex];
+  if (animated) {
+    animateCamera(camera, controls, cameraPreset.position, cameraPreset.target);
+    return;
+  }
+  camera.position.set(...cameraPreset.position);
+  controls.target.set(...cameraPreset.target);
+  camera.lookAt(...cameraPreset.target);
+  controls.update();
+}
+
 function CameraToolbar({
   cameraRef,
   controlsRef,
@@ -353,6 +385,8 @@ export default function Viewport3D({
   onErrorLine,
   onWarnings,
   captureRef,
+  presentationRef,
+  initialPresentationPreset,
   onToggleWireframe,
   projectName,
 }: Viewport3DProps) {
@@ -378,7 +412,12 @@ export default function Viewport3D({
   const [measurementStart, setMeasurementStart] = useState<THREE.Vector3 | null>(null);
   const [measurementPreviewEnd, setMeasurementPreviewEnd] = useState<THREE.Vector3 | null>(null);
   const updateIdRef = useRef(0);
+  const hasAppliedInitialPresentationPresetRef = useRef(false);
   const { t, locale } = useTranslation();
+
+  useEffect(() => {
+    hasAppliedInitialPresentationPresetRef.current = false;
+  }, [initialPresentationPreset]);
 
   // Pre-load Manifold WASM on mount
   useEffect(() => {
@@ -864,6 +903,16 @@ export default function Viewport3D({
         const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
         sceneBoundsRef.current = { center: center.clone(), size: maxDim };
 
+        if (initialPresentationPreset && !hasAppliedInitialPresentationPresetRef.current) {
+          hasAppliedInitialPresentationPresetRef.current = true;
+          const camera = cameraRef.current;
+          const controls = controlsRef.current;
+          if (camera && controls) {
+            applyCameraPreset(camera, controls, sceneBoundsRef.current, initialPresentationPreset, false);
+          }
+          return;
+        }
+
         if (!hasAutoFitRef.current && result.meshes.length > 10) {
           hasAutoFitRef.current = true;
           const camera = cameraRef.current;
@@ -882,7 +931,7 @@ export default function Viewport3D({
         }
       }
     },
-    [onObjectCount, onError, onErrorLine, onWarnings]
+    [initialPresentationPreset, onObjectCount, onError, onErrorLine, onWarnings]
   );
 
   // Debounced scene update — 100ms for snappy param slider response
@@ -930,6 +979,59 @@ export default function Viewport3D({
       captureRef.current = null;
     };
   }, [captureRef]);
+
+  useEffect(() => {
+    if (!presentationRef) return;
+
+    const focusPreset = (presetId: PresentationPresetId, animated = true) => {
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!camera || !controls) return;
+      applyCameraPreset(camera, controls, sceneBoundsRef.current, presetId, animated);
+    };
+
+    presentationRef.current = {
+      focusPreset: (presetId) => focusPreset(presetId, true),
+      captureFrame: (options = {}) => {
+        const renderer = rendererRef.current;
+        const scene = sceneRef.current;
+        const camera = cameraRef.current;
+        if (!renderer || !scene || !camera) return null;
+
+        if (options.presetId) {
+          focusPreset(options.presetId, false);
+        }
+
+        renderer.render(scene, camera);
+        const source = renderer.domElement;
+        const width = options.width ?? source.width;
+        const height = options.height ?? source.height;
+        const offscreen = document.createElement("canvas");
+        offscreen.width = width;
+        offscreen.height = height;
+        const ctx = offscreen.getContext("2d");
+        if (!ctx) return null;
+        ctx.fillStyle = "#0f0f12";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(source, 0, 0, width, height);
+
+        if (options.watermark !== false) {
+          const fontSize = Math.max(16, Math.round(height * 0.024));
+          ctx.font = `${fontSize}px "SF Mono", "Fira Code", "Cascadia Code", monospace`;
+          ctx.fillStyle = "rgba(255,255,255,0.34)";
+          ctx.textAlign = "right";
+          ctx.textBaseline = "bottom";
+          ctx.fillText("Made with Helscoop", width - fontSize, height - fontSize * 0.7);
+        }
+
+        return offscreen.toDataURL("image/png");
+      },
+    };
+
+    return () => {
+      presentationRef.current = null;
+    };
+  }, [presentationRef]);
 
   useEffect(() => {
     measurementsRef.current = measurements;
