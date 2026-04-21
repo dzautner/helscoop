@@ -347,13 +347,18 @@ export default function SceneEditor({
     >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: error ? "var(--danger)" : "var(--success)",
-          transition: "background 0.15s ease",
-        }} />
+        <div
+          role="status"
+          aria-label={error ? t("editor.sceneError") : t("editor.sceneValid")}
+          title={error ? t("editor.sceneError") : t("editor.sceneValid")}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: error ? "var(--danger)" : "var(--success)",
+            transition: "background 0.15s ease",
+          }}
+        />
         <span style={{
           fontSize: 12,
           fontWeight: 500,
