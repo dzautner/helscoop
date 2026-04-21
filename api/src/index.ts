@@ -33,6 +33,7 @@ import araGrantRouter from "./routes/ara-grant";
 import ryhtiRouter from "./routes/ryhti";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
+import { logProjectView } from "./notifications";
 
 // ---------------------------------------------------------------------------
 // Sentry — initialize before anything else so it can instrument the app
@@ -369,7 +370,7 @@ app.post("/auth/apple", authLimiter, async (req, res) => {
 
 app.get("/auth/me", authenticatedLimiter, requireAuth, async (req, res) => {
   const result = await query(
-    "SELECT id, email, name, role, email_verified, avatar_url, auth_provider FROM users WHERE id = $1",
+    "SELECT id, email, name, role, email_verified, avatar_url, auth_provider, email_notifications FROM users WHERE id = $1",
     [req.user!.id]
   );
   if (result.rows.length === 0) {
@@ -403,7 +404,7 @@ app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => 
     }
     values.push(req.user!.id);
     const result = await query(
-      `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, email, name, role`,
+      `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, email, name, role, email_notifications`,
       values
     );
     if (result.rows.length === 0) {
@@ -419,6 +420,36 @@ app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => 
     }
     res.status(400).json({ error: msg || "Update failed" });
   }
+});
+
+app.put("/auth/notifications", authenticatedLimiter, requireAuth, async (req, res) => {
+  const { email_notifications } = req.body;
+  if (typeof email_notifications !== "boolean") {
+    return res.status(400).json({ error: "email_notifications must be a boolean" });
+  }
+  const result = await query(
+    "UPDATE users SET email_notifications = $1 WHERE id = $2 RETURNING id, email_notifications",
+    [email_notifications, req.user!.id],
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  res.json(result.rows[0]);
+});
+
+app.get("/auth/unsubscribe/:token", publicLimiter, async (req, res) => {
+  const token = req.params.token;
+  if (!token || token.length > 128) {
+    return res.status(400).send("Invalid unsubscribe token");
+  }
+  const result = await query(
+    "UPDATE users SET email_notifications = false WHERE email_unsubscribe_token = $1 RETURNING id",
+    [token],
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).send("Unsubscribe link not found");
+  }
+  res.type("text/plain").send("You have been unsubscribed from Helscoop activity digests.");
 });
 
 app.put("/auth/password", authenticatedLimiter, requireAuth, async (req, res) => {
@@ -683,7 +714,9 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   }
 
   const result = await query(
-    "SELECT id, name, description, scene_js, building_info, created_at, updated_at FROM projects WHERE share_token = $1",
+    `SELECT id, name, description, scene_js, building_info, created_at, updated_at,
+      (SELECT COUNT(*)::int FROM project_views WHERE project_id = projects.id) AS view_count
+     FROM projects WHERE share_token = $1`,
     [token]
   );
   if (result.rows.length === 0) {
@@ -691,6 +724,11 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   }
 
   const project = result.rows[0];
+  try {
+    await logProjectView(project.id, req.ip, req.get("referer") || req.get("referrer") || null);
+  } catch (err) {
+    logger.warn({ err, projectId: project.id }, "Failed to log shared project view");
+  }
 
   const bom = await query(
     `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,

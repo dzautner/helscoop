@@ -8,6 +8,7 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
+    "digest:weekly": "tsx src/jobs/weekly-digest.ts",
     "db:migrate": "tsx ../db/migrate.ts migrate",
     "db:status": "tsx ../db/migrate.ts status"
   },

@@ -2207,6 +2207,11 @@ export default function ProjectPage() {
             <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: "0 0 20px", lineHeight: 1.5 }}>
               {t('share.description')}
             </p>
+            {Number(project?.view_count || 0) > 0 && (
+              <div className="badge badge-muted" style={{ display: "inline-flex", marginBottom: 14 }}>
+                {t("share.viewCount", { count: Number(project?.view_count || 0) })}
+              </div>
+            )}
 
             {/* Share URL field */}
             <div style={{

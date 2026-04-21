@@ -553,8 +553,16 @@ describe("GET /shared/:token", () => {
   it("returns project data without auth for valid token", async () => {
     // Project by share token
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", name: "Shared House", scene_js: "box(1,1,1);" }],
+      rows: [{ id: "proj-1", name: "Shared House", scene_js: "box(1,1,1);", view_count: 2 }],
       command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    // Shared view insert
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1" }],
+      command: "INSERT",
       rowCount: 1,
       oid: 0,
       fields: [],
@@ -568,9 +576,36 @@ describe("GET /shared/:token", () => {
       fields: [],
     });
 
-    const res = await makeRequest("GET", "/shared/valid-share-token-123");
+    const res = await makeRequest("GET", "/shared/valid-share-token-123", {
+      headers: { referer: "https://contractor.example/link" },
+    });
     expect(res.status).toBe(200);
     expect((res.body as { name: string }).name).toBe("Shared House");
+    expect(mockQuery.mock.calls[1][0]).toContain("INSERT INTO project_views");
+    expect(mockQuery.mock.calls[1][0]).toContain("NOT EXISTS");
+    expect(mockQuery.mock.calls[1][1]).toEqual(expect.arrayContaining(["proj-1", "https://contractor.example/link"]));
+  });
+});
+
+// --------------------------------------------------------------------------
+// GET /auth/unsubscribe/:token — public digest opt-out
+// --------------------------------------------------------------------------
+
+describe("GET /auth/unsubscribe/:token", () => {
+  it("turns off activity digest emails for a valid token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "user-1" }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/auth/unsubscribe/unsub-token-123");
+    expect(res.status).toBe(200);
+    expect(String(res.body)).toContain("unsubscribed");
+    expect(mockQuery.mock.calls[0][0]).toContain("email_notifications = false");
+    expect(mockQuery.mock.calls[0][1]).toEqual(["unsub-token-123"]);
   });
 });
 

@@ -30,6 +30,7 @@ export interface Project {
   building_info?: BuildingInfo | null;
   permit_metadata?: RyhtiPermitMetadata | null;
   share_token?: string | null;
+  view_count?: number;
   bom?: BomItem[];
 }
 

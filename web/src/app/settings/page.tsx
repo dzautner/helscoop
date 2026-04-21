@@ -16,6 +16,7 @@ interface UserProfile {
   name: string;
   email: string;
   role: string;
+  email_notifications?: boolean;
 }
 
 export default function SettingsPage() {
@@ -35,6 +36,8 @@ export default function SettingsPage() {
 
   // Data export
   const [exportingData, setExportingData] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [savingNotifications, setSavingNotifications] = useState(false);
 
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -55,6 +58,7 @@ export default function SettingsPage() {
         setUser(u);
         setName(u.name || "");
         setEmail(u.email || "");
+        setEmailNotifications(u.email_notifications !== false);
         setLoading(false);
       })
       .catch(() => {
@@ -146,6 +150,24 @@ export default function SettingsPage() {
       );
     }
     setExportingData(false);
+  }
+
+  async function handleNotificationToggle(nextValue: boolean) {
+    setSavingNotifications(true);
+    const previous = emailNotifications;
+    setEmailNotifications(nextValue);
+    try {
+      await api.updateNotificationPreferences({ email_notifications: nextValue });
+      setUser((prev) => prev ? { ...prev, email_notifications: nextValue } : prev);
+      toast(t("settings.notificationsSaved"), "success");
+    } catch (err) {
+      setEmailNotifications(previous);
+      toast(
+        err instanceof Error ? err.message : t("settings.notificationsSaveFailed"),
+        "error"
+      );
+    }
+    setSavingNotifications(false);
   }
 
   if (loading) {
@@ -416,9 +438,48 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* Onboarding tour section */}
+        {/* Notifications section */}
         <div
           className="card anim-up delay-2 settings-card"
+          style={{ marginBottom: 20 }}
+        >
+          <h2
+            className="heading-display"
+            style={{ fontSize: 20, marginBottom: 4 }}
+          >
+            {t("settings.notifications")}
+          </h2>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 14,
+              marginBottom: 20,
+            }}
+          >
+            {t("settings.notificationsDesc")}
+          </p>
+          <label
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={emailNotifications}
+              disabled={savingNotifications}
+              onChange={(e) => handleNotificationToggle(e.target.checked)}
+            />
+            {t("settings.weeklyDigest")}
+          </label>
+        </div>
+
+        {/* Onboarding tour section */}
+        <div
+          className="card anim-up delay-3 settings-card"
           style={{ marginBottom: 20 }}
         >
           <h2
@@ -465,7 +526,7 @@ export default function SettingsPage() {
 
         {/* Legal section */}
         <div
-          className="card anim-up delay-3 settings-card"
+          className="card anim-up delay-4 settings-card"
           style={{ marginBottom: 20 }}
         >
           <h2
