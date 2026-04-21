@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { getPresentationPreset } from "@/lib/presentation-export";
 import type { BomItem, Project } from "@/types";
 
 function Viewport3DLoading() {
@@ -23,6 +25,7 @@ const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
 
 export default function SharedProjectContent({ token }: { token: string }) {
   const { t, locale } = useTranslation();
+  const searchParams = useSearchParams();
 
   const [project, setProject] = useState<Project | null>(null);
   const [bom, setBom] = useState<BomItem[]>([]);
@@ -95,6 +98,8 @@ export default function SharedProjectContent({ token }: { token: string }) {
   }
 
   const grandTotal = bom.reduce((sum, b) => sum + (b.total || 0), 0);
+  const presentationMode = searchParams.get("presentation") === "1";
+  const presentationPreset = getPresentationPreset(searchParams.get("camera")).id;
 
   return (
     <div style={{
@@ -136,6 +141,11 @@ export default function SharedProjectContent({ token }: { token: string }) {
         }}>
           {t('share.readOnly')}
         </span>
+        {presentationMode && (
+          <span className="shared-presentation-badge">
+            {t("presentation.viewerBadge")}
+          </span>
+        )}
       </div>
 
       {/* Main content */}
@@ -146,7 +156,14 @@ export default function SharedProjectContent({ token }: { token: string }) {
         overflow: "hidden",
       }}>
         {/* Viewport */}
-        <div style={{ flex: 1, minWidth: 0, padding: 8 }}>
+        <div style={{ flex: 1, minWidth: 0, padding: 8, position: "relative" }}>
+          {presentationMode && (
+            <div className="shared-presentation-card">
+              <div className="label-mono">{t("presentation.pitchMode")}</div>
+              <strong>{project.name}</strong>
+              <span>{t("presentation.pitchModeDesc")}</span>
+            </div>
+          )}
           <ErrorBoundary
             fallback={({ error: err }) => (
               <div style={{
@@ -164,7 +181,11 @@ export default function SharedProjectContent({ token }: { token: string }) {
               </div>
             )}
           >
-            <Viewport3D sceneJs={project.scene_js || ""} wireframe={false} />
+            <Viewport3D
+              sceneJs={project.scene_js || ""}
+              wireframe={false}
+              initialPresentationPreset={presentationMode ? presentationPreset : undefined}
+            />
           </ErrorBoundary>
         </div>
 

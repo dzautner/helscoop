@@ -14,6 +14,7 @@ import ChatPanel from "@/components/ChatPanel";
 import MobileEditorTabs from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
+import SharePresentationPanel from "@/components/SharePresentationPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
@@ -35,6 +36,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project } from "@/types";
+import type { ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import type { DataProvenance } from "@/lib/confidence";
@@ -188,6 +190,7 @@ export default function ProjectPage() {
   const initialLoadDoneRef = useRef(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const captureThumbRef = useRef<(() => string | null) | null>(null);
+  const presentationRef = useRef<ViewportPresentationApi | null>(null);
   const resizingRef = useRef(false);
 
   const pushHistory = useCallback((code: string) => {
@@ -1972,6 +1975,7 @@ export default function ProjectPage() {
                 onErrorLine={setSceneErrorLine}
                 onWarnings={setSceneWarnings}
                 captureRef={captureThumbRef}
+                presentationRef={presentationRef}
                 onToggleWireframe={() => setWireframe(!wireframe)}
                 projectName={projectName}
               />
@@ -2172,7 +2176,7 @@ export default function ProjectPage() {
             style={{
               position: "relative",
               width: "100%",
-              maxWidth: 460,
+              maxWidth: 620,
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-strong)",
               borderRadius: "var(--radius-lg)",
@@ -2228,6 +2232,15 @@ export default function ProjectPage() {
                 {shareCopied ? t('share.copied') : t('share.copyLink')}
               </button>
             </div>
+
+            <SharePresentationPanel
+              shareToken={shareToken}
+              projectName={projectName}
+              bom={bom}
+              captureApiRef={presentationRef}
+              onCopySuccess={() => toast(t('toast.linkCopied'), "success")}
+              onCopyError={() => toast(t('toast.copyFailed'), "error")}
+            />
 
             {/* Actions */}
             <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>

@@ -459,6 +459,15 @@ describe("exhaustive i18n key parity", () => {
     "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
     "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
     "share.signUpCta", "share.materials", "share.total",
+    // presentation
+    "presentation.eyebrow", "presentation.title", "presentation.description",
+    "presentation.estimate", "presentation.cameraPresets", "presentation.front",
+    "presentation.frontDesc", "presentation.side", "presentation.sideDesc",
+    "presentation.aerial", "presentation.aerialDesc", "presentation.iso",
+    "presentation.isoDesc", "presentation.copyPresentation", "presentation.copied",
+    "presentation.downloadWatermarked", "presentation.rendering", "presentation.assetViewer",
+    "presentation.assetBom", "presentation.viewerBadge", "presentation.pitchMode",
+    "presentation.pitchModeDesc",
     // shortcuts
     "shortcuts.title", "shortcuts.close", "shortcuts.save", "shortcuts.toggleBom", "shortcuts.applyCode",
     "shortcuts.closePanel", "shortcuts.showShortcuts", "shortcuts.undo", "shortcuts.redo",

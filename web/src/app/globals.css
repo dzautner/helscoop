@@ -4381,6 +4381,200 @@ select:focus {
   }
 }
 
+/* Share presentation pack */
+.share-presentation-panel {
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(229, 160, 75, 0.14), transparent 42%),
+    var(--bg-tertiary);
+}
+
+.share-presentation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.share-presentation-eyebrow {
+  color: var(--amber);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.share-presentation-head h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.share-presentation-head p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.share-presentation-total {
+  min-width: 104px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.12);
+  text-align: right;
+}
+
+.share-presentation-total span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.share-presentation-total strong {
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.share-presentation-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.share-presentation-presets button {
+  min-height: 74px;
+  padding: 9px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(9, 9, 11, 0.2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.share-presentation-presets button:hover,
+.share-presentation-presets button[data-active="true"] {
+  border-color: var(--amber-border);
+  background: var(--amber-glow);
+}
+
+.share-presentation-presets strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.share-presentation-presets span,
+.share-presentation-assets span {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.share-presentation-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.share-presentation-actions button {
+  min-height: 42px;
+  font-size: 12px;
+}
+
+.share-presentation-assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.share-presentation-assets span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.shared-presentation-badge {
+  color: var(--amber);
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius-sm);
+  background: var(--amber-glow);
+  flex-shrink: 0;
+}
+
+.shared-presentation-card {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 12;
+  max-width: 320px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-md);
+}
+
+.shared-presentation-card .label-mono {
+  color: var(--amber);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.shared-presentation-card strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.shared-presentation-card span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 680px) {
+  .share-presentation-head,
+  .share-presentation-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .share-presentation-head {
+    flex-direction: column;
+  }
+
+  .share-presentation-total {
+    width: 100%;
+    text-align: left;
+  }
+
+  .share-presentation-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shared-presentation-card {
+    right: 18px;
+    max-width: none;
+  }
+}
+
 /* Viewport camera toolbar (floating over 3D canvas) */
 .viewport-cam-bar {
   position: absolute;
