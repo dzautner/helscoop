@@ -132,7 +132,7 @@ export default function ProjectPage() {
   const [showParams, setShowParams] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showAraChecklist, setShowAraChecklist] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -605,6 +605,20 @@ export default function ProjectPage() {
     }
   }, [araChecklistItems, bom, locale, project?.building_info, project?.thumbnail_url, projectDesc, projectName, sceneJs, t, toast, track]);
 
+  const exportIfcPermitModel = useCallback(async () => {
+    setShowExportMenu(false);
+    setExportingFormat("ifc");
+    try {
+      track("project_exported", { format: "ifc4x3_permit" });
+      await api.exportIFC(projectId, projectName);
+      toast(t("ifcExport.generated"), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("ifcExport.generateFailed"), "error");
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [projectId, projectName, t, toast, track]);
+
   /* ── Command palette commands ───────────────────────────── */
   const paletteCommands = useMemo<Command[]>(() => {
     const icon = (d: string) => (
@@ -697,6 +711,19 @@ export default function ProjectPage() {
           </svg>
         ),
         action: () => setShowAraChecklist(true),
+      },
+      {
+        id: "export-ifc-permit",
+        labelKey: "commandPalette.exportIfcPermit",
+        labelSecondaryKey: "commandPalette.exportIfcPermitEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7l9-4 9 4-9 4-9-4z" />
+            <path d="M3 12l9 4 9-4" />
+            <path d="M3 17l9 4 9-4" />
+          </svg>
+        ),
+        action: () => { void exportIfcPermitModel(); },
       },
       {
         id: "export-project",
@@ -840,7 +867,7 @@ export default function ProjectPage() {
         isActive: showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, markCodeEditor, wireframe, showBom, showDocs, resolvedTheme]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, markCodeEditor, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -1173,6 +1200,25 @@ export default function ProjectPage() {
                 </button>
                 <button
                   role="menuitem"
+                  className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
+                  onClick={() => { void exportIfcPermitModel(); }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "ifc" ? 0.4 : 1 }}
+                >
+                  {exportingFormat === "ifc" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 7l9-4 9 4-9 4-9-4z" />
+                      <path d="M3 12l9 4 9-4" />
+                      <path d="M3 17l9 4 9-4" />
+                    </svg>
+                  )}
+                  {t("ifcExport.exportMenu")}
+                </button>
+                <button
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
                   onClick={async () => {

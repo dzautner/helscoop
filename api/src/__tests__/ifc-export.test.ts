@@ -36,6 +36,8 @@ const mockQuery = vi.mocked(query);
 
 import app from "../index";
 import {
+  IFC_PERMIT_EXPORT_PURPOSE,
+  IFC_SCHEMA,
   generateIFC,
   parseSceneObjects,
   classifyElement,
@@ -107,14 +109,15 @@ beforeEach(() => {
 // 1. IFC Generator — structure validity
 // ---------------------------------------------------------------------------
 describe("generateIFC", () => {
-  it("produces valid IFC4 STEP file structure", () => {
+  it("produces valid IFC4x3 STEP file structure", () => {
     const ifc = generateIFC({
       project: { id: "p1", name: "Test Project" },
       bom: [],
     });
 
     expect(ifc).toContain("ISO-10303-21;");
-    expect(ifc).toContain("FILE_SCHEMA(('IFC4'));");
+    expect(ifc).toContain(`FILE_SCHEMA(('${IFC_SCHEMA}'));`);
+    expect(ifc).toContain("ViewDefinition [ReferenceView_V1.2]");
     expect(ifc).toContain("HEADER;");
     expect(ifc).toContain("DATA;");
     expect(ifc).toContain("ENDSEC;");
@@ -143,6 +146,45 @@ describe("generateIFC", () => {
     expect(ifc).toContain("IFCBUILDINGSTOREY");
     expect(ifc).toContain("IFCRELAGGREGATES");
     expect(ifc).toContain("Testikatu 1");
+  });
+
+  it("includes permit metadata required by digital permit workflows", () => {
+    const ifc = generateIFC({
+      project: { id: "p1", name: "Permit Sauna" },
+      bom: [],
+      buildingInfo: {
+        address: "Testikatu 1",
+        buildingType: "omakotitalo",
+        yearBuilt: 1985,
+        floorAreaM2: 95,
+      },
+      permitMetadata: {
+        permanentBuildingIdentifier: "103456789A",
+        propertyIdentifier: "91-1-2-3",
+        municipalityNumber: "091",
+        latitude: 60.1699,
+        longitude: 24.9384,
+        grossAreaM2: 120,
+        floors: 2,
+        energyClass: "B",
+        constructionActionType: "renovation",
+        permitApplicationType: "building-permit",
+      },
+    });
+
+    expect(ifc).toContain("IFCPROPERTYSET");
+    expect(ifc).toContain("Pset_HelscoopPermitMetadata");
+    expect(ifc).toContain(IFC_PERMIT_EXPORT_PURPOSE);
+    expect(ifc).toContain("PermanentBuildingIdentifier");
+    expect(ifc).toContain("103456789A");
+    expect(ifc).toContain("PropertyIdentifier");
+    expect(ifc).toContain("91-1-2-3");
+    expect(ifc).toContain("MunicipalityNumber");
+    expect(ifc).toContain("091");
+    expect(ifc).toContain("GrossAreaM2");
+    expect(ifc).toContain("IFCREAL(60.1699)");
+    expect(ifc).toContain("IFCREAL(24.9384)");
+    expect(ifc).toContain("EnergyClass");
   });
 
   it("maps scene objects to correct IFC element types", () => {
@@ -317,7 +359,15 @@ scene.add(wall1, { material: "lumber" });
           address: "Testikatu 1",
           buildingType: "Omakotitalo",
           yearBuilt: 1985,
-          area: 120,
+          area_m2: 120,
+          coordinates: { lat: 60.1699, lon: 24.9384 },
+          permanentBuildingIdentifier: "103456789A",
+        },
+        permit_metadata: {
+          propertyIdentifier: "91-1-2-3",
+          municipalityNumber: "091",
+          grossAreaM2: 128,
+          energyClass: "B",
         },
       }],
     } as never);
@@ -342,12 +392,18 @@ scene.add(wall1, { material: "lumber" });
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("application/x-step");
     expect(res.headers["content-disposition"]).toContain("Pihasauna.ifc");
+    expect(res.headers["x-helscoop-ifc-schema"]).toBe(IFC_SCHEMA);
+    expect(res.headers["x-helscoop-permit-export"]).toBe(IFC_PERMIT_EXPORT_PURPOSE);
 
     const ifcContent = res.body as string;
     expect(ifcContent).toContain("ISO-10303-21;");
+    expect(ifcContent).toContain(`FILE_SCHEMA(('${IFC_SCHEMA}'));`);
     expect(ifcContent).toContain("IFCPROJECT");
     expect(ifcContent).toContain("Pihasauna");
     expect(ifcContent).toContain("IFCWALL");
     expect(ifcContent).toContain("IFCSLAB");
+    expect(ifcContent).toContain("Pset_HelscoopPermitMetadata");
+    expect(ifcContent).toContain("103456789A");
+    expect(ifcContent).toContain("91-1-2-3");
   });
 });

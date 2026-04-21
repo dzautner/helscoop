@@ -1,10 +1,11 @@
 /**
- * IFC 4 STEP file generator for Lupapiste building permit submission.
+ * IFC 4x3 STEP file generator for Finnish building permit submission.
  *
- * Produces a minimal valid IFC4 file (ISO 10303-21) from project data,
+ * Produces a minimal IFC4x3 file (ISO 10303-21) from project data,
  * mapping scene objects to standard IFC building elements: IfcWall,
  * IfcRoof, IfcDoor, IfcWindow, IfcSlab. Includes IfcProject, IfcSite,
- * IfcBuilding, and IfcBuildingStorey hierarchy with material assignments.
+ * IfcBuilding, and IfcBuildingStorey hierarchy with material assignments
+ * and permit metadata for Ryhti/Lupapiste review workflows.
  *
  * Related issue: https://github.com/dzautner/helscoop/issues/360
  */
@@ -13,12 +14,38 @@
 // Types
 // ---------------------------------------------------------------------------
 
+export const IFC_SCHEMA = "IFC4X3_ADD2";
+export const IFC_VIEW_DEFINITION = "ReferenceView_V1.2";
+export const IFC_PERMIT_EXPORT_PURPOSE = "Rakentamislaki 2026 permit export";
+
 export interface IFCBuildingInfo {
   address?: string;
   buildingType?: string;
   yearBuilt?: number;
   area?: number;
+  floorAreaM2?: number;
+  grossAreaM2?: number;
   floors?: number;
+  permanentBuildingIdentifier?: string;
+  propertyIdentifier?: string;
+  municipalityNumber?: string;
+  latitude?: number;
+  longitude?: number;
+  energyClass?: string;
+}
+
+export interface IFCPermitMetadata {
+  permanentBuildingIdentifier?: string;
+  propertyIdentifier?: string;
+  municipalityNumber?: string;
+  latitude?: number;
+  longitude?: number;
+  grossAreaM2?: number;
+  floorAreaM2?: number;
+  floors?: number;
+  energyClass?: string;
+  constructionActionType?: string;
+  permitApplicationType?: string;
 }
 
 export interface IFCBomItem {
@@ -62,6 +89,25 @@ function isoTimestamp(): string {
 function stepString(s: string): string {
   // IFC STEP strings use single quotes with special escaping
   return "'" + s.replace(/'/g, "''") + "'";
+}
+
+function stepStringOrUnset(s?: string): string {
+  return s ? stepString(s) : "$";
+}
+
+function formatNumber(n: number): string {
+  if (Number.isInteger(n)) return `${n}.`;
+  return Number(n.toFixed(6)).toString();
+}
+
+function stepValue(value: string | number | boolean): string {
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? `IFCINTEGER(${value})` : `IFCREAL(${formatNumber(value)})`;
+  }
+  if (typeof value === "boolean") {
+    return value ? "IFCBOOLEAN(.T.)" : "IFCBOOLEAN(.F.)";
+  }
+  return `IFCLABEL(${stepString(value)})`;
 }
 
 /** Map a scene variable/material name to an IFC element type. */
@@ -184,19 +230,34 @@ export interface GenerateIFCInput {
   };
   bom: IFCBomItem[];
   buildingInfo?: IFCBuildingInfo;
+  permitMetadata?: IFCPermitMetadata;
 }
 
 /**
- * Generate a minimal IFC4 STEP file from project data.
+ * Generate a minimal IFC4x3 STEP file from project data.
  *
  * The output follows ISO 10303-21 encoding and is accepted by standard IFC
  * validators (e.g. BIM Collaboration Format tools, Solibri, Lupapiste).
  */
 export function generateIFC(input: GenerateIFCInput): string {
-  const { project, bom, buildingInfo } = input;
+  const { project, bom, buildingInfo, permitMetadata } = input;
   const ts = isoTimestamp();
   const projectName = project.name || "Helscoop Project";
   const projectDesc = project.description || "";
+  const permitInfo = {
+    ...buildingInfo,
+    ...permitMetadata,
+    floorAreaM2: permitMetadata?.floorAreaM2 ?? buildingInfo?.floorAreaM2 ?? buildingInfo?.area,
+    grossAreaM2: permitMetadata?.grossAreaM2 ?? buildingInfo?.grossAreaM2 ?? buildingInfo?.area,
+    floors: permitMetadata?.floors ?? buildingInfo?.floors,
+    energyClass: permitMetadata?.energyClass ?? buildingInfo?.energyClass,
+    permanentBuildingIdentifier:
+      permitMetadata?.permanentBuildingIdentifier ?? buildingInfo?.permanentBuildingIdentifier,
+    propertyIdentifier: permitMetadata?.propertyIdentifier ?? buildingInfo?.propertyIdentifier,
+    municipalityNumber: permitMetadata?.municipalityNumber ?? buildingInfo?.municipalityNumber,
+    latitude: permitMetadata?.latitude ?? buildingInfo?.latitude,
+    longitude: permitMetadata?.longitude ?? buildingInfo?.longitude,
+  };
 
   // Parse scene objects from scene_js
   const sceneObjects = project.scene_js ? parseSceneObjects(project.scene_js) : [];
@@ -213,6 +274,29 @@ export function generateIFC(input: GenerateIFCInput): string {
     const id = next();
     lines.push(`#${id}=${content};`);
     return id;
+  }
+
+  function emitPropertySet(
+    name: string,
+    properties: Record<string, string | number | boolean | undefined>,
+    targetId: number,
+    guidBase: number,
+  ): void {
+    const propertyIds: number[] = [];
+    for (const [propertyName, value] of Object.entries(properties)) {
+      if (value === undefined || value === "") continue;
+      propertyIds.push(
+        emit(`IFCPROPERTYSINGLEVALUE(${stepString(propertyName)},$,${stepValue(value)},$)`)
+      );
+    }
+    if (propertyIds.length === 0) return;
+
+    const psetId = emit(
+      `IFCPROPERTYSET('${ifcGuid(guidBase)}',#${ownerHistId},${stepString(name)},$,(#${propertyIds.join(",#")}))`
+    );
+    emit(
+      `IFCRELDEFINESBYPROPERTIES('${ifcGuid(guidBase + 1)}',#${ownerHistId},${stepString(`${name}Relation`)},$,(#${targetId}),#${psetId})`
+    );
   }
 
   // --- Header entities ---
@@ -273,20 +357,44 @@ export function generateIFC(input: GenerateIFCInput): string {
 
   // --- Spatial structure ---
 
-  // #17 IFCSITE
+  const sitePlacementId = emit(`IFCLOCALPLACEMENT($,#${wcsId})`);
+  const buildingPlacementId = emit(`IFCLOCALPLACEMENT(#${sitePlacementId},#${wcsId})`);
+  const storeyPlacementId = emit(`IFCLOCALPLACEMENT(#${buildingPlacementId},#${wcsId})`);
+
+  // IFCSITE
   const siteId = emit(
-    `IFCSITE('${ifcGuid(1)}',#${ownerHistId},${stepString(buildingInfo?.address || 'Site')},$,$,#${wcsId},$,$,.ELEMENT.,$,$,$,$,$)`
+    `IFCSITE('${ifcGuid(1)}',#${ownerHistId},${stepString(buildingInfo?.address || "Site")},$,$,#${sitePlacementId},$,$,.ELEMENT.,$,$,$,$,$)`
   );
 
-  // #18 IFCBUILDING
+  // IFCBUILDING
   const buildingId = emit(
-    `IFCBUILDING('${ifcGuid(2)}',#${ownerHistId},${stepString(projectName)},$,$,#${wcsId},$,$,.ELEMENT.,$,$,$)`
+    `IFCBUILDING('${ifcGuid(2)}',#${ownerHistId},${stepString(projectName)},${stepStringOrUnset(buildingInfo?.buildingType)},$,#${buildingPlacementId},$,$,.ELEMENT.,$,$,$)`
   );
 
-  // #19 IFCBUILDINGSTOREY
+  // IFCBUILDINGSTOREY
   const storeyId = emit(
-    `IFCBUILDINGSTOREY('${ifcGuid(3)}',#${ownerHistId},'Ground Floor',$,$,#${wcsId},$,$,.ELEMENT.,0.)`
+    `IFCBUILDINGSTOREY('${ifcGuid(3)}',#${ownerHistId},'Ground Floor',$,$,#${storeyPlacementId},$,$,.ELEMENT.,0.)`
   );
+
+  emitPropertySet("Pset_HelscoopPermitMetadata", {
+    IFCSchema: IFC_SCHEMA,
+    ExportPurpose: IFC_PERMIT_EXPORT_PURPOSE,
+    HelscoopProjectId: project.id,
+    Address: buildingInfo?.address,
+    BuildingType: buildingInfo?.buildingType,
+    YearBuilt: buildingInfo?.yearBuilt,
+    FloorAreaM2: permitInfo.floorAreaM2,
+    GrossAreaM2: permitInfo.grossAreaM2,
+    Floors: permitInfo.floors,
+    EnergyClass: permitInfo.energyClass,
+    PermanentBuildingIdentifier: permitInfo.permanentBuildingIdentifier,
+    PropertyIdentifier: permitInfo.propertyIdentifier,
+    MunicipalityNumber: permitInfo.municipalityNumber,
+    Latitude: permitInfo.latitude,
+    Longitude: permitInfo.longitude,
+    ConstructionActionType: permitMetadata?.constructionActionType,
+    PermitApplicationType: permitMetadata?.permitApplicationType,
+  }, buildingId, 500);
 
   // --- Spatial containment relationships ---
 
@@ -322,7 +430,7 @@ export function generateIFC(input: GenerateIFCInput): string {
     const placementId = emit(`IFCAXIS2PLACEMENT3D(#${ptId},#${dirZId},#${dirXId})`);
 
     // Local placement
-    const localPlacementId = emit(`IFCLOCALPLACEMENT($,#${placementId})`);
+    const localPlacementId = emit(`IFCLOCALPLACEMENT(#${storeyPlacementId},#${placementId})`);
 
     // Bounding box representation (geometry placeholder)
     const bbId = emit(`IFCBOUNDINGBOX(#${originId},${obj.dimensions.x.toFixed(3)},${obj.dimensions.z.toFixed(3)},${obj.dimensions.y.toFixed(3)})`);
@@ -389,9 +497,9 @@ export function generateIFC(input: GenerateIFCInput): string {
   const header = [
     "ISO-10303-21;",
     "HEADER;",
-    `FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');`,
+    `FILE_DESCRIPTION(('ViewDefinition [${IFC_VIEW_DEFINITION}]'),'2;1');`,
     `FILE_NAME('${projectName.replace(/'/g, "")}.ifc','${ts}',(''),(''),'Helscoop IFC Generator','Helscoop 1.0','');`,
-    "FILE_SCHEMA(('IFC4'));",
+    `FILE_SCHEMA(('${IFC_SCHEMA}'));`,
     "ENDSEC;",
     "",
     "DATA;",
