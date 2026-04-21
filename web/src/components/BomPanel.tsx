@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useCursorGlow } from "@/hooks/useCursorGlow";
 import { useTranslation } from "@/components/LocaleProvider";
 import { SkeletonPriceComparison } from "@/components/Skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -1746,6 +1747,7 @@ export default function BomPanel({
   /** Project ID used by API-backed cost add-ons such as waste estimates */
   projectId?: string;
 }) {
+  const glow = useCursorGlow();
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialPickerId, setMaterialPickerId] = useState<string | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -2061,9 +2063,12 @@ export default function BomPanel({
 
   return (
     <div
-      className="editor-bom-panel"
+      className="editor-bom-panel panel-glow"
       data-tour="bom-panel"
       style={style}
+      ref={glow.ref}
+      onMouseMove={glow.onMouseMove}
+      onMouseLeave={glow.onMouseLeave}
     >
       <div style={{
         padding: "16px 20px",

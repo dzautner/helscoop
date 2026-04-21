@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import type { SceneParam } from "@/lib/scene-interpreter";
 import { useTranslation } from "@/components/LocaleProvider";
+import { useCursorGlow } from "@/hooks/useCursorGlow";
 
 interface SceneParamsPanelProps {
   params: SceneParam[];
@@ -14,6 +15,7 @@ export default function SceneParamsPanel({
   onParamChange,
 }: SceneParamsPanelProps) {
   const { t } = useTranslation();
+  const glow = useCursorGlow();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -40,7 +42,7 @@ export default function SceneParamsPanel({
   if (params.length === 0) return null;
 
   return (
-    <div className="scene-params-panel">
+    <div className="scene-params-panel panel-glow" ref={glow.ref} onMouseMove={glow.onMouseMove} onMouseLeave={glow.onMouseLeave}>
       <div className="scene-params-header">
         <svg
           width="14"

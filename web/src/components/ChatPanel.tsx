@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useCursorGlow } from "@/hooks/useCursorGlow";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { ChatMessage, BomItem } from "@/types";
 
@@ -46,6 +47,7 @@ export default function ChatPanel({
   buildingInfo?: ChatContextBuildingInfo;
   onMessageCountChange?: (count: number) => void;
 }) {
+  const glow = useCursorGlow();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -151,7 +153,7 @@ export default function ChatPanel({
   }, []);
 
   return (
-    <div className="chat-embedded">
+    <div className="chat-embedded panel-glow" ref={glow.ref} onMouseMove={glow.onMouseMove} onMouseLeave={glow.onMouseLeave}>
       {/* Messages area - expands when there are messages */}
       {expanded && messages.length > 0 && (
         <div className="chat-messages-area">
