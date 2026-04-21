@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 
 // ---------------------------------------------------------------------------
@@ -103,13 +103,44 @@ export default function UpgradeGate({
 }: UpgradeGateProps) {
   const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  if (dismissed) return null;
-
-  function handleDismiss() {
+  const handleDismiss = useCallback(() => {
     setDismissed(true);
     onDismiss?.();
-  }
+  }, [onDismiss]);
+
+  useEffect(() => {
+    if (inline || dismissed) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        handleDismiss();
+        return;
+      }
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [inline, dismissed, handleDismiss]);
+
+  if (dismissed) return null;
 
   // Determine headline / description
   const isAiQuota = feature === "aiMessages";
@@ -174,7 +205,7 @@ export default function UpgradeGate({
   ];
 
   const content = (
-    <div style={inline ? {} : card}>
+    <div ref={dialogRef} role={inline ? undefined : "dialog"} aria-modal={inline ? undefined : true} aria-label={headline} style={inline ? {} : card}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
         <div>

@@ -730,6 +730,18 @@ const translations = {
       avatarAriaLabel: 'Käyttäjävalikko: {{name}}',
       menuAriaLabel: '{{name}} — valikko',
     },
+    verifyEmail: {
+      verifying: 'Vahvistetaan...',
+      pleaseWait: 'Odota hetki',
+      successTitle: 'S\u00e4hk\u00f6posti vahvistettu!',
+      successMessage: 'S\u00e4hk\u00f6postiosoitteesi on nyt vahvistettu. Voit jatkaa Helscoopiin.',
+      continue: 'Jatka',
+      failedTitle: 'Vahvistus ep\u00e4onnistui',
+      failed: 'Vahvistus ep\u00e4onnistui',
+      missingToken: 'Vahvistustunniste puuttuu',
+      backHome: 'Takaisin etusivulle',
+      loading: 'Ladataan...',
+    },
     bom: {
       donutChartAriaLabel: 'Kustannuserittelyn kaavio: {{categories}}',
       exportCsv: 'Lataa CSV',
@@ -1697,6 +1709,18 @@ const translations = {
     userMenu: {
       avatarAriaLabel: 'User menu for {{name}}',
       menuAriaLabel: '{{name}} menu',
+    },
+    verifyEmail: {
+      verifying: 'Verifying...',
+      pleaseWait: 'Please wait',
+      successTitle: 'Email verified!',
+      successMessage: 'Your email has been verified. You can continue to Helscoop.',
+      continue: 'Continue',
+      failedTitle: 'Verification failed',
+      failed: 'Verification failed',
+      missingToken: 'Missing verification token',
+      backHome: 'Back to home',
+      loading: 'Loading...',
     },
     bom: {
       donutChartAriaLabel: 'Cost breakdown chart: {{categories}}',

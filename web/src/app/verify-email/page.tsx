@@ -4,17 +4,19 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { api } from "@/lib/api";
+import { useTranslation } from "@/components/LocaleProvider";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setErrorMsg("Vahvistustunniste puuttuu / Missing verification token");
+      setErrorMsg(t("verifyEmail.missingToken"));
       return;
     }
 
@@ -22,9 +24,9 @@ function VerifyEmailContent() {
       .then(() => setStatus("success"))
       .catch((err) => {
         setStatus("error");
-        setErrorMsg(err instanceof Error ? err.message : "Vahvistus epaonnistui / Verification failed");
+        setErrorMsg(err instanceof Error ? err.message : t("verifyEmail.failed"));
       });
-  }, [token]);
+  }, [token, t]);
 
   return (
     <div style={{
@@ -44,10 +46,10 @@ function VerifyEmailContent() {
         {status === "loading" && (
           <>
             <h1 className="heading-display" style={{ fontSize: 28, marginBottom: 16 }}>
-              Vahvistetaan...
+              {t("verifyEmail.verifying")}
             </h1>
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
-              Odota hetki / Please wait...
+              {t("verifyEmail.pleaseWait")}
             </p>
           </>
         )}
@@ -61,19 +63,17 @@ function VerifyEmailContent() {
               </svg>
             </div>
             <h1 className="heading-display" style={{ fontSize: 28, marginBottom: 16 }}>
-              Sahkoposti vahvistettu!
+              {t("verifyEmail.successTitle")}
             </h1>
             <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
-              Sahkopostiosoitteesi on nyt vahvistettu. Voit jatkaa Helscoopiin.
-              <br />
-              Your email has been verified. You can continue to Helscoop.
+              {t("verifyEmail.successMessage")}
             </p>
             <a
               href="/"
               className="btn btn-primary"
               style={{ textDecoration: "none", padding: "13px 32px", fontSize: 14 }}
             >
-              Jatka / Continue
+              {t("verifyEmail.continue")}
             </a>
           </>
         )}
@@ -81,7 +81,7 @@ function VerifyEmailContent() {
         {status === "error" && (
           <>
             <h1 className="heading-display" style={{ fontSize: 28, marginBottom: 16 }}>
-              Vahvistus epaonnistui
+              {t("verifyEmail.failedTitle")}
             </h1>
             <div style={{
               padding: "10px 14px",
@@ -99,7 +99,7 @@ function VerifyEmailContent() {
               className="btn btn-ghost"
               style={{ fontSize: 13, textDecoration: "none" }}
             >
-              Takaisin etusivulle / Back to home
+              {t("verifyEmail.backHome")}
             </a>
           </>
         )}
@@ -109,6 +109,8 @@ function VerifyEmailContent() {
 }
 
 export default function VerifyEmailPage() {
+  const { t } = useTranslation();
+
   return (
     <Suspense fallback={
       <div style={{
@@ -119,7 +121,7 @@ export default function VerifyEmailPage() {
         background: "var(--bg-primary)",
         color: "var(--text-muted)",
       }}>
-        Ladataan... / Loading...
+        {t("verifyEmail.loading")}
       </div>
     }>
       <VerifyEmailContent />
