@@ -13,25 +13,13 @@ const PARTNERS = [
 ];
 
 export default function TrustLayer() {
-  const { locale } = useTranslation();
+  const { t } = useTranslation();
 
   const stats = [
-    {
-      value: "1 200+",
-      label: locale === "fi" ? "Tuotetta" : "Products",
-    },
-    {
-      value: "6",
-      label: locale === "fi" ? "Toimittajaa" : "Suppliers",
-    },
-    {
-      value: "100%",
-      label: locale === "fi" ? "Ilmainen" : "Free",
-    },
-    {
-      value: "GDPR",
-      label: locale === "fi" ? "Tietosuoja" : "Compliant",
-    },
+    { value: "1 200+", label: t("trust.products") },
+    { value: "6", label: t("trust.suppliers") },
+    { value: "100%", label: t("trust.free") },
+    { value: "GDPR", label: t("trust.gdprCompliant") },
   ];
 
   return (
@@ -39,7 +27,7 @@ export default function TrustLayer() {
       {/* Partner logos */}
       <div className="trust-partners">
         <span className="trust-partners-label">
-          {locale === "fi" ? "TIETOLAHTEET JA TOIMITTAJAT" : "DATA SOURCES & SUPPLIERS"}
+          {t("trust.sourcesLabel")}
         </span>
         <div className="trust-logo-row">
           {PARTNERS.map((p) => (
@@ -80,9 +68,7 @@ export default function TrustLayer() {
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
         <span className="trust-proof-text">
-          {locale === "fi"
-            ? "Virallinen rakennusdata DVV:lta ja MML:lta. Ei analytiikkaevasteita. Tietosi EU:ssa."
-            : "Official building data from DVV and MML. No analytics cookies. Your data stays in the EU."}
+          {t("trust.proofText")}
         </span>
       </div>
     </div>

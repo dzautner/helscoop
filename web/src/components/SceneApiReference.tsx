@@ -275,13 +275,13 @@ export default function SceneApiReference({
   };
 
   const sections: { key: Section; label: string }[] = [
-    { key: "primitives", label: "Primitives" },
-    { key: "transforms", label: "Transforms" },
-    { key: "booleans", label: "Booleans" },
+    { key: "primitives", label: t("apiRef.primitives") },
+    { key: "transforms", label: t("apiRef.transforms") },
+    { key: "booleans", label: t("apiRef.booleans") },
     { key: "scene", label: "scene.add" },
-    { key: "materials", label: "Materials" },
-    { key: "cookbook", label: "Cookbook" },
-    { key: "coords", label: "Coords" },
+    { key: "materials", label: t("apiRef.materials") },
+    { key: "cookbook", label: t("apiRef.cookbook") },
+    { key: "coords", label: t("apiRef.coords") },
   ];
 
   const allFunctions = useMemo(
@@ -380,7 +380,7 @@ export default function SceneApiReference({
             )}
             {filteredCookbook && filteredCookbook.length > 0 && (
               <div>
-                <div className="api-ref-section-label">Cookbook</div>
+                <div className="api-ref-section-label">{t("apiRef.cookbook")}</div>
                 {filteredCookbook.map((entry) => (
                   <div key={entry.title} className="api-ref-cookbook-entry">
                     <div className="api-ref-cookbook-title">{entry.title}</div>
@@ -406,7 +406,7 @@ export default function SceneApiReference({
             {(!filteredFunctions || filteredFunctions.length === 0) &&
               (!filteredCookbook || filteredCookbook.length === 0) && (
               <div className="api-ref-empty">
-                No results for &quot;{search}&quot;
+                {t("apiRef.noResults", { query: search })}
               </div>
             )}
           </div>
@@ -469,8 +469,7 @@ export default function SceneApiReference({
               ))}
             </div>
             <div className="api-ref-hint">
-              Use <code>material: &quot;{"{name}"}&quot;</code> in <code>scene.add()</code> options.
-              Color can be customized with <code>color: [r, g, b]</code> (values 0-1).
+              {t("apiRef.materialHint")}
             </div>
           </div>
         )}
@@ -505,13 +504,10 @@ export default function SceneApiReference({
         {/* Coords */}
         {!isSearching && activeSection === "coords" && (
           <div>
-            <div className="api-ref-section-label">Coordinate system</div>
+            <div className="api-ref-section-label">{t("apiRef.coordSystem")}</div>
             <pre className="api-ref-coords">{COORD_NOTE}</pre>
             <div className="api-ref-hint">
-              All mesh primitives are centered at the origin by default.
-              Use <code>translate(mesh, x, y, z)</code> to position them.
-              For example, <code>translate(box(1, 2, 1), 0, 1, 0)</code> places the box
-              with its center at Y=1 (bottom at Y=0).
+              {t("apiRef.coordHint")}
             </div>
           </div>
         )}
