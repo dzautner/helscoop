@@ -600,7 +600,7 @@ export default function SceneEditor({
               style={{
                 height: "22.1px",
                 ...(i === errorLineIdx
-                  ? { color: "#e05555", fontWeight: 600 }
+                  ? { color: "var(--error, #e05555)", fontWeight: 600 }
                   : i === cursorLine
                     ? { color: "var(--text-secondary)" }
                     : {}),
@@ -763,7 +763,7 @@ export default function SceneEditor({
                   borderRadius: "var(--radius-sm)",
                   fontSize: 11,
                   fontFamily: "var(--font-mono)",
-                  color: "#e05555",
+                  color: "var(--error, #e05555)",
                   lineHeight: 1.4,
                   maxWidth: "100%",
                   overflow: "hidden",
@@ -808,7 +808,7 @@ export default function SceneEditor({
             borderRadius: "var(--radius-sm)",
             fontSize: 12,
             fontFamily: "var(--font-mono)",
-            color: "#e05555",
+            color: "var(--error, #e05555)",
             lineHeight: 1.4,
           }}
         >

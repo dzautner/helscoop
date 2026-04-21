@@ -22,7 +22,7 @@ const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
 });
 
 export default function SharedProjectContent({ token }: { token: string }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const [project, setProject] = useState<Project | null>(null);
   const [bom, setBom] = useState<BomItem[]>([]);
@@ -238,7 +238,7 @@ export default function SharedProjectContent({ token }: { token: string }) {
                 {t('share.total')}
               </span>
               <span style={{ fontSize: 15, fontWeight: 700, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
-                {grandTotal.toLocaleString("fi-FI", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR
+                {grandTotal.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR
               </span>
             </div>
           </div>

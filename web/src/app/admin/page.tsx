@@ -205,7 +205,7 @@ function SuppliersTab() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   useEffect(() => {
     api.getSuppliers()
@@ -262,7 +262,7 @@ function SuppliersTab() {
                   <span className="badge badge-amber">{s.product_count}</span>
                 </td>
                 <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
-                  {s.oldest_price ? new Date(s.oldest_price).toLocaleDateString() : "-"}
+                  {s.oldest_price ? new Date(s.oldest_price).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB") : "-"}
                 </td>
               </tr>
             ))
@@ -277,7 +277,7 @@ function PricingTab() {
   const [stale, setStale] = useState<StalePrice[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   useEffect(() => {
     api.getStalePrices()
@@ -343,7 +343,7 @@ function PricingTab() {
                   {s.unit_price.toFixed(2)} EUR
                 </td>
                 <td style={{ ...tdStyle, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
-                  {new Date(s.last_scraped_at).toLocaleDateString()}
+                  {new Date(s.last_scraped_at).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")}
                 </td>
                 <td style={tdStyle}>
                   <span className={`badge ${s.days_stale > 60 ? "badge-danger" : "badge-warning"}`}>

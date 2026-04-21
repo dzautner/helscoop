@@ -138,7 +138,7 @@ export interface ConfidenceBadgeProps {
 }
 
 export default function ConfidenceBadge({ provenance, compact = false }: ConfidenceBadgeProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const cfg = LEVEL_CONFIG[provenance.confidence];
 
   const label = t(cfg.labelKey);
@@ -152,7 +152,7 @@ export default function ConfidenceBadge({ provenance, compact = false }: Confide
       {provenance.fetchedAt && (
         <span>
           {t("confidence.fetchedAt")}:{" "}
-          {new Date(provenance.fetchedAt).toLocaleDateString()}
+          {new Date(provenance.fetchedAt).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")}
         </span>
       )}
     </span>
@@ -162,7 +162,7 @@ export default function ConfidenceBadge({ provenance, compact = false }: Confide
     <Tooltip content={tooltipContent}>
       <span
         tabIndex={0}
-        aria-label={`${t("confidence.dataQuality")}: ${label}${provenance.fetchedAt ? `, ${t("confidence.fetchedAt")} ${new Date(provenance.fetchedAt).toLocaleDateString()}` : ""}`}
+        aria-label={`${t("confidence.dataQuality")}: ${label}${provenance.fetchedAt ? `, ${t("confidence.fetchedAt")} ${new Date(provenance.fetchedAt).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")}` : ""}`}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -190,14 +190,14 @@ export default function ConfidenceBadge({ provenance, compact = false }: Confide
 
 /* ── StalePrice badge ────────────────────────────────────────────── */
 export function StalePriceBadge({ lastUpdated }: { lastUpdated: string | null | undefined }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const tooltipContent = (
     <span>
       {t("confidence.stalePriceDetail")}
       {lastUpdated && (
         <>
-          {" "}({t("confidence.fetchedAt")}: {new Date(lastUpdated).toLocaleDateString()})
+          {" "}({t("confidence.fetchedAt")}: {new Date(lastUpdated).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")})
         </>
       )}
     </span>
