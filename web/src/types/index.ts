@@ -144,6 +144,25 @@ export interface BomItem {
   stock_last_checked_at?: string | null;
 }
 
+export interface QuoteRequestPayload {
+  contact_name: string;
+  contact_email: string;
+  contact_phone?: string;
+  postcode: string;
+  work_scope: string;
+  locale?: "fi" | "en";
+}
+
+export interface QuoteRequestResponse {
+  id: string;
+  status: "submitted" | "forwarded" | "closed";
+  created_at: string;
+  email_sent: boolean;
+  bom_line_count: number;
+  estimated_cost: number;
+  matched_contractor_count: number;
+}
+
 export interface PriceRow {
   id: string;
   material_id: string;

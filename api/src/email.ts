@@ -1,5 +1,12 @@
-export async function sendEmail(to: string, subject: string, body: string): Promise<boolean> {
-  console.log(`[EMAIL] Email would be sent to ${to}: ${subject}`);
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType: string;
+}
+
+export async function sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[] = []): Promise<boolean> {
+  const attachmentSummary = attachments.length > 0 ? ` with ${attachments.length} attachment(s)` : "";
+  console.log(`[EMAIL] Email would be sent to ${to}: ${subject}${attachmentSummary}`);
   return true;
 }
 

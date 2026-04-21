@@ -594,6 +594,15 @@ describe("exhaustive i18n key parity", () => {
     "bom.packageBasic", "bom.packageStandard", "bom.packagePremium",
     "bom.packageCurrent", "bom.packageChanges", "bom.packageLocked",
     "bom.packageLock", "bom.packageUnlock",
+    // quote request
+    "quoteRequest.eyebrow", "quoteRequest.title", "quoteRequest.subtitle",
+    "quoteRequest.open", "quoteRequest.emptyDisabled", "quoteRequest.summaryProject",
+    "quoteRequest.summaryAddress", "quoteRequest.summaryNoAddress", "quoteRequest.summaryRows",
+    "quoteRequest.summaryTotal", "quoteRequest.workScope", "quoteRequest.workScopePlaceholder",
+    "quoteRequest.contactName", "quoteRequest.contactEmail", "quoteRequest.contactPhone",
+    "quoteRequest.postcode", "quoteRequest.partnerNote", "quoteRequest.submit",
+    "quoteRequest.submittedToast", "quoteRequest.submitFailed", "quoteRequest.successTitle",
+    "quoteRequest.successDesc", "quoteRequest.done",
     // BOM savings
     "bomSavings.eyebrow", "bomSavings.title", "bomSavings.totalAvailable",
     "bomSavings.noSavings", "bomSavings.supplier_switch", "bomSavings.material_substitution",

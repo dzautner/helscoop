@@ -9,6 +9,7 @@ import WasteEstimatePanel from "@/components/WasteEstimatePanel";
 import RyhtiSubmissionPanel from "@/components/RyhtiSubmissionPanel";
 import MaterialPicker from "@/components/MaterialPicker";
 import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsPanel";
+import QuoteRequestModal from "@/components/QuoteRequestModal";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1725,6 +1726,7 @@ export default function BomPanel({
   style,
   sceneJs,
   projectName,
+  projectDescription,
   buildingInfo,
   projectId,
 }: {
@@ -1741,6 +1743,8 @@ export default function BomPanel({
   sceneJs?: string;
   /** Project name for export filenames */
   projectName?: string;
+  /** Project description used to prefill contractor quote scope */
+  projectDescription?: string;
   /** Address-derived building context for subsidy eligibility defaults */
   buildingInfo?: BuildingInfo | null;
   /** Project ID used by API-backed cost add-ons such as waste estimates */
@@ -1767,6 +1771,7 @@ export default function BomPanel({
   const [packageDelta, setPackageDelta] = useState<number | null>(null);
   const [packageFlashKey, setPackageFlashKey] = useState(0);
   const [lockedPackageMaterials, setLockedPackageMaterials] = useState<Set<string>>(() => new Set());
+  const [quoteRequestOpen, setQuoteRequestOpen] = useState(false);
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -2288,6 +2293,34 @@ export default function BomPanel({
         {bom.length > 0 && (
           <QuoteSummary bom={bom} materials={materials} />
         )}
+        <button
+          type="button"
+          onClick={() => setQuoteRequestOpen(true)}
+          disabled={bom.length === 0 || !projectId}
+          aria-label={t("quoteRequest.open")}
+          title={bom.length === 0 ? t("quoteRequest.emptyDisabled") : t("quoteRequest.open")}
+          style={{
+            marginTop: 10,
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "9px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: bom.length === 0 || !projectId ? "var(--text-muted)" : "var(--bg-primary)",
+            background: bom.length === 0 || !projectId ? "var(--bg-tertiary)" : "var(--amber)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            cursor: bom.length === 0 || !projectId ? "not-allowed" : "pointer",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+          </svg>
+          {t("quoteRequest.open")}
+        </button>
         {bom.length > 0 && total > 0 && (
           <SubsidyCalculator totalCost={total} buildingInfo={buildingInfo} />
         )}
@@ -2964,6 +2997,19 @@ export default function BomPanel({
           />
         );
       })()}
+
+      {projectId && (
+        <QuoteRequestModal
+          open={quoteRequestOpen}
+          projectId={projectId}
+          projectName={projectName || t("project.emptyTitle")}
+          projectDescription={projectDescription}
+          buildingInfo={buildingInfo}
+          bom={bom}
+          totalCost={total}
+          onClose={() => setQuoteRequestOpen(false)}
+        />
+      )}
 
       {/* Price comparison popup */}
       {compareMaterial && (

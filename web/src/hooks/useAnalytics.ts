@@ -26,6 +26,7 @@ export type AnalyticsEvent =
   | "bom_supplier_price_applied"
   | "presentation_link_copied"
   | "presentation_render_downloaded"
+  | "quote_request_submitted"
   | "bom_exported"
   | "project_exported"
   | "project_imported"
@@ -51,6 +52,7 @@ export interface AnalyticsEventProps {
   bom_supplier_price_applied: { material_id: string; supplier: string; unit_price: number };
   presentation_link_copied: { preset: string };
   presentation_render_downloaded: { preset: string; watermarked: boolean };
+  quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
   bom_exported: { format: "pdf" | "csv" | "json" };
   project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" };
   project_imported: { format: "helscoop" };

@@ -36,7 +36,9 @@ vi.mock("../email", () => ({
 
 // Import after mocks are set up
 import { query } from "../db";
+import { sendEmail } from "../email";
 const mockQuery = vi.mocked(query);
+const mockSendEmail = vi.mocked(sendEmail);
 
 // Import the express app
 import app from "../index";
@@ -105,6 +107,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Reset default mock to return empty results
   mockQuery.mockResolvedValue({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] });
+  mockSendEmail.mockResolvedValue(true);
 });
 
 // --------------------------------------------------------------------------
@@ -230,6 +233,109 @@ describe("GET /projects/:id", () => {
     const body = res.body as { name: string; bom: unknown[] };
     expect(body.name).toBe("My House");
     expect(body.bom).toHaveLength(1);
+  });
+});
+
+// --------------------------------------------------------------------------
+// POST /projects/:id/quote-request — homeowner contractor lead
+// --------------------------------------------------------------------------
+
+describe("POST /projects/:id/quote-request", () => {
+  it("stores the request and emails the homeowner a PDF BOM summary", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: "proj-1", name: "Kitchen Reno", description: "Helsinki kitchen", user_id: "user-1" }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          material_id: "pine_48x98_c24",
+          material_name: "Pine 48x98",
+          quantity: 10,
+          unit: "jm",
+          unit_price: 3.2,
+          line_cost: 32,
+          supplier_name: "K-Rauta",
+        }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: "quote-1", status: "submitted", created_at: "2026-04-21T10:00:00Z" }],
+        command: "INSERT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      });
+
+    const res = await makeRequest("POST", "/projects/proj-1/quote-request", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: {
+        contact_name: "Matti Meikalainen",
+        contact_email: "matti@example.com",
+        contact_phone: "+358401234567",
+        postcode: "00100",
+        work_scope: "Kitchen renovation and cabinet installation",
+        locale: "en",
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect((res.body as { id: string; bom_line_count: number }).id).toBe("quote-1");
+    expect((res.body as { bom_line_count: number }).bom_line_count).toBe(1);
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO quote_requests");
+    expect(mockQuery.mock.calls[2][1]).toEqual(expect.arrayContaining([
+      "proj-1",
+      "user-1",
+      "Matti Meikalainen",
+      "matti@example.com",
+      "00100",
+    ]));
+    expect(mockSendEmail).toHaveBeenCalledOnce();
+    const emailArgs = mockSendEmail.mock.calls[0];
+    expect(emailArgs[0]).toBe("matti@example.com");
+    expect(emailArgs[1]).toContain("quote request");
+    expect(emailArgs[3]?.[0]).toMatchObject({
+      filename: expect.stringContaining("helscoop_quote_Kitchen_Reno"),
+      contentType: "application/pdf",
+    });
+  });
+
+  it("rejects quote requests for empty BOMs", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: "proj-1", name: "Empty Project", user_id: "user-1" }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        command: "SELECT",
+        rowCount: 0,
+        oid: 0,
+        fields: [],
+      });
+
+    const res = await makeRequest("POST", "/projects/proj-1/quote-request", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: {
+        contact_name: "Matti Meikalainen",
+        contact_email: "matti@example.com",
+        postcode: "00100",
+        work_scope: "Please quote this work",
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("empty BOM");
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 });
 
