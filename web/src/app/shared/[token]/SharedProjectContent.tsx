@@ -12,8 +12,13 @@ import type { BomItem, Project } from "@/types";
 function Viewport3DLoading() {
   const { t } = useTranslation();
   return (
-    <div role="status" aria-live="polite" aria-busy="true" style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
-      {t('editor.loading3D')}
+    <div role="status" aria-live="polite" aria-busy="true" style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, overflow: "hidden", position: "relative" }}>
+      <div className="skeleton" style={{ position: "absolute", inset: 0, opacity: 0.3 }} />
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+      <span style={{ color: "var(--text-muted)", fontSize: 12, position: "relative" }}>{t('editor.loading3D')}</span>
     </div>
   );
 }
