@@ -603,6 +603,11 @@ describe("exhaustive i18n key parity", () => {
     "quoteRequest.postcode", "quoteRequest.partnerNote", "quoteRequest.submit",
     "quoteRequest.submittedToast", "quoteRequest.submitFailed", "quoteRequest.successTitle",
     "quoteRequest.successDesc", "quoteRequest.done",
+    // household deduction
+    "householdDeduction.eyebrow", "householdDeduction.title", "householdDeduction.coupleMode",
+    "householdDeduction.labourBasis", "householdDeduction.credit", "householdDeduction.netCost",
+    "householdDeduction.capNote", "householdDeduction.thresholdNote",
+    "householdDeduction.registerWarning", "householdDeduction.veroLink", "householdDeduction.proCta",
     // BOM savings
     "bomSavings.eyebrow", "bomSavings.title", "bomSavings.totalAvailable",
     "bomSavings.noSavings", "bomSavings.supplier_switch", "bomSavings.material_substitution",

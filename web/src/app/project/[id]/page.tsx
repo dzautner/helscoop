@@ -154,6 +154,7 @@ export default function ProjectPage() {
   const [projectName, setProjectName] = useState("");
   const previousNameRef = useRef("");
   const [projectDesc, setProjectDesc] = useState("");
+  const [householdDeductionJoint, setHouseholdDeductionJoint] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
@@ -239,6 +240,7 @@ export default function ProjectPage() {
         setProjectName(proj.name);
         previousNameRef.current = proj.name;
         setProjectDesc(proj.description || "");
+        setHouseholdDeductionJoint(Boolean(proj.household_deduction_joint));
         if (proj.share_token) setShareToken(proj.share_token);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
@@ -1219,6 +1221,19 @@ export default function ProjectPage() {
     );
   }, []);
 
+  const updateHouseholdDeductionMode = useCallback(async (joint: boolean) => {
+    const previous = householdDeductionJoint;
+    setHouseholdDeductionJoint(joint);
+    setProject((prev) => prev ? { ...prev, household_deduction_joint: joint } : prev);
+    try {
+      await api.updateProject(projectId, { household_deduction_joint: joint });
+    } catch (err) {
+      setHouseholdDeductionJoint(previous);
+      setProject((prev) => prev ? { ...prev, household_deduction_joint: previous } : prev);
+      toast(err instanceof Error ? err.message : t("toast.saveFailed"), "error");
+    }
+  }, [householdDeductionJoint, projectId, t, toast]);
+
   if (loadError) {
     return (
       <div className="anim-up" style={{ padding: 60, textAlign: "center" }}>
@@ -2131,6 +2146,8 @@ export default function ProjectPage() {
               projectDescription={projectDesc}
               buildingInfo={project?.building_info ?? null}
               projectId={projectId}
+              householdDeductionJoint={householdDeductionJoint}
+              onHouseholdDeductionJointChange={updateHouseholdDeductionMode}
             />
           </>
         )}

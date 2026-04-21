@@ -346,17 +346,25 @@ router.post("/:id/quote-request", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, description, scene_js } = req.body;
+  const { name, description, scene_js, household_deduction_joint } = req.body;
   if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
   if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
     return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
   }
+  if (household_deduction_joint !== undefined && typeof household_deduction_joint !== "boolean") {
+    return res.status(400).json({ error: "household_deduction_joint must be a boolean" });
+  }
   const result = await query(
-    `UPDATE projects SET name=COALESCE($1, name), description=COALESCE($2, description), scene_js=COALESCE($3, scene_js), updated_at=now()
-     WHERE id=$4 AND user_id=$5 RETURNING *`,
-    [name?.trim(), description, scene_js, req.params.id, req.user!.id]
+    `UPDATE projects SET
+       name=COALESCE($1, name),
+       description=COALESCE($2, description),
+       scene_js=COALESCE($3, scene_js),
+       household_deduction_joint=COALESCE($4, household_deduction_joint),
+       updated_at=now()
+     WHERE id=$5 AND user_id=$6 RETURNING *`,
+    [name?.trim(), description, scene_js, household_deduction_joint ?? null, req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });

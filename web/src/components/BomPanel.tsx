@@ -10,6 +10,7 @@ import RyhtiSubmissionPanel from "@/components/RyhtiSubmissionPanel";
 import MaterialPicker from "@/components/MaterialPicker";
 import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsPanel";
 import QuoteRequestModal from "@/components/QuoteRequestModal";
+import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1729,6 +1730,8 @@ export default function BomPanel({
   projectDescription,
   buildingInfo,
   projectId,
+  householdDeductionJoint = false,
+  onHouseholdDeductionJointChange,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -1749,6 +1752,10 @@ export default function BomPanel({
   buildingInfo?: BuildingInfo | null;
   /** Project ID used by API-backed cost add-ons such as waste estimates */
   projectId?: string;
+  /** Whether the household deduction calculator should use two claimants */
+  householdDeductionJoint?: boolean;
+  /** Persist household deduction claimant mode on the project */
+  onHouseholdDeductionJointChange?: (joint: boolean) => void;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialPickerId, setMaterialPickerId] = useState<string | null>(null);
@@ -2292,6 +2299,14 @@ export default function BomPanel({
         )}
         {bom.length > 0 && (
           <QuoteSummary bom={bom} materials={materials} />
+        )}
+        {bom.length > 0 && (
+          <HouseholdDeductionPanel
+            bom={bom}
+            materials={materials}
+            coupleMode={householdDeductionJoint}
+            onCoupleModeChange={onHouseholdDeductionJointChange || (() => undefined)}
+          />
         )}
         <button
           type="button"
