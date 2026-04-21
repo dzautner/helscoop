@@ -344,8 +344,36 @@ export default function ProjectPage() {
       const target = e.target as HTMLElement;
       if (!target.closest('[data-tour="export-btn"]')) setShowExportMenu(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowExportMenu(false);
+        const trigger = document.querySelector<HTMLElement>('[data-tour="export-btn"] button');
+        trigger?.focus();
+        return;
+      }
+      const menu = document.querySelector<HTMLElement>('[data-tour="export-btn"] [role="menu"]');
+      if (!menu) return;
+      const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+      if (items.length === 0) return;
+      const idx = items.indexOf(document.activeElement as HTMLElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        items[(idx + 1) % items.length].focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        items[(idx - 1 + items.length) % items.length].focus();
+      }
+    };
     document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    requestAnimationFrame(() => {
+      const firstItem = document.querySelector<HTMLElement>('[data-tour="export-btn"] [role="menuitem"]');
+      firstItem?.focus();
+    });
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [showExportMenu]);
 
   const startResize = useCallback((e: React.MouseEvent) => {
@@ -1054,6 +1082,8 @@ export default function ProjectPage() {
               data-tooltip={exportingFormat ? t('toast.exportingBom') : t('editor.export')}
               aria-label={exportingFormat ? t('toast.exportingBom') : t('editor.export')}
               aria-busy={exportingFormat !== null}
+              aria-haspopup="menu"
+              aria-expanded={showExportMenu}
               disabled={exportingFormat !== null}
               onClick={() => setShowExportMenu(v => !v)}
               style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}
@@ -1076,7 +1106,7 @@ export default function ProjectPage() {
               )}
             </button>
             {showExportMenu && (
-              <div className="dropdown-menu" style={{
+              <div className="dropdown-menu" role="menu" style={{
                 position: "absolute",
                 top: "calc(100% + 6px)",
                 right: 0,
@@ -1089,6 +1119,7 @@ export default function ProjectPage() {
                 zIndex: 100,
               }}>
                 <button
+                  role="menuitem"
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
                   onClick={async () => {
@@ -1119,6 +1150,7 @@ export default function ProjectPage() {
                   PDF
                 </button>
                 <button
+                  role="menuitem"
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
                   onClick={() => {
@@ -1140,6 +1172,7 @@ export default function ProjectPage() {
                   {locale === "fi" ? "ARA-paketti" : "ARA package"}
                 </button>
                 <button
+                  role="menuitem"
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
                   onClick={async () => {
@@ -1172,6 +1205,7 @@ export default function ProjectPage() {
                   CSV
                 </button>
                 <button
+                  role="menuitem"
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
                   onClick={async () => {
@@ -1208,8 +1242,9 @@ export default function ProjectPage() {
                   )}
                   JSON
                 </button>
-                <div style={{ height: 1, background: "var(--border)", margin: "2px 8px" }} />
+                <div style={{ height: 1, background: "var(--border)", margin: "2px 8px" }} role="separator" />
                 <button
+                  role="menuitem"
                   className="btn btn-ghost"
                   onClick={() => {
                     setShowExportMenu(false);
