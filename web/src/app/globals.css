@@ -2851,6 +2851,13 @@ select:focus {
   opacity: 1;
 }
 
+.project-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 /* Interactive card — hover lift + amber glow */
 .card-interactive {
   cursor: pointer;

@@ -364,7 +364,7 @@ function CostBreakdownChart({
 
         {/* Legend */}
         <div style={{ display: "flex", flexDirection: "column", gap: 5, width: "100%" }}>
-          {slices.map((s) => (
+          {slices.map((s, si) => (
             <div
               key={s.name}
               style={{
@@ -378,9 +378,10 @@ function CostBreakdownChart({
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: "50%",
+                  borderRadius: si % 4 === 0 ? "50%" : si % 4 === 1 ? "1px" : si % 4 === 2 ? "50% 0" : "0 50%",
                   background: s.color,
                   flexShrink: 0,
+                  transform: si % 4 === 3 ? "rotate(45deg)" : undefined,
                 }}
               />
               <span
