@@ -341,6 +341,26 @@ export const api = {
     a.click();
     URL.revokeObjectURL(url);
   },
+  exportIFC: async (projectId: string, projectName: string) => {
+    const t = getToken();
+    const res = await fetch(`${API_URL}/ifc-export/generate?projectId=${encodeURIComponent(projectId)}`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        ERROR_MESSAGES[res.status] || `Virhe ${res.status} / Error ${res.status}`,
+        res.status,
+        res.statusText
+      );
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `helscoop_permit_${projectName.replace(/\s+/g, '_')}.ifc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   exportPdf: async (projectId: string, projectName: string, lang: string) => {
     const t = getToken();
     const res = await fetch(`${API_URL}/projects/${projectId}/pdf?lang=${lang}`, {

@@ -40,6 +40,12 @@ function numberOrUndefined(value: unknown): number | undefined {
   return Number.isFinite(num) ? num : undefined;
 }
 
+function stringOrUndefined(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  return cleaned || undefined;
+}
+
 async function loadProject(projectId: string, userId: string): Promise<ProjectRow | null> {
   const result = await query(
     `SELECT id, name, description, scene_js, building_info, permit_metadata
@@ -74,12 +80,25 @@ async function loadBom(projectId: string): Promise<RyhtiBomInput[]> {
 
 function buildingInfoForIFC(project: ProjectRow) {
   const info = normalizeBuildingInfo(project.building_info);
+  const metadata = sanitizePermitMetadata(project.permit_metadata ?? {});
+  const floorAreaM2 = numberOrUndefined(metadata.floorAreaM2) ?? numberOrUndefined(info.floorAreaM2);
+  const grossAreaM2 = numberOrUndefined(metadata.grossAreaM2) ?? floorAreaM2;
+
   return {
-    address: typeof info.address === "string" ? info.address : undefined,
-    buildingType: typeof info.buildingType === "string" ? info.buildingType : undefined,
+    address: stringOrUndefined(metadata.address) ?? stringOrUndefined(info.address),
+    buildingType: stringOrUndefined(info.buildingType),
     yearBuilt: numberOrUndefined(info.yearBuilt),
-    area: numberOrUndefined(info.floorAreaM2),
-    floors: numberOrUndefined(info.floors),
+    area: floorAreaM2,
+    floorAreaM2,
+    grossAreaM2,
+    floors: numberOrUndefined(metadata.floors) ?? numberOrUndefined(info.floors),
+    permanentBuildingIdentifier:
+      stringOrUndefined(metadata.permanentBuildingIdentifier) ?? stringOrUndefined(info.permanentBuildingIdentifier),
+    propertyIdentifier: stringOrUndefined(metadata.propertyIdentifier) ?? stringOrUndefined(info.propertyIdentifier),
+    municipalityNumber: stringOrUndefined(metadata.municipalityNumber) ?? stringOrUndefined(info.municipalityNumber),
+    latitude: numberOrUndefined(metadata.latitude) ?? numberOrUndefined(info.latitude),
+    longitude: numberOrUndefined(metadata.longitude) ?? numberOrUndefined(info.longitude),
+    energyClass: stringOrUndefined(metadata.energyClass) ?? stringOrUndefined(info.energyClass),
   };
 }
 
@@ -99,6 +118,7 @@ function buildPackage(project: ProjectRow, bom: RyhtiBomInput[]) {
       category_name: item.category_name ?? undefined,
     })),
     buildingInfo: buildingInfoForIFC(project),
+    permitMetadata: sanitizePermitMetadata(project.permit_metadata ?? {}),
   });
 
   return buildRyhtiPermitPackage({

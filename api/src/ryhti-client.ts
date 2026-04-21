@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { IFC_SCHEMA, IFC_VIEW_DEFINITION } from "./ifc-generator";
 
 export type RyhtiSubmissionMode = "dry_run" | "live";
 export type RyhtiSubmissionStatus =
@@ -55,6 +56,8 @@ export interface RyhtiAttachmentSummary {
   type: "IFC4_DESIGN_MODEL";
   fileName: string;
   contentType: "application/x-step";
+  ifcSchema: typeof IFC_SCHEMA;
+  viewDefinition: typeof IFC_VIEW_DEFINITION;
   byteLength: number;
   sha256: string;
 }
@@ -326,6 +329,8 @@ export function buildRyhtiPermitPackage(input: {
         type: "IFC4_DESIGN_MODEL",
         fileName: `${safeName}.ifc`,
         contentType: "application/x-step",
+        ifcSchema: IFC_SCHEMA,
+        viewDefinition: IFC_VIEW_DEFINITION,
         byteLength: Buffer.byteLength(ifcContent, "utf8"),
         sha256: crypto.createHash("sha256").update(ifcContent).digest("hex"),
       }]
@@ -473,7 +478,7 @@ export function validateRyhtiPackage(
       level: "error",
       code: "missing_ifc_model",
       field: "attachments",
-      message: "Ryhti package needs a generated IFC4 design model.",
+      message: "Ryhti package needs a generated IFC4x3 design model.",
       action: "Generate the project's IFC model before creating the Ryhti package.",
     });
   }

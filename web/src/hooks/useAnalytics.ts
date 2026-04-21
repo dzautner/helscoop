@@ -39,7 +39,7 @@ export interface AnalyticsEventProps {
   bom_item_removed: { material_id: string };
   bom_item_undo_remove: { material_id: string };
   bom_exported: { format: "pdf" | "csv" | "json" };
-  project_exported: { format: "helscoop" | "ara_grant_package" };
+  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" };
   project_imported: { format: "helscoop" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;
