@@ -25,6 +25,7 @@ import buildingRegistryRouter from "./routes/building-registry";
 import carbonRouter from "./routes/carbon";
 import huoltokirjaRouter from "./routes/huoltokirja";
 import wasteRouter from "./routes/waste";
+import ifcExportRouter from "./routes/ifc-export";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 
@@ -626,6 +627,7 @@ app.use("/building-registry", buildingLimiter, buildingRegistryRouter);
 app.use("/carbon", authenticatedLimiter, carbonRouter);
 app.use("/huoltokirja", authenticatedLimiter, huoltokirjaRouter);
 app.use("/waste", authenticatedLimiter, wasteRouter);
+app.use("/ifc-export", authenticatedLimiter, ifcExportRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
