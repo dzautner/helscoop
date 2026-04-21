@@ -22,6 +22,7 @@ const mockDoc = {
   setDrawColor: vi.fn(),
   setLineWidth: vi.fn(),
   line: vi.fn(),
+  addImage: vi.fn(),
   addPage: vi.fn(),
   getNumberOfPages: vi.fn(() => 1),
   setPage: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock("jspdf", () => ({
   jsPDF: vi.fn(() => mockDoc),
 }));
 
-import { generateQuotePdf } from "@/lib/pdf";
+import { generateAraGrantPdf, generateQuotePdf } from "@/lib/pdf";
 import type { BomItem } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -113,6 +114,59 @@ describe("generateQuotePdf — basic", () => {
         locale: "fi",
       })
     ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. ARA grant package PDF
+// ---------------------------------------------------------------------------
+describe("generateAraGrantPdf — ARA package", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDoc.getNumberOfPages.mockReturnValue(1);
+  });
+
+  it("generates an ARA package without throwing", () => {
+    expect(() =>
+      generateAraGrantPdf({
+        projectName: "Grant Test",
+        bom: [
+          makeBomItem({ material_id: "insulation_100mm", material_name: "Mineraalivilla 100mm" }),
+          makeBomItem({ material_id: "triple_window", material_name: "Triple glazed window", total: 2400 }),
+        ],
+        locale: "en",
+        buildingInfo: {
+          address: "Ulvilantie 2, Helsinki",
+          year_built: 1975,
+          heating: "sahko",
+          area_m2: 140,
+        },
+        sceneJs: "scene.add(box(1, 1, 1));",
+      })
+    ).not.toThrow();
+  });
+
+  it("saves with an ARA-specific filename", () => {
+    generateAraGrantPdf({
+      projectName: "ARA Grant Test",
+      bom: [makeBomItem()],
+      locale: "en",
+    });
+
+    expect(mockDoc.save).toHaveBeenCalledWith("helscoop_ara_ARA_Grant_Test.pdf");
+  });
+
+  it("renders the energy class before/after section and manual attachment checklist", () => {
+    generateAraGrantPdf({
+      projectName: "Energy Upgrade",
+      bom: [makeBomItem({ material_id: "insulation_100mm", material_name: "Insulation 100mm" })],
+      locale: "en",
+      manualChecklist: ["Proof of ownership"],
+    });
+
+    const textCalls = mockDoc.text.mock.calls.map((call) => String(call[0]));
+    expect(textCalls.some((text) => text.includes("Energy class before / after"))).toBe(true);
+    expect(textCalls.some((text) => text.includes("Proof of ownership"))).toBe(true);
   });
 });
 

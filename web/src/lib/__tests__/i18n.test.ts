@@ -525,6 +525,7 @@ describe("exhaustive i18n key parity", () => {
     "commandPalette.toggleCodeEditor", "commandPalette.toggleCodeEditorEn",
     "commandPalette.toggleBom", "commandPalette.toggleBomEn",
     "commandPalette.exportPdf", "commandPalette.exportPdfEn",
+    "commandPalette.exportAraGrant", "commandPalette.exportAraGrantEn",
     "commandPalette.shareProject", "commandPalette.shareProjectEn",
     "commandPalette.toggleTheme", "commandPalette.toggleThemeEn",
     "commandPalette.showShortcuts", "commandPalette.showShortcutsEn",

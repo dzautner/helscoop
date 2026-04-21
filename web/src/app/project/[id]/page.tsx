@@ -18,7 +18,7 @@ import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
 import OnboardingTour from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { generateQuotePdf } from "@/lib/pdf";
+import { generateAraGrantPdf, generateQuotePdf } from "@/lib/pdf";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -132,8 +132,9 @@ export default function ProjectPage() {
   const [showParams, setShowParams] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showAraChecklist, setShowAraChecklist] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -153,6 +154,7 @@ export default function ProjectPage() {
   const [sceneWarnings, setSceneWarnings] = useState<string[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const shareDialogRef = useRef<HTMLDivElement>(null);
+  const araDialogRef = useRef<HTMLDivElement>(null);
 
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
@@ -527,6 +529,54 @@ export default function ProjectPage() {
   const closeShareDialog = useCallback(() => setShowShareDialog(false), []);
   useFocusTrap(shareDialogRef, showShareDialog && !!shareToken, closeShareDialog);
 
+  const closeAraChecklist = useCallback(() => setShowAraChecklist(false), []);
+  useFocusTrap(araDialogRef, showAraChecklist, closeAraChecklist);
+
+  const araChecklistItems = useMemo(
+    () => locale === "fi"
+      ? [
+          "Omistusoikeuden todistus tai taloyhtiön päätös",
+          "Henkilö-/Y-tunnus ja hakijan yhteystiedot",
+          "Virallinen energiatodistus tai energiaselvitys",
+          "Urakoitsijan tarjoukset ja aikataulu",
+          "Rakennus- tai toimenpideluvat, jos hanke vaatii ne",
+          "Valokuvat nykytilanteesta ennen työn aloitusta",
+        ]
+      : [
+          "Proof of ownership or housing-company decision",
+          "Applicant tax ID and contact details",
+          "Official energy certificate or energy report",
+          "Contractor quotes and schedule",
+          "Building/action permits if the project requires them",
+          "Before-work photos of current conditions",
+        ],
+    [locale]
+  );
+
+  const exportAraGrantPackage = useCallback(() => {
+    setShowAraChecklist(false);
+    setShowExportMenu(false);
+    setExportingFormat("ara");
+    try {
+      track("project_exported", { format: "ara_grant_package" });
+      generateAraGrantPdf({
+        projectName,
+        projectDescription: projectDesc,
+        bom,
+        locale,
+        buildingInfo: project?.building_info,
+        sceneJs,
+        sceneImage: captureThumbRef.current?.() ?? project?.thumbnail_url,
+        manualChecklist: araChecklistItems,
+      });
+      toast(locale === "fi" ? "ARA-avustuspaketti viety" : "ARA grant package exported", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [araChecklistItems, bom, locale, project?.building_info, project?.thumbnail_url, projectDesc, projectName, sceneJs, t, toast, track]);
+
   /* ── Command palette commands ───────────────────────────── */
   const paletteCommands = useMemo<Command[]>(() => {
     const icon = (d: string) => (
@@ -607,6 +657,18 @@ export default function ProjectPage() {
             toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
           }
         },
+      },
+      {
+        id: "export-ara-grant",
+        labelKey: "commandPalette.exportAraGrant",
+        labelSecondaryKey: "commandPalette.exportAraGrantEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+        ),
+        action: () => setShowAraChecklist(true),
       },
       {
         id: "export-project",
@@ -1025,6 +1087,27 @@ export default function ProjectPage() {
                     </svg>
                   )}
                   PDF
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowAraChecklist(true);
+                  }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "ara" ? 0.4 : 1 }}
+                >
+                  {exportingFormat === "ara" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 11l3 3L22 4" />
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                    </svg>
+                  )}
+                  {locale === "fi" ? "ARA-paketti" : "ARA package"}
                 </button>
                 <button
                   className="btn btn-ghost"
@@ -1719,6 +1802,114 @@ export default function ProjectPage() {
                 style={{ padding: "10px 20px", fontSize: 13 }}
               >
                 {t('editor.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ARA pre-flight checklist dialog */}
+      {showAraChecklist && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            animation: "fadeIn 0.15s ease both",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAraChecklist(false);
+          }}
+        >
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.62)",
+            backdropFilter: "blur(4px)",
+          }} />
+          <div
+            ref={araDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ara-dialog-title"
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: 560,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--radius-lg)",
+              padding: "28px 28px 24px",
+              boxShadow: "var(--shadow-lg)",
+              animation: "dialogSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
+            }}
+          >
+            <h2
+              id="ara-dialog-title"
+              className="heading-display"
+              style={{ fontSize: 18, margin: "0 0 8px", color: "var(--text-primary)" }}
+            >
+              {locale === "fi" ? "ARA-avustuspaketin tarkistus" : "ARA grant package pre-flight"}
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: "0 0 18px", lineHeight: 1.5 }}>
+              {locale === "fi"
+                ? "Helscoop tuottaa energialuokka-arvion, remonttisuunnitelman ja kustannusarvion nykyisestä projektista. Lisää nämä hakemukseen käsin ennen lähettämistä."
+                : "Helscoop will generate the energy-class estimate, renovation plan, and cost estimate from this project. Add these owner-supplied attachments manually before submission."}
+            </p>
+
+            <div style={{
+              display: "grid",
+              gap: 8,
+              padding: "12px 14px",
+              borderRadius: "var(--radius-md)",
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              marginBottom: 16,
+            }}>
+              {araChecklistItems.map((item) => (
+                <label key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                  <input type="checkbox" style={{ marginTop: 2 }} />
+                  <span>{item}</span>
+                </label>
+              ))}
+            </div>
+
+            <div style={{
+              padding: "10px 12px",
+              marginBottom: 18,
+              borderRadius: "var(--radius-sm)",
+              background: "var(--warning-dim)",
+              border: "1px solid var(--warning-border)",
+              color: "var(--warning)",
+              fontSize: 12,
+              lineHeight: 1.5,
+            }}>
+              {locale === "fi"
+                ? "Ei virallinen ARA-päätös tai energiatodistus. Tarkista ARA:n ajantasaiset ehdot ennen työn aloitusta."
+                : "Not an official ARA decision or energy certificate. Check current ARA requirements before work starts."}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowAraChecklist(false)}
+                style={{ padding: "10px 18px", fontSize: 13 }}
+              >
+                {t("editor.cancel")}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={exportAraGrantPackage}
+                disabled={exportingFormat !== null}
+                style={{ padding: "10px 18px", fontSize: 13, fontWeight: 600 }}
+              >
+                {exportingFormat === "ara"
+                  ? (locale === "fi" ? "Viedään..." : "Exporting...")
+                  : (locale === "fi" ? "Vie ARA-paketti" : "Export ARA package")}
               </button>
             </div>
           </div>
