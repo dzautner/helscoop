@@ -95,6 +95,7 @@ function MaterialsTab() {
         <input
           className="input"
           placeholder={t('admin.search')}
+          aria-label={t('admin.search')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
@@ -334,7 +335,7 @@ function PricingTab() {
           <tbody>
             {stale.map((s, i) => (
               <tr
-                key={i}
+                key={`${s.material_name}-${s.supplier_name}`}
                 style={{ animation: `fadeIn 0.2s ease-out ${i * 0.04}s both` }}
               >
                 <td style={{ ...tdStyle, fontWeight: 500 }}>{s.material_name}</td>
@@ -430,10 +431,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
+      <div role="tablist" style={{ display: "flex", gap: 4, marginBottom: 24 }}>
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
+            role="tab"
+            aria-selected={tab === tabItem.key}
             className="btn"
             onClick={() => setTab(tabItem.key)}
             style={{
