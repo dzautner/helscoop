@@ -1,3 +1,5 @@
+import type { EnergySubsidyRequest } from "@/types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 let token: string | null = null;
@@ -288,6 +290,8 @@ export const api = {
   getPriceHistory: (materialId: string) =>
     apiFetch(`/pricing/history/${materialId}`),
   getStalePrices: () => apiFetch("/pricing/stale"),
+  estimateEnergySubsidy: (data: EnergySubsidyRequest) =>
+    apiFetch("/subsidies/energy/estimate", { method: "POST", body: JSON.stringify(data) }),
 
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),

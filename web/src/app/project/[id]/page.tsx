@@ -1682,6 +1682,7 @@ export default function ProjectPage() {
               style={{ width: bomWidth }}
               sceneJs={sceneJs}
               projectName={projectName}
+              buildingInfo={project?.building_info ?? null}
             />
           </>
         )}

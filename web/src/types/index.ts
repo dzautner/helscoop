@@ -161,6 +161,60 @@ export interface MaterialPriceData {
   savings_per_unit: number;
 }
 
+export type EnergyHeatingType =
+  | "oil"
+  | "natural_gas"
+  | "direct_electric"
+  | "district_heat"
+  | "ground_source_heat_pump"
+  | "air_water_heat_pump"
+  | "wood"
+  | "other_non_fossil"
+  | "fossil"
+  | "unknown";
+
+export type EnergyBuildingType = "omakotitalo" | "paritalo" | "rivitalo" | "kerrostalo" | "other" | "unknown";
+export type EnergyApplicantAgeGroup = "under_65" | "65_plus" | "unknown";
+export type EnergyHeatingSystemCondition = "ok" | "broken_or_end_of_life" | "hard_to_maintain" | "unknown";
+export type EnergySubsidyStatus = "eligible" | "maybe" | "not_eligible";
+
+export interface EnergySubsidyRequest {
+  totalCost: number;
+  currentHeating: EnergyHeatingType;
+  targetHeating: EnergyHeatingType;
+  buildingType: EnergyBuildingType;
+  buildingYear?: number | null;
+  yearRoundResidential: boolean;
+  applicantAgeGroup: EnergyApplicantAgeGroup;
+  applicantDisabled: boolean;
+  heatingSystemCondition: EnergyHeatingSystemCondition;
+}
+
+export interface EnergySubsidyProgram {
+  program: "ely_oil_gas_heating" | "ara_repair_elderly_disabled";
+  name: string;
+  status: EnergySubsidyStatus;
+  amount: number;
+  netCost: number;
+  reasons: string[];
+  warnings: string[];
+  deadline?: string;
+  paymentDeadline?: string;
+  applicationUrl: string;
+  sourceUrl: string;
+}
+
+export interface EnergySubsidyResponse {
+  totalCost: number;
+  bestAmount: number;
+  netCost: number;
+  deadline: string;
+  daysUntilDeadline: number;
+  generatedAt: string;
+  programs: EnergySubsidyProgram[];
+  disclaimer: string;
+}
+
 export interface Category {
   id: string;
   display_name: string;
