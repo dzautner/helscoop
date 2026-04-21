@@ -184,15 +184,17 @@ export default function ProjectPage() {
     if (historyIndexRef.current > 0) {
       historyIndexRef.current -= 1;
       setSceneJs(historyRef.current[historyIndexRef.current]);
+      toast(t("shortcuts.undone"), "info");
     }
-  }, []);
+  }, [toast, t]);
 
   const redo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
       historyIndexRef.current += 1;
       setSceneJs(historyRef.current[historyIndexRef.current]);
+      toast(t("shortcuts.redone"), "info");
     }
-  }, []);
+  }, [toast, t]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -550,6 +552,27 @@ export default function ProjectPage() {
       code: "z",
       action: redo,
       descriptionKey: "shortcuts.redo",
+    },
+    {
+      key: "W",
+      mod: false,
+      code: "w",
+      action: () => setWireframe((v) => !v),
+      descriptionKey: "shortcuts.wireframe",
+    },
+    {
+      key: "E",
+      mod: false,
+      code: "e",
+      action: () => setShowCode((v) => !v),
+      descriptionKey: "shortcuts.toggleCode",
+    },
+    {
+      key: "D",
+      mod: false,
+      code: "d",
+      action: () => setShowDocs((v) => !v),
+      descriptionKey: "shortcuts.toggleDocs",
     },
   ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo]);
 
