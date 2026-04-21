@@ -43,6 +43,7 @@ function inferCategory(id: string): CommandCategory {
     id === "save" ||
     id === "share-project" ||
     id === "export-pdf" ||
+    id === "export-ara-grant" ||
     id === "export-project" ||
     id === "toggle-bom"
   ) return "project";
