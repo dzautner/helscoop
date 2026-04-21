@@ -68,6 +68,7 @@ export default function Home() {
   if (!loggedIn) {
     return (
       <>
+        <div className="scroll-progress" aria-hidden="true" />
         <LoginForm
           onLogin={handleLogin}
           pendingBuilding={pendingBuilding}
