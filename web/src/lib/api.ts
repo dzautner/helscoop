@@ -231,6 +231,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ credential }),
     }),
+  appleLogin: (identityToken: string, user?: unknown) =>
+    apiFetch("/auth/apple", {
+      method: "POST",
+      body: JSON.stringify({ identityToken, user }),
+    }),
   me: () => apiFetch("/auth/me"),
   updateProfile: (data: { name?: string; email?: string }) =>
     apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),

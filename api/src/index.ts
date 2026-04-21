@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, verifyGoogleToken, googleLogin, AuthUser } from "./auth";
+import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, verifyGoogleToken, googleLogin, verifyAppleToken, appleLogin, AuthUser } from "./auth";
 import { query, pool } from "./db";
 import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
@@ -323,6 +323,9 @@ app.post("/auth/google", authLimiter, async (req, res) => {
     if (!payload) {
       return res.status(401).json({ error: "Invalid Google credential" });
     }
+    if (!payload.email_verified) {
+      return res.status(401).json({ error: "Google email is not verified" });
+    }
     const user = await googleLogin(payload);
     res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
   } catch (e: unknown) {
@@ -333,9 +336,40 @@ app.post("/auth/google", authLimiter, async (req, res) => {
   }
 });
 
+app.post("/auth/apple", authLimiter, async (req, res) => {
+  const { identityToken, user: appleUser } = req.body;
+  if (!identityToken) {
+    return res.status(400).json({ error: "Apple identity token is required" });
+  }
+  try {
+    const nameParts = appleUser?.name;
+    const displayName =
+      typeof appleUser?.name === "string"
+        ? appleUser.name
+        : [nameParts?.firstName, nameParts?.lastName].filter(Boolean).join(" ");
+    const payload = await verifyAppleToken(identityToken, {
+      name: displayName,
+      email: appleUser?.email,
+    });
+    if (!payload) {
+      return res.status(401).json({ error: "Invalid Apple identity token" });
+    }
+    if (!payload.email_verified) {
+      return res.status(401).json({ error: "Apple email is not verified" });
+    }
+    const user = await appleLogin(payload);
+    res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
+  } catch (e: unknown) {
+    logger.error({ err: e }, "Apple auth error");
+    Sentry.captureException(e);
+    const msg = e instanceof Error ? e.message : "Apple authentication failed";
+    res.status(500).json({ error: msg });
+  }
+});
+
 app.get("/auth/me", authenticatedLimiter, requireAuth, async (req, res) => {
   const result = await query(
-    "SELECT id, email, name, role, email_verified FROM users WHERE id = $1",
+    "SELECT id, email, name, role, email_verified, avatar_url, auth_provider FROM users WHERE id = $1",
     [req.user!.id]
   );
   if (result.rows.length === 0) {

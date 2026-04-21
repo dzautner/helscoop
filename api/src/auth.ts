@@ -98,6 +98,7 @@ export async function login(email: string, password: string) {
   );
   if (result.rows.length === 0) return null;
   const user = result.rows[0];
+  if (!user.password_hash) return null;
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return null;
   return { id: user.id, email: user.email, name: user.name, role: user.role };
@@ -190,6 +191,11 @@ export async function resendVerification(userId: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const APPLE_CLIENT_ID = process.env.APPLE_CLIENT_ID || "";
+const APPLE_ISSUER = "https://appleid.apple.com";
+const APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys";
+
+type OAuthProvider = "google" | "apple";
 
 interface GoogleTokenPayload {
   sub: string;       // Google unique user ID
@@ -197,6 +203,82 @@ interface GoogleTokenPayload {
   email_verified: boolean;
   name?: string;
   picture?: string;
+}
+
+interface AppleTokenPayload {
+  sub: string;
+  email: string;
+  email_verified: boolean;
+  name?: string;
+}
+
+interface OAuthProfile {
+  provider: OAuthProvider;
+  providerUserId: string;
+  email: string;
+  emailVerified: boolean;
+  name?: string;
+  avatarUrl?: string;
+}
+
+interface AppleJwk {
+  kid: string;
+  kty: string;
+  alg?: string;
+  use?: string;
+  n: string;
+  e: string;
+}
+
+function cleanOAuthString(value: unknown, maxLength = 500): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  return cleaned ? cleaned.slice(0, maxLength) : undefined;
+}
+
+function cleanOAuthEmail(value: unknown): string | undefined {
+  const cleaned = cleanOAuthString(value, 320)?.toLowerCase();
+  return cleaned && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned) ? cleaned : undefined;
+}
+
+function fallbackName(email: string): string {
+  return email.split("@")[0] || "Helscoop user";
+}
+
+function decodeBase64UrlJson(segment: string): Record<string, unknown> | null {
+  try {
+    const decoded = Buffer.from(segment, "base64url").toString("utf8");
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function providerUserColumn(provider: OAuthProvider): "google_id" | "apple_id" {
+  return provider === "google" ? "google_id" : "apple_id";
+}
+
+async function verifyAppleJwtSignature(
+  signingInput: string,
+  signatureSegment: string,
+  kid: string,
+): Promise<boolean> {
+  const res = await fetch(APPLE_JWKS_URL);
+  if (!res.ok) return false;
+  const body = (await res.json()) as { keys?: AppleJwk[] };
+  const jwk = body.keys?.find((key) => key.kid === kid && key.kty === "RSA");
+  if (!jwk) return false;
+
+  const publicKey = crypto.createPublicKey({ key: jwk as any, format: "jwk" });
+  return crypto.verify(
+    "RSA-SHA256",
+    Buffer.from(signingInput),
+    publicKey,
+    Buffer.from(signatureSegment, "base64url"),
+  );
 }
 
 /**
@@ -216,14 +298,16 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
       return null;
     }
 
-    if (!payload.email || !payload.sub) return null;
+    const email = cleanOAuthEmail(payload.email);
+    const sub = cleanOAuthString(payload.sub, 255);
+    if (!email || !sub) return null;
 
     return {
-      sub: payload.sub as string,
-      email: payload.email as string,
+      sub,
+      email,
       email_verified: payload.email_verified === "true" || payload.email_verified === true,
-      name: (payload.name as string) || (payload.email as string).split("@")[0],
-      picture: payload.picture as string | undefined,
+      name: cleanOAuthString(payload.name, 200) || fallbackName(email),
+      picture: cleanOAuthString(payload.picture, 1000),
     };
   } catch {
     return null;
@@ -231,43 +315,186 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
 }
 
 /**
- * Find or create a user from a verified Google token payload.
- * - If a user with the same google_id exists, return them.
- * - If a user with the same email exists (local signup), link the Google account.
- * - Otherwise, create a new user.
+ * Verify an Apple Sign In identity token with Apple's JWKS endpoint.
+ * The optional display name is only provided by Apple on the first consent.
  */
-export async function googleLogin(payload: GoogleTokenPayload) {
-  // 1. Check by google_id first (returning Google user)
-  const byGoogleId = await query(
-    "SELECT id, email, name, role FROM users WHERE google_id = $1",
-    [payload.sub]
-  );
-  if (byGoogleId.rows.length > 0) {
-    return byGoogleId.rows[0];
+export async function verifyAppleToken(
+  identityToken: string,
+  profileHint: { name?: unknown; email?: unknown } = {},
+): Promise<AppleTokenPayload | null> {
+  const parts = identityToken.split(".");
+  if (parts.length !== 3) return null;
+
+  const [headerSegment, payloadSegment, signatureSegment] = parts;
+  const header = decodeBase64UrlJson(headerSegment);
+  const payload = decodeBase64UrlJson(payloadSegment);
+  if (!header || !payload) return null;
+  if (header.alg !== "RS256" || typeof header.kid !== "string") return null;
+  if (payload.iss !== APPLE_ISSUER) return null;
+  if (APPLE_CLIENT_ID && payload.aud !== APPLE_CLIENT_ID) return null;
+
+  const exp = typeof payload.exp === "number" ? payload.exp : Number(payload.exp);
+  if (!Number.isFinite(exp) || exp <= Math.floor(Date.now() / 1000)) return null;
+
+  try {
+    const verified = await verifyAppleJwtSignature(
+      `${headerSegment}.${payloadSegment}`,
+      signatureSegment,
+      header.kid,
+    );
+    if (!verified) return null;
+  } catch {
+    return null;
   }
 
-  // 2. Check by email (existing local user signing in with Google for the first time)
+  const sub = cleanOAuthString(payload.sub, 255);
+  const email = cleanOAuthEmail(payload.email) || cleanOAuthEmail(profileHint.email);
+  if (!sub || !email) return null;
+
+  const emailVerified = payload.email_verified === true || payload.email_verified === "true";
+  const name = cleanOAuthString(profileHint.name, 200) || cleanOAuthString(payload.name, 200);
+
+  return {
+    sub,
+    email,
+    email_verified: emailVerified,
+    name: name || fallbackName(email),
+  };
+}
+
+async function linkOAuthProvider(userId: string, profile: OAuthProfile) {
+  const providerColumn = providerUserColumn(profile.provider);
+  await query(
+    `UPDATE users
+     SET ${providerColumn} = COALESCE(${providerColumn}, $1),
+         email_verified = email_verified OR $2,
+         avatar_url = COALESCE(avatar_url, $3),
+         auth_provider = CASE WHEN auth_provider = 'local' THEN $4 ELSE auth_provider END
+     WHERE id = $5`,
+    [profile.providerUserId, profile.emailVerified, profile.avatarUrl ?? null, profile.provider, userId],
+  );
+
+  await query(
+    `INSERT INTO user_oauth_providers (
+       user_id, provider, provider_user_id, email, email_verified, display_name, avatar_url
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (provider, provider_user_id)
+     DO UPDATE SET
+       user_id = EXCLUDED.user_id,
+       email = EXCLUDED.email,
+       email_verified = EXCLUDED.email_verified,
+       display_name = COALESCE(EXCLUDED.display_name, user_oauth_providers.display_name),
+       avatar_url = COALESCE(EXCLUDED.avatar_url, user_oauth_providers.avatar_url),
+       updated_at = now()`,
+    [
+      userId,
+      profile.provider,
+      profile.providerUserId,
+      profile.email,
+      profile.emailVerified,
+      profile.name ?? null,
+      profile.avatarUrl ?? null,
+    ],
+  );
+}
+
+/**
+ * Find or create a user from a verified OAuth provider profile.
+ * - Existing provider identity returns the linked user.
+ * - Existing verified email links Google/Apple to that user.
+ * - Otherwise, a new OAuth-only user is created.
+ */
+export async function oauthLogin(profile: OAuthProfile) {
+  if (!profile.emailVerified) {
+    throw new Error("OAuth provider did not verify the email address");
+  }
+
+  const email = cleanOAuthEmail(profile.email);
+  const providerUserId = cleanOAuthString(profile.providerUserId, 255);
+  if (!email || !providerUserId) {
+    throw new Error("OAuth profile is missing a valid email or provider id");
+  }
+
+  const normalizedProfile: OAuthProfile = {
+    ...profile,
+    email,
+    providerUserId,
+    name: cleanOAuthString(profile.name, 200) || fallbackName(email),
+    avatarUrl: cleanOAuthString(profile.avatarUrl, 1000),
+  };
+
+  const byProvider = await query(
+    `SELECT u.id, u.email, u.name, u.role
+     FROM user_oauth_providers op
+     JOIN users u ON u.id = op.user_id
+     WHERE op.provider = $1 AND op.provider_user_id = $2`,
+    [normalizedProfile.provider, normalizedProfile.providerUserId],
+  );
+  if (byProvider.rows.length > 0) {
+    await linkOAuthProvider(byProvider.rows[0].id, normalizedProfile);
+    return byProvider.rows[0];
+  }
+
+  const providerColumn = providerUserColumn(normalizedProfile.provider);
+  const byLegacyProvider = await query(
+    `SELECT id, email, name, role FROM users WHERE ${providerColumn} = $1`,
+    [normalizedProfile.providerUserId],
+  );
+  if (byLegacyProvider.rows.length > 0) {
+    await linkOAuthProvider(byLegacyProvider.rows[0].id, normalizedProfile);
+    return byLegacyProvider.rows[0];
+  }
+
   const byEmail = await query(
-    "SELECT id, email, name, role FROM users WHERE email = $1",
-    [payload.email]
+    "SELECT id, email, name, role FROM users WHERE lower(email) = lower($1)",
+    [normalizedProfile.email],
   );
   if (byEmail.rows.length > 0) {
-    // Link Google account to existing user
-    await query(
-      "UPDATE users SET google_id = $1, email_verified = true WHERE id = $2",
-      [payload.sub, byEmail.rows[0].id]
-    );
+    await linkOAuthProvider(byEmail.rows[0].id, normalizedProfile);
     return byEmail.rows[0];
   }
 
-  // 3. Create new user
+  const providerColumnValue = normalizedProfile.providerUserId;
   const result = await query(
-    `INSERT INTO users (email, name, google_id, auth_provider, email_verified, accepted_terms_at)
-     VALUES ($1, $2, $3, 'google', true, NOW())
+    `INSERT INTO users (
+       email, name, password_hash, email_verified, accepted_terms_at,
+       auth_provider, avatar_url, ${providerColumn}
+     )
+     VALUES ($1, $2, NULL, true, NOW(), $3, $4, $5)
      RETURNING id, email, name, role`,
-    [payload.email, payload.name || payload.email.split("@")[0], payload.sub]
+    [
+      normalizedProfile.email,
+      normalizedProfile.name || fallbackName(normalizedProfile.email),
+      normalizedProfile.provider,
+      normalizedProfile.avatarUrl ?? null,
+      providerColumnValue,
+    ],
   );
+
+  await linkOAuthProvider(result.rows[0].id, normalizedProfile);
   return result.rows[0];
+}
+
+export async function googleLogin(payload: GoogleTokenPayload) {
+  return oauthLogin({
+    provider: "google",
+    providerUserId: payload.sub,
+    email: payload.email,
+    emailVerified: payload.email_verified,
+    name: payload.name,
+    avatarUrl: payload.picture,
+  });
+}
+
+export async function appleLogin(payload: AppleTokenPayload) {
+  return oauthLogin({
+    provider: "apple",
+    providerUserId: payload.sub,
+    email: payload.email,
+    emailVerified: payload.email_verified,
+    name: payload.name,
+  });
 }
 
 // Validate a reset token and update the user's password. Returns true on success.
