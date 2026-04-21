@@ -14,6 +14,7 @@ import MobileEditorTabs from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
+import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
@@ -1070,6 +1071,14 @@ export default function ProjectPage() {
         category: mat.category_name || "",
       });
 
+      setSceneJs((prev) => {
+        const result = replaceSceneMaterialReferences(prev, fromMaterialId, toMaterialId);
+        if (result.replacements > 0) {
+          pushHistory(result.code);
+        }
+        return result.code;
+      });
+
       setBom((prev) =>
         prev.map((item) =>
           item.material_id === fromMaterialId
@@ -1093,7 +1102,7 @@ export default function ProjectPage() {
         )
       );
     },
-    [materials, track],
+    [materials, pushHistory, track],
   );
 
   const removeBomItem = useCallback((materialId: string) => {
