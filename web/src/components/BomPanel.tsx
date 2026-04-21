@@ -11,7 +11,19 @@ import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
 import type { QuoteConfig } from "@/lib/quote-engine";
-import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass, StockLevel, BuildingInfo } from "@/types";
+import type {
+  BomItem,
+  Material,
+  MaterialPriceData,
+  Category,
+  PriceHistoryRow,
+  VatClass,
+  StockLevel,
+  BuildingInfo,
+  KeskoProduct,
+  KeskoSearchResponse,
+  KeskoImportResponse,
+} from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
 
@@ -1565,6 +1577,7 @@ export default function BomPanel({
   bom,
   materials,
   onAdd,
+  onAddImported,
   onRemove,
   onUpdateQty,
   style,
@@ -1576,6 +1589,7 @@ export default function BomPanel({
   bom: BomItem[];
   materials: Material[];
   onAdd: (materialId: string, qty: number) => void;
+  onAddImported?: (item: BomItem, material: Material) => void;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   style?: React.CSSProperties;
@@ -1590,6 +1604,12 @@ export default function BomPanel({
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
+  const [keskoMode, setKeskoMode] = useState(false);
+  const [keskoProducts, setKeskoProducts] = useState<KeskoProduct[]>([]);
+  const [keskoLoading, setKeskoLoading] = useState(false);
+  const [keskoError, setKeskoError] = useState<string | null>(null);
+  const [keskoConfigured, setKeskoConfigured] = useState<boolean | null>(null);
+  const [keskoAddingId, setKeskoAddingId] = useState<string | null>(null);
   const [totalSavings, setTotalSavings] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("");
@@ -1772,6 +1792,58 @@ export default function BomPanel({
       setQuickAddQty(1);
     }
   }, [quickAddId, quickAddQty, onAdd]);
+
+  const handleKeskoSearch = useCallback(async () => {
+    const q = materialSearch.trim();
+    if (q.length < 2) {
+      setKeskoProducts([]);
+      setKeskoError(t("pricing.keskoShortQuery"));
+      return;
+    }
+
+    setKeskoLoading(true);
+    setKeskoError(null);
+    try {
+      const data: KeskoSearchResponse = await api.searchKeskoProducts(q);
+      setKeskoConfigured(data.configured);
+      setKeskoProducts(data.products);
+      if (!data.configured) {
+        setKeskoError(t("pricing.keskoNotConfigured"));
+      } else if (data.error) {
+        setKeskoError(data.error);
+      } else if (data.products.length === 0) {
+        setKeskoError(t("pricing.noResults"));
+      }
+    } catch (err) {
+      setKeskoProducts([]);
+      setKeskoError(err instanceof Error ? err.message : t("pricing.keskoSearchFailed"));
+    } finally {
+      setKeskoLoading(false);
+    }
+  }, [materialSearch, t]);
+
+  const handleKeskoImport = useCallback(async (product: KeskoProduct) => {
+    if (!onAddImported) return;
+    setKeskoAddingId(product.id);
+    setKeskoError(null);
+    try {
+      const imported: KeskoImportResponse = await api.importKeskoProduct(product);
+      const price = imported.material.pricing?.[0];
+      const unitPrice = Number(price?.unit_price ?? imported.bom_item.unit_price ?? product.unitPrice ?? 0);
+      onAddImported({
+        ...imported.bom_item,
+        quantity: 1,
+        unit: imported.bom_item.unit || product.unit || "kpl",
+        unit_price: unitPrice,
+        total: unitPrice,
+        stock_level: imported.bom_item.stock_level ?? product.stockLevel,
+      }, imported.material);
+    } catch (err) {
+      setKeskoError(err instanceof Error ? err.message : t("pricing.keskoImportFailed"));
+    } finally {
+      setKeskoAddingId(null);
+    }
+  }, [onAddImported, t]);
 
   return (
     <div
@@ -2072,7 +2144,31 @@ export default function BomPanel({
             className="label-mono"
             style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 8 }}
           >
-            {t('pricing.browseMaterials')}
+            {keskoMode ? t('pricing.keskoLive') : t('pricing.browseMaterials')}
+          </div>
+
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <button
+              type="button"
+              className="category-chip"
+              data-active={!keskoMode}
+              aria-pressed={!keskoMode}
+              onClick={() => {
+                setKeskoMode(false);
+                setKeskoError(null);
+              }}
+            >
+              {t("pricing.localCatalog")}
+            </button>
+            <button
+              type="button"
+              className="category-chip"
+              data-active={keskoMode}
+              aria-pressed={keskoMode}
+              onClick={() => setKeskoMode(true)}
+            >
+              {t("pricing.keskoLive")}
+            </button>
           </div>
 
           {/* Search input */}
@@ -2091,10 +2187,16 @@ export default function BomPanel({
               onChange={(e) => setMaterialSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
+              onKeyDown={(e) => {
+                if (keskoMode && e.key === "Enter") {
+                  e.preventDefault();
+                  void handleKeskoSearch();
+                }
+              }}
               placeholder={t('pricing.searchMaterials')}
               style={{
                 width: "100%",
-                padding: "7px 8px 7px 28px",
+                padding: keskoMode ? "7px 86px 7px 28px" : "7px 8px 7px 28px",
                 background: "var(--bg-tertiary)",
                 border: searchFocused ? "1px solid var(--amber)" : "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
@@ -2104,10 +2206,51 @@ export default function BomPanel({
                 outlineOffset: "-1px",
               }}
             />
+            {keskoMode && (
+              <button
+                type="button"
+                onClick={handleKeskoSearch}
+                disabled={keskoLoading}
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "4px 8px",
+                  background: "var(--amber)",
+                  color: "var(--bg-primary)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: keskoLoading ? "wait" : "pointer",
+                  opacity: keskoLoading ? 0.7 : 1,
+                }}
+              >
+                {keskoLoading ? t("pricing.searchingKesko") : t("pricing.searchKesko")}
+              </button>
+            )}
           </div>
 
+          {keskoMode && (
+            <div
+              style={{
+                marginBottom: 8,
+                padding: "7px 9px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                background: keskoConfigured === false ? "rgba(229,160,75,0.08)" : "var(--bg-tertiary)",
+                color: keskoError ? "var(--text-secondary)" : "var(--text-muted)",
+                fontSize: 11,
+                lineHeight: 1.35,
+              }}
+            >
+              {keskoError || t("pricing.keskoHint")}
+            </div>
+          )}
+
           {/* Category filter tabs */}
-          {categories.length > 0 && (
+          {!keskoMode && categories.length > 0 && (
             <div
               style={{
                 display: "flex",
@@ -2154,7 +2297,154 @@ export default function BomPanel({
             gap: 4,
           }}
         >
-          {availableMaterials.length === 0 ? (
+          {keskoMode ? (
+            keskoLoading ? (
+              <div style={{ textAlign: "center", padding: "16px 8px", color: "var(--text-muted)", fontSize: 12 }}>
+                {t("pricing.searchingKesko")}
+              </div>
+            ) : keskoProducts.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "16px 8px", color: "var(--text-muted)", fontSize: 12 }}>
+                {keskoError || t("pricing.keskoNoSearchYet")}
+              </div>
+            ) : (
+              keskoProducts.map((product) => {
+                const stock = stockMeta(normalizeStockLevel(product.stockLevel), t);
+                const alreadyInBom = bom.some((item) => item.material_id === product.materialId);
+                const isAdding = keskoAddingId === product.id;
+                const stockTitle = [
+                  stock.label,
+                  product.stockQuantity != null ? `${product.stockQuantity} ${localizeUnit(product.unit, t)}` : null,
+                  product.storeLocation || product.storeName,
+                  product.lastCheckedAt ? `${t("bom.lastChecked")}: ${new Date(product.lastCheckedAt).toLocaleDateString(locale)}` : null,
+                ].filter(Boolean).join(" · ");
+                return (
+                  <div
+                    key={product.id}
+                    className="material-browse-card"
+                    data-selected={alreadyInBom}
+                    role="group"
+                    aria-label={product.name}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          style={{ width: 30, height: 30, borderRadius: "var(--radius-sm)", objectFit: "cover", flexShrink: 0 }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: "var(--radius-sm)",
+                            background: "linear-gradient(135deg, var(--amber), var(--forest))",
+                            opacity: 0.35,
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "var(--text-primary)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {product.name}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, minWidth: 0 }}>
+                          <span style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                            K-Rauta
+                          </span>
+                          {product.categoryName && (
+                            <>
+                              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>&middot;</span>
+                              <span style={{
+                                fontSize: 10,
+                                color: "var(--text-muted)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}>
+                                {product.categoryName}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                          <span
+                            title={stockTitle}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              fontSize: 10,
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: stock.color,
+                                flexShrink: 0,
+                              }}
+                            />
+                            {stock.label}
+                          </span>
+                          {product.productUrl && (
+                            <a
+                              href={product.productUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ fontSize: 10, color: "var(--amber)", textDecoration: "none" }}
+                            >
+                              {t("pricing.viewProduct")}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                        <span style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "var(--success)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}>
+                          {product.unitPrice != null ? `${product.unitPrice.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : "--"}
+                        </span>
+                        <span style={{ fontSize: 9, color: "var(--text-muted)" }}>
+                          {localizeUnit(product.unit, t)} · {t("pricing.vatNote")}
+                        </span>
+                        <button
+                          className="btn btn-primary"
+                          disabled={alreadyInBom || isAdding || !onAddImported}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleKeskoImport(product);
+                          }}
+                          style={{
+                            padding: "3px 9px",
+                            fontSize: 11,
+                            opacity: alreadyInBom || isAdding ? 0.65 : 1,
+                            cursor: alreadyInBom || isAdding ? "default" : "pointer",
+                          }}
+                        >
+                          {alreadyInBom ? t("pricing.added") : isAdding ? t("pricing.adding") : t("editor.add")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : availableMaterials.length === 0 ? (
             <div style={{ textAlign: "center", padding: "16px 8px", color: "var(--text-muted)", fontSize: 12 }}>
               {t('pricing.noResults')}
             </div>

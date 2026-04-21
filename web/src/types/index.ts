@@ -161,6 +161,41 @@ export interface MaterialPriceData {
   savings_per_unit: number;
 }
 
+export interface KeskoProduct {
+  id: string;
+  materialId: string;
+  name: string;
+  ean: string | null;
+  sku: string | null;
+  unitPrice: number | null;
+  priceText: string | null;
+  currency: string;
+  unit: string;
+  imageUrl: string | null;
+  productUrl: string | null;
+  stockLevel: StockLevel;
+  stockQuantity: number | null;
+  storeName: string | null;
+  storeLocation: string | null;
+  categoryName: string | null;
+  branchCode: string;
+  lastCheckedAt: string;
+}
+
+export interface KeskoSearchResponse {
+  configured: boolean;
+  source: "live" | "cache" | "not_configured" | "error";
+  branchCode: string;
+  products: KeskoProduct[];
+  cachedAt?: string;
+  error?: string;
+}
+
+export interface KeskoImportResponse {
+  material: Material;
+  bom_item: BomItem;
+}
+
 export type EnergyHeatingType =
   | "oil"
   | "natural_gas"

@@ -1,4 +1,4 @@
-import type { EnergySubsidyRequest } from "@/types";
+import type { EnergySubsidyRequest, KeskoProduct } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -290,6 +290,16 @@ export const api = {
   getPriceHistory: (materialId: string) =>
     apiFetch(`/pricing/history/${materialId}`),
   getStalePrices: () => apiFetch("/pricing/stale"),
+  searchKeskoProducts: (q: string, branchCode?: string) => {
+    const params = new URLSearchParams({ q });
+    if (branchCode) params.set("branchCode", branchCode);
+    return apiFetch(`/kesko/products/search?${params.toString()}`);
+  },
+  importKeskoProduct: (product: KeskoProduct) =>
+    apiFetch("/kesko/products/import", {
+      method: "POST",
+      body: JSON.stringify({ productId: product.id, product }),
+    }),
   estimateEnergySubsidy: (data: EnergySubsidyRequest) =>
     apiFetch("/subsidies/energy/estimate", { method: "POST", body: JSON.stringify(data) }),
   getWasteEstimate: (projectId: string) =>

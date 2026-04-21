@@ -851,6 +851,25 @@ export default function ProjectPage() {
     [materials, track]
   );
 
+  const addImportedBomItem = useCallback(
+    (item: BomItem, material: Material) => {
+      setMaterials((prev) => {
+        const existing = prev.find((m) => m.id === material.id);
+        if (existing) {
+          return prev.map((m) => (m.id === material.id ? { ...m, ...material } : m));
+        }
+        return [...prev, material];
+      });
+
+      track("bom_item_added", { material_id: item.material_id, category: item.category_name || "kesko" });
+      setBom((prev) => {
+        if (prev.some((b) => b.material_id === item.material_id)) return prev;
+        return [...prev, item];
+      });
+    },
+    [track],
+  );
+
   const removeBomItem = useCallback((materialId: string) => {
     let removedItem: BomItem | undefined;
     setBom((prev) => {
@@ -1677,6 +1696,7 @@ export default function ProjectPage() {
               bom={bom}
               materials={materials}
               onAdd={addBomItem}
+              onAddImported={addImportedBomItem}
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
               style={{ width: bomWidth }}
