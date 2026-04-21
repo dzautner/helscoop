@@ -41,6 +41,15 @@ export default function Home() {
       name: building.address,
       description: `${buildingTypeLabel}, ${materialLabel}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
       scene_js: building.scene_js,
+      building_info: {
+        address: building.address,
+        ...building.building_info,
+        confidence: building.confidence,
+        data_sources: building.data_sources,
+        climate_zone: building.climate_zone,
+        heating_degree_days: building.heating_degree_days,
+        data_source_error: building.data_source_error,
+      },
     });
     if (building.bom_suggestion.length > 0) {
       await api.saveBOM(project.id, building.bom_suggestion);

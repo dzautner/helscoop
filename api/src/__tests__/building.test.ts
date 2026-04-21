@@ -6,6 +6,9 @@
  */
 
 process.env.NODE_ENV = "test";
+process.env.BUILDING_REGISTRY_ENABLED = "false";
+delete process.env.DVV_API_KEY;
+delete process.env.MML_API_KEY;
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import http from "http";
@@ -334,7 +337,144 @@ describe("GET /building — generic building fallback", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Cache behavior
+// 4. External Finnish registry integration
+// ---------------------------------------------------------------------------
+describe("GET /building — Finnish registry integration", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    process.env.BUILDING_REGISTRY_ENABLED = "true";
+    delete process.env.DVV_API_KEY;
+    process.env.FMI_LOOKUP_ENABLED = "true";
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env.BUILDING_REGISTRY_ENABLED = "false";
+    delete process.env.FMI_LOOKUP_ENABLED;
+  });
+
+  it("uses Ryhti/DVV building data when registry lookup succeeds", async () => {
+    const mockFetch = vi.fn(async (input: unknown) => {
+      const url = String(input);
+
+      if (url.includes("/open_address/items")) {
+        return {
+          ok: true,
+          statusText: "OK",
+          json: async () => ({
+            features: [
+              {
+                properties: {
+                  address_fin: "Ulvilantie 2",
+                  postal_code: "00350",
+                  postal_office_fin: "Helsinki",
+                },
+                geometry: { coordinates: [24.87845, 60.20388] },
+              },
+            ],
+          }),
+        } as unknown as Response;
+      }
+
+      if (url.includes("opendata.fmi.fi")) {
+        return {
+          ok: true,
+          statusText: "OK",
+          text: async () =>
+            "<BsWfs:ParameterValue>0</BsWfs:ParameterValue><BsWfs:ParameterValue>-5</BsWfs:ParameterValue>",
+        } as unknown as Response;
+      }
+
+      if (url.includes("/avoimet_lupa_rakennukset/items")) {
+        return {
+          ok: true,
+          statusText: "OK",
+          json: async () => ({
+            features: [
+              {
+                properties: {
+                  paaasiallinen_kayttotarkoitus: "Erillinen pientalo",
+                  valmistumispaivamaara: "1984-06-01",
+                  kantavien_rakenteiden_rakennusaine: "betoni",
+                  lammitysenergian_lahde: "Maalämpö",
+                  kerrosluku: 2,
+                  kokonaisala: 172,
+                },
+                geometry: { coordinates: [24.87846, 60.20389] },
+              },
+            ],
+          }),
+        } as unknown as Response;
+      }
+
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const res = await makeRequest(
+      "GET",
+      `/building?address=${encodeURIComponent("Ulvilantie 2, 00350 Helsinki")}`
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      confidence: string;
+      address: string;
+      data_sources: string[];
+      climate_zone?: string;
+      heating_degree_days?: number;
+      building_info: {
+        type: string;
+        year_built: number;
+        material: string;
+        floors: number;
+        area_m2: number;
+        heating: string;
+      };
+    };
+
+    expect(body.confidence).toBe("verified");
+    expect(body.address).toContain("Ulvilantie 2");
+    expect(body.building_info.type).toBe("omakotitalo");
+    expect(body.building_info.year_built).toBe(1984);
+    expect(body.building_info.material).toBe("betoni");
+    expect(body.building_info.floors).toBe(2);
+    expect(body.building_info.area_m2).toBe(172);
+    expect(body.building_info.heating).toBe("maalampopumppu");
+    expect(body.climate_zone).toBe("southern");
+    expect(body.heating_degree_days).toBeGreaterThan(0);
+    expect(body.data_sources.some((source) => source.includes("Ryhti / DVV rakennustiedot"))).toBe(true);
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it("falls back to estimated data and exposes data_source_error when registry lookup fails", async () => {
+    process.env.FMI_LOOKUP_ENABLED = "false";
+    global.fetch = vi.fn(async () => {
+      throw new Error("registry unavailable");
+    }) as unknown as typeof fetch;
+
+    const res = await makeRequest(
+      "GET",
+      `/building?address=${encodeURIComponent("Registry Failure Street 7, 33900 Tampere")}`
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      confidence: string;
+      data_sources: string[];
+      data_source_error?: string;
+    };
+
+    expect(body.confidence).toBe("estimated");
+    expect(body.data_sources).toContain("Yleinen kerrostalomalli");
+    expect(body.data_source_error).toContain("Finnish registry lookup failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Cache behavior
 // ---------------------------------------------------------------------------
 describe("GET /building — caching", () => {
   it("returns consistent results for the same address", async () => {
@@ -369,7 +509,7 @@ describe("GET /building — caching", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Response shape
+// 6. Response shape
 // ---------------------------------------------------------------------------
 describe("GET /building — response shape", () => {
   it("includes all required fields in response", async () => {

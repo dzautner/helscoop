@@ -11,6 +11,9 @@ export interface BuildingInfo {
   units?: number;
   confidence?: string;
   data_sources?: string[];
+  climate_zone?: string;
+  heating_degree_days?: number;
+  data_source_error?: string;
 }
 
 export interface Project {
@@ -45,6 +48,9 @@ export interface BuildingResult {
   };
   confidence: "verified" | "estimated" | "template";
   data_sources: string[];
+  climate_zone?: string;
+  heating_degree_days?: number;
+  data_source_error?: string;
   scene_js: string;
   bom_suggestion: { material_id: string; quantity: number; unit: string }[];
 }

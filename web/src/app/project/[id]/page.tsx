@@ -1249,6 +1249,8 @@ export default function ProjectPage() {
           ...(bi.year_built ? [{ label: t("search.yearBuilt"), value: String(bi.year_built) }] : []),
           ...(bi.area_m2 ? [{ label: t("search.area"), value: `${bi.area_m2} m\u00B2` }] : []),
           ...(bi.floors ? [{ label: t("search.floors"), value: String(bi.floors) }] : []),
+          ...(bi.climate_zone ? [{ label: "Climate", value: bi.climate_zone }] : []),
+          ...(bi.heating_degree_days ? [{ label: "HDD", value: String(bi.heating_degree_days) }] : []),
         ];
         return (
           <div

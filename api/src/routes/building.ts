@@ -70,6 +70,55 @@ interface BuildingData {
   building_info: BuildingInfo;
   scene_js: string;
   bom_suggestion: BomItem[];
+  climate_zone?: string;
+  heating_degree_days?: number;
+  data_source_error?: string;
+}
+
+interface ExternalBuildingResult extends BuildingData {
+  confidence: "verified" | "estimated";
+  data_sources: string[];
+}
+
+interface RegistryLookupOutcome {
+  building?: ExternalBuildingResult;
+  partial?: {
+    address: string;
+    coordinates: { lat: number; lon: number };
+    data_sources: string[];
+  };
+  error?: string;
+}
+
+interface ParsedAddress {
+  streetName: string;
+  houseNumber: number;
+  postalCode?: string;
+  city?: string;
+}
+
+interface RegistryFeature {
+  properties?: Record<string, unknown>;
+  geometry?: {
+    coordinates?: unknown;
+  };
+}
+
+interface RegistryFeatureCollection {
+  features?: RegistryFeature[];
+}
+
+interface AddressLookup {
+  address: string;
+  coordinates: { lat: number; lon: number };
+  city?: string;
+  data_sources: string[];
+}
+
+interface ClimateLookup {
+  climate_zone?: string;
+  heating_degree_days?: number;
+  source?: string;
 }
 
 function loadDemoData(): BuildingData[] {
@@ -272,8 +321,468 @@ function generateGenericScene(
   return lines;
 }
 
+const DEFAULT_RYHTI_API_URL =
+  "https://paikkatiedot.ymparisto.fi/geoserver/ryhti_building/ogc/features/v1";
+const DEFAULT_FMI_WFS_URL = "https://opendata.fmi.fi/wfs";
+
+function externalRegistryEnabled(): boolean {
+  return process.env.BUILDING_REGISTRY_ENABLED === "true" || Boolean(process.env.DVV_API_KEY);
+}
+
+function registryTimeoutMs(): number {
+  const parsed = Number(process.env.BUILDING_REGISTRY_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 2500;
+}
+
+function registryHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const apiKey = process.env.DVV_API_KEY || process.env.MML_API_KEY;
+  if (apiKey) {
+    headers["X-API-Key"] = apiKey;
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
+async function fetchJsonWithTimeout<T>(url: URL): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), registryTimeoutMs());
+
+  try {
+    const response = await fetch(url, {
+      headers: registryHeaders(),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+
+    return (await response.json()) as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchTextWithTimeout(url: URL): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), registryTimeoutMs());
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/xml,text/xml,*/*" },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function registryBaseUrl(): string {
+  return (process.env.DVV_BUILDING_API_URL || DEFAULT_RYHTI_API_URL).replace(/\/+$/, "");
+}
+
+function parseFinnishAddress(address: string): ParsedAddress | null {
+  const normalized = address.replace(/\s+/g, " ").trim();
+  const postalMatch = normalized.match(/\b(\d{5})\b/);
+  const postalCode = postalMatch?.[1];
+  const beforePostal = postalMatch?.index !== undefined
+    ? normalized.slice(0, postalMatch.index).replace(/,\s*$/, "").trim()
+    : normalized.split(",")[0].trim();
+  const streetMatch = beforePostal.match(/^(.+?)\s+(\d+)(?:[-\s]?[A-Za-zÅÄÖåäö0-9]*)?$/);
+
+  if (!streetMatch) return null;
+
+  let city: string | undefined;
+  if (postalMatch?.index !== undefined) {
+    city = normalized
+      .slice(postalMatch.index + postalMatch[0].length)
+      .replace(/^[,\s]+/, "")
+      .split(",")[0]
+      .trim();
+  } else {
+    city = normalized.split(",")[1]?.replace(/\b\d{5}\b/g, "").trim();
+  }
+
+  return {
+    streetName: streetMatch[1].trim(),
+    houseNumber: Number(streetMatch[2]),
+    postalCode,
+    city: city || undefined,
+  };
+}
+
+function cqlString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function buildAddressFilter(parsed: ParsedAddress): string {
+  const filters = [
+    `address_name_fin=${cqlString(parsed.streetName)}`,
+    `number_part_of_address_number=${parsed.houseNumber}`,
+  ];
+
+  if (parsed.postalCode) {
+    filters.push(`postal_code=${cqlString(parsed.postalCode)}`);
+  }
+
+  if (!parsed.postalCode && parsed.city) {
+    filters.push(`postal_office_fin=${cqlString(parsed.city)}`);
+  }
+
+  return filters.join(" AND ");
+}
+
+function readString(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function readNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function firstNumber(properties: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = readNumber(properties[key]);
+    if (value !== null && value > 0) return value;
+  }
+  return null;
+}
+
+function firstString(properties: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = readString(properties[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function collectPositions(value: unknown, out: number[][] = []): number[][] {
+  if (!Array.isArray(value)) return out;
+
+  if (
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    typeof value[1] === "number"
+  ) {
+    out.push([value[0], value[1]]);
+    return out;
+  }
+
+  for (const child of value) {
+    collectPositions(child, out);
+  }
+  return out;
+}
+
+function pointFromGeometry(geometry?: RegistryFeature["geometry"]): { lat: number; lon: number } | null {
+  const positions = collectPositions(geometry?.coordinates);
+  if (positions.length === 0) return null;
+
+  const sum = positions.reduce(
+    (acc, [lon, lat]) => ({ lon: acc.lon + lon, lat: acc.lat + lat }),
+    { lon: 0, lat: 0 }
+  );
+
+  return {
+    lon: sum.lon / positions.length,
+    lat: sum.lat / positions.length,
+  };
+}
+
+function distanceScore(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const dLat = a.lat - b.lat;
+  const dLon = a.lon - b.lon;
+  return dLat * dLat + dLon * dLon;
+}
+
+function selectNearestFeature(
+  features: RegistryFeature[] | undefined,
+  target: { lat: number; lon: number }
+): RegistryFeature | null {
+  if (!features?.length) return null;
+
+  let best: RegistryFeature | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const feature of features) {
+    const point = pointFromGeometry(feature.geometry);
+    const score = point ? distanceScore(point, target) : Number.POSITIVE_INFINITY;
+    if (score < bestScore) {
+      best = feature;
+      bestScore = score;
+    }
+  }
+
+  return best ?? features[0] ?? null;
+}
+
+async function lookupRyhtiAddress(address: string): Promise<AddressLookup | null> {
+  const parsed = parseFinnishAddress(address);
+  if (!parsed) return null;
+
+  const url = new URL(`${registryBaseUrl()}/collections/open_address/items`);
+  url.searchParams.set("f", "json");
+  url.searchParams.set("limit", "5");
+  url.searchParams.set("filter-lang", "cql-text");
+  url.searchParams.set("filter", buildAddressFilter(parsed));
+
+  const collection = await fetchJsonWithTimeout<RegistryFeatureCollection>(url);
+  const feature = collection.features?.[0];
+  if (!feature) return null;
+
+  const coordinates = pointFromGeometry(feature.geometry);
+  if (!coordinates) return null;
+
+  const props = feature.properties ?? {};
+  const streetAddress = readString(props.address_fin)
+    ?? `${parsed.streetName} ${parsed.houseNumber}`;
+  const postal = [readString(props.postal_code), readString(props.postal_office_fin)]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    address: postal ? `${streetAddress}, ${postal}` : streetAddress,
+    coordinates,
+    city: readString(props.postal_office_fin) ?? parsed.city,
+    data_sources: [`Ryhti / DVV osoiterekisteri ${new Date().toISOString()}`],
+  };
+}
+
+async function lookupRyhtiBuildingProperties(
+  coordinates: { lat: number; lon: number }
+): Promise<Record<string, unknown> | null> {
+  for (const radius of [0.00045, 0.0009, 0.0018]) {
+    const url = new URL(`${registryBaseUrl()}/collections/avoimet_lupa_rakennukset/items`);
+    url.searchParams.set("f", "json");
+    url.searchParams.set("limit", "10");
+    url.searchParams.set(
+      "bbox",
+      [
+        coordinates.lon - radius,
+        coordinates.lat - radius,
+        coordinates.lon + radius,
+        coordinates.lat + radius,
+      ].join(",")
+    );
+
+    const collection = await fetchJsonWithTimeout<RegistryFeatureCollection>(url);
+    const feature = selectNearestFeature(collection.features, coordinates);
+    if (feature?.properties) return feature.properties;
+  }
+
+  return null;
+}
+
+function inferBuildingType(area: number): string {
+  if (area <= 90) return "kerrostalo";
+  if (area >= 240) return "rivitalo";
+  return "omakotitalo";
+}
+
+function normalizeBuildingType(raw: string | null, area: number): string {
+  const value = raw?.toLowerCase() ?? "";
+  if (value.includes("kerrostalo")) return "kerrostalo";
+  if (value.includes("rivi")) return "rivitalo";
+  if (value.includes("pari")) return "paritalo";
+  if (value.includes("omakoti") || value.includes("pientalo") || value.includes("erillinen")) {
+    return "omakotitalo";
+  }
+  return inferBuildingType(area);
+}
+
+function normalizeMaterial(raw: string | null, fallback: string): string {
+  const value = raw?.toLowerCase() ?? "";
+  if (value.includes("betoni")) return "betoni";
+  if (value.includes("tiili")) return "tiili";
+  if (value.includes("hirsi")) return "hirsi";
+  if (value.includes("puu")) return "puu";
+  if (value.includes("kivi")) return "tiili";
+  return fallback;
+}
+
+function normalizeHeating(raw: string | null, fallback: string): string {
+  const value = raw?.toLowerCase() ?? "";
+  if (value.includes("kauko")) return "kaukolampo";
+  if (value.includes("maal") || value.includes("geo")) return "maalampopumppu";
+  if (value.includes("säh") || value.includes("sah")) return "sahko";
+  if (value.includes("ölj") || value.includes("olj")) return "oljy";
+  if (value.includes("puu") || value.includes("pelletti")) return "puu";
+  return fallback;
+}
+
+function yearFromDate(value: string | null): number | null {
+  if (!value) return null;
+  const match = value.match(/\b(18|19|20)\d{2}\b/);
+  if (!match) return null;
+  const year = Number(match[0]);
+  return Number.isFinite(year) ? year : null;
+}
+
+function mapRegistryBuilding(
+  addressLookup: AddressLookup,
+  properties: Record<string, unknown>,
+  climate: ClimateLookup
+): ExternalBuildingResult {
+  const generic = generateGenericBuilding(addressLookup.address);
+  const area = firstNumber(properties, ["kokonaisala", "kerrosala", "huoneistoala"])
+    ?? generic.building_info.area_m2;
+  const floors = firstNumber(properties, ["kerrosluku"]) ?? generic.building_info.floors;
+  const year = yearFromDate(firstString(properties, ["valmistumispaivamaara", "paatospaivamaara"]))
+    ?? generic.building_info.year_built;
+  const materialRaw = firstString(properties, [
+    "kantavien_rakenteiden_rakennusaine",
+    "julkisivumateriaali",
+  ]);
+  const heatingRaw = firstString(properties, ["lammitysenergian_lahde", "lammitystapa"]);
+  const type = normalizeBuildingType(
+    firstString(properties, ["paaasiallinen_kayttotarkoitus", "kayttotarkoitus"]),
+    area
+  );
+  const roundedArea = Math.round(area);
+  const roundedFloors = Math.max(1, Math.round(floors));
+  const dataSources = [
+    ...addressLookup.data_sources,
+    `Ryhti / DVV rakennustiedot ${new Date().toISOString()}`,
+  ];
+
+  if (climate.source) {
+    dataSources.push(climate.source);
+  }
+
+  return {
+    ...generic,
+    address: addressLookup.address,
+    coordinates: addressLookup.coordinates,
+    building_info: {
+      ...generic.building_info,
+      type,
+      year_built: year,
+      material: normalizeMaterial(materialRaw, generic.building_info.material),
+      floors: roundedFloors,
+      area_m2: roundedArea,
+      heating: normalizeHeating(heatingRaw, generic.building_info.heating),
+    },
+    climate_zone: climate.climate_zone,
+    heating_degree_days: climate.heating_degree_days,
+    scene_js: generateGenericScene(type, roundedFloors, roundedArea),
+    confidence: "verified",
+    data_sources: dataSources,
+  };
+}
+
+function inferClimateZone(lat: number): string {
+  if (lat >= 66.5) return "lapland";
+  if (lat >= 63) return "northern";
+  if (lat >= 61) return "central";
+  return "southern";
+}
+
+function extractFmiTemperatures(xml: string): number[] {
+  const values: number[] = [];
+  const regex = /<(?:\w+:)?ParameterValue>(-?\d+(?:\.\d+)?)<\/(?:\w+:)?ParameterValue>/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(xml)) !== null) {
+    const value = Number(match[1]);
+    if (Number.isFinite(value)) values.push(value);
+  }
+
+  return values;
+}
+
+function estimateHeatingDegreeDays(temperatures: number[]): number | undefined {
+  if (temperatures.length === 0) return undefined;
+  const daily = temperatures.reduce((sum, temp) => sum + Math.max(17 - temp, 0), 0);
+  return Math.round((daily / temperatures.length) * 365);
+}
+
+async function lookupFmiClimate(
+  city: string | undefined,
+  coordinates: { lat: number; lon: number }
+): Promise<ClimateLookup> {
+  const result: ClimateLookup = {
+    climate_zone: inferClimateZone(coordinates.lat),
+  };
+
+  if (process.env.FMI_LOOKUP_ENABLED === "false") return result;
+
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const url = new URL(process.env.FMI_WFS_URL || DEFAULT_FMI_WFS_URL);
+    url.searchParams.set("service", "WFS");
+    url.searchParams.set("version", "2.0.0");
+    url.searchParams.set("request", "getFeature");
+    url.searchParams.set("storedquery_id", "fmi::observations::weather::daily::simple");
+    url.searchParams.set("parameters", "tday");
+    url.searchParams.set("maxlocations", "1");
+    url.searchParams.set("starttime", start.toISOString());
+    url.searchParams.set("endtime", end.toISOString());
+
+    if (city) {
+      url.searchParams.set("place", city);
+    } else {
+      url.searchParams.set("latlon", `${coordinates.lat},${coordinates.lon}`);
+    }
+
+    const xml = await fetchTextWithTimeout(url);
+    result.heating_degree_days = estimateHeatingDegreeDays(extractFmiTemperatures(xml));
+    if (result.heating_degree_days) {
+      result.source = `Ilmatieteen laitos daily observations ${new Date().toISOString()}`;
+    }
+  } catch {
+    // Climate context is additive; registry data should not fail because FMI is unavailable.
+  }
+
+  return result;
+}
+
+async function lookupFinnishRegistry(address: string): Promise<RegistryLookupOutcome> {
+  try {
+    const addressLookup = await lookupRyhtiAddress(address);
+    if (!addressLookup) {
+      return { error: "Finnish registry address match not found" };
+    }
+
+    const climate = await lookupFmiClimate(addressLookup.city, addressLookup.coordinates);
+    const properties = await lookupRyhtiBuildingProperties(addressLookup.coordinates);
+
+    if (!properties) {
+      return {
+        partial: {
+          address: addressLookup.address,
+          coordinates: addressLookup.coordinates,
+          data_sources: addressLookup.data_sources,
+        },
+        error: "Finnish building registry details not found; using estimated building model",
+      };
+    }
+
+    return {
+      building: mapRegistryBuilding(addressLookup, properties, climate),
+    };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "unknown error";
+    return { error: `Finnish registry lookup failed: ${detail}` };
+  }
+}
+
 // GET /building?address=<address>
-router.get("/", (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   const address = (req.query.address as string) || "";
 
   // Input validation: minimum length
@@ -306,12 +815,27 @@ router.get("/", (req: Request, res: Response) => {
     }
   }
 
+  let registryOutcome: RegistryLookupOutcome | null = null;
+  if (externalRegistryEnabled()) {
+    registryOutcome = await lookupFinnishRegistry(address);
+    if (registryOutcome.building) {
+      setCache(cacheKey, registryOutcome.building);
+      return res.json(registryOutcome.building);
+    }
+  }
+
   // Fallback: generate generic building
   const generic = generateGenericBuilding(address);
+  const partial = registryOutcome?.partial;
+  const dataSources = partial
+    ? [...partial.data_sources, "Yleinen kerrostalomalli"]
+    : ["Yleinen kerrostalomalli"];
   const result = {
     ...generic,
+    ...(partial ? { address: partial.address, coordinates: partial.coordinates } : {}),
     confidence: "estimated" as const,
-    data_sources: ["Yleinen kerrostalomalli"],
+    data_sources: dataSources,
+    ...(registryOutcome?.error ? { data_source_error: registryOutcome.error } : {}),
   };
   setCache(cacheKey, result);
   return res.json(result);
