@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api, setToken, getToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -39,6 +39,7 @@ export default function SettingsPage() {
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const deleteBtnRef = useRef<HTMLButtonElement>(null);
 
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -593,6 +594,7 @@ export default function SettingsPage() {
           </div>
 
           <button
+            ref={deleteBtnRef}
             className="btn btn-danger"
             onClick={() => setShowDeleteConfirm(true)}
             style={{ padding: "11px 24px" }}
@@ -613,7 +615,10 @@ export default function SettingsPage() {
           setShowDeleteConfirm(false);
           handleDeleteAccount();
         }}
-        onCancel={() => setShowDeleteConfirm(false)}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          deleteBtnRef.current?.focus();
+        }}
       />
     </div>
   );

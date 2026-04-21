@@ -3243,6 +3243,17 @@ select:focus {
   .bom-item-qty-input {
     padding: 10px 8px;
   }
+
+  .shared-project-layout {
+    flex-direction: column;
+  }
+
+  .shared-project-sidebar {
+    width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border);
+    max-height: 50vh;
+  }
 }
 
 /* ========= SMALL MOBILE (480px) ========= */
