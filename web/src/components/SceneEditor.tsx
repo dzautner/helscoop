@@ -345,6 +345,9 @@ export default function SceneEditor({
   const startCursorTracking = useCallback(() => {
     setIsFocused(true);
     updateCursorLine();
+    if (textareaRef.current) textareaRef.current.dataset.tabTrapped = "true";
+    if (intervalRef.current) return;
+    intervalRef.current = setInterval(updateCursorLine, 50);
   }, [updateCursorLine]);
 
   const stopCursorTracking = useCallback(() => {
@@ -806,15 +809,23 @@ export default function SceneEditor({
                   return;
                 }
               }
+              if (e.key === "Escape") {
+                (e.target as HTMLTextAreaElement).dataset.tabTrapped = "false";
+                return;
+              }
               if (e.key === "Tab") {
+                const ta = e.target as HTMLTextAreaElement;
+                if (ta.dataset.tabTrapped === "false") {
+                  ta.dataset.tabTrapped = "true";
+                  return;
+                }
                 e.preventDefault();
-                const target = e.target as HTMLTextAreaElement;
-                const start = target.selectionStart;
-                const end = target.selectionEnd;
-                const val = target.value;
+                const start = ta.selectionStart;
+                const end = ta.selectionEnd;
+                const val = ta.value;
                 onChange(val.substring(0, start) + "  " + val.substring(end));
                 setTimeout(() => {
-                  target.selectionStart = target.selectionEnd = start + 2;
+                  ta.selectionStart = ta.selectionEnd = start + 2;
                   updateCursorLine();
                 }, 0);
               }

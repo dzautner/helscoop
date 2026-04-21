@@ -573,7 +573,13 @@ export default function SettingsPage() {
                 required
                 aria-required="true"
                 autoComplete="new-password"
+                minLength={8}
               />
+              {newPassword.length > 0 && newPassword.length < 8 && (
+                <span style={{ fontSize: 11, color: "var(--danger)", marginTop: 4, display: "block" }}>
+                  {t("settings.passwordTooShort")}
+                </span>
+              )}
             </div>
             <div>
               <label
@@ -594,12 +600,17 @@ export default function SettingsPage() {
                 aria-required="true"
                 autoComplete="new-password"
               />
+              {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                <span style={{ fontSize: 11, color: "var(--danger)", marginTop: 4, display: "block" }}>
+                  {t("settings.passwordMismatch")}
+                </span>
+              )}
             </div>
             <div>
               <button
                 className="btn btn-primary"
                 type="submit"
-                disabled={changingPassword}
+                disabled={changingPassword || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
                 style={{ padding: "11px 24px" }}
               >
                 {changingPassword
