@@ -14,6 +14,7 @@ import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
+import { detectHeatingGrantOpportunity } from "@/lib/heating-grant-context";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
 import type { QuoteConfig } from "@/lib/quote-engine";
 import type {
@@ -1806,6 +1807,12 @@ export default function BomPanel({
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const animatedTotal = useAnimatedNumber(total);
+  const heatingGrantOpportunity = useMemo(() => detectHeatingGrantOpportunity({
+    sceneJs,
+    bom,
+    materials,
+    buildingInfo,
+  }), [sceneJs, bom, materials, buildingInfo]);
   const packageSummaries = useMemo<PackageSummary[]>(() => {
     const materialMap = new Map(materials.map((material) => [material.id, material]));
     const bomMaterialIds = new Set(bom.map((item) => item.material_id));
@@ -2336,8 +2343,13 @@ export default function BomPanel({
           </svg>
           {t("quoteRequest.open")}
         </button>
-        {bom.length > 0 && total > 0 && (
-          <SubsidyCalculator totalCost={total} buildingInfo={buildingInfo} />
+        {bom.length > 0 && total > 0 && heatingGrantOpportunity.shouldShow && (
+          <SubsidyCalculator
+            totalCost={total}
+            buildingInfo={buildingInfo}
+            triggeredByScene={heatingGrantOpportunity.triggeredByScene}
+            detectedTargetHeating={heatingGrantOpportunity.detectedTargetHeating}
+          />
         )}
         {bom.length > 0 && projectId && (
           <WasteEstimatePanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />

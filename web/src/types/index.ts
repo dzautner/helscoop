@@ -267,6 +267,9 @@ export interface EnergySubsidyProgram {
   netCost: number;
   reasons: string[];
   warnings: string[];
+  applicationDeadline?: string;
+  applicationDeadlineAt?: string;
+  completionDeadline?: string;
   deadline?: string;
   paymentDeadline?: string;
   applicationUrl: string;
@@ -277,6 +280,11 @@ export interface EnergySubsidyResponse {
   totalCost: number;
   bestAmount: number;
   netCost: number;
+  applicationDeadline: string;
+  applicationDeadlineAt: string;
+  daysUntilApplicationDeadline: number;
+  completionDeadline: string;
+  daysUntilCompletionDeadline: number;
   deadline: string;
   daysUntilDeadline: number;
   generatedAt: string;

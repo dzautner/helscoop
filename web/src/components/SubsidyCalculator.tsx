@@ -41,14 +41,18 @@ function formatEur(value: number, locale: string): string {
 export default function SubsidyCalculator({
   totalCost,
   buildingInfo,
+  triggeredByScene = false,
+  detectedTargetHeating = null,
 }: {
   totalCost: number;
   buildingInfo?: BuildingInfo | null;
+  triggeredByScene?: boolean;
+  detectedTargetHeating?: EnergyHeatingType | null;
 }) {
   const { t, locale } = useTranslation();
   const [answers, setAnswers] = useState<Omit<EnergySubsidyRequest, "totalCost">>(() => ({
     currentHeating: normalizeHeating(buildingInfo?.heating),
-    targetHeating: "air_water_heat_pump",
+    targetHeating: detectedTargetHeating ?? "air_water_heat_pump",
     buildingType: normalizeBuildingType(buildingInfo?.type),
     buildingYear: buildingInfo?.year_built ?? null,
     yearRoundResidential: true,
@@ -68,6 +72,13 @@ export default function SubsidyCalculator({
       buildingYear: prev.buildingYear ?? buildingInfo?.year_built ?? null,
     }));
   }, [buildingInfo]);
+
+  useEffect(() => {
+    if (!detectedTargetHeating) return;
+    setAnswers((prev) => (
+      prev.targetHeating === detectedTargetHeating ? prev : { ...prev, targetHeating: detectedTargetHeating }
+    ));
+  }, [detectedTargetHeating]);
 
   const request = useMemo<EnergySubsidyRequest>(() => ({
     ...answers,
@@ -99,6 +110,18 @@ export default function SubsidyCalculator({
   const ara = result?.programs.find((program) => program.program === "ara_repair_elderly_disabled");
   const eligible = ely?.status === "eligible";
   const possibleAra = ara?.status === "maybe";
+  const deadlineDays = result ? Math.max(0, result.daysUntilApplicationDeadline ?? result.daysUntilDeadline) : 0;
+  const deadlineAt = result?.applicationDeadlineAt ? new Date(result.applicationDeadlineAt) : null;
+  const applicationDeadline = deadlineAt
+    ? new Intl.DateTimeFormat(locale === "fi" ? "fi-FI" : "en-GB", {
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Helsinki",
+    }).format(deadlineAt)
+    : null;
 
   const selectStyle: CSSProperties = {
     width: "100%",
@@ -134,10 +157,10 @@ export default function SubsidyCalculator({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div>
           <div className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            {t("subsidy.sectionLabel")}
+            {triggeredByScene ? t("subsidy.opportunityLabel") : t("subsidy.sectionLabel")}
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginTop: 2 }}>
-            {eligible ? t("subsidy.eligibleTitle") : possibleAra ? t("subsidy.maybeTitle") : t("subsidy.checkTitle")}
+            {triggeredByScene ? t("subsidy.sceneTriggeredTitle") : eligible ? t("subsidy.eligibleTitle") : possibleAra ? t("subsidy.maybeTitle") : t("subsidy.checkTitle")}
           </div>
         </div>
         <span
@@ -153,11 +176,17 @@ export default function SubsidyCalculator({
             whiteSpace: "nowrap",
           }}
         >
-          {result ? t("subsidy.deadlineCountdown", { days: Math.max(0, result.daysUntilDeadline) }) : t("subsidy.loading")}
+          {result ? t("subsidy.applicationDeadlineCountdown", { days: deadlineDays }) : t("subsidy.loading")}
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+      {triggeredByScene && (
+        <div style={{ marginTop: 8, color: "var(--text-secondary)", fontSize: 11, lineHeight: 1.45 }}>
+          {t("subsidy.sceneTriggeredBody")}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))", gap: 8, marginTop: 12 }}>
         <label>
           <span style={labelStyle}>{t("subsidy.currentHeating")}</span>
           <select
@@ -268,6 +297,21 @@ export default function SubsidyCalculator({
                 {t("subsidy.araMaybe")}
               </div>
             )}
+            <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: 10, lineHeight: 1.45 }}>
+              {applicationDeadline
+                ? t("subsidy.deadlineDatesWithApplication", {
+                  application: applicationDeadline,
+                  completion: result.completionDeadline,
+                  payment: ely.paymentDeadline || result.completionDeadline,
+                })
+                : t("subsidy.deadlineDates", {
+                  completion: result.completionDeadline,
+                  payment: ely.paymentDeadline || result.completionDeadline,
+                })}
+            </div>
+            <div style={{ marginTop: 6, color: "var(--amber)", fontSize: 10, lineHeight: 1.45 }}>
+              {t("subsidy.mutualExclusion")}
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <a
                 href={ely.applicationUrl}

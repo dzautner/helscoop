@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
 import http from "http";
 import type { AddressInfo } from "net";
-import { estimateEnergySubsidy } from "../routes/subsidies";
+import { estimateEnergySubsidy, OIL_GAS_HEATING_GRANT_CONFIG } from "../routes/subsidies";
 
 const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
@@ -105,7 +105,11 @@ describe("estimateEnergySubsidy", () => {
     expect(result.bestAmount).toBe(4000);
     expect(result.netCost).toBe(8400);
     expect(result.programs[0].status).toBe("eligible");
-    expect(result.daysUntilDeadline).toBeGreaterThan(0);
+    expect(result.applicationDeadline).toBe(OIL_GAS_HEATING_GRANT_CONFIG.applicationDeadline);
+    expect(result.completionDeadline).toBe(OIL_GAS_HEATING_GRANT_CONFIG.completionDeadline);
+    expect(result.daysUntilApplicationDeadline).toBeGreaterThan(0);
+    expect(result.programs[0].applicationUrl).toBe(OIL_GAS_HEATING_GRANT_CONFIG.applicationUrl);
+    expect(result.programs[0].warnings.join(" ")).toContain("cannot be claimed");
   });
 
   it("returns 2500 EUR ELY support for oil to other non-fossil heating", () => {
@@ -119,6 +123,22 @@ describe("estimateEnergySubsidy", () => {
 
     expect(result.bestAmount).toBe(2500);
     expect(result.netCost).toBe(6500);
+  });
+
+  it("uses the application deadline, not completion deadline, for the grant countdown", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 10000,
+      currentHeating: "oil",
+      targetHeating: "air_water_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, new Date("2026-05-26T09:00:00.000Z"));
+
+    expect(result.daysUntilApplicationDeadline).toBeLessThan(0);
+    expect(result.daysUntilCompletionDeadline).toBeGreaterThan(0);
+    expect(result.bestAmount).toBe(0);
+    expect(result.programs[0].status).toBe("not_eligible");
+    expect(result.programs[0].warnings).toContain("ELY application deadline has passed.");
   });
 
   it("does not deduct ARA/Varke discretionary support from net cost", () => {
@@ -175,6 +195,6 @@ describe("POST /subsidies/energy/estimate", () => {
     expect(body.bestAmount).toBe(4000);
     expect(body.netCost).toBe(8400);
     expect(body.programs[0].status).toBe("eligible");
-    expect(body.programs[0].sourceUrl).toContain("maakaasulammityksesta");
+    expect(body.programs[0].sourceUrl).toBe(OIL_GAS_HEATING_GRANT_CONFIG.gasSourceUrl);
   });
 });

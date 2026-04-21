@@ -40,6 +40,9 @@ interface SubsidyProgramEstimate {
   netCost: number;
   reasons: string[];
   warnings: string[];
+  applicationDeadline?: string;
+  applicationDeadlineAt?: string;
+  completionDeadline?: string;
   deadline?: string;
   paymentDeadline?: string;
   applicationUrl: string;
@@ -50,6 +53,11 @@ interface EnergySubsidyResponse {
   totalCost: number;
   bestAmount: number;
   netCost: number;
+  applicationDeadline: string;
+  applicationDeadlineAt: string;
+  daysUntilApplicationDeadline: number;
+  completionDeadline: string;
+  daysUntilCompletionDeadline: number;
   deadline: string;
   daysUntilDeadline: number;
   generatedAt: string;
@@ -57,11 +65,20 @@ interface EnergySubsidyResponse {
   disclaimer: string;
 }
 
-const ELY_SOURCE_URL = "https://www.ely-keskus.fi/avustus-asuinrakennuksen-oljylammityksesta-luopumiseksi";
-const ELY_GAS_SOURCE_URL = "https://www.ely-keskus.fi/avustus-asuinrakennuksen-maakaasulammityksesta-luopumiseksi";
-const ARA_SOURCE_URL = "https://avustusohjeet.ara.fi/fi/korjausavustus/v6/esimerkkeja-korjaustoimenpiteista";
-const ELY_COMPLETION_DEADLINE = "2026-08-31";
-const ELY_PAYMENT_DEADLINE = "2026-09-30";
+export const OIL_GAS_HEATING_GRANT_CONFIG = {
+  cycle: "2026",
+  sourceCheckedAt: "2026-04-21",
+  oilSourceUrl: "https://elinvoimakeskus.fi/avustus-asuinrakennuksen-oljylammityksesta-luopumiseksi",
+  gasSourceUrl: "https://elinvoimakeskus.fi/kaasulammityksen-vaihtajalle",
+  applicationUrl: "https://sahkoinenasiointi.ahtp.fi/fi/palvelut",
+  araSourceUrl: "https://avustusohjeet.ara.fi/fi/korjausavustus/v6/korjausavustus-iakkaiden-ja-vammaisten-henkiloiden",
+  applicationDeadline: "2026-05-25",
+  applicationDeadlineAt: "2026-05-25T16:15:00+03:00",
+  completionDeadline: "2026-08-31",
+  paymentDeadline: "2026-09-30",
+  highSupportAmount: 4000,
+  otherSupportAmount: 2500,
+} as const;
 
 const HIGH_SUPPORT_TARGETS = new Set<HeatingType>([
   "district_heat",
@@ -84,13 +101,22 @@ function normalizeEnum<T extends string>(value: unknown, allowed: readonly T[], 
   return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
 }
 
-function daysUntil(date: string, now = new Date()): number {
+function daysUntilDate(date: string, now = new Date()): number {
   const target = new Date(`${date}T23:59:59+03:00`);
   const ms = target.getTime() - now.getTime();
-  return Math.ceil(ms / (24 * 60 * 60 * 1000));
+  const days = ms / (24 * 60 * 60 * 1000);
+  return ms < 0 ? Math.floor(days) : Math.ceil(days);
+}
+
+function daysUntilDateTime(dateTime: string, now = new Date()): number {
+  const target = new Date(dateTime);
+  const ms = target.getTime() - now.getTime();
+  const days = ms / (24 * 60 * 60 * 1000);
+  return ms < 0 ? Math.floor(days) : Math.ceil(days);
 }
 
 export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Date()): EnergySubsidyResponse {
+  const grantConfig = OIL_GAS_HEATING_GRANT_CONFIG;
   const totalCost = Math.max(0, Number(input.totalCost ?? 0));
   const currentHeating = normalizeEnum<HeatingType>(
     input.currentHeating,
@@ -119,11 +145,22 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
   );
   const yearRoundResidential = input.yearRoundResidential === true;
   const applicantDisabled = input.applicantDisabled === true;
+  const daysUntilApplicationDeadline = daysUntilDateTime(grantConfig.applicationDeadlineAt, now);
+  const daysUntilCompletionDeadline = daysUntilDate(grantConfig.completionDeadline, now);
 
   const elyReasons: string[] = [];
-  const elyWarnings: string[] = [];
+  const elyWarnings: string[] = [
+    "ELY support, ARA/Varke repair support, and household deduction cannot be claimed for the same heating replacement work.",
+  ];
   let elyStatus: SubsidyStatus = "eligible";
   let elyAmount = 0;
+
+  if (daysUntilApplicationDeadline < 0) {
+    elyStatus = "not_eligible";
+    elyWarnings.push("ELY application deadline has passed.");
+  } else if (daysUntilApplicationDeadline <= 45) {
+    elyWarnings.push("ELY application window closes soon; submit before 25 May 2026 at 16:15.");
+  }
 
   if (!FOSSIL_SOURCE_HEATING.has(currentHeating)) {
     elyStatus = "not_eligible";
@@ -145,17 +182,17 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
   }
 
   if (HIGH_SUPPORT_TARGETS.has(targetHeating)) {
-    elyAmount = 4000;
+    elyAmount = grantConfig.highSupportAmount;
     elyReasons.push("Target heating qualifies for the 4,000 EUR fixed grant.");
   } else if (NON_FOSSIL_TARGETS.has(targetHeating)) {
-    elyAmount = 2500;
+    elyAmount = grantConfig.otherSupportAmount;
     elyReasons.push("Target heating is non-fossil and qualifies for the 2,500 EUR fixed grant.");
   } else {
     elyStatus = "not_eligible";
     elyReasons.push("Target heating must be a non-fossil heating system.");
   }
 
-  if (daysUntil(ELY_COMPLETION_DEADLINE, now) < 0) {
+  if (daysUntilCompletionDeadline < 0) {
     elyStatus = "not_eligible";
     elyWarnings.push("ELY completion deadline has passed.");
   }
@@ -167,6 +204,7 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
   const effectiveElyAmount = elyStatus === "eligible" ? elyAmount : 0;
   const araReasons: string[] = [];
   const araWarnings = [
+    "ARA/Varke repair support cannot be combined with ELY support or household deduction for the same work.",
     "ARA/Varke repair support is discretionary and requires official review; Helscoop does not deduct it from net cost.",
   ];
   let araStatus: SubsidyStatus = "not_eligible";
@@ -192,10 +230,13 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
       netCost: Math.max(0, totalCost - effectiveElyAmount),
       reasons: elyReasons,
       warnings: elyWarnings,
-      deadline: ELY_COMPLETION_DEADLINE,
-      paymentDeadline: ELY_PAYMENT_DEADLINE,
-      applicationUrl: currentHeating === "natural_gas" ? ELY_GAS_SOURCE_URL : ELY_SOURCE_URL,
-      sourceUrl: currentHeating === "natural_gas" ? ELY_GAS_SOURCE_URL : ELY_SOURCE_URL,
+      applicationDeadline: grantConfig.applicationDeadline,
+      applicationDeadlineAt: grantConfig.applicationDeadlineAt,
+      completionDeadline: grantConfig.completionDeadline,
+      deadline: grantConfig.applicationDeadline,
+      paymentDeadline: grantConfig.paymentDeadline,
+      applicationUrl: grantConfig.applicationUrl,
+      sourceUrl: currentHeating === "natural_gas" ? grantConfig.gasSourceUrl : grantConfig.oilSourceUrl,
     },
     {
       program: "ara_repair_elderly_disabled",
@@ -205,8 +246,8 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
       netCost: totalCost,
       reasons: araReasons,
       warnings: araWarnings,
-      applicationUrl: ARA_SOURCE_URL,
-      sourceUrl: ARA_SOURCE_URL,
+      applicationUrl: grantConfig.araSourceUrl,
+      sourceUrl: grantConfig.araSourceUrl,
     },
   ];
 
@@ -215,11 +256,16 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
     totalCost,
     bestAmount,
     netCost: Math.max(0, totalCost - bestAmount),
-    deadline: ELY_COMPLETION_DEADLINE,
-    daysUntilDeadline: daysUntil(ELY_COMPLETION_DEADLINE, now),
+    applicationDeadline: grantConfig.applicationDeadline,
+    applicationDeadlineAt: grantConfig.applicationDeadlineAt,
+    daysUntilApplicationDeadline,
+    completionDeadline: grantConfig.completionDeadline,
+    daysUntilCompletionDeadline,
+    deadline: grantConfig.applicationDeadline,
+    daysUntilDeadline: daysUntilApplicationDeadline,
     generatedAt: now.toISOString(),
     programs,
-    disclaimer: "Preliminary estimate only. Confirm eligibility, deadlines, funding availability, and required attachments from official ELY and ARA/Varke instructions before starting work.",
+    disclaimer: `Preliminary estimate only. Grant config ${grantConfig.cycle}, checked ${grantConfig.sourceCheckedAt}. Confirm eligibility, deadlines, funding availability, and required attachments from official Elinvoimakeskus and ARA/Varke instructions before starting work.`,
   };
 }
 
