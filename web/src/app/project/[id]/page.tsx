@@ -1019,6 +1019,7 @@ export default function ProjectPage() {
             className="btn btn-ghost"
             data-tooltip={t('editor.share')}
             aria-label={t('editor.share')}
+            disabled={shareLoading}
             onClick={async () => {
               if (!shareToken) {
                 setShareLoading(true);
@@ -1034,7 +1035,7 @@ export default function ProjectPage() {
               }
               setShowShareDialog(true);
             }}
-            style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4 }}
+            style={{ padding: "5px 7px", display: "flex", alignItems: "center", gap: 4, opacity: shareLoading ? 0.5 : 1 }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="18" cy="5" r="3" />
