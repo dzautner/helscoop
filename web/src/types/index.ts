@@ -111,6 +111,18 @@ export interface Material {
   substitution_group?: string;
   /** ISO date string of last catalog update */
   last_updated?: string | null;
+  /** Optional DB/catalog visual colour as RGB values from 0-1 */
+  visual_albedo?: number[] | null;
+  /** Optional thermal conductivity in W/mK */
+  thermal_conductivity?: number | string | null;
+  /** Optional material thickness in millimetres */
+  thermal_thickness?: number | string | null;
+  /** Optional Euroclass/reaction-to-fire value */
+  fire_rating?: string | null;
+  /** Optional structural grade, e.g. C24 */
+  structural_grade_class?: string | null;
+  /** Search/filter tags from the material catalog */
+  tags?: string[] | null;
 }
 
 export interface BomItem {

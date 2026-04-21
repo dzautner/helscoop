@@ -7,6 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import SubsidyCalculator from "@/components/SubsidyCalculator";
 import WasteEstimatePanel from "@/components/WasteEstimatePanel";
 import RyhtiSubmissionPanel from "@/components/RyhtiSubmissionPanel";
+import MaterialPicker from "@/components/MaterialPicker";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1270,6 +1271,7 @@ function BomItemCard({
   onFocusIndex,
   isPackageLocked = false,
   onTogglePackageLock,
+  onOpenMaterialPicker,
 }: {
   item: BomItem;
   materials: Material[];
@@ -1283,6 +1285,7 @@ function BomItemCard({
   onFocusIndex: (index: number) => void;
   isPackageLocked?: boolean;
   onTogglePackageLock?: (materialId: string) => void;
+  onOpenMaterialPicker: (materialId: string) => void;
 }) {
   const { t } = useTranslation();
   const [localQty, setLocalQty] = useState(String(item.quantity));
@@ -1381,13 +1384,19 @@ function BomItemCard({
         break;
       case "Enter":
         e.preventDefault();
-        // Focus the quantity input for editing
-        if (inputRef.current) {
+        if (e.shiftKey && inputRef.current) {
           inputRef.current.focus();
           inputRef.current.select();
           setIsEditing(true);
           setPrevQty(localQty);
+        } else {
+          onOpenMaterialPicker(item.material_id);
         }
+        break;
+      case "m":
+      case "M":
+        e.preventDefault();
+        onOpenMaterialPicker(item.material_id);
         break;
       case "Delete":
       case "Backspace":
@@ -1433,6 +1442,10 @@ function BomItemCard({
       aria-label={t('editor.bomItemRow', { name: materialName, qty: localQty, total: Number(item.total || 0).toFixed(2) })}
       data-bom-index={index}
       onClick={() => onCompare(item.material_id, materialName)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onOpenMaterialPicker(item.material_id);
+      }}
       onFocus={() => onFocusIndex(index)}
       onKeyDown={handleCardKeyDown}
     >
@@ -1521,9 +1534,18 @@ function BomItemCard({
             flexShrink: 0,
           }}
         />
-        <span className="bom-item-total">
+        <button
+          type="button"
+          className="bom-item-total bom-item-cost-badge"
+          title={t("materialPicker.openFor", { name: materialName })}
+          aria-label={t("materialPicker.openFor", { name: materialName })}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenMaterialPicker(item.material_id);
+          }}
+        >
           {Number(item.total || 0).toFixed(2)}
-        </span>
+        </button>
       </div>
       {/* Purchasable quantity hint — shown when conversion differs from design */}
       {(() => {
@@ -1722,6 +1744,7 @@ export default function BomPanel({
   projectId?: string;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
+  const [materialPickerId, setMaterialPickerId] = useState<string | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
   const [keskoMode, setKeskoMode] = useState(false);
   const [keskoProducts, setKeskoProducts] = useState<KeskoProduct[]>([]);
@@ -2400,6 +2423,9 @@ export default function BomPanel({
               onFocusIndex={setFocusedBomIndex}
               isPackageLocked={lockedPackageMaterials.has(item.material_id)}
               onTogglePackageLock={togglePackageLock}
+              onOpenMaterialPicker={(id) => {
+                if (onReplaceMaterial) setMaterialPickerId(id);
+              }}
             />
           ))
         )}
@@ -2908,6 +2934,21 @@ export default function BomPanel({
           )}
         </div>
       </div>
+
+      {(() => {
+        const pickerItem = materialPickerId ? bom.find((item) => item.material_id === materialPickerId) : null;
+        if (!pickerItem || !onReplaceMaterial) return null;
+        return (
+          <MaterialPicker
+            currentMaterialId={pickerItem.material_id}
+            bomItem={pickerItem}
+            materials={materials}
+            disabledMaterialIds={new Set(bom.map((item) => item.material_id).filter((id) => id !== pickerItem.material_id))}
+            onClose={() => setMaterialPickerId(null)}
+            onSelect={(toMaterialId) => onReplaceMaterial(pickerItem.material_id, toMaterialId)}
+          />
+        );
+      })()}
 
       {/* Price comparison popup */}
       {compareMaterial && (
