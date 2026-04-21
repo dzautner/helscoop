@@ -68,6 +68,9 @@ function formatWarning(raw: string, t: (key: string, params?: Record<string, str
   if (key === "validation.invalidDimension") {
     return t(key, { geometry: rest });
   }
+  if (key === "validation.highTriCount" || key === "validation.unmaterialized" || key === "validation.highObjectCount") {
+    return t(key, { count: rest });
+  }
   return t(key);
 }
 

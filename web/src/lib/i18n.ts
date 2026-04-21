@@ -632,6 +632,9 @@ const translations = {
       tooManyObjects: 'Kohtauksessa on {{count}} objektia — yli 200 voi hidastaa suorituskykyä',
       farFromOrigin: 'Objekti on {{distance}} yksikön päässä origosta — tarkista sijainti',
       invalidDimension: '{{geometry}}-objektilla on nolla- tai negatiivinen mitta',
+      highTriCount: 'Kohtauksessa on {{count}} kolmiota — voi hidastaa renderöintiä',
+      unmaterialized: '{{count}} objektilla ei ole materiaalia',
+      highObjectCount: 'Kohtauksessa on {{count}} objektia — harkitse yksinkertaistamista',
       warningsTitle: 'Varoitukset',
     },
     saveStatus: {
@@ -1735,6 +1738,9 @@ const translations = {
       tooManyObjects: 'Scene has {{count}} objects — more than 200 may cause performance issues',
       farFromOrigin: 'Object is {{distance}} units from origin — check position',
       invalidDimension: '{{geometry}} has zero or negative dimensions',
+      highTriCount: 'Scene has {{count}} triangles — may slow rendering',
+      unmaterialized: '{{count}} objects have no material assigned',
+      highObjectCount: 'Scene has {{count}} objects — consider simplifying',
       warningsTitle: 'Warnings',
     },
     saveStatus: {
