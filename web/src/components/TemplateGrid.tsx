@@ -23,7 +23,7 @@ export default function TemplateGrid({
   creating: boolean;
   onCreateFromTemplate: (tmpl: Template) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   return (
     <div style={{ marginTop: 28 }}>
@@ -105,7 +105,7 @@ export default function TemplateGrid({
                     {tmpl.name}
                   </div>
                   <span className="badge badge-amber">
-                    ~{Number(tmpl.estimated_cost).toLocaleString("fi-FI")} &euro;
+                    ~{Number(tmpl.estimated_cost).toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} &euro;
                   </span>
                 </div>
               </div>

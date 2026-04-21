@@ -69,7 +69,7 @@ const CATEGORY_LABELS_FALLBACK: Record<CommandCategory, string> = {
  */
 function isMacPlatform(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  return /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 }
 
 function formatShortcutDisplay(shortcut: string): string {

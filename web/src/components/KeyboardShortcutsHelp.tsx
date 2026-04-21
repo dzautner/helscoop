@@ -9,7 +9,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
  */
 function isMacPlatform(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  return /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 }
 
 function formatShortcut(shortcut: KeyboardShortcut): string {

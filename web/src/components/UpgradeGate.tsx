@@ -268,7 +268,7 @@ export default function UpgradeGate({
           style={{
             flex: 1,
             background: "var(--amber, #c4915c)",
-            color: "#fff",
+            color: "var(--on-amber, #fff)",
             border: "none",
             borderRadius: "var(--radius-sm, 6px)",
             padding: "10px 20px",

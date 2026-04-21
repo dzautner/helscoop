@@ -315,7 +315,7 @@ export default function ChatPanel({
             "This will replace your current scene script with the AI-generated code.") +
           "\n\n" +
           (t('editor.confirmApplyUndo') || "You can undo with") +
-          ` ${navigator.platform?.includes("Mac") ? "Cmd" : "Ctrl"}+Z`
+          ` ${/Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? "Cmd" : "Ctrl"}+Z`
         }
         confirmText={t('editor.applyToScene') || "Apply to scene"}
         cancelText={t('editor.cancel') || "Cancel"}

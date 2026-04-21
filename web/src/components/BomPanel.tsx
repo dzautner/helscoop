@@ -85,13 +85,14 @@ function stockTooltip(
     link?: string | null;
   },
   t: (key: string) => string,
+  locale: string = "fi",
 ): string {
   const meta = stockMeta(normalizeStockLevel(item.stock_level), t);
   const checkedAt = item.stock_last_checked_at ?? item.last_checked_at;
   const parts = [meta.label];
   if (item.store_location) parts.push(item.store_location);
   if (checkedAt) {
-    parts.push(`${t("bom.lastChecked")}: ${new Date(checkedAt).toLocaleDateString()}`);
+    parts.push(`${t("bom.lastChecked")}: ${new Date(checkedAt).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")}`);
   }
   if (item.link) parts.push(item.link);
   return parts.join(" · ");
@@ -659,7 +660,7 @@ function PriceComparisonPopup({
   const [priceHistory, setPriceHistory] = useState<PriceHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showChart, setShowChart] = useState(false);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const popupRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<Element | null>(null);
@@ -841,7 +842,7 @@ function PriceComparisonPopup({
                 const sparkColor = supplierColors.get(price.supplier_id) || "var(--text-muted)";
                 const priceStockLevel = normalizeStockLevel(price.stock_level);
                 const priceStock = stockMeta(priceStockLevel, t);
-                const priceStockTooltip = stockTooltip(price, t);
+                const priceStockTooltip = stockTooltip(price, t, locale);
                 return (
                   <div
                     key={price.id}
@@ -932,7 +933,7 @@ function PriceComparisonPopup({
                         <span>{localizeUnit(price.unit, t)} {t('pricing.perUnit')}</span>
                         {price.sku && <span>SKU: {price.sku}</span>}
                         {price.last_scraped_at && (
-                          <span>{t('pricing.lastChecked')}: {new Date(price.last_scraped_at).toLocaleDateString()}</span>
+                          <span>{t('pricing.lastChecked')}: {new Date(price.last_scraped_at).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")}</span>
                         )}
                       </div>
                       {price.link && (
@@ -1334,7 +1335,7 @@ function BomItemCard({
     mat.design_unit !== mat.purchasable_unit;
   const stockLevel = normalizeStockLevel(item.stock_level);
   const stock = stockMeta(stockLevel, t);
-  const stockTooltipText = stockTooltip(item, t);
+  const stockTooltipText = stockTooltip(item, t, locale);
 
   return (
     <div
@@ -2455,7 +2456,7 @@ export default function BomPanel({
               const displayName = getLocalizedMaterialName(m, locale);
               const priceStockLevel = normalizeStockLevel(price?.stock_level);
               const priceStock = stockMeta(priceStockLevel, t);
-              const priceStockTooltip = price ? stockTooltip(price, t) : "";
+              const priceStockTooltip = price ? stockTooltip(price, t, locale) : "";
               return (
                 <div
                   key={m.id}
