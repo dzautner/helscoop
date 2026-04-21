@@ -31,6 +31,7 @@ export interface Project {
   permit_metadata?: RyhtiPermitMetadata | null;
   share_token?: string | null;
   view_count?: number;
+  household_deduction_joint?: boolean;
   bom?: BomItem[];
 }
 

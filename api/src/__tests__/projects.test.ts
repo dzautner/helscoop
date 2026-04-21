@@ -375,6 +375,26 @@ describe("PUT /projects/:id", () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it("persists household deduction couple mode", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", household_deduction_joint: true }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { household_deduction_joint: true },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { household_deduction_joint: boolean }).household_deduction_joint).toBe(true);
+    expect(mockQuery.mock.calls[0][0]).toContain("household_deduction_joint=COALESCE");
+    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, "proj-1", "user-1"]);
+  });
 });
 
 // --------------------------------------------------------------------------
