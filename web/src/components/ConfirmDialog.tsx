@@ -12,6 +12,7 @@ export interface ConfirmDialogProps {
   variant?: "default" | "danger";
   onConfirm: () => void;
   onCancel: () => void;
+  children?: React.ReactNode;
 }
 
 export default function ConfirmDialog({
@@ -23,6 +24,7 @@ export default function ConfirmDialog({
   variant = "default",
   onConfirm,
   onCancel,
+  children,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const resolvedConfirmText = confirmText ?? t("dialog.confirm");
@@ -52,9 +54,13 @@ export default function ConfirmDialog({
       }
 
       if (e.key === "Tab") {
-        const focusable = [cancelBtnRef.current, confirmBtnRef.current].filter(
-          Boolean
-        ) as HTMLElement[];
+        const container = dialogRef.current;
+        if (!container) return;
+        const focusable = Array.from(
+          container.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
         if (focusable.length === 0) return;
 
         const first = focusable[0];
@@ -171,6 +177,8 @@ export default function ConfirmDialog({
         >
           {message}
         </p>
+
+        {children}
 
         <div
           style={{

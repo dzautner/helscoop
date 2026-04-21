@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
               </div>
 
               {error && (
-                <div style={{
+                <div role="alert" style={{
                   padding: "10px 14px",
                   borderRadius: "var(--radius-md)",
                   background: "var(--danger-dim)",

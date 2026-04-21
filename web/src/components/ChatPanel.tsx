@@ -321,8 +321,7 @@ export default function ChatPanel({
         cancelText={t('editor.cancel') || "Cancel"}
         onConfirm={handleConfirmApply}
         onCancel={() => setPendingCode(null)}
-      />
-      {pendingCode !== null && (
+      >
         <div className="chat-skip-confirm">
           <input
             type="checkbox"
@@ -335,7 +334,7 @@ export default function ChatPanel({
             {t('editor.dontAskAgain') || "Don't ask again this session"}
           </label>
         </div>
-      )}
+      </ConfirmDialog>
     </div>
   );
 }

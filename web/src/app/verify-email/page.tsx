@@ -54,7 +54,12 @@ function VerifyEmailContent() {
 
         {status === "success" && (
           <>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>&#10003;</div>
+            <div style={{ marginBottom: 16 }} aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--success, #4ade80)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
             <h1 className="heading-display" style={{ fontSize: 28, marginBottom: 16 }}>
               Sahkoposti vahvistettu!
             </h1>
