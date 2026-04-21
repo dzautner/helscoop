@@ -1,4 +1,4 @@
-import type { EnergySubsidyRequest, KeskoProduct, RyhtiPermitMetadata } from "@/types";
+import type { EnergySubsidyRequest, KeskoProduct, QuoteRequestPayload, RyhtiPermitMetadata } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -392,6 +392,11 @@ export const api = {
     apiFetch(`/projects/${projectId}/bom`, {
       method: "PUT",
       body: JSON.stringify({ items }),
+    }),
+  submitQuoteRequest: (projectId: string, data: QuoteRequestPayload) =>
+    apiFetch(`/projects/${projectId}/quote-request`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 
   shareProject: (projectId: string) =>

@@ -2128,6 +2128,7 @@ export default function ProjectPage() {
               style={isMobileEditor ? undefined : { width: bomWidth }}
               sceneJs={sceneJs}
               projectName={projectName}
+              projectDescription={projectDesc}
               buildingInfo={project?.building_info ?? null}
               projectId={projectId}
             />
