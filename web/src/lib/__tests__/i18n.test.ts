@@ -562,6 +562,21 @@ describe("exhaustive i18n key parity", () => {
     "bom.inStock", "bom.lowStock", "bom.outOfStock", "bom.stockUnknown",
     "bom.stockSummary", "bom.outOfStockCount", "bom.stockWarning",
     "bom.alternativeAvailable", "bom.lastChecked",
+    // subsidy
+    "subsidy.sectionLabel", "subsidy.eligibleTitle", "subsidy.maybeTitle",
+    "subsidy.checkTitle", "subsidy.deadlineCountdown", "subsidy.deadlineTooltip",
+    "subsidy.currentHeating", "subsidy.targetHeating", "subsidy.household",
+    "subsidy.householdUnder65", "subsidy.household65Plus", "subsidy.householdDisabled",
+    "subsidy.systemCondition", "subsidy.conditionUnknown", "subsidy.conditionOk",
+    "subsidy.conditionBroken", "subsidy.conditionHard", "subsidy.yearRoundResidential",
+    "subsidy.netCost", "subsidy.elyDeduction", "subsidy.notEligible",
+    "subsidy.araMaybe", "subsidy.applyEly", "subsidy.readAra",
+    "subsidy.loading", "subsidy.error", "subsidy.heating.unknown",
+    "subsidy.heating.oil", "subsidy.heating.naturalGas",
+    "subsidy.heating.directElectric", "subsidy.heating.wood",
+    "subsidy.heating.districtHeat", "subsidy.heating.airWater",
+    "subsidy.heating.groundSource", "subsidy.heating.otherNonFossil",
+    "subsidy.heating.fossil",
     // viewport
     "viewport.contextMenuLabel",
   ];

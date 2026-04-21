@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { SkeletonPriceComparison } from "@/components/Skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import SubsidyCalculator from "@/components/SubsidyCalculator";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
 import type { QuoteConfig } from "@/lib/quote-engine";
-import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass, StockLevel } from "@/types";
+import type { BomItem, Material, MaterialPriceData, Category, PriceHistoryRow, VatClass, StockLevel, BuildingInfo } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
 
@@ -1568,6 +1569,7 @@ export default function BomPanel({
   style,
   sceneJs,
   projectName,
+  buildingInfo,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -1579,6 +1581,8 @@ export default function BomPanel({
   sceneJs?: string;
   /** Project name for export filenames */
   projectName?: string;
+  /** Address-derived building context for subsidy eligibility defaults */
+  buildingInfo?: BuildingInfo | null;
 }) {
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -1900,6 +1904,9 @@ export default function BomPanel({
         )}
         {bom.length > 0 && (
           <QuoteSummary bom={bom} materials={materials} />
+        )}
+        {bom.length > 0 && total > 0 && (
+          <SubsidyCalculator totalCost={total} buildingInfo={buildingInfo} />
         )}
         {bom.length > 0 && (
           <button
