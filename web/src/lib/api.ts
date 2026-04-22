@@ -1,4 +1,10 @@
-import type { EnergySubsidyRequest, KeskoProduct, QuoteRequestPayload, RyhtiPermitMetadata } from "@/types";
+import type {
+  EnergySubsidyRequest,
+  KeskoProduct,
+  ProjectMaterialTrendResponse,
+  QuoteRequestPayload,
+  RyhtiPermitMetadata,
+} from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -314,6 +320,8 @@ export const api = {
     apiFetch(`/pricing/stock/${materialId}`),
   getPriceHistory: (materialId: string) =>
     apiFetch(`/pricing/history/${materialId}`),
+  getProjectMaterialTrends: (projectId: string): Promise<ProjectMaterialTrendResponse> =>
+    apiFetch(`/pricing/trends/project/${encodeURIComponent(projectId)}`),
   getStalePrices: () => apiFetch("/pricing/stale"),
   searchKeskoProducts: (q: string, branchCode?: string) => {
     const params = new URLSearchParams({ q });

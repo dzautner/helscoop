@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
-import { requirePermission } from "../permissions";
+import { normalizeRole, requirePermission } from "../permissions";
+import { buildMaterialTrend, buildProjectTrendSummary, type PriceHistoryInput } from "../material-trends";
 
 const router = Router();
 
@@ -62,6 +63,98 @@ router.get("/stock/:materialId", requireAuth, requirePermission("pricing:read"),
     total: stock.length,
     available,
     stock,
+  });
+});
+
+// GET /pricing/trends/project/:projectId — BOM-level material cost trends and timing hints
+router.get("/trends/project/:projectId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
+  const { projectId } = req.params;
+  const user = req.user;
+
+  if (!user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  const isAdmin = normalizeRole(user.role) === "admin";
+  const projectResult = await query(
+    `SELECT id
+     FROM projects
+     WHERE id = $1
+       AND ($2::boolean OR user_id = $3)
+       AND deleted_at IS NULL`,
+    [projectId, isAdmin, user.id],
+  );
+
+  if (projectResult.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const bomResult = await query(
+    `SELECT
+       pb.material_id,
+       pb.quantity,
+       pb.unit,
+       m.name AS material_name,
+       c.display_name AS category_name,
+       p.id AS pricing_id,
+       COALESCE(p.unit_price, 0) AS unit_price,
+       (pb.quantity * COALESCE(p.unit_price, 0) * COALESCE(m.waste_factor, 1)) AS line_cost
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     JOIN categories c ON m.category_id = c.id
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE pb.project_id = $1
+     ORDER BY c.sort_order, m.name`,
+    [projectId],
+  );
+
+  const pricingIds = bomResult.rows
+    .map((row: { pricing_id?: string | null }) => row.pricing_id)
+    .filter((id: string | null | undefined): id is string => Boolean(id));
+
+  const historyByPricingId = new Map<string, PriceHistoryInput[]>();
+  if (pricingIds.length > 0) {
+    const historyResult = await query(
+      `SELECT pricing_id, unit_price, scraped_at
+       FROM pricing_history
+       WHERE pricing_id = ANY($1::uuid[])
+         AND scraped_at >= now() - interval '18 months'
+       ORDER BY scraped_at ASC`,
+      [pricingIds],
+    );
+
+    for (const row of historyResult.rows as { pricing_id: string; unit_price: string | number; scraped_at: string | Date }[]) {
+      const values = historyByPricingId.get(row.pricing_id) ?? [];
+      values.push({ unitPrice: Number(row.unit_price), scrapedAt: row.scraped_at });
+      historyByPricingId.set(row.pricing_id, values);
+    }
+  }
+
+  const items = bomResult.rows.map((row: {
+    material_id: string;
+    material_name: string;
+    category_name: string | null;
+    quantity: string | number;
+    unit: string;
+    pricing_id?: string | null;
+    unit_price: string | number;
+    line_cost: string | number;
+  }) => buildMaterialTrend({
+    materialId: row.material_id,
+    materialName: row.material_name,
+    categoryName: row.category_name,
+    quantity: Number(row.quantity),
+    unit: row.unit,
+    unitPrice: Number(row.unit_price),
+    lineCost: Number(row.line_cost),
+    history: row.pricing_id ? historyByPricingId.get(row.pricing_id) : [],
+  }));
+
+  res.json({
+    projectId,
+    generatedAt: new Date().toISOString(),
+    dataSources: Array.from(new Set(items.map((item) => item.source))),
+    ...buildProjectTrendSummary(items),
   });
 });
 

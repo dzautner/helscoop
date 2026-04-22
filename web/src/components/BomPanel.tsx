@@ -13,6 +13,7 @@ import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsP
 import QuoteRequestModal from "@/components/QuoteRequestModal";
 import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import RenovationRoiPanel from "@/components/RenovationRoiPanel";
+import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1884,6 +1885,11 @@ export default function BomPanel({
       known: levels.filter((level) => level !== "unknown").length,
     };
   }, [bom]);
+  const materialTrendSignature = useMemo(() => {
+    return bom
+      .map((item) => `${item.material_id}:${item.quantity}:${item.unit_price ?? ""}:${item.total ?? ""}`)
+      .join("|");
+  }, [bom]);
 
   const togglePackageLock = useCallback((materialId: string) => {
     setLockedPackageMaterials((prev) => {
@@ -2311,6 +2317,9 @@ export default function BomPanel({
               -{totalSavings.toFixed(2)} &euro;
             </span>
           </div>
+        )}
+        {bom.length > 0 && projectId && (
+          <MaterialTrendDashboard projectId={projectId} bomSignature={materialTrendSignature} />
         )}
         {bom.length > 0 && (
           <BomSavingsPanel

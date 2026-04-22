@@ -407,6 +407,53 @@ export interface PriceHistoryRow {
   supplier_id: string;
 }
 
+export type MaterialTrendDirection = "rising" | "falling" | "stable";
+export type MaterialTrendRecommendation = "buy_now" | "wait" | "watch";
+export type MaterialTrendConfidence = "high" | "medium" | "low";
+export type MaterialTrendSource = "retailer_history" | "seasonal_model";
+
+export interface MaterialTrendPoint {
+  month: string;
+  unitPrice: number;
+  source: MaterialTrendSource;
+}
+
+export interface MaterialTrendItem {
+  materialId: string;
+  materialName: string;
+  categoryName: string | null;
+  quantity: number;
+  unit: string;
+  currentUnitPrice: number;
+  currentLineCost: number;
+  average3m: number | null;
+  average12m: number | null;
+  vs3mPct: number | null;
+  vs12mPct: number | null;
+  direction: MaterialTrendDirection;
+  recommendation: MaterialTrendRecommendation;
+  bestBuyMonth: string | null;
+  estimatedWaitSavingsPct: number;
+  estimatedWaitSavings: number;
+  confidence: MaterialTrendConfidence;
+  source: MaterialTrendSource;
+  points: MaterialTrendPoint[];
+}
+
+export interface ProjectMaterialTrendResponse {
+  projectId: string;
+  generatedAt: string;
+  dataSources: MaterialTrendSource[];
+  totalCurrentCost: number;
+  weightedVs12mPct: number | null;
+  estimatedWaitSavings: number;
+  bestBuyMonth: string | null;
+  buyNowCount: number;
+  waitCount: number;
+  watchCount: number;
+  items: MaterialTrendItem[];
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
