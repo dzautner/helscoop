@@ -425,6 +425,16 @@ describe("exhaustive i18n key parity", () => {
     "bomAggregate.costPerM2", "bomAggregate.costPerM2Missing",
     "bomAggregate.sharedMaterials", "bomAggregate.noSharedMaterials",
     "bomAggregate.uncategorized", "bomAggregate.noBulk",
+    // photo estimate
+    "photoEstimate.eyebrow", "photoEstimate.title", "photoEstimate.subtitle",
+    "photoEstimate.creditCost", "photoEstimate.creditTooltip",
+    "photoEstimate.dropHint", "photoEstimate.fileInput", "photoEstimate.selected",
+    "photoEstimate.analyze", "photoEstimate.analyzing", "photoEstimate.error",
+    "photoEstimate.insufficientCredits", "photoEstimate.rangeLabel",
+    "photoEstimate.context", "photoEstimate.confidence", "photoEstimate.subsidyFlag",
+    "photoEstimate.addToBom", "photoEstimate.imported", "photoEstimate.importedShort",
+    "photoEstimate.scope.roof", "photoEstimate.scope.facade", "photoEstimate.scope.windows",
+    "photoEstimate.scope.insulation", "photoEstimate.scope.heating", "photoEstimate.scope.terrace",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
     "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",

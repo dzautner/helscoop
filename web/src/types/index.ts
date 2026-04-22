@@ -135,6 +135,59 @@ export interface BomAggregateResponse {
   items: BomAggregateItem[];
 }
 
+export interface PhotoEstimateUpload {
+  name: string;
+  mime_type: string;
+  size?: number;
+  data_url?: string;
+}
+
+export interface PhotoEstimateBomSuggestion {
+  material_id: string;
+  material_name: string;
+  category_name: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+  supplier: string | null;
+  link: string | null;
+  confidence: number;
+  note: string;
+}
+
+export interface PhotoEstimateScope {
+  scope: "roof" | "facade" | "windows" | "insulation" | "heating" | "terrace";
+  confidence: number;
+  rationale: string;
+  quantity: number;
+  unit: string;
+  low_cost: number;
+  mid_cost: number;
+  high_cost: number;
+  non_catalog_cost: number;
+  bom_suggestions: PhotoEstimateBomSuggestion[];
+}
+
+export interface PhotoEstimateResponse {
+  project_id: string;
+  project_name: string;
+  analysis_mode: "catalog_heuristic" | "catalog_heuristic_ai_ready";
+  photos_analyzed: number;
+  building_context: {
+    area_m2: number | null;
+    year_built: number | null;
+    floors: number | null;
+    heating: string | null;
+    roof_type: string | null;
+  };
+  estimate: { low: number; mid: number; high: number };
+  scopes: PhotoEstimateScope[];
+  subsidy_flags: { id: string; label: string; reason: string }[];
+  disclaimer: string;
+  credits?: { cost: number; balance: number };
+}
+
 export interface BuildingResult {
   address: string;
   coordinates: { lat: number; lon: number };
