@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useTranslation } from "@/components/LocaleProvider";
+import { buildAffiliateRetailerUrl } from "@/lib/material-affiliate";
 import type { BomItem, Material, StockLevel } from "@/types";
 
 type MaterialSort = "price-asc" | "price-desc" | "thermal" | "availability";
@@ -22,6 +23,7 @@ interface MaterialMetrics {
   category: string;
   dimensions: string;
   supplier: string;
+  retailerLink: string | null;
   unit: string;
   unitPrice: number;
   totalCost: number;
@@ -177,6 +179,10 @@ export default function MaterialPicker({
         category: locale === "fi" && material.category_name_fi ? material.category_name_fi : material.category_name,
         dimensions: getDimensions(material),
         supplier: price?.supplier_name ?? t("materialPicker.unknownSupplier"),
+        retailerLink: buildAffiliateRetailerUrl(price?.link, {
+          materialId: material.id,
+          supplier: price?.supplier_name,
+        }),
         unit,
         unitPrice,
         totalCost: unitPrice * Number(bomItem.quantity || 0),
@@ -282,6 +288,7 @@ export default function MaterialPicker({
             <code>{formatCurrency(currentUnitPrice, locale)} / {localizeUnit(bomItem.unit, t)}</code>
           </div>
         )}
+        <p className="material-picker-disclosure">{t("materialPicker.affiliateDisclosure")}</p>
 
         <div className="material-picker-controls">
           <label className="material-picker-search">
@@ -403,6 +410,21 @@ export default function MaterialPicker({
                       <button type="button" onClick={() => toggleCompare(metric.material.id)} aria-pressed={isComparing}>
                         {isComparing ? t("materialPicker.comparing") : t("materialPicker.compare")}
                       </button>
+                      {metric.retailerLink ? (
+                        <a
+                          className="material-picker-retailer-link"
+                          href={metric.retailerLink}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {t("materialPicker.viewAtRetailer")}
+                        </a>
+                      ) : (
+                        <span className="material-picker-retailer-link" data-disabled="true">
+                          {t("materialPicker.noRetailerLink")}
+                        </span>
+                      )}
                       <button
                         type="button"
                         className="btn btn-primary"

@@ -21,6 +21,14 @@ export interface ViewportPresentationApi {
   focusPreset: (presetId: PresentationPresetId) => void;
 }
 
+export interface ViewportMaterialSelection {
+  materialId: string;
+  objectId?: string;
+  point: [number, number, number];
+  clientX: number;
+  clientY: number;
+}
+
 interface Viewport3DProps {
   sceneJs: string;
   wireframe?: boolean;
@@ -32,6 +40,7 @@ interface Viewport3DProps {
   presentationRef?: React.MutableRefObject<ViewportPresentationApi | null>;
   initialPresentationPreset?: PresentationPresetId;
   onToggleWireframe?: () => void;
+  onMaterialSurfaceSelect?: (selection: ViewportMaterialSelection) => void;
   projectName?: string;
 }
 
@@ -152,6 +161,8 @@ function addSingleTessellatedMesh(
   });
 
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.userData.materialId = tess.material;
+  mesh.userData.objectId = tess.objectId;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   parent.add(mesh);
@@ -388,6 +399,7 @@ export default function Viewport3D({
   presentationRef,
   initialPresentationPreset,
   onToggleWireframe,
+  onMaterialSurfaceSelect,
   projectName,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -400,6 +412,7 @@ export default function Viewport3D({
   const measurementsRef = useRef<Measurement[]>([]);
   const previewMeasurementRef = useRef<Measurement | null>(null);
   const measurementLabelRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const surfacePointerDownRef = useRef<{ x: number; y: number; button: number } | null>(null);
   const animFrameRef = useRef<number>(0);
   const lastValidSceneRef = useRef<string>(sceneJs);
   const sceneBoundsRef = useRef<{ center: THREE.Vector3; size: number } | null>(null);
@@ -547,6 +560,35 @@ export default function Viewport3D({
     }
 
     return nearest ?? hit.point.clone();
+  }, []);
+
+  const pickMaterialSurface = useCallback((clientX: number, clientY: number): ViewportMaterialSelection | null => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    const group = objectGroupRef.current;
+    if (!renderer || !camera || !group) return null;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const intersections = raycaster.intersectObjects(group.children, true);
+    const hit = intersections.find((candidate) => {
+      const materialId = candidate.object.userData.materialId;
+      return typeof materialId === "string" && materialId.length > 0 && materialId !== "default";
+    });
+    if (!hit) return null;
+
+    return {
+      materialId: hit.object.userData.materialId,
+      objectId: hit.object.userData.objectId,
+      point: [hit.point.x, hit.point.y, hit.point.z],
+      clientX,
+      clientY,
+    };
   }, []);
 
   const rebuildMeasurementVisuals = useCallback(() => {
@@ -1103,6 +1145,27 @@ export default function Viewport3D({
     if (point) setMeasurementPreviewEnd(point);
   }, [measurementMode, measurementStart, pickMeasurementPoint]);
 
+  const handleSurfacePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onMaterialSurfaceSelect || measurementMode || e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("a") || target.closest("input") || target.closest("select") || target.closest("textarea")) return;
+    surfacePointerDownRef.current = { x: e.clientX, y: e.clientY, button: e.button };
+  }, [measurementMode, onMaterialSurfaceSelect]);
+
+  const handleSurfacePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onMaterialSurfaceSelect || measurementMode) return;
+    const start = surfacePointerDownRef.current;
+    surfacePointerDownRef.current = null;
+    if (!start || start.button !== e.button || e.button !== 0) return;
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (dx * dx + dy * dy > 36) return;
+
+    const selection = pickMaterialSurface(e.clientX, e.clientY);
+    if (selection) onMaterialSurfaceSelect(selection);
+  }, [measurementMode, onMaterialSurfaceSelect, pickMaterialSurface]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -1246,7 +1309,11 @@ export default function Viewport3D({
     <div
       ref={containerRef}
       onContextMenu={handleContextMenu}
-      onPointerDown={handleMeasurementPointerDown}
+      onPointerDown={(e) => {
+        handleSurfacePointerDown(e);
+        handleMeasurementPointerDown(e);
+      }}
+      onPointerUp={handleSurfacePointerUp}
       onPointerMove={handleMeasurementPointerMove}
       data-measuring={measurementMode}
       style={{
@@ -1303,6 +1370,11 @@ export default function Viewport3D({
       {measurementMode && (
         <div className="viewport-measure-hint">
           {measurementStart ? t("editor.measurePickSecond") : t("editor.measurePickFirst")}
+        </div>
+      )}
+      {onMaterialSurfaceSelect && !measurementMode && (
+        <div className="viewport-measure-hint" style={{ left: 12, right: "auto" }}>
+          {t("editor.materialConfiguratorHint")}
         </div>
       )}
       <div className="viewport-measure-label-layer" aria-hidden="true">

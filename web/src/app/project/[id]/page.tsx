@@ -8,7 +8,8 @@ import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectEditor } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
-import BomPanel from "@/components/BomPanel";
+import BomPanel, { matchSceneMaterial } from "@/components/BomPanel";
+import MaterialPicker from "@/components/MaterialPicker";
 import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
 import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/MobileEditorTabs";
@@ -38,7 +39,7 @@ import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project } from "@/types";
-import type { ViewportPresentationApi } from "@/components/Viewport3D";
+import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import type { DataProvenance } from "@/lib/confidence";
@@ -131,6 +132,28 @@ function clampBomWidth(width: number): number {
   return Math.max(min, Math.min(max, width));
 }
 
+function buildBomItemFromMaterial(material: Material, quantity = 1): BomItem {
+  const pricing = material.pricing?.find((price) => price.is_primary) || material.pricing?.[0];
+  const unitPrice = Number(pricing?.unit_price ?? 0);
+
+  return {
+    material_id: material.id,
+    material_name: material.name,
+    category_name: material.category_name,
+    image_url: material.image_url,
+    quantity,
+    unit: material.design_unit || pricing?.unit || "kpl",
+    unit_price: unitPrice,
+    total: unitPrice * quantity,
+    supplier: pricing?.supplier_name,
+    link: pricing?.link,
+    in_stock: pricing?.in_stock,
+    stock_level: pricing?.stock_level ?? "unknown",
+    store_location: pricing?.store_location,
+    stock_last_checked_at: pricing?.last_checked_at,
+  };
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -145,6 +168,7 @@ export default function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bom, setBom] = useState<BomItem[]>([]);
+  const [surfacePickerMaterialId, setSurfacePickerMaterialId] = useState<string | null>(null);
   const [sceneJs, setSceneJs] = useState("");
   const [savedScript, setSavedScript] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -1181,6 +1205,78 @@ export default function ProjectPage() {
     [bom, materials, pushHistory, t, toast, track],
   );
 
+  const surfacePickerContext = useMemo(() => {
+    if (!surfacePickerMaterialId) return null;
+
+    const directBomItem = bom.find((item) => item.material_id === surfacePickerMaterialId) ?? null;
+    const matchedMaterial = matchSceneMaterial(surfacePickerMaterialId, materials);
+    const matchedBomItem = matchedMaterial
+      ? bom.find((item) => item.material_id === matchedMaterial.id) ?? null
+      : null;
+    const bomItem = directBomItem ?? matchedBomItem ?? (matchedMaterial ? buildBomItemFromMaterial(matchedMaterial) : null);
+    if (!bomItem) return null;
+
+    return {
+      sceneMaterialId: surfacePickerMaterialId,
+      currentMaterialId: bomItem.material_id,
+      bomItem,
+    };
+  }, [bom, materials, surfacePickerMaterialId]);
+
+  const handleViewportMaterialSurfaceSelect = useCallback((selection: ViewportMaterialSelection) => {
+    const hasBomMaterial = bom.some((item) => item.material_id === selection.materialId);
+    const matchedMaterial = matchSceneMaterial(selection.materialId, materials);
+    if (!hasBomMaterial && !matchedMaterial) {
+      toast(t("materialPicker.surfaceNoMatch", { material: selection.materialId }), "info");
+      return;
+    }
+
+    track("material_surface_selected", {
+      material_id: selection.materialId,
+      object_id: selection.objectId ?? "",
+    });
+    setSurfacePickerMaterialId(selection.materialId);
+  }, [bom, materials, t, toast, track]);
+
+  const handleSurfacePickerSelect = useCallback((toMaterialId: string) => {
+    if (!surfacePickerContext) return;
+    const toMaterial = materials.find((material) => material.id === toMaterialId);
+    if (!toMaterial) return;
+
+    const existingBomItem = bom.find((item) => item.material_id === surfacePickerContext.sceneMaterialId)
+      ?? bom.find((item) => item.material_id === surfacePickerContext.currentMaterialId)
+      ?? null;
+
+    if (existingBomItem) {
+      replaceBomMaterial(existingBomItem.material_id, toMaterialId, { source: "viewport_surface" });
+      if (existingBomItem.material_id !== surfacePickerContext.sceneMaterialId) {
+        setSceneJs((prev) => {
+          const result = replaceSceneMaterialReferences(prev, surfacePickerContext.sceneMaterialId, toMaterialId);
+          if (result.replacements > 0) pushHistory(result.code);
+          return result.code;
+        });
+      }
+    } else {
+      setSceneJs((prev) => {
+        const result = replaceSceneMaterialReferences(prev, surfacePickerContext.sceneMaterialId, toMaterialId);
+        if (result.replacements > 0) pushHistory(result.code);
+        return result.code;
+      });
+      setBom((prev) => {
+        if (prev.some((item) => item.material_id === toMaterialId)) return prev;
+        return [...prev, buildBomItemFromMaterial(toMaterial, surfacePickerContext.bomItem.quantity)];
+      });
+    }
+
+    track("material_surface_replaced", {
+      from_material_id: surfacePickerContext.sceneMaterialId,
+      to_material_id: toMaterialId,
+      category: toMaterial.category_name || "",
+    });
+    setSurfacePickerMaterialId(null);
+    toast(t("materialPicker.surfaceApplied", { material: toMaterial.name }), "success");
+  }, [bom, materials, pushHistory, replaceBomMaterial, surfacePickerContext, t, toast, track]);
+
   const applyBomPriceOverride = useCallback(
     (override: BomPriceOverride) => {
       const previousItem = bom.find((item) => item.material_id === override.materialId);
@@ -2040,6 +2136,7 @@ export default function ProjectPage() {
                 captureRef={captureThumbRef}
                 presentationRef={presentationRef}
                 onToggleWireframe={() => setWireframe(!wireframe)}
+                onMaterialSurfaceSelect={handleViewportMaterialSurfaceSelect}
                 projectName={projectName}
               />
             </ErrorBoundary>
@@ -2216,6 +2313,17 @@ export default function ProjectPage() {
           saveStatus={saveStatus}
           lastSavedAt={lastSaved ? new Date(lastSaved) : null}
           warningCount={sceneWarnings.length}
+        />
+      )}
+
+      {surfacePickerContext && (
+        <MaterialPicker
+          currentMaterialId={surfacePickerContext.currentMaterialId}
+          bomItem={surfacePickerContext.bomItem}
+          materials={materials}
+          disabledMaterialIds={new Set(bom.map((item) => item.material_id).filter((id) => id !== surfacePickerContext.currentMaterialId))}
+          onClose={() => setSurfacePickerMaterialId(null)}
+          onSelect={handleSurfacePickerSelect}
         />
       )}
 

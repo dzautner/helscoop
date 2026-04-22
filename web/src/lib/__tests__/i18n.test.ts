@@ -454,7 +454,7 @@ describe("exhaustive i18n key parity", () => {
     "editor.docs", "editor.share", "editor.duplicateProject", "editor.parameters",
     "editor.unsavedWarning", "editor.quantityFor",
     "editor.removeMaterial", "editor.confirmRemoveItem", "editor.bomItemRow",
-    "editor.sceneMaterialsDetected", "editor.syncFromScene",
+    "editor.sceneMaterialsDetected", "editor.syncFromScene", "editor.materialConfiguratorHint",
     // share
     "share.title", "share.description", "share.generating", "share.copyLink",
     "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
@@ -506,8 +506,9 @@ describe("exhaustive i18n key parity", () => {
     "materialPicker.deltaEach", "materialPicker.deltaTotal", "materialPicker.compare",
     "materialPicker.comparing", "materialPicker.compareLimit", "materialPicker.compareHint",
     "materialPicker.comparisonTitle", "materialPicker.feature", "materialPicker.bestValue",
-    "materialPicker.totalCost", "materialPicker.select", "materialPicker.currentSelected",
-    "materialPicker.alreadyInBom",
+    "materialPicker.totalCost", "materialPicker.viewAtRetailer", "materialPicker.noRetailerLink",
+    "materialPicker.affiliateDisclosure", "materialPicker.surfaceApplied", "materialPicker.surfaceNoMatch",
+    "materialPicker.select", "materialPicker.currentSelected", "materialPicker.alreadyInBom",
     // units
     "units.jm", "units.sqm", "units.m2", "units.m3", "units.kpl",
     "units.sheet", "units.box", "units.liter", "units.sakki",
