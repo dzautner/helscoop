@@ -15,7 +15,7 @@ import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
 import AddressSearch from "@/components/AddressSearch";
 import Link from "next/link";
-import type { Project, Template, BuildingResult } from "@/types";
+import type { Project, ProjectStatus, Template, BuildingResult } from "@/types";
 
 type SortKey = "modified" | "created" | "name" | "cost";
 
@@ -32,6 +32,8 @@ export default function ProjectList({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("modified");
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [trashProjects, setTrashProjects] = useState<Project[]>([]);
@@ -237,20 +239,35 @@ export default function ProjectList({
     return { days, remaining };
   }
 
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const p of projects) {
+      if (p.tags) p.tags.forEach((tag) => tagSet.add(tag));
+    }
+    return Array.from(tagSet).sort();
+  }, [projects]);
+
   const filteredProjects = useMemo(() => {
     let result = projects;
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
-          (p.description && p.description.toLowerCase().includes(q))
+          (p.description && p.description.toLowerCase().includes(q)) ||
+          (p.tags && p.tags.some((tag) => tag.toLowerCase().includes(q)))
       );
     }
 
-    // Sort
+    if (statusFilter !== "all") {
+      result = result.filter((p) => (p.status || "planning") === statusFilter);
+    }
+
+    if (tagFilter) {
+      result = result.filter((p) => p.tags && p.tags.includes(tagFilter));
+    }
+
     const sorted = [...result];
     switch (sortKey) {
       case "name":
@@ -269,7 +286,7 @@ export default function ProjectList({
     }
 
     return sorted;
-  }, [projects, searchQuery, sortKey, locale]);
+  }, [projects, searchQuery, sortKey, locale, statusFilter, tagFilter]);
 
   const dashboardStats = useMemo(() => {
     if (projects.length === 0) return null;
@@ -513,6 +530,33 @@ export default function ProjectList({
                 <option value="created">{t('project.sortByCreated')}</option>
                 <option value="cost">{t('project.sortByCost')}</option>
               </select>
+              <select
+                className="select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | "all")}
+                aria-label={t('project.filterByStatus')}
+                style={{ maxWidth: 140 }}
+              >
+                <option value="all">{t('project.filterAll')}</option>
+                <option value="planning">{t('project.statusPlanning')}</option>
+                <option value="in_progress">{t('project.statusInProgress')}</option>
+                <option value="completed">{t('project.statusCompleted')}</option>
+                <option value="archived">{t('project.statusArchived')}</option>
+              </select>
+              {allTags.length > 0 && (
+                <select
+                  className="select"
+                  value={tagFilter || ""}
+                  onChange={(e) => setTagFilter(e.target.value || null)}
+                  aria-label={t('project.filterByTag')}
+                  style={{ maxWidth: 140 }}
+                >
+                  <option value="">{t('project.tags')}</option>
+                  {allTags.map((tag) => (
+                    <option key={tag} value={tag}>{tag}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {dashboardStats && (

@@ -377,7 +377,7 @@ router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   const result = await query(
-    `SELECT id, name, description, is_public, created_at, updated_at, thumbnail_url,
+    `SELECT id, name, description, is_public, created_at, updated_at, thumbnail_url, tags, status,
       (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
@@ -405,7 +405,7 @@ router.get("/trash", async (req, res) => {
 });
 
 router.post("/", requirePermission("project:create"), async (req, res) => {
-  const { name, description, scene_js, building_info } = req.body;
+  const { name, description, scene_js, building_info, tags, status } = req.body;
   if (!name || typeof name !== "string") {
     return res.status(400).json({ error: "Project name is required" });
   }
@@ -415,10 +415,13 @@ router.post("/", requirePermission("project:create"), async (req, res) => {
   if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
     return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
   }
+  const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
+  const safeStatus = status && VALID_STATUSES.includes(status) ? status : "planning";
+  const safeTags = Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : [];
   const result = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js, building_info)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [req.user!.id, name.trim(), description, scene_js, building_info ? JSON.stringify(building_info) : null]
+    `INSERT INTO projects (user_id, name, description, scene_js, building_info, tags, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [req.user!.id, name.trim(), description, scene_js, building_info ? JSON.stringify(building_info) : null, safeTags, safeStatus]
   );
   res.status(201).json(result.rows[0]);
 });
@@ -793,7 +796,7 @@ router.post("/:id/quote-request", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, description, scene_js, household_deduction_joint } = req.body;
+  const { name, description, scene_js, household_deduction_joint, tags, status } = req.body;
   if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
@@ -803,15 +806,24 @@ router.put("/:id", async (req, res) => {
   if (household_deduction_joint !== undefined && typeof household_deduction_joint !== "boolean") {
     return res.status(400).json({ error: "household_deduction_joint must be a boolean" });
   }
+  const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(", ")}` });
+  }
+  const safeTags = tags !== undefined
+    ? (Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : null)
+    : null;
   const result = await query(
     `UPDATE projects SET
        name=COALESCE($1, name),
        description=COALESCE($2, description),
        scene_js=COALESCE($3, scene_js),
        household_deduction_joint=COALESCE($4, household_deduction_joint),
+       tags=COALESCE($5, tags),
+       status=COALESCE($6, status),
        updated_at=now()
-     WHERE id=$5 AND user_id=$6 RETURNING *`,
-    [name?.trim(), description, scene_js, household_deduction_joint ?? null, req.params.id, req.user!.id]
+     WHERE id=$7 AND user_id=$8 RETURNING *`,
+    [name?.trim(), description, scene_js, household_deduction_joint ?? null, safeTags, status ?? null, req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
