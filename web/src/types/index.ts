@@ -275,6 +275,56 @@ export interface MaterialSubstitutionResponse {
   suggestions: MaterialSubstitutionSuggestion[];
 }
 
+export interface AdminStalePrice {
+  material_id?: string;
+  material_name: string;
+  supplier_id: string;
+  supplier_name: string;
+  unit_price: number;
+  last_scraped_at: string | null;
+  days_stale: number | null;
+}
+
+export interface AdminStats {
+  api_health: {
+    status: string;
+    uptime_seconds: number;
+    checked_at: string;
+  };
+  users_total: number;
+  user_count: number;
+  users_new_30d: number;
+  users_active_24h: number;
+  users_active_7d: number;
+  users_active_30d: number;
+  projects_total: number;
+  project_count: number;
+  bom_total_value: number;
+  price_freshness: {
+    total: number;
+    fresh: number;
+    aging: number;
+    stale: number;
+    never: number;
+    stale_percent: number;
+    alert: boolean;
+  };
+  stale_prices: AdminStalePrice[];
+  recent_projects: {
+    id: string;
+    name: string;
+    source: "address" | "template" | "blank";
+    created_at: string;
+    updated_at: string;
+  }[];
+  recent_signups: {
+    id: string;
+    role: string;
+    created_at: string;
+  }[];
+  role_distribution: Array<{ role: string; count: number }>;
+}
+
 export interface BomSubstitutionResponse {
   ok: boolean;
   from_material_id: string;

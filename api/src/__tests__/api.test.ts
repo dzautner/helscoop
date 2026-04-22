@@ -231,6 +231,7 @@ describe("Web app", () => {
       "getProjects", "getProject", "createProject",
       "updateProject", "deleteProject", "duplicateProject",
       "getMaterials", "getSuppliers", "getStalePrices",
+      "getAdminStats", "requestSupplierRescrape",
       "searchKeskoProducts", "importKeskoProduct",
       "exportBOM", "chat",
       "verifyEmail", "resendVerification",
