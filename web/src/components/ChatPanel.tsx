@@ -6,6 +6,7 @@ import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useCursorGlow } from "@/hooks/useCursorGlow";
+import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { buildSavingsRecommendations } from "@/lib/bom-savings";
 import type { ChatMessage, BomItem, Material } from "@/types";
@@ -79,6 +80,7 @@ export default function ChatPanel({
   const { toast } = useToast();
   const { t } = useTranslation();
   const { track } = useAnalytics();
+  const { play: playSound } = useAmbientSound();
 
   useEffect(() => {
     onMessageCountChange?.(messages.length);
@@ -167,6 +169,7 @@ export default function ChatPanel({
         window.dispatchEvent(new CustomEvent("helscoop:credits-updated", { detail: reply.credits }));
       }
       setMessages([...newMessages, { role: reply.role, content: reply.content }]);
+      playSound("chatReply");
     } catch (err) {
       const message = err instanceof ApiError && err.status === 402
         ? t("credits.insufficient")
