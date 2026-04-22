@@ -36,6 +36,7 @@ export default function ChatPanel({
   projectName,
   projectDescription,
   buildingInfo,
+  renovationRoiSummary,
   onMessageCountChange,
 }: {
   sceneJs: string;
@@ -44,6 +45,7 @@ export default function ChatPanel({
   projectName?: string;
   projectDescription?: string;
   buildingInfo?: ChatContextBuildingInfo;
+  renovationRoiSummary?: string;
   onMessageCountChange?: (count: number) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -125,6 +127,7 @@ export default function ChatPanel({
         bomSummary,
         buildingInfo,
         projectInfo: { name: projectName, description: projectDescription },
+        renovationRoiSummary,
       });
       setMessages([...newMessages, reply]);
     } catch (err) {

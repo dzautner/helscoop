@@ -17,6 +17,7 @@ import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
+import { estimateRenovationRoi } from "@/lib/renovation-roi";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
@@ -487,6 +488,10 @@ export default function ProjectPage() {
   }, [bomWidth]);
 
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
+  const renovationRoi = useMemo(
+    () => estimateRenovationRoi(bom, materials, project?.building_info ?? null, { coupleMode: householdDeductionJoint }),
+    [bom, householdDeductionJoint, materials, project?.building_info],
+  );
 
   const handleParamChange = useCallback(
     (name: string, value: number) => {
@@ -2141,6 +2146,7 @@ export default function ProjectPage() {
             projectName={projectName}
             projectDescription={projectDesc}
             buildingInfo={project?.building_info ?? undefined}
+            renovationRoiSummary={renovationRoi?.summary}
             onMessageCountChange={setChatMessageCount}
           />
         </div>

@@ -11,6 +11,7 @@ import MaterialPicker from "@/components/MaterialPicker";
 import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsPanel";
 import QuoteRequestModal from "@/components/QuoteRequestModal";
 import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
+import RenovationRoiPanel from "@/components/RenovationRoiPanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -2313,6 +2314,14 @@ export default function BomPanel({
             materials={materials}
             coupleMode={householdDeductionJoint}
             onCoupleModeChange={onHouseholdDeductionJointChange || (() => undefined)}
+          />
+        )}
+        {bom.length > 0 && (
+          <RenovationRoiPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            coupleMode={householdDeductionJoint}
           />
         )}
         <button
