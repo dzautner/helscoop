@@ -22,6 +22,7 @@ export type AnalyticsEvent =
   | "bom_item_undo_remove"
   | "bom_package_material_replaced"
   | "bom_optimization_applied"
+  | "bom_optimization_dismissed"
   | "bom_optimization_undo"
   | "bom_supplier_price_applied"
   | "material_surface_selected"
@@ -50,6 +51,7 @@ export interface AnalyticsEventProps {
   bom_item_undo_remove: { material_id: string };
   bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string; source?: string };
   bom_optimization_applied: { type: string; material_id: string; savings_amount: number };
+  bom_optimization_dismissed: { type: string; material_id: string; savings_amount: number };
   bom_optimization_undo: { type: string; material_id: string };
   bom_supplier_price_applied: { material_id: string; supplier: string; unit_price: number };
   material_surface_selected: { material_id: string; object_id?: string };
