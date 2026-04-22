@@ -395,8 +395,9 @@ describe("exhaustive i18n key parity", () => {
     "search.sectionLabel", "search.title", "search.subtitle", "search.placeholder",
     "search.searching", "search.searchButton", "search.createFromBuilding",
     "search.creatingProject", "search.createError", "search.notFound",
-    "search.yearBuilt", "search.area", "search.floors", "search.material",
-    "search.heating", "search.bomRows", "search.verified", "search.estimated",
+    "search.type", "search.yearBuilt", "search.area", "search.floors", "search.material",
+    "search.heating", "search.roofType", "search.bomRows", "search.editHint",
+    "search.updatingBuilding", "search.updateError", "search.verified", "search.estimated",
     "search.dataSources",
     // project
     "project.myProjects", "project.projectCount", "project.startFirst",
@@ -410,6 +411,20 @@ describe("exhaustive i18n key parity", () => {
     "project.emptyCta", "project.noSearchResultsCta", "project.useTemplate",
     "project.openAriaLabel", "project.copyAriaLabel", "project.deleteAriaLabel",
     "project.viewCount",
+    // BOM aggregate
+    "bomAggregate.eyebrow", "bomAggregate.title", "bomAggregate.subtitle",
+    "bomAggregate.selectProject", "bomAggregate.selectShort",
+    "bomAggregate.selectedCount", "bomAggregate.combine", "bomAggregate.clear",
+    "bomAggregate.selectHint", "bomAggregate.error", "bomAggregate.projects",
+    "bomAggregate.mergedRows", "bomAggregate.totalCost", "bomAggregate.bulkCandidates",
+    "bomAggregate.tableHint", "bomAggregate.empty", "bomAggregate.exportCsv",
+    "bomAggregate.exported", "bomAggregate.material", "bomAggregate.quantity",
+    "bomAggregate.cost", "bomAggregate.bulk", "bomAggregate.projectBreakdown",
+    "bomAggregate.bulkCandidate", "bomAggregate.compareTitle",
+    "bomAggregate.compareSubtitle", "bomAggregate.compareLimit",
+    "bomAggregate.costPerM2", "bomAggregate.costPerM2Missing",
+    "bomAggregate.sharedMaterials", "bomAggregate.noSharedMaterials",
+    "bomAggregate.uncategorized", "bomAggregate.noBulk",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
     "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",
@@ -601,6 +616,7 @@ describe("exhaustive i18n key parity", () => {
     "landing.feature3Title", "landing.feature3Desc",
     // building
     "building.omakotitalo", "building.rivitalo", "building.kerrostalo", "building.paritalo",
+    "building.roofGable", "building.roofFlat", "building.roofMansard", "building.roofShed",
     // bom
     "bom.donutChartAriaLabel", "bom.exportCsv", "bom.importBom",
     "bom.importNoRows", "bom.importFailed", "bom.importDrop",

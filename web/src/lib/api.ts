@@ -1,5 +1,8 @@
 import type {
   AdminStats,
+  BuildingInfo,
+  BuildingResult,
+  BomAggregateResponse,
   EnergySubsidyRequest,
   BomSubstitutionResponse,
   KeskoProduct,
@@ -399,10 +402,21 @@ export const api = {
     apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/submit`, { method: "POST" }),
   getRyhtiStatus: (projectId: string) =>
     apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/status`),
+  generateBuilding: (payload: {
+    address?: string;
+    coordinates?: { lat: number; lon: number };
+    building_info: Partial<BuildingInfo>;
+  }): Promise<BuildingResult> =>
+    apiFetch("/building/generate", { method: "POST", body: JSON.stringify(payload) }),
 
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),
   exportBOM: (projectId: string) => apiFetch(`/bom/export/${projectId}`),
+  aggregateBOM: (projectIds: string[]): Promise<BomAggregateResponse> =>
+    apiFetch("/bom/aggregate", {
+      method: "POST",
+      body: JSON.stringify({ project_ids: projectIds }),
+    }),
   exportBOMCsv: async (projectId: string, projectName: string) => {
     const t = getToken();
     const res = await fetch(`${API_URL}/bom/export/${projectId}?format=csv`, {

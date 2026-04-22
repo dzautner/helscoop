@@ -46,6 +46,7 @@ import type { Material, BomItem, Project, ProjectVersionSnapshot } from "@/types
 import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
+import PriceSummaryBar from "@/components/PriceSummaryBar";
 import type { DataProvenance } from "@/lib/confidence";
 
 /** Parse a validation warning key like "validation.typoDetected:scene" into
@@ -2447,6 +2448,13 @@ export default function ProjectPage() {
             buildingInfo={project?.building_info ?? undefined}
             renovationRoiSummary={renovationRoi?.summary}
             onMessageCountChange={setChatMessageCount}
+          />
+          <PriceSummaryBar
+            bom={bom}
+            onViewBom={showBom ? undefined : () => {
+              const el = document.querySelector(".editor-bom-panel");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
           />
         </div>
 

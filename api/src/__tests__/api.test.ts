@@ -7,6 +7,7 @@ describe("API structure", () => {
     const suppliers = await import("../routes/suppliers");
     const pricing = await import("../routes/pricing");
     const chat = await import("../routes/chat");
+    const bom = await import("../routes/bom");
     const kesko = await import("../routes/kesko");
     const ryhti = await import("../routes/ryhti");
     expect(materials.default).toBeDefined();
@@ -14,6 +15,7 @@ describe("API structure", () => {
     expect(suppliers.default).toBeDefined();
     expect(pricing.default).toBeDefined();
     expect(chat.default).toBeDefined();
+    expect(bom.default).toBeDefined();
     expect(kesko.default).toBeDefined();
     expect(ryhti.default).toBeDefined();
   });

@@ -37,7 +37,7 @@ import app from "../index";
 function makeRequest(
   method: string,
   path: string,
-  opts: { headers?: Record<string, string> } = {}
+  opts: { headers?: Record<string, string>; body?: unknown } = {}
 ): Promise<{ status: number; body: unknown }> {
   return new Promise((resolve, reject) => {
     const server = app.listen(0, () => {
@@ -72,6 +72,10 @@ function makeRequest(
         server.close();
         reject(err);
       });
+
+      if (opts.body !== undefined) {
+        req.write(JSON.stringify(opts.body));
+      }
 
       req.end();
     });
@@ -436,7 +440,102 @@ describe("GET /building — generic building fallback", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. External Finnish registry integration
+// 4. Manual building generation
+// ---------------------------------------------------------------------------
+describe("POST /building/generate", () => {
+  it("generates a manual-confidence building from corrected user details", async () => {
+    const res = await makeRequest(
+      "POST",
+      "/building/generate",
+      {
+        body: {
+          address: "Merikannontie 3, 00260 Helsinki",
+          coordinates: { lat: 60.181, lon: 24.912 },
+          building_info: {
+            type: "paritalo",
+            year_built: 1924,
+            area_m2: 185.5,
+            floors: 3,
+            material: "tiili",
+            heating: "maalampopumppu",
+            roof_type: "mansardikatto",
+          },
+        },
+      }
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      confidence: string;
+      address: string;
+      coordinates: { lat: number; lon: number };
+      building_info: {
+        type: string;
+        year_built: number;
+        area_m2: number;
+        floors: number;
+        material: string;
+        heating: string;
+        roof_type: string;
+      };
+      data_sources: string[];
+      scene_js: string;
+      bom_suggestion: { material_id: string; quantity: number }[];
+    };
+    expect(body.confidence).toBe("manual");
+    expect(body.address).toBe("Merikannontie 3, 00260 Helsinki");
+    expect(body.coordinates.lat).toBeCloseTo(60.181);
+    expect(body.building_info).toMatchObject({
+      type: "paritalo",
+      year_built: 1924,
+      area_m2: 185.5,
+      floors: 3,
+      material: "tiili",
+      heating: "maalampopumppu",
+      roof_type: "mansardikatto",
+    });
+    expect(body.data_sources).toContain("User-corrected building details");
+    expect(body.scene_js).toContain("scene.add");
+    expect(body.bom_suggestion.length).toBeGreaterThan(0);
+  });
+
+  it("sanitizes invalid generated building input", async () => {
+    const res = await makeRequest(
+      "POST",
+      "/building/generate",
+      {
+        body: {
+          building_info: {
+            type: "castle",
+            year_built: 1200,
+            area_m2: -4,
+            floors: 99,
+            material: "paper",
+            heating: "fire",
+            roof_type: "cloud",
+          },
+        },
+      }
+    );
+
+    expect(res.status).toBe(200);
+    const info = (res.body as {
+      building_info: { type: string; year_built: number; area_m2: number; floors: number; material: string; heating: string; roof_type: string };
+    }).building_info;
+    expect(info).toMatchObject({
+      type: "omakotitalo",
+      year_built: 1800,
+      area_m2: 20,
+      floors: 10,
+      material: "puu",
+      heating: "kaukolampo",
+      roof_type: "harjakatto",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. External Finnish registry integration
 // ---------------------------------------------------------------------------
 describe("GET /building — Finnish registry integration", () => {
   const originalFetch = global.fetch;
