@@ -35,6 +35,7 @@ const CATEGORY_ORDER: CommandCategory[] = ["scene", "project", "preferences"];
 function inferCategory(id: string): CommandCategory {
   if (
     id === "toggle-wireframe" ||
+    id === "toggle-ruler" ||
     id === "reset-camera" ||
     id === "toggle-code-editor" ||
     id === "show-docs"
