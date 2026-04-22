@@ -2368,6 +2368,7 @@ export default function ProjectPage() {
                 onChange={handleSceneChange}
                 error={sceneError}
                 errorLine={sceneErrorLine}
+                materials={materials}
               />
             </div>
           )}
