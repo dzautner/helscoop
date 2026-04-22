@@ -475,6 +475,16 @@ export const api = {
     currentScene: string,
     context?: {
       bomSummary?: { material: string; qty: number; unit: string; total: number }[];
+      substitutionSuggestions?: {
+        material: string;
+        materialId: string;
+        substitute?: string;
+        substituteId?: string;
+        savings?: number;
+        savingsPercent?: number;
+        reason?: string;
+        stockLevel?: string | null;
+      }[];
       buildingInfo?: {
         address?: string;
         type?: string;
@@ -499,6 +509,7 @@ export const api = {
         messages,
         currentScene,
         bomSummary: context?.bomSummary,
+        substitutionSuggestions: context?.substitutionSuggestions,
         buildingInfo: context?.buildingInfo,
         projectInfo: context?.projectInfo,
         renovationRoiSummary: context?.renovationRoiSummary,

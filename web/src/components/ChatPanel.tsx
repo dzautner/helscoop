@@ -7,7 +7,8 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useCursorGlow } from "@/hooks/useCursorGlow";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import type { ChatMessage, BomItem } from "@/types";
+import { buildSavingsRecommendations } from "@/lib/bom-savings";
+import type { ChatMessage, BomItem, Material } from "@/types";
 
 interface ChatContextBuildingInfo {
   address?: string;
@@ -35,6 +36,7 @@ export default function ChatPanel({
   sceneJs,
   onApplyCode,
   bom,
+  materials,
   projectName,
   projectDescription,
   buildingInfo,
@@ -45,6 +47,7 @@ export default function ChatPanel({
   sceneJs: string;
   onApplyCode: (code: string) => void;
   bom?: BomItem[];
+  materials?: Material[];
   projectName?: string;
   projectDescription?: string;
   buildingInfo?: ChatContextBuildingInfo;
@@ -138,8 +141,24 @@ export default function ChatPanel({
         unit: item.unit,
         total: item.total || (item.unit_price || 0) * item.quantity,
       }));
+      const substitutionSuggestions = bom && materials?.length
+        ? buildSavingsRecommendations(bom, materials)
+          .filter((recommendation) => recommendation.type === "material_substitution" || recommendation.type === "seasonal_stock")
+          .slice(0, 5)
+          .map((recommendation) => ({
+            material: recommendation.materialName,
+            materialId: recommendation.materialId,
+            substitute: recommendation.toMaterialName,
+            substituteId: recommendation.toMaterialId,
+            savings: Math.round(recommendation.savingsAmount),
+            savingsPercent: Math.round(recommendation.savingsPercent),
+            reason: recommendation.reason,
+            stockLevel: recommendation.stockLevel ?? null,
+          }))
+        : undefined;
       const reply = await api.chat(newMessages, sceneJs, {
         bomSummary,
+        substitutionSuggestions,
         buildingInfo,
         projectInfo: { name: projectName, description: projectDescription },
         renovationRoiSummary,

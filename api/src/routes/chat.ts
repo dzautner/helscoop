@@ -169,6 +169,8 @@ ${MATERIALS_CATALOG_SUMMARY}
 
 Substitution groups mean materials are interchangeable within a group. When suggesting alternatives, stay within the same substitution group unless there is a technical reason to change.
 
+When substitution opportunities are supplied in the current project context, use them when the user asks for cheaper materials, stock replacements, budget reductions, or "onko vaihtoehtoja?". Mention material IDs, substitute IDs, estimated savings, and whether the suggestion is driven by price or stock.
+
 ## Language and response style
 
 - Detect the user's language from their message. If they write in Finnish, respond in Finnish. If in English, respond in English. If mixed, follow the dominant language.
@@ -193,6 +195,17 @@ interface BomSummaryItem {
   qty: number;
   unit: string;
   total: number;
+}
+
+interface SubstitutionSuggestionSummary {
+  material: string;
+  materialId: string;
+  substitute?: string;
+  substituteId?: string;
+  savings?: number;
+  savingsPercent?: number;
+  reason?: string;
+  stockLevel?: string | null;
 }
 
 interface BuildingInfo {
@@ -221,6 +234,7 @@ function buildContextBlock(
   buildingInfo?: BuildingInfo,
   projectInfo?: ProjectInfo,
   renovationRoiSummary?: string,
+  substitutionSuggestions?: SubstitutionSuggestionSummary[],
 ): string {
   let context = `\n\nCurrent scene script:\n\`\`\`javascript\n${currentScene}\n\`\`\``;
 
@@ -266,6 +280,30 @@ function buildContextBlock(
     context += `\nUse BOM data to give cost-aware suggestions. Reference actual prices when discussing additions or changes.`;
   }
 
+  if (substitutionSuggestions && substitutionSuggestions.length > 0) {
+    const suggestionLines = substitutionSuggestions
+      .slice(0, 8)
+      .map((suggestion) => {
+        const parts = [
+          `${suggestion.material} (${suggestion.materialId})`,
+          suggestion.substitute && suggestion.substituteId
+            ? `-> ${suggestion.substitute} (${suggestion.substituteId})`
+            : "needs substitute review",
+        ];
+        if (typeof suggestion.savings === "number" && suggestion.savings > 0) {
+          parts.push(`saves ${suggestion.savings.toFixed(0)} EUR`);
+        }
+        if (typeof suggestion.savingsPercent === "number" && suggestion.savingsPercent > 0) {
+          parts.push(`${suggestion.savingsPercent.toFixed(0)}%`);
+        }
+        if (suggestion.stockLevel) parts.push(`stock: ${suggestion.stockLevel}`);
+        if (suggestion.reason) parts.push(`reason: ${suggestion.reason}`);
+        return `  ${parts.join(" | ")}`;
+      });
+    context += `\n\nMaterial substitution opportunities:\n${suggestionLines.join("\n")}`;
+    context += `\nIf the user asks about alternatives, stock issues, or saving money, proactively explain these swaps before giving generic advice.`;
+  }
+
   if (renovationRoiSummary) {
     context += `\n\nRenovation ROI dashboard:\n${renovationRoiSummary}`;
     context += `\nWhen the user asks whether the renovation is worth it, use this dashboard summary and clearly separate estimate, assumption, and recommendation.`;
@@ -282,6 +320,7 @@ router.post("/", async (req, res) => {
     buildingInfo,
     projectInfo,
     renovationRoiSummary,
+    substitutionSuggestions,
   }: {
     messages: ChatMessage[];
     currentScene: string;
@@ -289,6 +328,7 @@ router.post("/", async (req, res) => {
     buildingInfo?: BuildingInfo;
     projectInfo?: ProjectInfo;
     renovationRoiSummary?: string;
+    substitutionSuggestions?: SubstitutionSuggestionSummary[];
   } = req.body;
 
   if (!messages?.length) {
@@ -332,11 +372,18 @@ router.post("/", async (req, res) => {
     });
   };
 
-  const contextBlock = buildContextBlock(currentScene, bomSummary, buildingInfo, projectInfo, renovationRoiSummary);
+  const contextBlock = buildContextBlock(
+    currentScene,
+    bomSummary,
+    buildingInfo,
+    projectInfo,
+    renovationRoiSummary,
+    substitutionSuggestions,
+  );
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene));
+    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene, substitutionSuggestions));
   }
 
   try {
@@ -363,12 +410,42 @@ router.post("/", async (req, res) => {
     return sendMeteredReply(data.content[0].text);
   } catch (err) {
     console.error("Chat API error:", err);
-    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene));
+    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene, substitutionSuggestions));
   }
 });
 
-function generateLocalResponse(userMessage: string, currentScene: string): string {
+function asksForAlternatives(message: string): boolean {
+  return /alternative|substitut|cheaper|budget|saving|save|stock|unavailable|vaihtoehto|halvempi|saast|sääst|budjet|varasto|loppu/.test(message);
+}
+
+function generateSubstitutionResponse(suggestions: SubstitutionSuggestionSummary[]): string {
+  const lines = suggestions.slice(0, 5).map((suggestion) => {
+    const target = suggestion.substitute && suggestion.substituteId
+      ? `${suggestion.substitute} (${suggestion.substituteId})`
+      : "manual substitute review";
+    const savings = typeof suggestion.savings === "number" && suggestion.savings > 0
+      ? `, estimated saving ${suggestion.savings.toFixed(0)} EUR`
+      : "";
+    const pct = typeof suggestion.savingsPercent === "number" && suggestion.savingsPercent > 0
+      ? ` (${suggestion.savingsPercent.toFixed(0)}%)`
+      : "";
+    const reason = suggestion.reason ? `, reason: ${suggestion.reason}` : "";
+    return `- ${suggestion.material} (${suggestion.materialId}) -> ${target}${savings}${pct}${reason}`;
+  });
+
+  return `I found substitution opportunities in the current BOM:\n${lines.join("\n")}\n\nVerify technical compatibility before ordering, especially for structural or moisture-critical materials.`;
+}
+
+function generateLocalResponse(
+  userMessage: string,
+  currentScene: string,
+  substitutionSuggestions: SubstitutionSuggestionSummary[] = [],
+): string {
   const lower = userMessage.toLowerCase();
+
+  if (substitutionSuggestions.length > 0 && asksForAlternatives(lower)) {
+    return generateSubstitutionResponse(substitutionSuggestions);
+  }
 
   if (lower.includes("add") && lower.includes("roof")) {
     const roofCode = `\n// Roof\nconst roofLeft = translate(rotate(box(4.3, 0.1, 4.2), 0, 0, 30), -1.1, 3.5, 0);\nconst roofRight = translate(rotate(box(4.3, 0.1, 4.2), 0, 0, -30), 1.1, 3.5, 0);\nscene.add(roofLeft, { material: "roofing", color: [0.55, 0.27, 0.07] });\nscene.add(roofRight, { material: "roofing", color: [0.55, 0.27, 0.07] });`;
