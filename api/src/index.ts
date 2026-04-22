@@ -52,6 +52,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
 const IS_TEST = process.env.NODE_ENV === "test";
+const IS_E2E = process.env.E2E === "1";
 const startedAt = Date.now();
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -1065,8 +1066,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: "Internal server error" });
 });
 
-// Only start listening when run directly, not when imported for testing
-if (!IS_TEST) {
+// Only start listening when run directly. Playwright runs the real server with
+// NODE_ENV=test for deterministic limits, so it opts in via E2E=1.
+if (!IS_TEST || IS_E2E) {
   app.listen(PORT, () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Helscoop API running");
   });

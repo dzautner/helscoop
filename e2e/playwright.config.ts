@@ -40,6 +40,7 @@ export default defineConfig({
         DATABASE_URL: "postgres://dingcad:dingcad_dev@localhost:5433/dingcad",
         JWT_SECRET: "helscoop-e2e-test-secret",
         NODE_ENV: "test",
+        E2E: "1",
       },
     },
     {
