@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAnalytics, useEditorSession, PLAUSIBLE_DOMAIN } from "@/hooks/useAnalytics";
 
-let consoleSpy: ReturnType<typeof vi.spyOn>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let consoleSpy: any;
+const win = window as any;
 
 beforeEach(() => {
   vi.clearAllMocks();
   consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-  window.plausible = undefined;
+  win.plausible = undefined;
   Object.defineProperty(window, "location", {
     value: { hostname: "localhost" },
     writable: true,
@@ -44,7 +46,7 @@ describe("useAnalytics", () => {
 
   it("does not call plausible on localhost even if defined", () => {
     const mockPlausible = vi.fn();
-    window.plausible = mockPlausible;
+    win.plausible = mockPlausible;
     const { result } = renderHook(() => useAnalytics());
     act(() => {
       result.current.track("page_view", { path: "/test" });
@@ -54,7 +56,7 @@ describe("useAnalytics", () => {
 
   it("calls window.plausible in production", () => {
     const mockPlausible = vi.fn();
-    window.plausible = mockPlausible;
+    win.plausible = mockPlausible;
     Object.defineProperty(window, "location", {
       value: { hostname: "helscoop.fi" },
       writable: true,
@@ -75,7 +77,7 @@ describe("useAnalytics", () => {
       writable: true,
       configurable: true,
     });
-    window.plausible = undefined;
+    win.plausible = undefined;
     const { result } = renderHook(() => useAnalytics());
     expect(() => {
       act(() => {
@@ -86,7 +88,7 @@ describe("useAnalytics", () => {
 
   it("passes props to plausible in production", () => {
     const mockPlausible = vi.fn();
-    window.plausible = mockPlausible;
+    win.plausible = mockPlausible;
     Object.defineProperty(window, "location", {
       value: { hostname: "helscoop.fi" },
       writable: true,

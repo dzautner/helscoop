@@ -38,7 +38,7 @@ describe("sendEmail", () => {
   });
 
   it("does not mention attachments when none provided", async () => {
-    await sendEmail("user@example.com", "No attachment", "Body");
+    await sendEmail("user@example.com", "Plain message", "Body");
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.not.stringContaining("attachment"),
     );
