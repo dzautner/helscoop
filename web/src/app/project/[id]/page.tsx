@@ -2243,6 +2243,7 @@ export default function ProjectPage() {
 
           {/* Embedded AI assistant */}
           <ChatPanel
+            projectId={projectId}
             sceneJs={sceneJs}
             onApplyCode={handleApplyCode}
             bom={bom}
