@@ -346,6 +346,18 @@ interface CategorySlice {
   color: string;
 }
 
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+  const clampedEnd = Math.min(endAngle, startAngle + 359.999);
+  const startRad = ((clampedEnd - 90) * Math.PI) / 180;
+  const endRad = ((startAngle - 90) * Math.PI) / 180;
+  const x1 = cx + r * Math.cos(endRad);
+  const y1 = cy + r * Math.sin(endRad);
+  const x2 = cx + r * Math.cos(startRad);
+  const y2 = cy + r * Math.sin(startRad);
+  const largeArc = clampedEnd - startAngle > 180 ? 1 : 0;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
+}
+
 function CostBreakdownChart({
   bom,
   materials,
@@ -356,6 +368,7 @@ function CostBreakdownChart({
   total: number;
 }) {
   const { t, locale } = useTranslation();
+  const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
 
   const slices = useMemo<CategorySlice[]>(() => {
     if (total <= 0) return [];
@@ -382,14 +395,21 @@ function CostBreakdownChart({
 
   if (slices.length === 0) return null;
 
-  let cumDeg = 0;
-  const stops: string[] = [];
-  for (const s of slices) {
-    const deg = (s.pct / 100) * 360;
-    stops.push(`${s.color} ${cumDeg}deg ${cumDeg + deg}deg`);
-    cumDeg += deg;
-  }
-  const gradient = `conic-gradient(${stops.join(", ")})`;
+  const svgSize = 140;
+  const cx = svgSize / 2;
+  const cy = svgSize / 2;
+  const outerR = 62;
+  const strokeW = 22;
+  const r = outerR - strokeW / 2;
+  const hovered = slices.find((s) => s.name === hoveredSlice);
+
+  let cumAngle = 0;
+  const arcs = slices.map((s) => {
+    const startAngle = cumAngle;
+    const sweep = (s.pct / 100) * 360;
+    cumAngle += sweep;
+    return { ...s, startAngle, sweep };
+  });
 
   return (
     <div
@@ -416,63 +436,91 @@ function CostBreakdownChart({
           alignItems: "center",
         }}
       >
-        {/* Donut */}
-        <div
-          role="img"
-          aria-label={t('bom.donutChartAriaLabel', {
-            categories: slices.map((s) => `${s.name} ${s.pct.toFixed(0)}%`).join(', '),
-          })}
-          style={{
-            width: 100,
-            height: 100,
-            borderRadius: "50%",
-            background: gradient,
-            position: "relative",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{ position: "relative", width: svgSize, height: svgSize }}>
+          <svg
+            width={svgSize}
+            height={svgSize}
+            viewBox={`0 0 ${svgSize} ${svgSize}`}
+            role="img"
+            aria-label={t('bom.donutChartAriaLabel', {
+              categories: slices.map((s) => `${s.name} ${s.pct.toFixed(0)}%`).join(', '),
+            })}
+          >
+            {arcs.map((arc) => (
+              <path
+                key={arc.name}
+                d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.sweep)}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={strokeW}
+                strokeLinecap="butt"
+                onMouseEnter={() => setHoveredSlice(arc.name)}
+                onMouseLeave={() => setHoveredSlice(null)}
+                style={{
+                  opacity: hoveredSlice && hoveredSlice !== arc.name ? 0.35 : 1,
+                  transform: hoveredSlice === arc.name ? "scale(1.04)" : "scale(1)",
+                  transformOrigin: "center",
+                  transition: "opacity 0.15s ease, transform 0.15s ease",
+                  cursor: "pointer",
+                }}
+              />
+            ))}
+          </svg>
           <div
             style={{
               position: "absolute",
-              inset: 18,
-              borderRadius: "50%",
-              background: "var(--bg-tertiary)",
+              inset: 0,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
+              pointerEvents: "none",
             }}
           >
-            <span
-              className="heading-display"
-              style={{ fontSize: 14, lineHeight: 1.1, color: "var(--text-primary)" }}
-            >
-              {total.toLocaleString(locale, { maximumFractionDigits: 0 })}
-            </span>
-            <span style={{ fontSize: 9, color: "var(--text-muted)" }}>&euro;</span>
+            {hovered ? (
+              <>
+                <span style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.2, textAlign: "center", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {hovered.name}
+                </span>
+                <span className="heading-display" style={{ fontSize: 14, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                  {hovered.total.toLocaleString(locale, { maximumFractionDigits: 0 })}&euro;
+                </span>
+                <span style={{ fontSize: 9, color: "var(--text-muted)" }}>{hovered.pct.toFixed(0)}%</span>
+              </>
+            ) : (
+              <>
+                <span className="heading-display" style={{ fontSize: 16, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                  {total.toLocaleString(locale, { maximumFractionDigits: 0 })}
+                </span>
+                <span style={{ fontSize: 9, color: "var(--text-muted)" }}>&euro;</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Legend */}
         <div style={{ display: "flex", flexDirection: "column", gap: 5, width: "100%" }}>
-          {slices.map((s, si) => (
+          {slices.map((s) => (
             <div
               key={s.name}
+              onMouseEnter={() => setHoveredSlice(s.name)}
+              onMouseLeave={() => setHoveredSlice(null)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 fontSize: 11,
+                cursor: "pointer",
+                opacity: hoveredSlice && hoveredSlice !== s.name ? 0.5 : 1,
+                transition: "opacity 0.15s ease",
               }}
             >
               <span
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: si % 4 === 0 ? "50%" : si % 4 === 1 ? "1px" : si % 4 === 2 ? "50% 0" : "0 50%",
+                  borderRadius: "2px",
                   background: s.color,
                   flexShrink: 0,
-                  transform: si % 4 === 3 ? "rotate(45deg)" : undefined,
                 }}
               />
               <span
@@ -508,12 +556,10 @@ function Sparkline({
   data,
   width = 80,
   height = 24,
-  color = "var(--text-muted)",
 }: {
   data: number[];
   width?: number;
   height?: number;
-  color?: string;
 }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
@@ -522,20 +568,33 @@ function Sparkline({
   const padY = 2;
   const usableH = height - padY * 2;
 
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * width;
-      const y = padY + usableH - ((v - min) / range) * usableH;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * width,
+    y: padY + usableH - ((v - min) / range) * usableH,
+  }));
+
+  const linePoints = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const fillPath = `M ${pts[0].x},${pts[0].y} ` +
+    pts.slice(1).map((p) => `L ${p.x},${p.y}`).join(" ") +
+    ` L ${width},${height} L 0,${height} Z`;
+
+  const trending = data[data.length - 1] > data[0] ? "up" : data[data.length - 1] < data[0] ? "down" : "stable";
+  const strokeColor = trending === "down" ? "var(--success, #8bc48b)" : trending === "up" ? "var(--danger, #e05555)" : "var(--amber, #e5a04b)";
+  const gradId = `sparkGrad-${Math.random().toString(36).slice(2, 8)}`;
 
   return (
     <svg width={width} height={height} aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={fillPath} fill={`url(#${gradId})`} />
       <polyline
-        points={points}
+        points={linePoints}
         fill="none"
-        stroke={color}
+        stroke={strokeColor}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -931,7 +990,6 @@ function PriceComparisonPopup({
                 const unitPrice = parseFloat(price.unit_price);
                 const spark = sparklineData.get(price.supplier_id);
                 const trend = computeTrend(priceHistory, price.supplier_id, 30);
-                const sparkColor = supplierColors.get(price.supplier_id) || "var(--text-muted)";
                 const priceStockLevel = normalizeStockLevel(price.stock_level);
                 const priceStock = stockMeta(priceStockLevel, t);
                 const priceStockTooltip = stockTooltip(price, t, locale);
@@ -1007,7 +1065,7 @@ function PriceComparisonPopup({
                             }}
                             title={t("pricing.showTrend")}
                           >
-                            <Sparkline data={spark} width={60} height={20} color={sparkColor} />
+                            <Sparkline data={spark} width={60} height={20} />
                           </div>
                         )}
                         <span style={{
