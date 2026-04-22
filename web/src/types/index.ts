@@ -35,6 +35,56 @@ export interface Project {
   bom?: BomItem[];
 }
 
+export interface ProjectVersionSnapshot {
+  name: string;
+  description: string;
+  scene_js: string;
+  bom: { material_id: string; quantity: number; unit: string }[];
+}
+
+export interface ProjectBranch {
+  id: string;
+  project_id: string;
+  name: string;
+  forked_from_version_id: string | null;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface ProjectVersion {
+  id: string;
+  project_id: string;
+  branch_id: string | null;
+  parent_version_id: string | null;
+  restored_from_version_id: string | null;
+  name: string | null;
+  description: string | null;
+  event_type: "auto" | "named" | "restore" | "branch";
+  delta: {
+    changedFields?: string[];
+    bom?: {
+      added?: number;
+      removed?: number;
+      quantityChanged?: number;
+      unitChanged?: number;
+    };
+  };
+  thumbnail_url: string | null;
+  created_at: string;
+}
+
+export interface ProjectVersionsResponse {
+  branches: ProjectBranch[];
+  versions: ProjectVersion[];
+}
+
+export interface ProjectVersionCompareResponse {
+  base: { id: string; name: string | null; created_at: string; estimated_cost: number };
+  target: { id: string; name: string | null; created_at: string; estimated_cost: number };
+  delta: ProjectVersion["delta"];
+  cost_delta: number;
+}
+
 export interface BuildingResult {
   address: string;
   coordinates: { lat: number; lon: number };
