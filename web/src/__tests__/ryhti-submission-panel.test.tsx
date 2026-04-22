@@ -201,14 +201,16 @@ describe("RyhtiSubmissionPanel", () => {
   it("saves metadata on check button click", async () => {
     mockUpdateRyhtiMetadata.mockResolvedValue(mockPackage);
     render(<RyhtiSubmissionPanel projectId="p1" bomCount={5} />);
+    // Wait for loading to complete (button becomes enabled)
     await waitFor(() => {
-      expect(screen.getByText("ryhti.check")).toBeInTheDocument();
-    });
+      const btn = screen.getByText("ryhti.check").closest("button")!;
+      expect(btn).not.toBeDisabled();
+    }, { timeout: 5000 });
     const checkBtn = screen.getByText("ryhti.check").closest("button")!;
     fireEvent.click(checkBtn);
     await waitFor(() => {
       expect(mockUpdateRyhtiMetadata).toHaveBeenCalled();
-    }, { timeout: 3000 });
+    }, { timeout: 5000 });
   });
 
   it("renders address from buildingInfo", async () => {
