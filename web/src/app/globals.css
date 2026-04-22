@@ -26,7 +26,7 @@
 
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  --text-muted: #94949f;
 
   --amber: #e5a04b;
   --amber-light: #f0b86a;
@@ -2103,6 +2103,10 @@ body::before {
   color: var(--amber);
 }
 
+[data-theme="light"] .lang-switch:hover {
+  color: var(--amber-dim);
+}
+
 @keyframes slideLeft {
   from { opacity: 0; transform: translateX(8px); }
   to { opacity: 1; transform: translateX(0); }
@@ -2226,6 +2230,10 @@ body::before {
   color: #09090b;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+[data-theme="light"] .btn-primary {
+  color: #ffffff;
 }
 
 .btn-primary:hover:not(:disabled) {

@@ -48,7 +48,7 @@ export function ThemeToggle() {
           <line x1="12" y1="17" x2="12" y2="21" />
         </svg>
       )}
-      <span style={{ fontSize: 10, opacity: 0.8 }}>{label.toUpperCase()}</span>
+      <span style={{ fontSize: 10, fontWeight: 700 }}>{label.toUpperCase()}</span>
     </button>
   );
 }
