@@ -698,6 +698,43 @@ export interface ProjectMaterialTrendResponse {
   items: MaterialTrendItem[];
 }
 
+export type PriceAlertEmailFrequency = "off" | "daily" | "weekly";
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface PriceWatch {
+  id: string;
+  project_id: string;
+  material_id: string;
+  material_name?: string;
+  project_name?: string;
+  target_price: string | number | null;
+  watch_any_decrease: boolean;
+  notify_email: boolean;
+  notify_push: boolean;
+  last_notified_price: string | number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectPriceChangeSummary {
+  project_id: string;
+  current_total: number;
+  previous_total: number | null;
+  delta: number;
+  delta_percent: number;
+  days_since_last_visit: number | null;
+  show: boolean;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;

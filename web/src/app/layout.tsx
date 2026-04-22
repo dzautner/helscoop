@@ -4,6 +4,7 @@ import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ConnectionBanner from "@/components/ConnectionBanner";
+import NotificationCenter from "@/components/NotificationCenter";
 
 const SITE_TITLE = "Helscoop — Suunnittele remonttisi 3D:ssä";
 const SITE_DESCRIPTION =
@@ -120,6 +121,7 @@ export default function RootLayout({
           <LocaleProvider>
             <ToastProvider>
               <ConnectionBanner />
+              <NotificationCenter />
               {children}
             </ToastProvider>
           </LocaleProvider>

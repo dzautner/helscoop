@@ -225,13 +225,49 @@ async function scrapeSupplier(supplierId: string): Promise<ScrapeResult[]> {
 
     if (newPrice !== null && newPrice !== oldPrice) {
       await pool.query(
-        "UPDATE pricing SET unit_price=$1, last_scraped_at=now(), updated_at=now() WHERE id=$2",
+        "UPDATE pricing SET previous_unit_price=unit_price, unit_price=$1, last_scraped_at=now(), updated_at=now() WHERE id=$2",
         [newPrice, row.id]
       );
       await pool.query(
         "INSERT INTO pricing_history (pricing_id, unit_price, source) VALUES ($1, $2, 'scraper')",
         [row.id, newPrice]
       );
+      if (newPrice < oldPrice) {
+        await pool.query(
+          `WITH matching_watches AS (
+             SELECT pw.id, pw.user_id, pw.project_id, pw.material_id,
+                    m.name AS material_name, p.name AS project_name
+             FROM price_watches pw
+             JOIN projects p ON p.id = pw.project_id AND p.deleted_at IS NULL
+             JOIN materials m ON m.id = pw.material_id
+             WHERE pw.material_id = $1
+               AND (pw.last_notified_price IS NULL OR $2::numeric < pw.last_notified_price)
+               AND (
+                 pw.watch_any_decrease = true
+                 OR (pw.target_price IS NOT NULL AND $2::numeric <= pw.target_price)
+               )
+           ), inserted AS (
+             INSERT INTO notifications (user_id, type, title, body, metadata_json)
+             SELECT user_id,
+                    'price_drop',
+                    material_name || ' dropped ' || ROUND((($3::numeric - $2::numeric) / $3::numeric) * 100)::text || '%',
+                    project_name || ': ' || $3::numeric::text || ' EUR -> ' || $2::numeric::text || ' EUR.',
+                    jsonb_build_object(
+                      'material_id', material_id,
+                      'project_id', project_id,
+                      'previous_unit_price', $3::numeric,
+                      'unit_price', $2::numeric,
+                      'source', 'scraper'
+                    )
+             FROM matching_watches
+             RETURNING user_id
+           )
+           UPDATE price_watches
+           SET last_notified_price = $2::numeric, updated_at = now()
+           WHERE id IN (SELECT id FROM matching_watches)`,
+          [row.material_id, newPrice, oldPrice]
+        );
+      }
       console.log(
         `    Price updated: ${oldPrice} → ${newPrice} EUR`
       );

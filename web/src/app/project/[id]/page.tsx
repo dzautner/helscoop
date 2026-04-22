@@ -42,7 +42,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
-import type { Material, BomItem, Project, ProjectVersionSnapshot } from "@/types";
+import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary } from "@/types";
 import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
@@ -250,6 +250,7 @@ export default function ProjectPage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
+  const [priceChangeSummary, setPriceChangeSummary] = useState<ProjectPriceChangeSummary | null>(null);
   const [duplicating, setDuplicating] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
@@ -367,6 +368,21 @@ export default function ProjectPage() {
         }
       });
   }, [projectId, router, toast, t]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    let cancelled = false;
+    api.getProjectPriceChange(projectId)
+      .then((summary) => {
+        if (!cancelled) setPriceChangeSummary(summary);
+      })
+      .catch(() => {
+        if (!cancelled) setPriceChangeSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   // Memoize the BOM in a save-friendly format to avoid unnecessary re-renders
   const bomForSave = useMemo(
@@ -2486,6 +2502,46 @@ export default function ProjectPage() {
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }}
           />
+          {priceChangeSummary?.show && (
+            <div
+              role="status"
+              style={{
+                position: "absolute",
+                left: 18,
+                bottom: 76,
+                zIndex: 10,
+                maxWidth: 420,
+                border: "1px solid var(--border)",
+                borderRadius: 14,
+                padding: "12px 14px",
+                background: "rgba(15, 23, 42, 0.88)",
+                color: "var(--text-primary)",
+                boxShadow: "0 18px 60px rgba(0,0,0,0.28)",
+                backdropFilter: "blur(14px)",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 3 }}>
+                {locale === "fi" ? "Edellisen käynnin jälkeen" : "Since your last visit"}
+              </div>
+              <strong style={{ fontSize: 14 }}>
+                {priceChangeSummary.delta < 0
+                  ? locale === "fi" ? "Materiaalit halpenivat" : "Materials got cheaper"
+                  : locale === "fi" ? "Materiaalit kallistuivat" : "Materials got more expensive"}
+                {": "}
+                {priceChangeSummary.delta > 0 ? "+" : ""}
+                {priceChangeSummary.delta.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", {
+                  maximumFractionDigits: 0,
+                })} EUR
+              </strong>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+                {priceChangeSummary.previous_total?.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { maximumFractionDigits: 0 })} EUR{" -> "}
+                {priceChangeSummary.current_total.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { maximumFractionDigits: 0 })} EUR
+                {" · "}
+                {priceChangeSummary.delta_percent > 0 ? "+" : ""}
+                {priceChangeSummary.delta_percent.toFixed(1)}%
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Scene parameters panel */}
