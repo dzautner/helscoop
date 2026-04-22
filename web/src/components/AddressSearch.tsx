@@ -18,6 +18,9 @@ function buildingResultToProvenance(result: BuildingResult): DataProvenance {
   if (result.confidence === "template") {
     return { confidence: "demo", source: "template" };
   }
+  if (result.confidence === "manual") {
+    return { confidence: "manual", source: result.data_sources?.[0] ?? "user" };
+  }
   return { confidence: "estimated", source: result.data_sources?.[0] ?? "heuristic" };
 }
 
@@ -56,8 +59,21 @@ const HEATING_I18N: Record<string, string> = {
   kaukolampo: "building.heatingDistrict",
   sahko: "building.heatingElectric",
   maalampopumppu: "building.heatingGroundSource",
+  maalampo: "building.heatingGroundSource",
   oljy: "building.heatingOil",
 };
+
+const ROOF_TYPE_I18N: Record<string, string> = {
+  harjakatto: "building.roofGable",
+  tasakatto: "building.roofFlat",
+  mansardikatto: "building.roofMansard",
+  pulpettikatto: "building.roofShed",
+};
+
+const BUILDING_TYPE_OPTIONS = ["omakotitalo", "rivitalo", "kerrostalo", "paritalo"];
+const MATERIAL_OPTIONS = ["puu", "tiili", "betoni", "hirsi"];
+const HEATING_OPTIONS = ["kaukolampo", "sahko", "maalampopumppu", "oljy"];
+const ROOF_TYPE_OPTIONS = ["harjakatto", "tasakatto", "mansardikatto", "pulpettikatto"];
 
 function DataSourcesSection({ label, sources }: { label: string; sources: string[] }) {
   const [open, setOpen] = useState(false);
@@ -139,6 +155,8 @@ export default function AddressSearch({
   const [result, setResult] = useState<BuildingResult | null>(null);
   const [searched, setSearched] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [updatingBuilding, setUpdatingBuilding] = useState(false);
+  const [editError, setEditError] = useState(false);
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
 
@@ -150,6 +168,7 @@ export default function AddressSearch({
     try {
       const data = await api.getBuilding(query.trim());
       setResult(data);
+      setEditError(false);
       track("address_search", { query_length: query.trim().length, had_result: true });
     } catch {
       setResult(null);
@@ -162,6 +181,59 @@ export default function AddressSearch({
   const resolveBuildingType = (type: string) => BUILDING_TYPE_I18N[type] ? t(BUILDING_TYPE_I18N[type]) : type;
   const resolveMaterial = (mat: string) => MATERIAL_I18N[mat] ? t(MATERIAL_I18N[mat]) : mat;
   const resolveHeating = (heat: string) => HEATING_I18N[heat] ? t(HEATING_I18N[heat]) : heat;
+  const resolveRoofType = (roof: string) => ROOF_TYPE_I18N[roof] ? t(ROOF_TYPE_I18N[roof]) : roof;
+
+  const updateBuildingDetails = useCallback(async (patch: Partial<BuildingResult["building_info"]>) => {
+    if (!result || result.confidence === "verified") return;
+    const nextInfo = { ...result.building_info, ...patch };
+    setUpdatingBuilding(true);
+    setEditError(false);
+    try {
+      const updated = await api.generateBuilding({
+        address: result.address,
+        coordinates: result.coordinates,
+        building_info: nextInfo,
+      });
+      setResult(updated);
+    } catch {
+      setEditError(true);
+    } finally {
+      setUpdatingBuilding(false);
+    }
+  }, [result]);
+
+  const canEditBuilding = Boolean(result && result.confidence !== "verified");
+  const editControlStyle = {
+    width: "100%",
+    padding: "6px 8px",
+    fontSize: 13,
+    minHeight: 32,
+  };
+  const renderSelect = (
+    value: string,
+    options: string[],
+    resolveLabel: (value: string) => string,
+    onChange: (value: string) => void,
+    label: string,
+  ) => {
+    const selectOptions = options.includes(value) ? options : [value, ...options];
+    return (
+      <select
+        className="input"
+        value={value}
+        disabled={updatingBuilding}
+        aria-label={label}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        style={editControlStyle}
+      >
+        {selectOptions.map((option) => (
+          <option key={option} value={option}>
+            {resolveLabel(option)}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   if (compact) {
     return (
@@ -368,6 +440,16 @@ export default function AddressSearch({
                       {resolveBuildingType(result.building_info.type)}
                     </span>
                     <ConfidenceBadge provenance={buildingResultToProvenance(result)} />
+                    {canEditBuilding && (
+                      <span className="badge" style={{ fontSize: 11 }}>
+                        {t('search.editHint')}
+                      </span>
+                    )}
+                    {updatingBuilding && (
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                        {t('search.updatingBuilding')}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{
@@ -385,11 +467,107 @@ export default function AddressSearch({
                 flex: 1,
               }}>
                 {[
-                  { label: t('search.yearBuilt'), value: String(result.building_info.year_built) },
-                  { label: t('search.area'), value: `${result.building_info.area_m2} m\u00B2` },
-                  { label: t('search.floors'), value: String(result.building_info.floors) },
-                  { label: t('search.material'), value: resolveMaterial(result.building_info.material) },
-                  { label: t('search.heating'), value: resolveHeating(result.building_info.heating) },
+                  {
+                    label: t('search.type'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.type,
+                        BUILDING_TYPE_OPTIONS,
+                        resolveBuildingType,
+                        (value) => void updateBuildingDetails({ type: value }),
+                        t('search.type'),
+                      )
+                      : resolveBuildingType(result.building_info.type),
+                  },
+                  {
+                    label: t('search.yearBuilt'),
+                    value: canEditBuilding ? (
+                      <input
+                        key={`year-${result.building_info.year_built}`}
+                        className="input"
+                        type="number"
+                        min={1800}
+                        max={new Date().getFullYear() + 1}
+                        defaultValue={result.building_info.year_built}
+                        disabled={updatingBuilding}
+                        aria-label={t('search.yearBuilt')}
+                        onBlur={(event) => void updateBuildingDetails({ year_built: Number(event.currentTarget.value) })}
+                        style={editControlStyle}
+                      />
+                    ) : String(result.building_info.year_built),
+                  },
+                  {
+                    label: t('search.area'),
+                    value: canEditBuilding ? (
+                      <input
+                        key={`area-${result.building_info.area_m2}`}
+                        className="input"
+                        type="number"
+                        min={20}
+                        max={2000}
+                        step={0.5}
+                        defaultValue={result.building_info.area_m2}
+                        disabled={updatingBuilding}
+                        aria-label={t('search.area')}
+                        onBlur={(event) => void updateBuildingDetails({ area_m2: Number(event.currentTarget.value) })}
+                        style={editControlStyle}
+                      />
+                    ) : `${result.building_info.area_m2} m\u00B2`,
+                  },
+                  {
+                    label: t('search.floors'),
+                    value: canEditBuilding ? (
+                      <input
+                        key={`floors-${result.building_info.floors}`}
+                        className="input"
+                        type="number"
+                        min={1}
+                        max={10}
+                        step={1}
+                        defaultValue={result.building_info.floors}
+                        disabled={updatingBuilding}
+                        aria-label={t('search.floors')}
+                        onBlur={(event) => void updateBuildingDetails({ floors: Number(event.currentTarget.value) })}
+                        style={editControlStyle}
+                      />
+                    ) : String(result.building_info.floors),
+                  },
+                  {
+                    label: t('search.material'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.material,
+                        MATERIAL_OPTIONS,
+                        resolveMaterial,
+                        (value) => void updateBuildingDetails({ material: value }),
+                        t('search.material'),
+                      )
+                      : resolveMaterial(result.building_info.material),
+                  },
+                  {
+                    label: t('search.heating'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.heating,
+                        HEATING_OPTIONS,
+                        resolveHeating,
+                        (value) => void updateBuildingDetails({ heating: value }),
+                        t('search.heating'),
+                      )
+                      : resolveHeating(result.building_info.heating),
+                  },
+                  {
+                    label: t('search.roofType'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.roof_type ?? "harjakatto",
+                        ROOF_TYPE_OPTIONS,
+                        resolveRoofType,
+                        (value) => void updateBuildingDetails({ roof_type: value }),
+                        t('search.roofType'),
+                      )
+                      : resolveRoofType(result.building_info.roof_type ?? "harjakatto"),
+                  },
                   { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
                 ].map((item, i) => (
                   <div key={i} style={{
@@ -415,6 +593,12 @@ export default function AddressSearch({
 
               {result.coordinates && (
                 <MapPreview lat={result.coordinates.lat} lon={result.coordinates.lon} />
+              )}
+
+              {editError && (
+                <div className="inline-error-banner">
+                  {t('search.updateError')}
+                </div>
               )}
 
               {createError && (

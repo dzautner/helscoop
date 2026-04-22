@@ -395,8 +395,9 @@ describe("exhaustive i18n key parity", () => {
     "search.sectionLabel", "search.title", "search.subtitle", "search.placeholder",
     "search.searching", "search.searchButton", "search.createFromBuilding",
     "search.creatingProject", "search.createError", "search.notFound",
-    "search.yearBuilt", "search.area", "search.floors", "search.material",
-    "search.heating", "search.bomRows", "search.verified", "search.estimated",
+    "search.type", "search.yearBuilt", "search.area", "search.floors", "search.material",
+    "search.heating", "search.roofType", "search.bomRows", "search.editHint",
+    "search.updatingBuilding", "search.updateError", "search.verified", "search.estimated",
     "search.dataSources",
     // project
     "project.myProjects", "project.projectCount", "project.startFirst",
@@ -601,6 +602,7 @@ describe("exhaustive i18n key parity", () => {
     "landing.feature3Title", "landing.feature3Desc",
     // building
     "building.omakotitalo", "building.rivitalo", "building.kerrostalo", "building.paritalo",
+    "building.roofGable", "building.roofFlat", "building.roofMansard", "building.roofShed",
     // bom
     "bom.donutChartAriaLabel", "bom.exportCsv", "bom.importBom",
     "bom.importNoRows", "bom.importFailed", "bom.importDrop",
