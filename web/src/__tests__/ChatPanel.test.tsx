@@ -69,6 +69,7 @@ vi.mock("@/components/ConfirmDialog", () => ({
 }));
 
 import ChatPanel from "@/components/ChatPanel";
+import type { BomItem, Material } from "@/types";
 
 beforeEach(() => {
   mockToast.mockReset();
@@ -81,6 +82,36 @@ const defaultProps = {
   sceneJs: "scene.add(box(1,1,1));",
   onApplyCode: vi.fn(),
 };
+
+function makeMaterial(overrides: Partial<Material> = {}): Material {
+  return {
+    id: "pine_48x148_c24",
+    name: "Pine C24",
+    name_fi: "Pine C24",
+    name_en: "Pine C24",
+    category_name: "Lumber",
+    category_name_fi: "Sahatavara",
+    image_url: null,
+    design_unit: "jm",
+    substitution_group: "framing_48",
+    pricing: [{ unit_price: 5, unit: "jm", supplier_name: "K-Rauta", is_primary: true }],
+    ...overrides,
+  };
+}
+
+function makeBomItem(overrides: Partial<BomItem> = {}): BomItem {
+  return {
+    material_id: "pine_48x148_c24",
+    material_name: "Pine C24",
+    category_name: "Lumber",
+    quantity: 10,
+    unit: "jm",
+    unit_price: 5,
+    total: 50,
+    supplier: "K-Rauta",
+    ...overrides,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Rendering
@@ -206,6 +237,44 @@ describe("ChatPanel — sending messages", () => {
 
     await waitFor(() => {
       expect(onMessageCountChange).toHaveBeenCalledWith(2);
+    });
+  });
+
+  it("includes material substitution opportunities in chat context", async () => {
+    mockChat.mockResolvedValueOnce({ role: "assistant", content: "Use the cheaper substitute." });
+    render(
+      <ChatPanel
+        {...defaultProps}
+        bom={[makeBomItem()]}
+        materials={[
+          makeMaterial(),
+          makeMaterial({
+            id: "spruce_48x148_c24",
+            name: "Spruce C24",
+            name_fi: "Spruce C24",
+            name_en: "Spruce C24",
+            pricing: [{ unit_price: 3, unit: "jm", supplier_name: "STARK", is_primary: true }],
+          }),
+        ]}
+      />,
+    );
+
+    const input = screen.getByLabelText("editor.chatInputLabel");
+    fireEvent.change(input, { target: { value: "Any cheaper alternatives?" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(mockChat).toHaveBeenCalledTimes(1);
+    });
+    expect(mockChat.mock.calls[0][2]).toMatchObject({
+      substitutionSuggestions: [
+        {
+          materialId: "pine_48x148_c24",
+          substituteId: "spruce_48x148_c24",
+          savings: 20,
+          savingsPercent: 40,
+        },
+      ],
     });
   });
 });

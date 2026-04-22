@@ -128,6 +128,12 @@ describe("chat.ts — system prompt Finnish building context (#667)", () => {
     expect(SYSTEM_PROMPT).toContain("cost");
     expect(SYSTEM_PROMPT).toContain("EUR");
   });
+
+  it("instructs AI to use supplied material substitution opportunities", () => {
+    expect(SYSTEM_PROMPT).toContain("substitution opportunities");
+    expect(SYSTEM_PROMPT).toContain("onko vaihtoehtoja");
+    expect(SYSTEM_PROMPT).toContain("substitute IDs");
+  });
 });
 
 describe("chat.ts — materials catalog loader", () => {
@@ -147,5 +153,11 @@ describe("chat.ts — materials catalog loader", () => {
 
   it("handles missing materials.json gracefully (try/catch)", () => {
     expect(CHAT_SOURCE).toContain("materials catalog unavailable");
+  });
+
+  it("adds substitution opportunities to project context", () => {
+    expect(CHAT_SOURCE).toContain("Material substitution opportunities");
+    expect(CHAT_SOURCE).toContain("substitutionSuggestions");
+    expect(CHAT_SOURCE).toContain("generateSubstitutionResponse");
   });
 });

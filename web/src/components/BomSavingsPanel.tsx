@@ -95,7 +95,12 @@ export default function BomSavingsPanel({
     bulk_discount: false,
     seasonal_stock: false,
   });
-  const recommendations = useMemo(() => buildSavingsRecommendations(bom, materials), [bom, materials]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
+  const allRecommendations = useMemo(() => buildSavingsRecommendations(bom, materials), [bom, materials]);
+  const recommendations = useMemo(
+    () => allRecommendations.filter((recommendation) => !dismissedIds.has(recommendation.id)),
+    [allRecommendations, dismissedIds],
+  );
   const totalSavings = useMemo(() => sumSavings(recommendations), [recommendations]);
   const grouped = useMemo(() => {
     const map = new Map<BomSavingType, BomSavingRecommendation[]>();
@@ -133,6 +138,19 @@ export default function BomSavingsPanel({
     }
 
     onCompareMaterial(recommendation.materialId, recommendation.materialName);
+  };
+
+  const dismissRecommendation = (recommendation: BomSavingRecommendation) => {
+    track("bom_optimization_dismissed", {
+      type: recommendation.type,
+      material_id: recommendation.materialId,
+      savings_amount: Math.round(recommendation.savingsAmount),
+    });
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(recommendation.id);
+      return next;
+    });
   };
 
   return (
@@ -205,6 +223,9 @@ export default function BomSavingsPanel({
                                 {t("bomSavings.compare")}
                               </button>
                             )}
+                            <button type="button" onClick={() => dismissRecommendation(recommendation)}>
+                              {t("bom.dismiss")}
+                            </button>
                           </div>
                         </article>
                       ))

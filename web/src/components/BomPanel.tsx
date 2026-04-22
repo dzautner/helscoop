@@ -19,6 +19,7 @@ import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import { detectHeatingGrantOpportunity } from "@/lib/heating-grant-context";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
+import { buildSavingsRecommendations } from "@/lib/bom-savings";
 import type { QuoteConfig } from "@/lib/quote-engine";
 import type {
   BomItem,
@@ -1277,6 +1278,7 @@ function BomItemCard({
   onNavigate,
   onFocusIndex,
   isPackageLocked = false,
+  hasSubstitutionSuggestion = false,
   onTogglePackageLock,
   onOpenMaterialPicker,
   onUpdateNote,
@@ -1292,6 +1294,7 @@ function BomItemCard({
   onNavigate: (direction: "up" | "down" | "next") => void;
   onFocusIndex: (index: number) => void;
   isPackageLocked?: boolean;
+  hasSubstitutionSuggestion?: boolean;
   onTogglePackageLock?: (materialId: string) => void;
   onOpenMaterialPicker: (materialId: string) => void;
   onUpdateNote?: (materialId: string, note: string) => void;
@@ -1628,12 +1631,16 @@ function BomItemCard({
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         />
       )}
-      {stockLevel === "out_of_stock" && (
+      {(stockLevel === "out_of_stock" || hasSubstitutionSuggestion) && (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onCompare(item.material_id, materialName);
+            if (hasSubstitutionSuggestion) {
+              onOpenMaterialPicker(item.material_id);
+            } else {
+              onCompare(item.material_id, materialName);
+            }
           }}
           style={{
             marginTop: 6,
@@ -1648,7 +1655,7 @@ function BomItemCard({
             fontFamily: "var(--font-body)",
           }}
         >
-          {t("bom.alternativeAvailable")}
+          {hasSubstitutionSuggestion ? t("bom.substituteAvailable") : t("bom.alternativeAvailable")}
         </button>
       )}
     </div>
@@ -1890,6 +1897,16 @@ export default function BomPanel({
       .map((item) => `${item.material_id}:${item.quantity}:${item.unit_price ?? ""}:${item.total ?? ""}`)
       .join("|");
   }, [bom]);
+  const substitutionSuggestionIds = useMemo(() => {
+    return new Set(
+      buildSavingsRecommendations(bom, materials)
+        .filter((recommendation) =>
+          recommendation.type === "material_substitution" ||
+          recommendation.type === "seasonal_stock"
+        )
+        .map((recommendation) => recommendation.materialId),
+    );
+  }, [bom, materials]);
 
   const togglePackageLock = useCallback((materialId: string) => {
     setLockedPackageMaterials((prev) => {
@@ -2537,6 +2554,7 @@ export default function BomPanel({
               onNavigate={(dir) => handleBomNavigate(idx, dir)}
               onFocusIndex={setFocusedBomIndex}
               isPackageLocked={lockedPackageMaterials.has(item.material_id)}
+              hasSubstitutionSuggestion={substitutionSuggestionIds.has(item.material_id)}
               onTogglePackageLock={togglePackageLock}
               onOpenMaterialPicker={(id) => {
                 if (onReplaceMaterial) setMaterialPickerId(id);

@@ -246,6 +246,47 @@ export interface MaterialPriceData {
   savings_per_unit: number;
 }
 
+export interface MaterialSubstitutionSuggestion {
+  material_id: string;
+  material_name: string;
+  category_name: string | null;
+  substitution_type: "equivalent" | "alternative" | "upgrade" | "budget";
+  confidence: "verified" | "suggested";
+  notes: string | null;
+  unit_price: number | null;
+  unit: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  link: string | null;
+  stock_level: StockLevel;
+  savings_per_unit: number;
+  savings_percent: number;
+  trigger_reasons: string[];
+}
+
+export interface MaterialSubstitutionResponse {
+  material_id: string;
+  material_name: string;
+  current: {
+    unit_price: number | null;
+    previous_unit_price: number | null;
+    stock_level: StockLevel;
+  };
+  suggestions: MaterialSubstitutionSuggestion[];
+}
+
+export interface BomSubstitutionResponse {
+  ok: boolean;
+  from_material_id: string;
+  to_material_id: string;
+  item: BomItem | null;
+  substitution: {
+    substitution_type: MaterialSubstitutionSuggestion["substitution_type"];
+    confidence: MaterialSubstitutionSuggestion["confidence"];
+    notes: string | null;
+  };
+}
+
 export interface KeskoProduct {
   id: string;
   materialId: string;

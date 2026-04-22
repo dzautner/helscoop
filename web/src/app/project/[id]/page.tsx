@@ -2377,6 +2377,7 @@ export default function ProjectPage() {
             sceneJs={sceneJs}
             onApplyCode={handleApplyCode}
             bom={bom}
+            materials={materials}
             projectName={projectName}
             projectDescription={projectDesc}
             buildingInfo={project?.building_info ?? undefined}
