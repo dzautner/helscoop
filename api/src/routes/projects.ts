@@ -19,6 +19,24 @@ interface QuoteRequestBomRow {
   supplier_name?: string | null;
 }
 
+interface ProjectVersionBomItem {
+  material_id: string;
+  quantity: number;
+  unit: string;
+}
+
+interface ProjectVersionSnapshot {
+  name: string;
+  description: string;
+  scene_js: string;
+  bom: ProjectVersionBomItem[];
+}
+
+type ProjectVersionEvent = "auto" | "named" | "restore" | "branch";
+
+const MAX_AUTO_VERSIONS = 100;
+const VERSION_EVENTS = new Set<ProjectVersionEvent>(["auto", "named", "restore", "branch"]);
+
 function requiredText(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`${field} is required`);
@@ -47,6 +65,218 @@ function formatCurrency(value: number, locale: "fi" | "en"): string {
 
 function safeFilename(name: string): string {
   return name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 80) || "project";
+}
+
+function normalizeVersionSnapshot(value: unknown): ProjectVersionSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as {
+    name?: unknown;
+    description?: unknown;
+    scene_js?: unknown;
+    bom?: unknown;
+  };
+  if (typeof raw.name !== "string" || typeof raw.scene_js !== "string" || !Array.isArray(raw.bom)) {
+    return null;
+  }
+  if (raw.scene_js.length > 512 * 1024) {
+    return null;
+  }
+
+  const bom: ProjectVersionBomItem[] = [];
+  for (const item of raw.bom) {
+    if (!item || typeof item !== "object") return null;
+    const row = item as { material_id?: unknown; quantity?: unknown; unit?: unknown };
+    const quantity = Number(row.quantity);
+    if (typeof row.material_id !== "string" || row.material_id.trim().length === 0) return null;
+    if (!Number.isFinite(quantity) || quantity <= 0) return null;
+    bom.push({
+      material_id: row.material_id,
+      quantity,
+      unit: typeof row.unit === "string" && row.unit.trim() ? row.unit : "kpl",
+    });
+  }
+
+  return {
+    name: raw.name.trim().slice(0, 200),
+    description: typeof raw.description === "string" ? raw.description.slice(0, 5000) : "",
+    scene_js: raw.scene_js,
+    bom,
+  };
+}
+
+function snapshotEquals(a: ProjectVersionSnapshot, b: ProjectVersionSnapshot): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function buildVersionDelta(previous: ProjectVersionSnapshot | null, next: ProjectVersionSnapshot) {
+  const changedFields: string[] = [];
+  if (!previous) {
+    return {
+      changedFields: ["initial"],
+      bom: { added: next.bom.length, removed: 0, quantityChanged: 0, unitChanged: 0 },
+    };
+  }
+
+  if (previous.name !== next.name) changedFields.push("name");
+  if (previous.description !== next.description) changedFields.push("description");
+  if (previous.scene_js !== next.scene_js) changedFields.push("scene_js");
+
+  const previousBom = new Map(previous.bom.map((item) => [item.material_id, item]));
+  const nextBom = new Map(next.bom.map((item) => [item.material_id, item]));
+  let added = 0;
+  let removed = 0;
+  let quantityChanged = 0;
+  let unitChanged = 0;
+
+  for (const item of next.bom) {
+    const old = previousBom.get(item.material_id);
+    if (!old) {
+      added += 1;
+      continue;
+    }
+    if (old.quantity !== item.quantity) quantityChanged += 1;
+    if (old.unit !== item.unit) unitChanged += 1;
+  }
+
+  for (const item of previous.bom) {
+    if (!nextBom.has(item.material_id)) removed += 1;
+  }
+
+  if (added || removed || quantityChanged || unitChanged) changedFields.push("bom");
+  return { changedFields, bom: { added, removed, quantityChanged, unitChanged } };
+}
+
+async function ensureDefaultBranch(projectId: string) {
+  const existing = await query(
+    "SELECT * FROM project_branches WHERE project_id=$1 AND is_default=true LIMIT 1",
+    [projectId],
+  );
+  if (existing.rows.length > 0) return existing.rows[0];
+
+  const created = await query(
+    `INSERT INTO project_branches (project_id, name, is_default)
+     VALUES ($1, 'Main', true)
+     RETURNING *`,
+    [projectId],
+  );
+  return created.rows[0];
+}
+
+async function getOwnedProjectSnapshot(projectId: string, userId: string): Promise<ProjectVersionSnapshot | null> {
+  const projectResult = await query(
+    "SELECT name, description, scene_js FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [projectId, userId],
+  );
+  if (projectResult.rows.length === 0) return null;
+  const bomResult = await query(
+    "SELECT material_id, quantity, unit FROM project_bom WHERE project_id=$1 ORDER BY created_at, material_id",
+    [projectId],
+  );
+  const project = projectResult.rows[0];
+  return {
+    name: project.name || "",
+    description: project.description || "",
+    scene_js: project.scene_js || "",
+    bom: bomResult.rows.map((row: { material_id: string; quantity: string | number; unit: string | null }) => ({
+      material_id: row.material_id,
+      quantity: Number(row.quantity),
+      unit: row.unit || "kpl",
+    })),
+  };
+}
+
+async function getLatestVersion(projectId: string, branchId: string | null) {
+  const result = await query(
+    `SELECT *
+     FROM project_versions
+     WHERE project_id=$1
+       AND (($2::uuid IS NULL AND branch_id IS NULL) OR branch_id=$2)
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [projectId, branchId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function insertProjectVersion(params: {
+  projectId: string;
+  branchId: string | null;
+  snapshot: ProjectVersionSnapshot;
+  name?: string | null;
+  description?: string | null;
+  eventType: ProjectVersionEvent;
+  thumbnailUrl?: string | null;
+  restoredFromVersionId?: string | null;
+}) {
+  const latest = await getLatestVersion(params.projectId, params.branchId);
+  const previousSnapshot = latest?.snapshot ? normalizeVersionSnapshot(latest.snapshot) : null;
+  if (latest && previousSnapshot && snapshotEquals(previousSnapshot, params.snapshot) && params.eventType === "auto" && !params.name) {
+    return latest;
+  }
+
+  const delta = buildVersionDelta(previousSnapshot, params.snapshot);
+  const result = await query(
+    `INSERT INTO project_versions (
+       project_id, branch_id, parent_version_id, restored_from_version_id,
+       name, description, event_type, snapshot, delta, thumbnail_url
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING *`,
+    [
+      params.projectId,
+      params.branchId,
+      latest?.id ?? null,
+      params.restoredFromVersionId ?? null,
+      params.name ?? null,
+      params.description ?? null,
+      params.eventType,
+      JSON.stringify(params.snapshot),
+      JSON.stringify(delta),
+      params.thumbnailUrl ?? null,
+    ],
+  );
+
+  await query(
+    `DELETE FROM project_versions
+     WHERE id IN (
+       SELECT id
+       FROM project_versions
+       WHERE project_id=$1
+         AND (($2::uuid IS NULL AND branch_id IS NULL) OR branch_id=$2)
+         AND event_type='auto'
+         AND name IS NULL
+       ORDER BY created_at DESC
+       OFFSET $3
+     )`,
+    [params.projectId, params.branchId, MAX_AUTO_VERSIONS],
+  );
+
+  return result.rows[0];
+}
+
+async function estimateSnapshotCost(snapshot: ProjectVersionSnapshot): Promise<number> {
+  const materialIds = Array.from(new Set(snapshot.bom.map((item) => item.material_id)));
+  if (materialIds.length === 0) return 0;
+
+  const pricingResult = await query(
+    `SELECT m.id, COALESCE(p.unit_price, 0) AS unit_price, COALESCE(m.waste_factor, 1) AS waste_factor
+     FROM materials m
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE m.id = ANY($1::text[])`,
+    [materialIds],
+  );
+  const priceByMaterial = new Map(
+    pricingResult.rows.map((row: { id: string; unit_price: string | number; waste_factor: string | number }) => [
+      row.id,
+      { unitPrice: Number(row.unit_price), wasteFactor: Number(row.waste_factor) || 1 },
+    ]),
+  );
+
+  return snapshot.bom.reduce((sum, item) => {
+    const pricing = priceByMaterial.get(item.material_id);
+    if (!pricing) return sum;
+    return sum + item.quantity * pricing.unitPrice * pricing.wasteFactor;
+  }, 0);
 }
 
 async function renderQuoteRequestPdf(params: {
@@ -219,6 +449,223 @@ router.get("/:id", async (req, res) => {
   );
 
   res.json({ ...result.rows[0], bom: bom.rows });
+});
+
+router.get("/:id/versions", async (req, res) => {
+  const project = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  await ensureDefaultBranch(req.params.id);
+  const branches = await query(
+    `SELECT id, project_id, name, forked_from_version_id, is_default, created_at
+     FROM project_branches
+     WHERE project_id=$1
+     ORDER BY is_default DESC, created_at ASC`,
+    [req.params.id],
+  );
+  const versions = await query(
+    `SELECT id, project_id, branch_id, parent_version_id, restored_from_version_id,
+       name, description, event_type, delta, thumbnail_url, created_at
+     FROM project_versions
+     WHERE project_id=$1
+     ORDER BY created_at DESC
+     LIMIT 200`,
+    [req.params.id],
+  );
+
+  res.json({ branches: branches.rows, versions: versions.rows });
+});
+
+router.post("/:id/versions", async (req, res) => {
+  const project = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const snapshot = normalizeVersionSnapshot(req.body.snapshot)
+    ?? await getOwnedProjectSnapshot(req.params.id, req.user!.id);
+  if (!snapshot) {
+    return res.status(400).json({ error: "Valid snapshot is required" });
+  }
+
+  let branchId = typeof req.body.branch_id === "string" ? req.body.branch_id : null;
+  if (branchId) {
+    const branch = await query(
+      "SELECT id FROM project_branches WHERE id=$1 AND project_id=$2",
+      [branchId, req.params.id],
+    );
+    if (branch.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid branch_id" });
+    }
+  } else {
+    const branch = await ensureDefaultBranch(req.params.id);
+    branchId = branch.id;
+  }
+
+  const rawEvent = typeof req.body.event_type === "string" ? req.body.event_type : "auto";
+  const eventType = VERSION_EVENTS.has(rawEvent as ProjectVersionEvent)
+    ? rawEvent as ProjectVersionEvent
+    : "auto";
+  const versionName = optionalText(req.body.name, 200);
+  const version = await insertProjectVersion({
+    projectId: req.params.id,
+    branchId,
+    snapshot,
+    name: versionName,
+    description: optionalText(req.body.description, 1000),
+    eventType: versionName && eventType === "auto" ? "named" : eventType,
+    thumbnailUrl: optionalText(req.body.thumbnail_url, 250000),
+  });
+
+  res.status(201).json({ version });
+});
+
+router.post("/:id/branches", async (req, res) => {
+  const project = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  let name: string;
+  try {
+    name = requiredText(req.body.name ?? "Alternative", "name", 120);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid branch name" });
+  }
+  const snapshot = normalizeVersionSnapshot(req.body.snapshot)
+    ?? await getOwnedProjectSnapshot(req.params.id, req.user!.id);
+  if (!snapshot) {
+    return res.status(400).json({ error: "Valid snapshot is required" });
+  }
+
+  const branchResult = await query(
+    `INSERT INTO project_branches (project_id, name, is_default)
+     VALUES ($1,$2,false)
+     RETURNING *`,
+    [req.params.id, name],
+  );
+  const branch = branchResult.rows[0];
+  const version = await insertProjectVersion({
+    projectId: req.params.id,
+    branchId: branch.id,
+    snapshot,
+    name,
+    description: "Branch fork",
+    eventType: "branch",
+    thumbnailUrl: optionalText(req.body.thumbnail_url, 250000),
+  });
+  await query(
+    "UPDATE project_branches SET forked_from_version_id=$1 WHERE id=$2",
+    [version.id, branch.id],
+  );
+
+  res.status(201).json({ branch: { ...branch, forked_from_version_id: version.id }, version });
+});
+
+router.get("/:id/versions/compare", async (req, res) => {
+  const baseId = typeof req.query.base === "string" ? req.query.base : "";
+  const targetId = typeof req.query.target === "string" ? req.query.target : "";
+  if (!baseId || !targetId) {
+    return res.status(400).json({ error: "base and target query params are required" });
+  }
+
+  const versions = await query(
+    `SELECT v.id, v.name, v.created_at, v.snapshot
+     FROM project_versions v
+     JOIN projects p ON p.id = v.project_id
+     WHERE v.project_id=$1
+       AND v.id = ANY($2::uuid[])
+       AND p.user_id=$3
+       AND p.deleted_at IS NULL`,
+    [req.params.id, [baseId, targetId], req.user!.id],
+  );
+
+  if (versions.rows.length !== 2) {
+    return res.status(404).json({ error: "Versions not found" });
+  }
+
+  const baseRow = versions.rows.find((row: { id: string }) => row.id === baseId);
+  const targetRow = versions.rows.find((row: { id: string }) => row.id === targetId);
+  const baseSnapshot = normalizeVersionSnapshot(baseRow?.snapshot);
+  const targetSnapshot = normalizeVersionSnapshot(targetRow?.snapshot);
+  if (!baseSnapshot || !targetSnapshot) {
+    return res.status(500).json({ error: "Version snapshot is invalid" });
+  }
+
+  const [baseCost, targetCost] = await Promise.all([
+    estimateSnapshotCost(baseSnapshot),
+    estimateSnapshotCost(targetSnapshot),
+  ]);
+
+  res.json({
+    base: { id: baseRow.id, name: baseRow.name, created_at: baseRow.created_at, estimated_cost: baseCost },
+    target: { id: targetRow.id, name: targetRow.name, created_at: targetRow.created_at, estimated_cost: targetCost },
+    delta: buildVersionDelta(baseSnapshot, targetSnapshot),
+    cost_delta: targetCost - baseCost,
+  });
+});
+
+router.post("/:id/versions/:versionId/restore", async (req, res) => {
+  const versionResult = await query(
+    `SELECT v.*
+     FROM project_versions v
+     JOIN projects p ON p.id = v.project_id
+     WHERE v.project_id=$1
+       AND v.id=$2
+       AND p.user_id=$3
+       AND p.deleted_at IS NULL`,
+    [req.params.id, req.params.versionId, req.user!.id],
+  );
+  if (versionResult.rows.length === 0) {
+    return res.status(404).json({ error: "Version not found" });
+  }
+
+  const sourceVersion = versionResult.rows[0];
+  const snapshot = normalizeVersionSnapshot(sourceVersion.snapshot);
+  if (!snapshot) {
+    return res.status(500).json({ error: "Version snapshot is invalid" });
+  }
+
+  const projectResult = await query(
+    `UPDATE projects SET name=$1, description=$2, scene_js=$3, updated_at=now()
+     WHERE id=$4 AND user_id=$5
+     RETURNING *`,
+    [snapshot.name, snapshot.description, snapshot.scene_js, req.params.id, req.user!.id],
+  );
+  await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
+  for (const item of snapshot.bom) {
+    const matExists = await query("SELECT id FROM materials WHERE id=$1", [item.material_id]);
+    if (matExists.rows.length === 0) continue;
+    await query(
+      "INSERT INTO project_bom (project_id, material_id, quantity, unit) VALUES ($1,$2,$3,$4)",
+      [req.params.id, item.material_id, item.quantity, item.unit],
+    );
+  }
+
+  const branchId = sourceVersion.branch_id ?? (await ensureDefaultBranch(req.params.id)).id;
+  const restoredVersion = await insertProjectVersion({
+    projectId: req.params.id,
+    branchId,
+    snapshot,
+    name: sourceVersion.name ? `Restore: ${sourceVersion.name}` : "Restore checkpoint",
+    description: `Restored from ${sourceVersion.id}`,
+    eventType: "restore",
+    thumbnailUrl: sourceVersion.thumbnail_url,
+    restoredFromVersionId: sourceVersion.id,
+  });
+
+  res.json({ project: projectResult.rows[0], snapshot, version: restoredVersion });
 });
 
 router.post("/:id/quote-request", async (req, res) => {

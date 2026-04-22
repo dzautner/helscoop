@@ -237,6 +237,120 @@ describe("GET /projects/:id", () => {
 });
 
 // --------------------------------------------------------------------------
+// Project version history
+// --------------------------------------------------------------------------
+
+describe("project version history", () => {
+  const snapshot = {
+    name: "Roof option",
+    description: "New roof",
+    scene_js: "scene.add(box(1,1,1));",
+    bom: [{ material_id: "roof_tile", quantity: 12, unit: "m2" }],
+  };
+
+  it("creates a named project version on the default branch", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "11111111-1111-1111-1111-111111111111", name: "Main", is_default: true }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "22222222-2222-2222-2222-222222222222",
+          branch_id: "11111111-1111-1111-1111-111111111111",
+          name: "Option A",
+          event_type: "named",
+          snapshot,
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/versions", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { snapshot, name: "Option A", event_type: "named" },
+    });
+
+    expect(res.status).toBe(201);
+    const body = res.body as { version: { name: string; event_type: string } };
+    expect(body.version.name).toBe("Option A");
+    expect(body.version.event_type).toBe("named");
+  });
+
+  it("lists branches and versions for an owned project", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "branch-1", name: "Main", is_default: true }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "branch-1", name: "Main", is_default: true }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "v1", branch_id: "branch-1", event_type: "auto", delta: {} }] } as never);
+
+    const res = await makeRequest("GET", "/projects/proj-1/versions", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { branches: unknown[]; versions: unknown[] };
+    expect(body.branches).toHaveLength(1);
+    expect(body.versions).toHaveLength(1);
+  });
+
+  it("restores a version and records the restore as a new version", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "22222222-2222-2222-2222-222222222222",
+          branch_id: "11111111-1111-1111-1111-111111111111",
+          name: "Option A",
+          snapshot,
+          thumbnail_url: null,
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1", name: snapshot.name }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "roof_tile" }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "latest", snapshot: { ...snapshot, name: "Before" } }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "restore-1", event_type: "restore", snapshot }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/versions/22222222-2222-2222-2222-222222222222/restore", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { snapshot: typeof snapshot; version: { event_type: string } };
+    expect(body.snapshot.name).toBe("Roof option");
+    expect(body.version.event_type).toBe("restore");
+  });
+
+  it("compares two versions with material and cost deltas", async () => {
+    const base = { ...snapshot, bom: [{ material_id: "roof_tile", quantity: 10, unit: "m2" }] };
+    const target = { ...snapshot, scene_js: "scene.add(box(2,1,1));", bom: [{ material_id: "roof_tile", quantity: 14, unit: "m2" }] };
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          { id: "11111111-1111-1111-1111-111111111111", name: "Base", created_at: "2026-04-22T00:00:00.000Z", snapshot: base },
+          { id: "22222222-2222-2222-2222-222222222222", name: "Target", created_at: "2026-04-22T00:01:00.000Z", snapshot: target },
+        ],
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "roof_tile", unit_price: 20, waste_factor: 1.05 }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "roof_tile", unit_price: 20, waste_factor: 1.05 }] } as never);
+
+    const res = await makeRequest(
+      "GET",
+      "/projects/proj-1/versions/compare?base=11111111-1111-1111-1111-111111111111&target=22222222-2222-2222-2222-222222222222",
+      { headers: { Authorization: `Bearer ${authToken("user-1")}` } },
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as { delta: { changedFields: string[]; bom: { quantityChanged: number } }; cost_delta: number };
+    expect(body.delta.changedFields).toContain("scene_js");
+    expect(body.delta.changedFields).toContain("bom");
+    expect(body.delta.bom.quantityChanged).toBe(1);
+    expect(body.cost_delta).toBe(84);
+  });
+});
+
+// --------------------------------------------------------------------------
 // POST /projects/:id/quote-request — homeowner contractor lead
 // --------------------------------------------------------------------------
 

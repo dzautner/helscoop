@@ -610,6 +610,18 @@ describe("exhaustive i18n key parity", () => {
     "bomTrends.source.retailer_history", "bomTrends.source.seasonal_model",
     "bomTrends.recommendation.buy_now", "bomTrends.recommendation.wait",
     "bomTrends.recommendation.watch",
+    // Versions
+    "versions.eyebrow", "versions.title", "versions.subtitle",
+    "versions.branches", "versions.branchPlaceholder", "versions.createBranch",
+    "versions.defaultBranchName", "versions.checkpointPlaceholder",
+    "versions.saveCheckpoint", "versions.saving", "versions.loading",
+    "versions.empty", "versions.compareTitle", "versions.costDelta",
+    "versions.compare", "versions.uncompare", "versions.restore",
+    "versions.restoring", "versions.restoreConfirm", "versions.restoreSuccess",
+    "versions.fieldName", "versions.fieldDescription", "versions.fieldScene",
+    "versions.initialSnapshot", "versions.bomChanges", "versions.noMaterialChanges",
+    "versions.event.auto", "versions.event.named", "versions.event.restore",
+    "versions.event.branch",
     // quote request
     "quoteRequest.eyebrow", "quoteRequest.title", "quoteRequest.subtitle",
     "quoteRequest.open", "quoteRequest.emptyDisabled", "quoteRequest.summaryProject",

@@ -1,6 +1,9 @@
 import type {
   EnergySubsidyRequest,
   KeskoProduct,
+  ProjectVersionCompareResponse,
+  ProjectVersionsResponse,
+  ProjectVersionSnapshot,
   ProjectMaterialTrendResponse,
   QuoteRequestPayload,
   RyhtiPermitMetadata,
@@ -301,6 +304,29 @@ export const api = {
     apiFetch(`/projects/${id}/permanent`, { method: "DELETE" }),
   duplicateProject: (id: string) =>
     apiFetch(`/projects/${id}/duplicate`, { method: "POST" }),
+  getProjectVersions: (id: string): Promise<ProjectVersionsResponse> =>
+    apiFetch(`/projects/${id}/versions`),
+  createProjectVersion: (
+    id: string,
+    data: {
+      snapshot: ProjectVersionSnapshot;
+      branch_id?: string | null;
+      name?: string | null;
+      description?: string | null;
+      event_type?: "auto" | "named" | "restore" | "branch";
+      thumbnail_url?: string | null;
+    },
+  ) =>
+    apiFetch(`/projects/${id}/versions`, { method: "POST", body: JSON.stringify(data) }),
+  restoreProjectVersion: (id: string, versionId: string) =>
+    apiFetch(`/projects/${id}/versions/${versionId}/restore`, { method: "POST" }),
+  compareProjectVersions: (id: string, baseId: string, targetId: string): Promise<ProjectVersionCompareResponse> =>
+    apiFetch(`/projects/${id}/versions/compare?base=${encodeURIComponent(baseId)}&target=${encodeURIComponent(targetId)}`),
+  createProjectBranch: (
+    id: string,
+    data: { name: string; snapshot: ProjectVersionSnapshot; thumbnail_url?: string | null },
+  ) =>
+    apiFetch(`/projects/${id}/branches`, { method: "POST", body: JSON.stringify(data) }),
   saveThumbnail: (id: string, thumbnail: string) =>
     apiFetch(`/projects/${id}/thumbnail`, {
       method: "PUT",

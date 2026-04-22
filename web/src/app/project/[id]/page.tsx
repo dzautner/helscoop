@@ -17,6 +17,7 @@ import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
+import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
@@ -39,7 +40,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
-import type { Material, BomItem, Project } from "@/types";
+import type { Material, BomItem, Project, ProjectVersionSnapshot } from "@/types";
 import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
@@ -155,6 +156,47 @@ function buildBomItemFromMaterial(material: Material, quantity = 1): BomItem {
   };
 }
 
+function buildProjectVersionSnapshot(fields: {
+  name: string;
+  description: string;
+  scene_js: string;
+  bom: { material_id: string; quantity: number; unit: string }[];
+}): ProjectVersionSnapshot {
+  return {
+    name: fields.name,
+    description: fields.description,
+    scene_js: fields.scene_js,
+    bom: fields.bom.map((item) => ({
+      material_id: item.material_id,
+      quantity: item.quantity,
+      unit: item.unit,
+    })),
+  };
+}
+
+function hydrateSnapshotBom(snapshot: ProjectVersionSnapshot, materials: Material[]): BomItem[] {
+  return snapshot.bom.map((item) => {
+    const material = materials.find((candidate) => candidate.id === item.material_id);
+    if (!material) {
+      return {
+        material_id: item.material_id,
+        material_name: item.material_id,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: 0,
+        total: 0,
+        stock_level: "unknown",
+      };
+    }
+    const hydrated = buildBomItemFromMaterial(material, item.quantity);
+    return {
+      ...hydrated,
+      unit: item.unit || hydrated.unit,
+      total: (hydrated.unit_price || 0) * item.quantity,
+    };
+  });
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -190,6 +232,8 @@ export default function ProjectPage() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showVersionPanel, setShowVersionPanel] = useState(false);
+  const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | null>(null);
@@ -225,6 +269,7 @@ export default function ProjectPage() {
   const captureThumbRef = useRef<(() => string | null) | null>(null);
   const presentationRef = useRef<ViewportPresentationApi | null>(null);
   const resizingRef = useRef(false);
+  const activeVersionBranchRef = useRef<string | null>(null);
 
   const pushHistory = useCallback((code: string) => {
     const history = historyRef.current;
@@ -240,6 +285,10 @@ export default function ProjectPage() {
 
   const canUndo = historyIndexRef.current > 0;
   const canRedo = historyIndexRef.current < historyRef.current.length - 1;
+
+  useEffect(() => {
+    activeVersionBranchRef.current = activeVersionBranchId;
+  }, [activeVersionBranchId]);
 
   const undo = useCallback(() => {
     if (historyIndexRef.current > 0) {
@@ -325,6 +374,15 @@ export default function ProjectPage() {
     }),
     [projectName, projectDesc, sceneJs, bomForSave]
   );
+  const currentVersionSnapshot = useMemo(
+    () => buildProjectVersionSnapshot({
+      name: projectName,
+      description: projectDesc,
+      scene_js: sceneJs,
+      bom: bomForSave,
+    }),
+    [bomForSave, projectDesc, projectName, sceneJs],
+  );
 
   const autoSaveCallbacks = useMemo(
     () => ({
@@ -348,6 +406,14 @@ export default function ProjectPage() {
         setLastSaved(new Date().toLocaleTimeString());
         setSaveFailCount(0);
         setSaveErrorVisible(false);
+        api.createProjectVersion(projectId, {
+          snapshot: buildProjectVersionSnapshot(saved),
+          branch_id: activeVersionBranchRef.current,
+          event_type: "auto",
+          thumbnail_url: captureThumbRef.current?.() ?? null,
+        }).catch(() => {
+          // Version history should not block core saving.
+        });
         toast(t('toast.saved'), "success");
       },
       onSaveError: (err: unknown) => {
@@ -653,6 +719,35 @@ export default function ProjectPage() {
       setDuplicating(false);
     }
   }, [projectId, router, t, toast]);
+
+  const handleVersionRestored = useCallback(
+    ({ snapshot }: { snapshot: ProjectVersionSnapshot; project?: unknown }) => {
+      const restoredBom = hydrateSnapshotBom(snapshot, materials);
+      setProjectName(snapshot.name);
+      previousNameRef.current = snapshot.name;
+      setProjectDesc(snapshot.description || "");
+      setSceneJs(snapshot.scene_js || DEFAULT_SCENE);
+      setSavedScript(snapshot.scene_js || DEFAULT_SCENE);
+      setBom(restoredBom);
+      setProject((prev) => prev ? {
+        ...prev,
+        name: snapshot.name,
+        description: snapshot.description,
+        scene_js: snapshot.scene_js,
+        bom: restoredBom,
+      } : prev);
+      setSavedSnapshot({
+        name: snapshot.name,
+        description: snapshot.description || "",
+        scene_js: snapshot.scene_js || DEFAULT_SCENE,
+        bom: snapshot.bom,
+      });
+      pushHistory(snapshot.scene_js || DEFAULT_SCENE);
+      setViewportKey((key) => key + 1);
+      toast(t("versions.restoreSuccess"), "success");
+    },
+    [materials, pushHistory, setSavedSnapshot, t, toast],
+  );
 
   useEffect(() => {
     if (!isMobileEditor) {
@@ -1466,6 +1561,19 @@ export default function ProjectPage() {
           </button>
           <button
             className="btn btn-ghost editor-action-secondary"
+            data-tooltip={t('versions.title')}
+            aria-label={t('versions.title')}
+            onClick={() => setShowVersionPanel((visible) => !visible)}
+            style={{ padding: "5px 7px", color: showVersionPanel ? "var(--forest)" : undefined }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v6h6" />
+              <path d="M3 9a9 9 0 1 0 2.64-6.36L3 6" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+          </button>
+          <button
+            className="btn btn-ghost editor-action-secondary"
             data-tooltip={t('project.copy')}
             aria-label={t('editor.duplicateProject')}
             disabled={duplicating}
@@ -1522,6 +1630,16 @@ export default function ProjectPage() {
                   }}
                 >
                   {t("editor.redo")}
+                </button>
+                <button
+                  role="menuitem"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowHeaderMenu(false);
+                    setShowVersionPanel(true);
+                  }}
+                >
+                  {t("versions.title")}
                 </button>
                 <button
                   role="menuitem"
@@ -1806,6 +1924,18 @@ export default function ProjectPage() {
           </div>
         </div>
       </div>
+
+      <ProjectVersionPanel
+        projectId={projectId}
+        open={showVersionPanel}
+        snapshot={currentVersionSnapshot}
+        activeBranchId={activeVersionBranchId}
+        saveNow={save}
+        getThumbnail={() => captureThumbRef.current?.() ?? project?.thumbnail_url ?? null}
+        onClose={() => setShowVersionPanel(false)}
+        onActiveBranchChange={setActiveVersionBranchId}
+        onRestored={handleVersionRestored}
+      />
 
       {/* Draft recovery banner */}
       {hasDraft && (
