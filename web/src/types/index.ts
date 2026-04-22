@@ -32,8 +32,12 @@ export interface Project {
   share_token?: string | null;
   view_count?: number;
   household_deduction_joint?: boolean;
+  tags?: string[];
+  status?: ProjectStatus;
   bom?: BomItem[];
 }
+
+export type ProjectStatus = "planning" | "in_progress" | "completed" | "archived";
 
 export interface ProjectVersionSnapshot {
   name: string;

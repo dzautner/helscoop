@@ -226,6 +226,8 @@ export default function ProjectPage() {
   const [projectName, setProjectName] = useState("");
   const previousNameRef = useRef("");
   const [projectDesc, setProjectDesc] = useState("");
+  const [projectStatus, setProjectStatus] = useState<import("@/types").ProjectStatus>("planning");
+  const [projectTags, setProjectTags] = useState<string[]>([]);
   const [householdDeductionJoint, setHouseholdDeductionJoint] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
@@ -321,6 +323,8 @@ export default function ProjectPage() {
         previousNameRef.current = proj.name;
         setProjectDesc(proj.description || "");
         setHouseholdDeductionJoint(Boolean(proj.household_deduction_joint));
+        setProjectStatus(proj.status || "planning");
+        setProjectTags(proj.tags || []);
         if (proj.share_token) setShareToken(proj.share_token);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
@@ -1579,6 +1583,22 @@ export default function ProjectPage() {
           )}
         </div>
         <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
+        <select
+          className="select"
+          value={projectStatus}
+          onChange={(e) => {
+            const newStatus = e.target.value as import("@/types").ProjectStatus;
+            setProjectStatus(newStatus);
+            api.updateProject(projectId, { status: newStatus } as Record<string, unknown>).catch(() => {});
+          }}
+          aria-label={t('project.filterByStatus')}
+          style={{ fontSize: 11, padding: "3px 6px", maxWidth: 110, height: 28 }}
+        >
+          <option value="planning">{t('project.statusPlanning')}</option>
+          <option value="in_progress">{t('project.statusInProgress')}</option>
+          <option value="completed">{t('project.statusCompleted')}</option>
+          <option value="archived">{t('project.statusArchived')}</option>
+        </select>
         <div className="editor-header-actions">
           <CreditBalancePill compact />
           <button

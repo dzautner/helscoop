@@ -2,7 +2,20 @@
 
 import Link from "next/link";
 import { useTranslation } from "@/components/LocaleProvider";
-import type { Project } from "@/types";
+import type { Project, ProjectStatus } from "@/types";
+
+const STATUS_COLORS: Record<ProjectStatus, string> = {
+  planning: "var(--amber, #e5a04b)",
+  in_progress: "var(--info, #7ab3e0)",
+  completed: "var(--success, #8bc48b)",
+  archived: "var(--text-muted, #666)",
+};
+const STATUS_KEYS: Record<ProjectStatus, string> = {
+  planning: "project.statusPlanning",
+  in_progress: "project.statusInProgress",
+  completed: "project.statusCompleted",
+  archived: "project.statusArchived",
+};
 
 export default function ProjectCard({
   project,
@@ -74,7 +87,43 @@ export default function ProjectCard({
                 {t("project.viewCount", { count: Number(project.view_count || 0) })}
               </span>
             )}
+            {project.status && project.status !== "planning" && (
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 10,
+                color: STATUS_COLORS[project.status],
+                fontFamily: "var(--font-mono)",
+              }}>
+                <span style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: STATUS_COLORS[project.status],
+                }} />
+                {t(STATUS_KEYS[project.status])}
+              </span>
+            )}
           </div>
+          {project.tags && project.tags.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+              {project.tags.slice(0, 5).map((tag) => (
+                <span key={tag} style={{
+                  fontSize: 10,
+                  padding: "1px 6px",
+                  borderRadius: "var(--radius-sm, 4px)",
+                  background: "var(--bg-tertiary)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-mono)",
+                  whiteSpace: "nowrap",
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)", fontSize: 13, minWidth: 0 }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{project.description || t('project.emptyDescription')}</span>
             <span style={{ opacity: 0.5 }}>&middot;</span>
