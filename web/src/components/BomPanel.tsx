@@ -15,6 +15,7 @@ import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import RenovationRoiPanel from "@/components/RenovationRoiPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
 import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
+import PermitCheckerPanel from "@/components/PermitCheckerPanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -2383,6 +2384,7 @@ export default function BomPanel({
             onImportBom={onImportBom}
           />
         )}
+        <PermitCheckerPanel buildingInfo={buildingInfo} />
         {bom.length > 0 && (
           <div className="package-switcher" data-has-choices={hasPackageChoices}>
             <div className="package-switcher-head">
