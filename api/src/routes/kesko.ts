@@ -2,6 +2,7 @@ import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
 import { requirePermission } from "../permissions";
+import { notifyPriceWatchers } from "../price-alerts";
 import {
   KeskoProduct,
   getCachedKeskoProduct,
@@ -117,8 +118,8 @@ router.post("/products/import", async (req, res) => {
        last_scraped_at = now(),
        last_verified_at = now(),
        updated_at = now()
-     RETURNING id, material_id, supplier_id, unit, unit_price, currency, sku, ean, link,
-       is_primary, in_stock, stock_level, store_location, last_checked_at`,
+     RETURNING id, material_id, supplier_id, unit, unit_price, previous_unit_price,
+       currency, sku, ean, link, is_primary, in_stock, stock_level, store_location, last_checked_at`,
     [
       product.materialId,
       product.unit,
@@ -139,6 +140,14 @@ router.post("/products/import", async (req, res) => {
      VALUES ($1, $2, 'kesko-api')`,
     [pricingResult.rows[0].id, unitPrice],
   );
+
+  await notifyPriceWatchers({
+    materialId: product.materialId,
+    supplierId: "k-rauta",
+    previousUnitPrice: pricingResult.rows[0].previous_unit_price,
+    unitPrice: pricingResult.rows[0].unit_price,
+    source: "kesko-api",
+  });
 
   const material = materialResult.rows[0];
   const pricing = {

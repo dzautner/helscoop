@@ -7,9 +7,13 @@ import type {
   BomSubstitutionResponse,
   KeskoProduct,
   MaterialSubstitutionResponse,
+  AppNotification,
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
+  PriceAlertEmailFrequency,
+  PriceWatch,
+  ProjectPriceChangeSummary,
   PhotoEstimateResponse,
   PhotoEstimateUpload,
   ProjectMaterialTrendResponse,
@@ -289,7 +293,11 @@ export const api = {
   me: () => apiFetch("/auth/me"),
   updateProfile: (data: { name?: string; email?: string }) =>
     apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),
-  updateNotificationPreferences: (data: { email_notifications: boolean }) =>
+  updateNotificationPreferences: (data: {
+    email_notifications: boolean;
+    price_alert_email_frequency?: PriceAlertEmailFrequency;
+    push_notifications?: boolean;
+  }) =>
     apiFetch("/auth/notifications", { method: "PUT", body: JSON.stringify(data) }),
   changePassword: (currentPassword: string, newPassword: string) =>
     apiFetch("/auth/password", { method: "PUT", body: JSON.stringify({ currentPassword, newPassword }) }),
@@ -375,6 +383,43 @@ export const api = {
     apiFetch(`/pricing/history/${materialId}`),
   getProjectMaterialTrends: (projectId: string): Promise<ProjectMaterialTrendResponse> =>
     apiFetch(`/pricing/trends/project/${encodeURIComponent(projectId)}`),
+  getNotifications: (limit = 20): Promise<AppNotification[]> =>
+    apiFetch(`/notifications?limit=${encodeURIComponent(String(limit))}`),
+  getUnreadNotificationCount: (): Promise<{ unread: number }> =>
+    apiFetch("/notifications/unread-count"),
+  markNotificationRead: (id: string, read = true): Promise<AppNotification> =>
+    apiFetch(`/notifications/${encodeURIComponent(id)}/read`, {
+      method: "PATCH",
+      body: JSON.stringify({ read }),
+    }),
+  markAllNotificationsRead: (): Promise<{ updated: number }> =>
+    apiFetch("/notifications/mark-all-read", { method: "POST" }),
+  getPriceWatches: (projectId?: string): Promise<PriceWatch[]> => {
+    const suffix = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+    return apiFetch(`/notifications/price-watches${suffix}`);
+  },
+  upsertPriceWatch: (data: {
+    project_id: string;
+    material_id: string;
+    target_price?: number | null;
+    watch_any_decrease?: boolean;
+    notify_email?: boolean;
+    notify_push?: boolean;
+  }): Promise<PriceWatch> =>
+    apiFetch("/notifications/price-watches", { method: "PUT", body: JSON.stringify(data) }),
+  deletePriceWatch: (id: string): Promise<{ ok: boolean }> =>
+    apiFetch(`/notifications/price-watches/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  getPushPublicKey: (): Promise<{ configured: boolean; publicKey: string | null }> =>
+    apiFetch("/notifications/push/public-key"),
+  subscribePushNotifications: (subscription: PushSubscriptionJSON) =>
+    apiFetch("/notifications/push/subscribe", { method: "POST", body: JSON.stringify({ subscription }) }),
+  updateNotificationCenterPreferences: (data: {
+    price_alert_email_frequency?: PriceAlertEmailFrequency;
+    push_notifications?: boolean;
+  }) =>
+    apiFetch("/notifications/preferences", { method: "PUT", body: JSON.stringify(data) }),
+  getProjectPriceChange: (projectId: string): Promise<ProjectPriceChangeSummary> =>
+    apiFetch(`/notifications/projects/${encodeURIComponent(projectId)}/price-change`),
   getStalePrices: () => apiFetch("/pricing/stale"),
   getAdminStats: (): Promise<AdminStats> => apiFetch("/admin/stats"),
   requestSupplierRescrape: (supplierId: string) =>

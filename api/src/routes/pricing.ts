@@ -3,6 +3,7 @@ import { query } from "../db";
 import { requireAuth } from "../auth";
 import { normalizeRole, requirePermission } from "../permissions";
 import { buildMaterialTrend, buildProjectTrendSummary, type PriceHistoryInput } from "../material-trends";
+import { notifyPriceWatchers } from "../price-alerts";
 
 const router = Router();
 
@@ -244,6 +245,14 @@ router.put(
        VALUES ($1, $2, 'manual')`,
       [result.rows[0].id, unit_price]
     );
+
+    await notifyPriceWatchers({
+      materialId,
+      supplierId,
+      previousUnitPrice: result.rows[0].previous_unit_price,
+      unitPrice: result.rows[0].unit_price,
+      source: "manual",
+    });
 
     res.json(result.rows[0]);
   }

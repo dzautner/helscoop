@@ -13,6 +13,7 @@ import { getAmbientSoundEnabled, setAmbientSoundEnabled } from "@/hooks/useAmbie
 import { playSound } from "@/lib/sounds";
 import { Skeleton, SkeletonBlock } from "@/components/Skeleton";
 import Link from "next/link";
+import type { PriceAlertEmailFrequency } from "@/types";
 
 interface UserProfile {
   id: string;
@@ -20,6 +21,8 @@ interface UserProfile {
   email: string;
   role: string;
   email_notifications?: boolean;
+  price_alert_email_frequency?: PriceAlertEmailFrequency;
+  push_notifications?: boolean;
 }
 
 export default function SettingsPage() {
@@ -40,6 +43,10 @@ export default function SettingsPage() {
   // Data export
   const [exportingData, setExportingData] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [priceAlertFrequency, setPriceAlertFrequency] = useState<PriceAlertEmailFrequency>("daily");
+  const [pushNotifications, setPushNotifications] = useState(false);
+  const [pushAvailable, setPushAvailable] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
   // Ambient sound
@@ -66,6 +73,14 @@ export default function SettingsPage() {
         setName(u.name || "");
         setEmail(u.email || "");
         setEmailNotifications(u.email_notifications !== false);
+        setPriceAlertFrequency(u.price_alert_email_frequency || "daily");
+        setPushNotifications(Boolean(u.push_notifications));
+        setPushAvailable(
+          typeof window !== "undefined" &&
+          "Notification" in window &&
+          "serviceWorker" in navigator &&
+          "PushManager" in window,
+        );
         setSoundEnabled(getAmbientSoundEnabled());
         setLoading(false);
       })
@@ -165,7 +180,11 @@ export default function SettingsPage() {
     const previous = emailNotifications;
     setEmailNotifications(nextValue);
     try {
-      await api.updateNotificationPreferences({ email_notifications: nextValue });
+      await api.updateNotificationPreferences({
+        email_notifications: nextValue,
+        price_alert_email_frequency: priceAlertFrequency,
+        push_notifications: pushNotifications,
+      });
       setUser((prev) => prev ? { ...prev, email_notifications: nextValue } : prev);
       toast(t("settings.notificationsSaved"), "success");
     } catch (err) {
@@ -176,6 +195,90 @@ export default function SettingsPage() {
       );
     }
     setSavingNotifications(false);
+  }
+
+  async function handlePriceAlertFrequency(nextValue: PriceAlertEmailFrequency) {
+    setSavingNotifications(true);
+    const previous = priceAlertFrequency;
+    setPriceAlertFrequency(nextValue);
+    try {
+      await api.updateNotificationPreferences({
+        email_notifications: emailNotifications,
+        price_alert_email_frequency: nextValue,
+        push_notifications: pushNotifications,
+      });
+      setUser((prev) => prev ? { ...prev, price_alert_email_frequency: nextValue } : prev);
+      toast(t("settings.notificationsSaved"), "success");
+    } catch (err) {
+      setPriceAlertFrequency(previous);
+      toast(
+        err instanceof Error ? err.message : t("settings.notificationsSaveFailed"),
+        "error",
+      );
+    }
+    setSavingNotifications(false);
+  }
+
+  function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const output = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i += 1) {
+      output[i] = rawData.charCodeAt(i);
+    }
+    return output.buffer as ArrayBuffer;
+  }
+
+  async function handlePushToggle(nextValue: boolean) {
+    if (!nextValue) {
+      setSavingNotifications(true);
+      const previous = pushNotifications;
+      setPushNotifications(false);
+      try {
+        await api.updateNotificationPreferences({
+          email_notifications: emailNotifications,
+          price_alert_email_frequency: priceAlertFrequency,
+          push_notifications: false,
+        });
+        setUser((prev) => prev ? { ...prev, push_notifications: false } : prev);
+        toast(t("settings.notificationsSaved"), "success");
+      } catch (err) {
+        setPushNotifications(previous);
+        toast(err instanceof Error ? err.message : t("settings.notificationsSaveFailed"), "error");
+      }
+      setSavingNotifications(false);
+      return;
+    }
+
+    setEnablingPush(true);
+    try {
+      const vapid = await api.getPushPublicKey();
+      if (!vapid.configured || !vapid.publicKey) {
+        throw new Error(t("settings.pushNotConfigured"));
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error(t("settings.pushPermissionDenied"));
+      }
+      const registration = await navigator.serviceWorker.register("/push-sw.js");
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToArrayBuffer(vapid.publicKey),
+      });
+      await api.subscribePushNotifications(subscription.toJSON());
+      await api.updateNotificationPreferences({
+        email_notifications: emailNotifications,
+        price_alert_email_frequency: priceAlertFrequency,
+        push_notifications: true,
+      });
+      setPushNotifications(true);
+      setUser((prev) => prev ? { ...prev, push_notifications: true } : prev);
+      toast(t("settings.pushEnabled"), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("settings.pushEnableFailed"), "error");
+    }
+    setEnablingPush(false);
   }
 
   if (loading) {
@@ -538,6 +641,50 @@ export default function SettingsPage() {
             />
             {t("settings.weeklyDigest")}
           </label>
+          <div style={{ marginTop: 18 }}>
+            <label
+              htmlFor="settings-price-alert-frequency"
+              className="label-mono"
+              style={{ display: "block", marginBottom: 8 }}
+            >
+              {t("settings.priceAlertFrequency")}
+            </label>
+            <select
+              id="settings-price-alert-frequency"
+              className="input"
+              value={priceAlertFrequency}
+              disabled={savingNotifications}
+              onChange={(e) => handlePriceAlertFrequency(e.target.value as PriceAlertEmailFrequency)}
+            >
+              <option value="daily">{t("settings.frequencyDaily")}</option>
+              <option value="weekly">{t("settings.frequencyWeekly")}</option>
+              <option value="off">{t("settings.frequencyOff")}</option>
+            </select>
+          </div>
+          <label
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+              marginTop: 16,
+              opacity: pushAvailable ? 1 : 0.6,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={pushNotifications}
+              disabled={!pushAvailable || savingNotifications || enablingPush}
+              onChange={(e) => handlePushToggle(e.target.checked)}
+            />
+            {enablingPush ? t("settings.pushEnabling") : t("settings.pushAlerts")}
+          </label>
+          {!pushAvailable && (
+            <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "8px 0 0 28px" }}>
+              {t("settings.pushUnavailable")}
+            </p>
+          )}
         </div>
 
         {/* Ambient sound section */}

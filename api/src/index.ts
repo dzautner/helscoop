@@ -13,6 +13,7 @@ import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
 import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
+import notificationsRouter from "./routes/notifications";
 import chatRouter from "./routes/chat";
 import buildingRouter from "./routes/building";
 import bomRouter from "./routes/bom";
@@ -378,7 +379,9 @@ app.post("/auth/apple", authLimiter, async (req, res) => {
 
 app.get("/auth/me", authenticatedLimiter, requireAuth, async (req, res) => {
   const result = await query(
-    "SELECT id, email, name, role, email_verified, avatar_url, auth_provider, email_notifications FROM users WHERE id = $1",
+    `SELECT id, email, name, role, email_verified, avatar_url, auth_provider,
+            email_notifications, price_alert_email_frequency, push_notifications
+     FROM users WHERE id = $1`,
     [req.user!.id]
   );
   if (result.rows.length === 0) {
@@ -412,7 +415,8 @@ app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => 
     }
     values.push(req.user!.id);
     const result = await query(
-      `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, email, name, role, email_notifications`,
+      `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx}
+       RETURNING id, email, name, role, email_notifications, price_alert_email_frequency, push_notifications`,
       values
     );
     if (result.rows.length === 0) {
@@ -431,13 +435,27 @@ app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => 
 });
 
 app.put("/auth/notifications", authenticatedLimiter, requireAuth, async (req, res) => {
-  const { email_notifications } = req.body;
+  const { email_notifications, price_alert_email_frequency, push_notifications } = req.body;
   if (typeof email_notifications !== "boolean") {
     return res.status(400).json({ error: "email_notifications must be a boolean" });
   }
+  if (
+    price_alert_email_frequency !== undefined &&
+    !["off", "daily", "weekly"].includes(price_alert_email_frequency)
+  ) {
+    return res.status(400).json({ error: "price_alert_email_frequency must be off, daily, or weekly" });
+  }
+  if (push_notifications !== undefined && typeof push_notifications !== "boolean") {
+    return res.status(400).json({ error: "push_notifications must be a boolean" });
+  }
   const result = await query(
-    "UPDATE users SET email_notifications = $1 WHERE id = $2 RETURNING id, email_notifications",
-    [email_notifications, req.user!.id],
+    `UPDATE users
+     SET email_notifications = $1,
+         price_alert_email_frequency = COALESCE($2, price_alert_email_frequency),
+         push_notifications = COALESCE($3, push_notifications)
+     WHERE id = $4
+     RETURNING id, email_notifications, price_alert_email_frequency, push_notifications`,
+    [email_notifications, price_alert_email_frequency ?? null, push_notifications ?? null, req.user!.id],
   );
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "User not found" });
@@ -695,6 +713,7 @@ app.use("/projects", authenticatedLimiter, projectsRouter);
 app.use("/bom", authenticatedLimiter, bomRouter);
 app.use("/suppliers", authenticatedLimiter, suppliersRouter);
 app.use("/pricing", authenticatedLimiter, pricingRouter);
+app.use("/notifications", authenticatedLimiter, notificationsRouter);
 app.use("/chat", chatLimiter, chatRouter);
 app.use("/entitlements", authenticatedLimiter, entitlementsRouter);
 app.use("/roles", authenticatedLimiter, rolesRouter);

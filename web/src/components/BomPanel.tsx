@@ -43,6 +43,7 @@ import type {
   KeskoProduct,
   KeskoSearchResponse,
   KeskoImportResponse,
+  PriceWatch,
 } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
@@ -1346,8 +1347,11 @@ function BomItemCard({
   onNavigate,
   onFocusIndex,
   isPackageLocked = false,
+  isPriceWatched = false,
+  isPriceWatchBusy = false,
   hasSubstitutionSuggestion = false,
   onTogglePackageLock,
+  onTogglePriceWatch,
   onOpenMaterialPicker,
   onUpdateNote,
 }: {
@@ -1362,8 +1366,11 @@ function BomItemCard({
   onNavigate: (direction: "up" | "down" | "next") => void;
   onFocusIndex: (index: number) => void;
   isPackageLocked?: boolean;
+  isPriceWatched?: boolean;
+  isPriceWatchBusy?: boolean;
   hasSubstitutionSuggestion?: boolean;
   onTogglePackageLock?: (materialId: string) => void;
+  onTogglePriceWatch?: (item: BomItem) => void;
   onOpenMaterialPicker: (materialId: string) => void;
   onUpdateNote?: (materialId: string, note: string) => void;
 }) {
@@ -1567,6 +1574,26 @@ function BomItemCard({
                     <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                   </>
                 )}
+              </svg>
+            </button>
+          )}
+          {onTogglePriceWatch && (
+            <button
+              className="bom-package-lock-btn"
+              data-locked={isPriceWatched}
+              tabIndex={-1}
+              disabled={isPriceWatchBusy}
+              aria-pressed={isPriceWatched}
+              aria-label={t(isPriceWatched ? "priceAlerts.stopWatching" : "priceAlerts.watchMaterial", { name: materialName })}
+              title={t(isPriceWatched ? "priceAlerts.stopWatching" : "priceAlerts.watchMaterial", { name: materialName })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePriceWatch(item);
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill={isPriceWatched ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
             </button>
           )}
@@ -1982,6 +2009,11 @@ export default function BomPanel({
         .map((recommendation) => recommendation.materialId),
     );
   }, [bom, materials]);
+  const [priceWatches, setPriceWatches] = useState<PriceWatch[]>([]);
+  const [priceWatchBusyId, setPriceWatchBusyId] = useState<string | null>(null);
+  const priceWatchByMaterial = useMemo(() => {
+    return new Map(priceWatches.map((watch) => [watch.material_id, watch]));
+  }, [priceWatches]);
 
   const togglePackageLock = useCallback((materialId: string) => {
     setLockedPackageMaterials((prev) => {
@@ -2005,6 +2037,47 @@ export default function BomPanel({
     setPackageDelta(summary.delta);
     setPackageFlashKey((key) => key + 1);
   }, [onReplaceMaterial, packageSummaries]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setPriceWatches([]);
+      return;
+    }
+    let cancelled = false;
+    api.getPriceWatches(projectId)
+      .then((watches) => {
+        if (!cancelled) setPriceWatches(watches);
+      })
+      .catch(() => {
+        if (!cancelled) setPriceWatches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const togglePriceWatch = useCallback(async (item: BomItem) => {
+    if (!projectId) return;
+    const existing = priceWatchByMaterial.get(item.material_id);
+    setPriceWatchBusyId(item.material_id);
+    try {
+      if (existing) {
+        await api.deletePriceWatch(existing.id);
+        setPriceWatches((prev) => prev.filter((watch) => watch.id !== existing.id));
+      } else {
+        const watch = await api.upsertPriceWatch({
+          project_id: projectId,
+          material_id: item.material_id,
+          watch_any_decrease: true,
+          notify_email: true,
+          notify_push: false,
+        });
+        setPriceWatches((prev) => [watch, ...prev.filter((candidate) => candidate.material_id !== item.material_id)]);
+      }
+    } finally {
+      setPriceWatchBusyId(null);
+    }
+  }, [priceWatchByMaterial, projectId]);
 
   // Extract scene material names that are not yet in the BOM
   const unmatchedSceneMaterials = useMemo(() => {
@@ -2762,8 +2835,11 @@ export default function BomPanel({
               onNavigate={(dir) => handleBomNavigate(idx, dir)}
               onFocusIndex={setFocusedBomIndex}
               isPackageLocked={lockedPackageMaterials.has(item.material_id)}
+              isPriceWatched={priceWatchByMaterial.has(item.material_id)}
+              isPriceWatchBusy={priceWatchBusyId === item.material_id}
               hasSubstitutionSuggestion={substitutionSuggestionIds.has(item.material_id)}
               onTogglePackageLock={togglePackageLock}
+              onTogglePriceWatch={projectId ? togglePriceWatch : undefined}
               onOpenMaterialPicker={(id) => {
                 if (onReplaceMaterial) setMaterialPickerId(id);
               }}
