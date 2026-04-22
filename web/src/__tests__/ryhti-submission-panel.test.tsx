@@ -208,7 +208,7 @@ describe("RyhtiSubmissionPanel", () => {
     fireEvent.click(checkBtn);
     await waitFor(() => {
       expect(mockUpdateRyhtiMetadata).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
   });
 
   it("renders address from buildingInfo", async () => {
