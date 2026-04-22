@@ -31,6 +31,7 @@ function shouldGroup(current: ChatMessage, prev: ChatMessage | undefined): boole
 }
 
 export default function ChatPanel({
+  projectId,
   sceneJs,
   onApplyCode,
   bom,
@@ -40,6 +41,7 @@ export default function ChatPanel({
   renovationRoiSummary,
   onMessageCountChange,
 }: {
+  projectId?: string;
   sceneJs: string;
   onApplyCode: (code: string) => void;
   bom?: BomItem[];
@@ -50,7 +52,18 @@ export default function ChatPanel({
   onMessageCountChange?: (count: number) => void;
 }) {
   const glow = useCursorGlow();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const chatStorageKey = projectId ? `helscoop-chat-${projectId}` : null;
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === "undefined" || !chatStorageKey) return [];
+    try {
+      const stored = localStorage.getItem(chatStorageKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    if (!chatStorageKey || messages.length === 0) return;
+    try { localStorage.setItem(chatStorageKey, JSON.stringify(messages.slice(-50))); } catch {}
+  }, [messages, chatStorageKey]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
