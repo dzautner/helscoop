@@ -421,6 +421,12 @@ describe("exhaustive i18n key parity", () => {
     "toast.loadPricingFailed", "toast.materialRemoved", "toast.undo",
     "toast.overflowMore", "toast.dismiss",
     "toast.copyFailed",
+    // credits
+    "credits.shortLabel", "credits.balanceAria", "credits.eyebrow",
+    "credits.title", "credits.subtitle", "credits.currentBalance",
+    "credits.credits", "credits.unitPrice", "credits.savings",
+    "credits.lowBadge", "credits.lowToast", "credits.neverExpire",
+    "credits.insufficient", "credits.checkoutFailed", "credits.purchaseSimulated",
     // editor
     "editor.scene", "editor.materialList", "editor.save", "editor.saved",
     "editor.saving", "editor.unsaved", "editor.export", "editor.exportPdf",
@@ -515,7 +521,7 @@ describe("exhaustive i18n key parity", () => {
     "units.jmLong", "units.sqmLong", "units.m2Long", "units.m3Long",
     "units.kplLong", "units.sheetLong", "units.boxLong", "units.literLong", "units.sakkiLong",
     // dialog
-    "dialog.confirm", "dialog.cancel", "dialog.deleteProjectTitle",
+    "dialog.confirm", "dialog.cancel", "dialog.close", "dialog.deleteProjectTitle",
     "dialog.deleteProjectMessage", "dialog.deleteAccountTitle", "dialog.deleteAccountMessage",
     "dialog.deleteBomItemTitle", "dialog.deleteBomItemMessage",
     // admin

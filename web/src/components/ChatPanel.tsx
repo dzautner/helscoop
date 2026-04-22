@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -130,10 +130,16 @@ export default function ChatPanel({
         buildingInfo,
         projectInfo: { name: projectName, description: projectDescription },
         renovationRoiSummary,
-      });
-      setMessages([...newMessages, reply]);
+      }) as ChatMessage & { credits?: { cost: number; balance: number } };
+      if (reply.credits && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("helscoop:credits-updated", { detail: reply.credits }));
+      }
+      setMessages([...newMessages, { role: reply.role, content: reply.content }]);
     } catch (err) {
-      toast(err instanceof Error ? err.message : t('toast.aiError'), "error");
+      const message = err instanceof ApiError && err.status === 402
+        ? t("credits.insufficient")
+        : err instanceof Error ? err.message : t('toast.aiError');
+      toast(message, "error");
       setMessages([
         ...newMessages,
         { role: "assistant", content: t('editor.chatError') },
