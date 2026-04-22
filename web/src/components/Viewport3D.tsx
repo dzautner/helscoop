@@ -12,6 +12,7 @@ import { shortcutLabel } from "@/lib/shortcut-label";
 import { getPresentationPreset, type PresentationPresetId } from "@/lib/presentation-export";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ViewCube from "@/components/ViewCube";
+import Minimap from "@/components/Minimap";
 
 export interface ViewportPresentationApi {
   captureFrame: (options?: {
@@ -1572,6 +1573,17 @@ export default function Viewport3D({
         onSetSectionPos={setSectionPos}
       />
       <ViewCube
+        cameraRef={cameraRef}
+        controlsRef={controlsRef}
+        sceneBoundsRef={sceneBoundsRef}
+        onNavigate={(pos, target) => {
+          const camera = cameraRef.current;
+          const controls = controlsRef.current;
+          if (camera && controls) animateCamera(camera, controls, pos, target);
+        }}
+      />
+      <Minimap
+        sceneRef={sceneRef}
         cameraRef={cameraRef}
         controlsRef={controlsRef}
         sceneBoundsRef={sceneBoundsRef}
