@@ -9,6 +9,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import CreditBalancePill from "@/components/CreditBalancePill";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
@@ -284,6 +285,7 @@ export default function ProjectList({
             <span className="label-mono">{t('nav.projects')}</span>
           </div>
           <div className="nav-links">
+            <CreditBalancePill />
             <ThemeToggle />
             <LanguageSwitcher />
             <Link href="/settings" className="btn btn-ghost" style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -312,6 +314,7 @@ export default function ProjectList({
           </button>
         </div>
         <div className={`nav-mobile-menu ${mobileMenuOpen ? "open" : ""}`}>
+          <CreditBalancePill />
           <ThemeToggle />
             <LanguageSwitcher />
           <Link href="/settings" className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>

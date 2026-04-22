@@ -15,7 +15,7 @@ import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
 import chatRouter from "./routes/chat";
 import buildingRouter from "./routes/building";
-import entitlementsRouter from "./routes/entitlements";
+import entitlementsRouter, { handleCreditCheckoutWebhook } from "./routes/entitlements";
 import rolesRouter from "./routes/roles";
 import auditRouter from "./routes/audit";
 import adminRouter from "./routes/admin";
@@ -69,6 +69,10 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Stripe sends signed webhook payloads; this route must receive the raw body
+// before the JSON parser mutates it.
+app.post("/entitlements/credits/webhook", express.raw({ type: "application/json" }), handleCreditCheckoutWebhook);
 
 // Request body size limit
 app.use(express.json({ limit: "1mb" }));

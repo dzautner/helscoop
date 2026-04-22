@@ -75,6 +75,7 @@ function lastRequestHeaders(): Record<string, string> {
 }
 
 import app from "../index";
+import { _resetStores } from "../entitlements";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,6 +168,7 @@ const SAMPLE_BUILDING_INFO = {
 
 beforeEach(() => {
   fetchSpy.mockReset();
+  _resetStores();
 });
 
 // =====================================================================

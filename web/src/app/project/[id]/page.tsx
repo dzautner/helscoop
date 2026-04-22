@@ -12,6 +12,7 @@ import BomPanel, { matchSceneMaterial } from "@/components/BomPanel";
 import MaterialPicker from "@/components/MaterialPicker";
 import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
+import CreditBalancePill from "@/components/CreditBalancePill";
 import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
@@ -1428,6 +1429,7 @@ export default function ProjectPage() {
         </div>
         <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
         <div className="editor-header-actions">
+          <CreditBalancePill compact />
           <button
             className="btn btn-ghost editor-action-secondary"
             onClick={undo}

@@ -2,6 +2,14 @@ import { Router } from "express";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { requireAuth } from "../auth";
+import {
+  CREDIT_COSTS,
+  CREDIT_PACKS,
+  deductCreditsForFeature,
+  ensureMonthlyCreditGrant,
+  getCreditBalance,
+  type InsufficientCreditsBody,
+} from "../entitlements";
 
 const router = Router();
 
@@ -287,14 +295,48 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Messages required" });
   }
 
+  await ensureMonthlyCreditGrant(req.user!.id);
+  const creditBalance = await getCreditBalance(req.user!.id);
+  const creditCost = CREDIT_COSTS.aiMessages;
+  if (creditBalance < creditCost) {
+    return res.status(402).json({
+      error: "insufficient_credits",
+      feature: "aiMessages",
+      cost: creditCost,
+      balance: creditBalance,
+      packs: CREDIT_PACKS,
+    } satisfies InsufficientCreditsBody);
+  }
+
+  const sendMeteredReply = async (content: string) => {
+    const debit = await deductCreditsForFeature(req.user!.id, "aiMessages", {
+      messageCount: messages.length,
+      fallback: !process.env.ANTHROPIC_API_KEY,
+    });
+    if (!debit.ok) {
+      return res.status(402).json({
+        error: "insufficient_credits",
+        feature: "aiMessages",
+        cost: debit.cost,
+        balance: debit.balance,
+        packs: CREDIT_PACKS,
+      } satisfies InsufficientCreditsBody);
+    }
+    return res.json({
+      role: "assistant",
+      content,
+      credits: {
+        cost: creditCost,
+        balance: debit.entry.balanceAfter,
+      },
+    });
+  };
+
   const contextBlock = buildContextBlock(currentScene, bomSummary, buildingInfo, projectInfo, renovationRoiSummary);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.json({
-      role: "assistant",
-      content: generateLocalResponse(messages[messages.length - 1].content, currentScene),
-    });
+    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene));
   }
 
   try {
@@ -318,16 +360,10 @@ router.post("/", async (req, res) => {
     }
 
     const data = (await response.json()) as { content: { text: string }[] };
-    res.json({
-      role: "assistant",
-      content: data.content[0].text,
-    });
+    return sendMeteredReply(data.content[0].text);
   } catch (err) {
     console.error("Chat API error:", err);
-    res.json({
-      role: "assistant",
-      content: generateLocalResponse(messages[messages.length - 1].content, currentScene),
-    });
+    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene));
   }
 });
 

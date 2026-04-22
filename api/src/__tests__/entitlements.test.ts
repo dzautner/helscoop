@@ -22,15 +22,21 @@ const mockQuery = vi.mocked(query);
 
 import {
   PLANS,
+  CREDIT_COSTS,
+  CREDIT_PACKS,
+  FREE_MONTHLY_CREDIT_GRANT,
   getUserPlan,
   getDailyAiMessageCount,
   recordAiMessage,
   hasAdminOverride,
   checkEntitlement,
+  checkCredits,
   getUserQuota,
   adminOverride,
   getUsageHistory,
   getAdminOverrides,
+  deductCreditsForFeature,
+  grantPurchasedCredits,
   _resetStores,
 } from "../entitlements";
 
@@ -361,7 +367,7 @@ describe("recordAiMessage", () => {
       ["u1"]
     );
     // Also check in-memory ledger
-    const history = getUsageHistory("u1");
+    const history = await getUsageHistory("u1");
     expect(history).toHaveLength(1);
     expect(history[0].feature).toBe("aiMessages");
     expect(history[0].userId).toBe("u1");
@@ -407,23 +413,21 @@ describe("hasAdminOverride", () => {
 // 9. getUserQuota
 // ---------------------------------------------------------------------------
 describe("getUserQuota", () => {
-  it("returns remaining AI messages for free plan", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ plan_tier: null, role: "user" }] } as any); // getUserPlan
-    mockQuery.mockResolvedValueOnce({ rows: [{ cnt: "3" }] } as any); // getDailyAiMessageCount
+  it("returns AI chat actions from credit balance", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ credit_balance: 12 }] } as any);
 
     const quota = await getUserQuota("u1", "aiMessages");
-    expect(quota.used).toBe(3);
-    expect(quota.limit).toBe(10);
-    expect(quota.remaining).toBe(7);
+    expect(quota.used).toBe(0);
+    expect(quota.limit).toBe(CREDIT_COSTS.aiMessages);
+    expect(quota.remaining).toBe(12);
   });
 
-  it("returns null remaining for unlimited enterprise plan", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ plan_tier: "enterprise", role: "user" }] } as any);
-    // getDailyAiMessageCount -- in-memory returns 0
+  it("returns feature-specific remaining actions based on cost", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ credit_balance: 12 }] } as any);
 
-    const quota = await getUserQuota("u1", "aiMessages");
-    expect(quota.limit).toBe(-1);
-    expect(quota.remaining).toBeNull();
+    const quota = await getUserQuota("u1", "photoEstimate");
+    expect(quota.limit).toBe(CREDIT_COSTS.photoEstimate);
+    expect(quota.remaining).toBe(2);
   });
 
   it("returns allowed status for boolean features", async () => {
@@ -481,8 +485,8 @@ describe("adminOverride (write)", () => {
 // 11. getUsageHistory
 // ---------------------------------------------------------------------------
 describe("getUsageHistory", () => {
-  it("returns empty array when no usage recorded", () => {
-    expect(getUsageHistory("u1")).toHaveLength(0);
+  it("returns empty array when no usage recorded", async () => {
+    expect(await getUsageHistory("u1")).toHaveLength(0);
   });
 
   it("returns only entries for the specified user", async () => {
@@ -491,7 +495,80 @@ describe("getUsageHistory", () => {
     await recordAiMessage("u1");
     await recordAiMessage("u2");
 
-    expect(getUsageHistory("u1")).toHaveLength(2);
-    expect(getUsageHistory("u2")).toHaveLength(1);
+    expect(await getUsageHistory("u1")).toHaveLength(2);
+    expect(await getUsageHistory("u2")).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Credit metering
+// ---------------------------------------------------------------------------
+describe("credit metering", () => {
+  it("defines the launch credit costs and packs", () => {
+    expect(FREE_MONTHLY_CREDIT_GRANT).toBe(20);
+    expect(CREDIT_COSTS).toMatchObject({
+      aiMessages: 1,
+      photoEstimate: 5,
+      quantityTakeoff: 10,
+      materialRecommendation: 2,
+      smartWizard: 15,
+    });
+    expect(CREDIT_PACKS.map((pack) => [pack.id, pack.credits, pack.priceEur])).toEqual([
+      ["credits_50", 50, 4.99],
+      ["credits_200", 200, 14.99],
+      ["credits_500", 500, 29.99],
+    ]);
+  });
+
+  it("deducts credits in the in-memory fallback ledger", async () => {
+    mockQuery.mockResolvedValue({ rows: [] } as any);
+    const result = await deductCreditsForFeature("u1", "quantityTakeoff", { projectId: "p1" });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.amount).toBe(-10);
+      expect(result.entry.balanceAfter).toBe(10);
+      expect(result.entry.metadata).toMatchObject({ projectId: "p1" });
+    }
+  });
+
+  it("rejects metered actions when fallback balance is insufficient", async () => {
+    mockQuery.mockResolvedValue({ rows: [] } as any);
+    await deductCreditsForFeature("u1", "smartWizard");
+    const result = await deductCreditsForFeature("u1", "smartWizard");
+
+    expect(result).toMatchObject({
+      ok: false,
+      balance: 5,
+      cost: 15,
+    });
+  });
+
+  it("grants purchased credits from a known pack", async () => {
+    mockQuery.mockResolvedValue({ rows: [] } as any);
+    const entry = await grantPurchasedCredits("u1", "credits_50", { simulated: true });
+
+    expect(entry.amount).toBe(50);
+    expect(entry.type).toBe("purchase");
+    expect(entry.balanceAfter).toBe(70);
+    expect(entry.metadata).toMatchObject({ packId: "credits_50", simulated: true });
+  });
+
+  it("checkCredits returns 402 when DB balance is too low", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: "grant-this-month" }] } as any) // ensureMonthlyCreditGrant
+      .mockResolvedValueOnce({ rows: [{ credit_balance: 0 }] } as any); // getCreditBalance
+
+    const { req, res, next } = makeReqResNext();
+    await checkCredits("aiMessages")(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect((res as any)._statusCode).toBe(402);
+    expect((res as any)._body).toMatchObject({
+      error: "insufficient_credits",
+      feature: "aiMessages",
+      cost: 1,
+      balance: 0,
+    });
   });
 });

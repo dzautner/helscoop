@@ -32,6 +32,11 @@ vi.mock("../email", () => ({
 }));
 
 import app from "../index";
+import { _resetStores } from "../entitlements";
+
+beforeEach(() => {
+  _resetStores();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers

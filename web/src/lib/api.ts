@@ -50,6 +50,7 @@ export class ApiError extends Error {
 const ERROR_MESSAGES: Record<number, string> = {
   400: "Virheellinen pyynto / Bad request",
   401: "Istunto vanhentunut / Session expired",
+  402: "Maksu vaaditaan / Payment required",
   403: "Ei kayttooikeutta / Access denied",
   404: "Ei loytynyt / Not found",
   409: "Ristiriita / Conflict",
@@ -57,6 +58,23 @@ const ERROR_MESSAGES: Record<number, string> = {
   429: "Liian monta pyyntoa / Too many requests",
   500: "Palvelinvirhe / Server error",
 };
+
+export interface CreditPack {
+  id: string;
+  credits: number;
+  priceEur: number;
+  unitPriceEur: number;
+  savingsPercent?: number;
+}
+
+export interface CreditState {
+  balance: number;
+  lowCredit: boolean;
+  monthlyGrant: number;
+  lowCreditThreshold: number;
+  costs: Record<string, number>;
+  packs: CreditPack[];
+}
 
 // ---------------------------------------------------------------------------
 // Token refresh helpers
@@ -448,6 +466,11 @@ export const api = {
   getEntitlements: () => apiFetch("/entitlements"),
   getEntitlementUsage: () => apiFetch("/entitlements/usage"),
   getPlans: () => apiFetch("/entitlements/plans"),
+  createCreditCheckout: (packId: string, simulate = false) =>
+    apiFetch("/entitlements/credits/checkout", {
+      method: "POST",
+      body: JSON.stringify({ packId, simulate }),
+    }),
   setAdminOverride: (userId: string, feature: string, allow: boolean) =>
     apiFetch("/entitlements/admin/override", {
       method: "POST",
