@@ -314,6 +314,7 @@ export default function ProjectPage() {
   const [lockedLayerIds, setLockedLayerIds] = useState<Set<string>>(() => new Set());
   const [renderedLayers, setRenderedLayers] = useState<LayerSeed[]>([]);
   const [priceChangeSummary, setPriceChangeSummary] = useState<ProjectPriceChangeSummary | null>(null);
+  const [explodedView, setExplodedView] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
@@ -712,6 +713,12 @@ export default function ProjectPage() {
     document.addEventListener("touchcancel", onEnd);
   }, [bomWidth]);
 
+  const materialCategoryMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of materials) map[m.id] = m.category_name;
+    return map;
+  }, [materials]);
+
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
 
   const thermalData = useMemo(() => {
@@ -1071,6 +1078,13 @@ export default function ProjectPage() {
       code: "t",
       action: () => setThermalView((v) => !v),
       descriptionKey: "shortcuts.thermal",
+    },
+    {
+      key: "E",
+      mod: false,
+      code: "e",
+      action: () => setExplodedView((v) => !v),
+      descriptionKey: "shortcuts.explode",
     },
     {
       key: "E",
@@ -2668,6 +2682,8 @@ export default function ProjectPage() {
               <Viewport3D
                 sceneJs={sceneJs}
                 wireframe={wireframe}
+                explodedView={explodedView}
+                materialCategoryMap={materialCategoryMap}
                 onObjectCount={setObjectCount}
                 onError={setSceneError}
                 onErrorLine={setSceneErrorLine}
@@ -2714,6 +2730,20 @@ export default function ProjectPage() {
                 <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
               </svg>
               {t('editor.thermal')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={explodedView}
+              onClick={() => setExplodedView(!explodedView)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2l-2 4h4l-2-4z" />
+                <path d="M12 22l-2-4h4l-2 4z" />
+                <path d="M2 12l4-2v4l-4-2z" />
+                <path d="M22 12l-4-2v4l4-2z" />
+                <rect x="9" y="9" width="6" height="6" rx="1" />
+              </svg>
+              {t('editor.explode')}
             </button>
             <div className="viewport-lighting-wrap" ref={lightingMenuRef}>
               <button

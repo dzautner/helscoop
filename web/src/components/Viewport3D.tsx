@@ -40,6 +40,8 @@ export interface ViewportMaterialSelection {
 interface Viewport3DProps {
   sceneJs: string;
   wireframe?: boolean;
+  explodedView?: boolean;
+  materialCategoryMap?: Record<string, string>;
   onObjectCount?: (count: number) => void;
   onError?: (error: string | null) => void;
   onErrorLine?: (line: number | null) => void;
@@ -563,6 +565,8 @@ function CameraToolbar({
 export default function Viewport3D({
   sceneJs,
   wireframe = false,
+  explodedView = false,
+  materialCategoryMap = {},
   onObjectCount,
   onError,
   onErrorLine,
@@ -623,6 +627,8 @@ export default function Viewport3D({
   const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));
   const updateIdRef = useRef(0);
   const hasAppliedInitialPresentationPresetRef = useRef(false);
+  const [explodeFactor, setExplodeFactor] = useState(0.5);
+  const originalPositionsRef = useRef<Map<THREE.Object3D, THREE.Vector3>>(new Map());
   const { t, locale } = useTranslation();
 
   useEffect(() => {
@@ -1500,7 +1506,6 @@ export default function Viewport3D({
     }
     renderer.toneMappingExposure = config.toneMappingExposure;
 
-    // Regenerate environment map for the preset
     const envCanvas = document.createElement("canvas");
     envCanvas.width = 256;
     envCanvas.height = 128;
@@ -1523,7 +1528,6 @@ export default function Viewport3D({
     envCanvas.height = 0;
     if (oldEnv) oldEnv.dispose();
 
-    // Update background gradient to match
     const bgCanvas = document.createElement("canvas");
     bgCanvas.width = 2;
     bgCanvas.height = 256;
@@ -1540,6 +1544,95 @@ export default function Viewport3D({
     bgCanvas.height = 0;
     if (oldBg instanceof THREE.Texture) oldBg.dispose();
   }, [lightingPreset]);
+
+  // Exploded view: shift mesh positions by category group
+  useEffect(() => {
+    const group = objectGroupRef.current;
+    if (!group) return;
+
+    const CONSTRUCTION_ORDER = [
+      "masonry", "foundation", "lumber", "sheathing", "roofing",
+      "insulation", "membrane", "hardware", "cladding", "finish",
+      "trim", "interior", "fasteners", "opening", "unknown",
+    ];
+
+    if (!explodedView) {
+      // Restore original positions
+      originalPositionsRef.current.forEach((pos, obj) => {
+        obj.position.copy(pos);
+      });
+      originalPositionsRef.current.clear();
+      return;
+    }
+
+    // Group meshes by category
+    const categoryMeshes: Record<string, THREE.Mesh[]> = {};
+    group.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const matId = child.userData.materialId as string | undefined;
+      const category = (matId && materialCategoryMap[matId]) || "unknown";
+      if (!categoryMeshes[category]) categoryMeshes[category] = [];
+      categoryMeshes[category].push(child);
+    });
+
+    // Store original positions (only on first explode after scene load)
+    if (originalPositionsRef.current.size === 0) {
+      group.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          originalPositionsRef.current.set(child, child.position.clone());
+        }
+      });
+    }
+
+    // Compute scene center
+    const box = new THREE.Box3().setFromObject(group);
+    const center = box.getCenter(new THREE.Vector3());
+    const sceneSize = box.getSize(new THREE.Vector3()).length();
+
+    // Sort categories by construction order
+    const sortedCategories = Object.keys(categoryMeshes).sort((a, b) => {
+      const ai = CONSTRUCTION_ORDER.indexOf(a);
+      const bi = CONSTRUCTION_ORDER.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+    // Assign explosion offsets per category
+    const categoryCount = sortedCategories.length;
+    const maxOffset = sceneSize * 0.6 * explodeFactor;
+
+    for (let i = 0; i < categoryCount; i++) {
+      const category = sortedCategories[i];
+      const meshes = categoryMeshes[category];
+      if (!meshes || meshes.length === 0) continue;
+
+      // Compute category centroid
+      const centroid = new THREE.Vector3();
+      for (const mesh of meshes) {
+        const orig = originalPositionsRef.current.get(mesh);
+        if (orig) centroid.add(orig);
+      }
+      centroid.divideScalar(meshes.length);
+
+      // Direction from center to category centroid
+      const dir = centroid.clone().sub(center);
+      if (dir.length() < 0.001) {
+        // For categories at center, push along Y (up in scene-local coords, which is Z-up)
+        dir.set(0, 0, 1);
+      }
+      dir.normalize();
+
+      // Offset: spread outward, with inner layers staying closer
+      const layerFraction = categoryCount > 1 ? (i - (categoryCount - 1) / 2) / ((categoryCount - 1) / 2 || 1) : 0;
+      const offset = dir.multiplyScalar(layerFraction * maxOffset);
+
+      for (const mesh of meshes) {
+        const orig = originalPositionsRef.current.get(mesh);
+        if (orig) {
+          mesh.position.copy(orig).add(offset);
+        }
+      }
+    }
+  }, [explodedView, explodeFactor, materialCategoryMap]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -2144,6 +2237,26 @@ export default function Viewport3D({
           if (camera && controls) animateCamera(camera, controls, pos, target);
         }}
       />
+      {explodedView && (
+        <div className="viewport-explode-slider">
+          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+            {t("editor.explodeDistance")}
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={explodeFactor}
+            onChange={(e) => setExplodeFactor(parseFloat(e.target.value))}
+            aria-label={t("editor.explodeDistance")}
+            style={{ width: 120, accentColor: "var(--accent)" }}
+          />
+          <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)", minWidth: 32, textAlign: "right" }}>
+            {Math.round(explodeFactor * 100)}%
+          </span>
+        </div>
+      )}
       {measurementMode && (
         <div className="viewport-measure-hint">
           {measurementStart ? t("editor.measurePickSecond") : t("editor.measurePickFirst")}
