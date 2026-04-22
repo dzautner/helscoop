@@ -194,7 +194,7 @@ describe.skipIf(!process.env.E2E)("E2E Integration Tests", () => {
   });
 
   it("generates generic building with estimated confidence", async () => {
-    const { status, body } = await apiFetch("/building?address=Mannerheimintie+42,+Helsinki");
+    const { status, body } = await apiFetch("/building?address=Kuvitteellinenpolku+77,+00990,+Helsinki");
     expect(status).toBe(200);
     expect(body.confidence).toBe("estimated");
     expect(body.scene_js).toContain("box(");
