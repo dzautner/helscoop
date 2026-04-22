@@ -67,22 +67,26 @@ describe("LanguageSwitcher", () => {
     expect(mockSetLocale).toHaveBeenCalledWith("fi");
   });
 
-  it("highlights active locale (FI full opacity when fi)", () => {
+  it("highlights active locale (FI emphasized when fi)", () => {
     mockLocale = "fi";
     render(<LanguageSwitcher />);
     const fi = screen.getByText("FI");
-    expect(fi.style.opacity).toBe("1");
+    expect(fi.style.color).toBe("var(--text-primary)");
+    expect(fi.style.fontWeight).toBe("700");
     const en = screen.getByText("EN");
-    expect(en.style.opacity).toBe("0.4");
+    expect(en.style.color).toBe("var(--text-secondary)");
+    expect(en.style.fontWeight).toBe("500");
   });
 
-  it("highlights active locale (EN full opacity when en)", () => {
+  it("highlights active locale (EN emphasized when en)", () => {
     mockLocale = "en";
     render(<LanguageSwitcher />);
     const en = screen.getByText("EN");
-    expect(en.style.opacity).toBe("1");
+    expect(en.style.color).toBe("var(--text-primary)");
+    expect(en.style.fontWeight).toBe("700");
     const fi = screen.getByText("FI");
-    expect(fi.style.opacity).toBe("0.4");
+    expect(fi.style.color).toBe("var(--text-secondary)");
+    expect(fi.style.fontWeight).toBe("500");
   });
 });
 
