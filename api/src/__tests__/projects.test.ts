@@ -507,7 +507,7 @@ describe("PUT /projects/:id", () => {
     expect(res.status).toBe(200);
     expect((res.body as { household_deduction_joint: boolean }).household_deduction_joint).toBe(true);
     expect(mockQuery.mock.calls[0][0]).toContain("household_deduction_joint=COALESCE");
-    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, "proj-1", "user-1"]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, null, null, "proj-1", "user-1"]);
   });
 });
 
