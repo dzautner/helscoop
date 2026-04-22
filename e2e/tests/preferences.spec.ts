@@ -20,7 +20,7 @@ test.describe("Theme toggle persistence", () => {
       expect(toggledTheme).not.toBe(initialTheme);
 
       const storedTheme = await page.evaluate(() =>
-        localStorage.getItem("helscoop_theme")
+        localStorage.getItem("helscoop-theme")
       );
       expect(storedTheme).toBeTruthy();
 
