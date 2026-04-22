@@ -110,6 +110,9 @@ export default function RootLayout({
         />
       </head>
       <body className="grain">
+        <a className="skip-link" href="#main-content">
+          Siirry sisältöön / Skip to content
+        </a>
         <ThemeProvider>
           <LocaleProvider>
             <ToastProvider>

@@ -67,7 +67,7 @@ export default function Home() {
 
   if (!loggedIn) {
     return (
-      <>
+      <main id="main-content" tabIndex={-1}>
         <div className="scroll-progress" aria-hidden="true" />
         <LoginForm
           onLogin={handleLogin}
@@ -78,13 +78,13 @@ export default function Home() {
         />
         <FeatureHighlights />
         <LandingFooter />
-      </>
+      </main>
     );
   }
 
   return (
-    <div>
+    <main id="main-content" tabIndex={-1}>
       <ProjectList onCreateFromBuilding={handleCreateFromBuilding} />
-    </div>
+    </main>
   );
 }

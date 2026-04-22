@@ -443,6 +443,7 @@ describe("exhaustive i18n key parity", () => {
     "editor.noMaterials", "editor.noMaterialsHint", "editor.noMaterialsCta",
     "editor.error", "editor.errorLoadProject", "editor.backToProjects",
     "editor.loadingProject", "editor.chatError",
+    "editor.viewportA11yLabel", "editor.viewportA11yDescription", "editor.viewportA11yKeyboardHelp",
     "editor.viewportCrashTitle", "editor.viewportCrashMessage", "editor.resetScene",
     "editor.loading3D", "editor.showCode", "editor.hideCode", "editor.wireframe",
     "editor.params", "editor.resetCamera",
