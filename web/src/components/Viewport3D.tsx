@@ -789,6 +789,27 @@ export default function Viewport3D({
     controls.update();
     controlsRef.current = controls;
 
+    // Procedural environment map for subtle PBR reflections (Nordic twilight palette)
+    let envCanvas: HTMLCanvasElement | null = document.createElement("canvas");
+    envCanvas.width = 256;
+    envCanvas.height = 128;
+    const envCtx = envCanvas.getContext("2d")!;
+    const envGrad = envCtx.createLinearGradient(0, 0, 0, 128);
+    envGrad.addColorStop(0, "#1a2030");
+    envGrad.addColorStop(0.35, "#2a3545");
+    envGrad.addColorStop(0.5, "#3a3428");
+    envGrad.addColorStop(0.65, "#2a2520");
+    envGrad.addColorStop(1, "#0a0a08");
+    envCtx.fillStyle = envGrad;
+    envCtx.fillRect(0, 0, 256, 128);
+    const envTexture = new THREE.CanvasTexture(envCanvas);
+    envTexture.mapping = THREE.EquirectangularReflectionMapping;
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const envMap = pmremGenerator.fromEquirectangular(envTexture).texture;
+    scene.environment = envMap;
+    envTexture.dispose();
+    pmremGenerator.dispose();
+
     const ambientLight = new THREE.AmbientLight(0xe8e4df, 0.35);
     scene.add(ambientLight);
 
@@ -836,10 +857,24 @@ export default function Viewport3D({
     scene.fog = new THREE.Fog(0x1a1d22, 30, 120);
 
     const groundGeom = new THREE.PlaneGeometry(100, 100);
+    let groundAlphaCanvas: HTMLCanvasElement | null = document.createElement("canvas");
+    groundAlphaCanvas.width = 256;
+    groundAlphaCanvas.height = 256;
+    const gCtx = groundAlphaCanvas.getContext("2d")!;
+    const gGrad = gCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gGrad.addColorStop(0, "#ffffff");
+    gGrad.addColorStop(0.35, "#ffffff");
+    gGrad.addColorStop(0.7, "#555555");
+    gGrad.addColorStop(1, "#000000");
+    gCtx.fillStyle = gGrad;
+    gCtx.fillRect(0, 0, 256, 256);
+    const groundAlphaMap = new THREE.CanvasTexture(groundAlphaCanvas);
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x1f1e1c,
       roughness: 0.92,
       metalness: 0.0,
+      transparent: true,
+      alphaMap: groundAlphaMap,
     });
     const ground = new THREE.Mesh(groundGeom, groundMat);
     ground.rotation.x = -Math.PI / 2;
@@ -909,14 +944,27 @@ export default function Viewport3D({
 
       // Dispose background texture and release underlying canvas
       scene.background = null;
+      scene.environment = null;
       bgTexture.dispose();
+      envMap.dispose();
       if (gradientCanvas) {
         gradientCanvas.width = 0;
         gradientCanvas.height = 0;
         gradientCanvas = null;
       }
+      if (envCanvas) {
+        envCanvas.width = 0;
+        envCanvas.height = 0;
+        envCanvas = null;
+      }
 
       groundGeom.dispose();
+      groundAlphaMap.dispose();
+      if (groundAlphaCanvas) {
+        groundAlphaCanvas.width = 0;
+        groundAlphaCanvas.height = 0;
+        groundAlphaCanvas = null;
+      }
       groundMat.dispose();
 
       renderer.dispose();
