@@ -885,6 +885,106 @@ router.delete("/:id/share", async (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/:id/bom/substitute", async (req, res) => {
+  const fromMaterialId = typeof req.body.from_material_id === "string"
+    ? req.body.from_material_id.trim()
+    : "";
+  const toMaterialId = typeof req.body.to_material_id === "string"
+    ? req.body.to_material_id.trim()
+    : "";
+
+  if (!fromMaterialId || !toMaterialId) {
+    return res.status(400).json({ error: "from_material_id and to_material_id are required" });
+  }
+  if (fromMaterialId === toMaterialId) {
+    return res.status(400).json({ error: "from_material_id and to_material_id must differ" });
+  }
+
+  const proj = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (proj.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const sourceItem = await query(
+    "SELECT material_id, quantity, unit FROM project_bom WHERE project_id=$1 AND material_id=$2",
+    [req.params.id, fromMaterialId],
+  );
+  if (sourceItem.rows.length === 0) {
+    return res.status(404).json({ error: "Source BOM item not found" });
+  }
+
+  const mapping = await query(
+    `SELECT substitution_type, confidence, notes
+     FROM material_substitutions
+     WHERE material_id=$1 AND substitute_id=$2`,
+    [fromMaterialId, toMaterialId],
+  );
+  if (mapping.rows.length === 0) {
+    return res.status(400).json({ error: "Requested material is not a mapped substitute" });
+  }
+
+  const substitute = await query(
+    `SELECT m.id, m.name, p.unit
+     FROM materials m
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE m.id=$1`,
+    [toMaterialId],
+  );
+  if (substitute.rows.length === 0) {
+    return res.status(404).json({ error: "Substitute material not found" });
+  }
+
+  const source = sourceItem.rows[0] as { quantity: number | string; unit: string };
+  const targetUnit = substitute.rows[0].unit || source.unit || "kpl";
+  const existingTarget = await query(
+    "SELECT material_id FROM project_bom WHERE project_id=$1 AND material_id=$2",
+    [req.params.id, toMaterialId],
+  );
+
+  if (existingTarget.rows.length > 0) {
+    await query(
+      "UPDATE project_bom SET quantity = quantity + $1 WHERE project_id=$2 AND material_id=$3",
+      [Number(source.quantity), req.params.id, toMaterialId],
+    );
+    await query(
+      "DELETE FROM project_bom WHERE project_id=$1 AND material_id=$2",
+      [req.params.id, fromMaterialId],
+    );
+  } else {
+    await query(
+      "UPDATE project_bom SET material_id=$1, unit=$2 WHERE project_id=$3 AND material_id=$4",
+      [toMaterialId, targetUnit, req.params.id, fromMaterialId],
+    );
+  }
+
+  const updated = await query(
+    `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
+      p.unit_price, p.link, s.name AS supplier_name,
+      p.in_stock, p.stock_level, p.store_location, p.last_checked_at AS stock_last_checked_at,
+      (pb.quantity * p.unit_price * m.waste_factor) AS total
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     JOIN categories c ON m.category_id = c.id
+     LEFT JOIN pricing p ON m.id = p.material_id AND p.is_primary = true
+     LEFT JOIN suppliers s ON p.supplier_id = s.id
+     WHERE pb.project_id = $1 AND pb.material_id = $2
+     ORDER BY pb.created_at DESC
+     LIMIT 1`,
+    [req.params.id, toMaterialId],
+  );
+
+  res.json({
+    ok: true,
+    from_material_id: fromMaterialId,
+    to_material_id: toMaterialId,
+    item: updated.rows[0] ?? null,
+    substitution: mapping.rows[0],
+  });
+});
+
 router.put("/:id/bom", async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items))

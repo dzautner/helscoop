@@ -152,7 +152,82 @@ describe("GET /materials", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. GET /materials/:id — single material with pricing + history
+// 2. GET /materials/:id/substitutions — mapped substitutes with live signals
+// ---------------------------------------------------------------------------
+describe("GET /materials/:id/substitutions", () => {
+  it("rejects request without auth", async () => {
+    const res = await makeRequest("GET", "/materials/pine_48x98_c24/substitutions");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 for a missing material", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/materials/missing/substitutions", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns substitution suggestions with price, stock, and trigger reasons", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "pine_48x148_c24",
+        name: "48x148 C24",
+        current_unit_price: "4.00",
+        previous_unit_price: "3.00",
+        current_stock_level: "low_stock",
+      }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        material_id: "pine_48x148_c24",
+        substitute_id: "pressure_treated_48x148",
+        substitute_name: "Kestopuu 48x148",
+        category_name: "Lumber",
+        substitution_type: "budget",
+        confidence: "verified",
+        notes: "Dry-location substitute",
+        current_unit_price: "4.00",
+        previous_unit_price: "3.00",
+        current_stock_level: "low_stock",
+        unit_price: "3.20",
+        unit: "jm",
+        link: "https://example.com",
+        stock_level: "in_stock",
+        supplier_id: "sarokas",
+        supplier_name: "Sarokas",
+      }],
+    } as never);
+
+    const res = await makeRequest("GET", "/materials/pine_48x148_c24/substitutions", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      material_id: string;
+      suggestions: Array<{
+        material_id: string;
+        savings_per_unit: number;
+        savings_percent: number;
+        trigger_reasons: string[];
+      }>;
+    };
+    expect(body.material_id).toBe("pine_48x148_c24");
+    expect(body.suggestions[0].material_id).toBe("pressure_treated_48x148");
+    expect(body.suggestions[0].savings_per_unit).toBeCloseTo(0.8);
+    expect(body.suggestions[0].savings_percent).toBeCloseTo(20);
+    expect(body.suggestions[0].trigger_reasons).toEqual([
+      "current_stock_risk",
+      "price_spike",
+      "cheaper_equivalent",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. GET /materials/:id — single material with pricing + history
 // ---------------------------------------------------------------------------
 describe("GET /materials/:id", () => {
   it("returns 404 for non-existent material", async () => {

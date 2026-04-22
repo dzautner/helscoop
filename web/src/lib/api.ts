@@ -1,6 +1,8 @@
 import type {
   EnergySubsidyRequest,
+  BomSubstitutionResponse,
   KeskoProduct,
+  MaterialSubstitutionResponse,
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
@@ -336,6 +338,8 @@ export const api = {
   getMaterials: () => apiFetch("/materials"),
   getMaterial: (id: string) => apiFetch(`/materials/${id}`),
   getMaterialPrices: (id: string) => apiFetch(`/materials/${id}/prices`),
+  getMaterialSubstitutions: (id: string): Promise<MaterialSubstitutionResponse> =>
+    apiFetch(`/materials/${encodeURIComponent(id)}/substitutions`),
 
   getSuppliers: () => apiFetch("/suppliers"),
   getSupplier: (id: string) => apiFetch(`/suppliers/${id}`),
@@ -444,6 +448,14 @@ export const api = {
     apiFetch(`/projects/${projectId}/bom`, {
       method: "PUT",
       body: JSON.stringify({ items }),
+    }),
+  substituteBomMaterial: (
+    projectId: string,
+    data: { from_material_id: string; to_material_id: string },
+  ): Promise<BomSubstitutionResponse> =>
+    apiFetch(`/projects/${encodeURIComponent(projectId)}/bom/substitute`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
   submitQuoteRequest: (projectId: string, data: QuoteRequestPayload) =>
     apiFetch(`/projects/${projectId}/quote-request`, {

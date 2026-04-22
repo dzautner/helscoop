@@ -615,6 +615,68 @@ describe("PUT /projects/:id/bom", () => {
 });
 
 // --------------------------------------------------------------------------
+// POST /projects/:id/bom/substitute — mapped BOM material swaps
+// --------------------------------------------------------------------------
+
+describe("POST /projects/:id/bom/substitute", () => {
+  it("rejects missing material ids", async () => {
+    const res = await makeRequest("POST", "/projects/proj-1/bom/substitute", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { from_material_id: "pine_48x148_c24" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects unmapped substitutions", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [{ material_id: "pine_48x148_c24", quantity: 10, unit: "jm" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/bom/substitute", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { from_material_id: "pine_48x148_c24", to_material_id: "osb_9mm" },
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("mapped substitute");
+  });
+
+  it("updates a BOM row to the mapped substitute", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [{ material_id: "pine_48x148_c24", quantity: 10, unit: "jm" }] } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ substitution_type: "budget", confidence: "verified", notes: "Cheaper dry-location option" }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "pressure_treated_48x148", name: "Kestopuu 48x148", unit: "jm" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        material_id: "pressure_treated_48x148",
+        material_name: "Kestopuu 48x148",
+        quantity: 10,
+        unit: "jm",
+        unit_price: "3.80",
+        total: "38.00",
+      }],
+    } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/bom/substitute", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { from_material_id: "pine_48x148_c24", to_material_id: "pressure_treated_48x148" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { ok: boolean; item: { material_id: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.material_id).toBe("pressure_treated_48x148");
+    expect(mockQuery).toHaveBeenCalledWith(
+      "UPDATE project_bom SET material_id=$1, unit=$2 WHERE project_id=$3 AND material_id=$4",
+      ["pressure_treated_48x148", "jm", "proj-1", "pine_48x148_c24"],
+    );
+  });
+});
+
+// --------------------------------------------------------------------------
 // POST /projects/:id/share — share token
 // --------------------------------------------------------------------------
 
