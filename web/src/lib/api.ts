@@ -2,6 +2,7 @@ import type {
   AdminStats,
   BuildingInfo,
   BuildingResult,
+  BomAggregateResponse,
   EnergySubsidyRequest,
   BomSubstitutionResponse,
   KeskoProduct,
@@ -411,6 +412,11 @@ export const api = {
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),
   exportBOM: (projectId: string) => apiFetch(`/bom/export/${projectId}`),
+  aggregateBOM: (projectIds: string[]): Promise<BomAggregateResponse> =>
+    apiFetch("/bom/aggregate", {
+      method: "POST",
+      body: JSON.stringify({ project_ids: projectIds }),
+    }),
   exportBOMCsv: async (projectId: string, projectName: string) => {
     const t = getToken();
     const res = await fetch(`${API_URL}/bom/export/${projectId}?format=csv`, {

@@ -15,6 +15,7 @@ import suppliersRouter from "./routes/suppliers";
 import pricingRouter from "./routes/pricing";
 import chatRouter from "./routes/chat";
 import buildingRouter from "./routes/building";
+import bomRouter from "./routes/bom";
 import entitlementsRouter, { handleCreditCheckoutWebhook } from "./routes/entitlements";
 import rolesRouter from "./routes/roles";
 import auditRouter from "./routes/audit";
@@ -689,6 +690,7 @@ app.post("/auth/refresh", authLimiter, async (req, res) => {
 // Authenticated routes get the relaxed rate limiter (500 req/15min per user)
 app.use("/materials", authenticatedLimiter, materialsRouter);
 app.use("/projects", authenticatedLimiter, projectsRouter);
+app.use("/bom", authenticatedLimiter, bomRouter);
 app.use("/suppliers", authenticatedLimiter, suppliersRouter);
 app.use("/pricing", authenticatedLimiter, pricingRouter);
 app.use("/chat", chatLimiter, chatRouter);

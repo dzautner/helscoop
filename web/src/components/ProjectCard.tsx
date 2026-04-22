@@ -22,11 +22,17 @@ export default function ProjectCard({
   index,
   onDuplicate,
   onDelete,
+  selectable = false,
+  selected = false,
+  onSelectChange,
 }: {
   project: Project;
   index: number;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (checked: boolean) => void;
 }) {
   const { t, locale } = useTranslation();
 
@@ -40,6 +46,36 @@ export default function ProjectCard({
         position: "relative",
       }}
     >
+      {selectable && (
+        <label
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 3,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 8px",
+            borderRadius: "999px",
+            border: "1px solid var(--border)",
+            background: "color-mix(in srgb, var(--bg-elevated) 88%, transparent)",
+            color: "var(--text-secondary)",
+            fontSize: 11,
+            fontFamily: "var(--font-mono)",
+            boxShadow: "var(--shadow-sm)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onSelectChange?.(event.currentTarget.checked)}
+            aria-label={t("bomAggregate.selectProject", { name: project.name })}
+          />
+          {t("bomAggregate.selectShort")}
+        </label>
+      )}
       {/* Thumbnail or placeholder */}
       <div className="project-card-thumb" style={{
         background: project.thumbnail_url
