@@ -24,6 +24,8 @@ export type AnalyticsEvent =
   | "bom_optimization_applied"
   | "bom_optimization_undo"
   | "bom_supplier_price_applied"
+  | "material_surface_selected"
+  | "material_surface_replaced"
   | "presentation_link_copied"
   | "presentation_render_downloaded"
   | "quote_request_submitted"
@@ -50,6 +52,8 @@ export interface AnalyticsEventProps {
   bom_optimization_applied: { type: string; material_id: string; savings_amount: number };
   bom_optimization_undo: { type: string; material_id: string };
   bom_supplier_price_applied: { material_id: string; supplier: string; unit_price: number };
+  material_surface_selected: { material_id: string; object_id?: string };
+  material_surface_replaced: { from_material_id: string; to_material_id: string; category?: string };
   presentation_link_copied: { preset: string };
   presentation_render_downloaded: { preset: string; watermarked: boolean };
   quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
