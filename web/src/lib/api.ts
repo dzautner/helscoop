@@ -426,6 +426,7 @@ export const api = {
         data_source_error?: string;
       };
       projectInfo?: { name?: string; description?: string };
+      renovationRoiSummary?: string;
     },
   ) =>
     apiFetch("/chat", {
@@ -436,6 +437,7 @@ export const api = {
         bomSummary: context?.bomSummary,
         buildingInfo: context?.buildingInfo,
         projectInfo: context?.projectInfo,
+        renovationRoiSummary: context?.renovationRoiSummary,
       }),
     }),
 

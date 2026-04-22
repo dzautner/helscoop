@@ -212,6 +212,7 @@ function buildContextBlock(
   bomSummary?: BomSummaryItem[],
   buildingInfo?: BuildingInfo,
   projectInfo?: ProjectInfo,
+  renovationRoiSummary?: string,
 ): string {
   let context = `\n\nCurrent scene script:\n\`\`\`javascript\n${currentScene}\n\`\`\``;
 
@@ -257,6 +258,11 @@ function buildContextBlock(
     context += `\nUse BOM data to give cost-aware suggestions. Reference actual prices when discussing additions or changes.`;
   }
 
+  if (renovationRoiSummary) {
+    context += `\n\nRenovation ROI dashboard:\n${renovationRoiSummary}`;
+    context += `\nWhen the user asks whether the renovation is worth it, use this dashboard summary and clearly separate estimate, assumption, and recommendation.`;
+  }
+
   return context;
 }
 
@@ -267,19 +273,21 @@ router.post("/", async (req, res) => {
     bomSummary,
     buildingInfo,
     projectInfo,
+    renovationRoiSummary,
   }: {
     messages: ChatMessage[];
     currentScene: string;
     bomSummary?: BomSummaryItem[];
     buildingInfo?: BuildingInfo;
     projectInfo?: ProjectInfo;
+    renovationRoiSummary?: string;
   } = req.body;
 
   if (!messages?.length) {
     return res.status(400).json({ error: "Messages required" });
   }
 
-  const contextBlock = buildContextBlock(currentScene, bomSummary, buildingInfo, projectInfo);
+  const contextBlock = buildContextBlock(currentScene, bomSummary, buildingInfo, projectInfo, renovationRoiSummary);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

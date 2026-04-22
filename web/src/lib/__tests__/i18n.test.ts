@@ -608,6 +608,14 @@ describe("exhaustive i18n key parity", () => {
     "householdDeduction.labourBasis", "householdDeduction.credit", "householdDeduction.netCost",
     "householdDeduction.capNote", "householdDeduction.thresholdNote",
     "householdDeduction.registerWarning", "householdDeduction.veroLink", "householdDeduction.proCta",
+    // renovation ROI
+    "renovationRoi.eyebrow", "renovationRoi.title", "renovationRoi.grossCost",
+    "renovationRoi.netCost", "renovationRoi.materialCost", "renovationRoi.labourCost",
+    "renovationRoi.bestSubsidy", "renovationRoi.valueImpact",
+    "renovationRoi.energyPayback", "renovationRoi.tenYearRoi", "renovationRoi.assumptionNote",
+    "renovationRoi.category.energy", "renovationRoi.category.roof", "renovationRoi.category.kitchen",
+    "renovationRoi.category.bathroom", "renovationRoi.category.facade", "renovationRoi.category.windows",
+    "renovationRoi.category.outdoor", "renovationRoi.category.general",
     // BOM savings
     "bomSavings.eyebrow", "bomSavings.title", "bomSavings.totalAvailable",
     "bomSavings.noSavings", "bomSavings.supplier_switch", "bomSavings.material_substitution",
