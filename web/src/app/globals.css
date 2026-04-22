@@ -4935,6 +4935,43 @@ select:focus {
   }
 }
 
+/* Viewport minimap (bottom-left HUD) */
+.viewport-minimap {
+  position: absolute;
+  bottom: 65px;
+  left: 10px;
+  width: 200px;
+  height: 140px;
+  z-index: 10;
+  border-radius: 6px;
+  background: var(--surface-float, rgba(17, 17, 19, 0.75));
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  pointer-events: auto;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.viewport-minimap:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.viewport-minimap-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  border-radius: 5px;
+}
+
+.viewport-minimap-overlay:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 640px) {
+  .viewport-minimap {
+    display: none;
+  }
+}
+
 /* Viewport camera toolbar (floating over 3D canvas) */
 .viewport-cam-bar {
   position: absolute;
