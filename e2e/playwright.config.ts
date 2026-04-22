@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 const API_PORT = 3051;
 const WEB_PORT = 3052;
 
+process.env.TEST_API_URL ??= `http://localhost:${API_PORT}`;
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
