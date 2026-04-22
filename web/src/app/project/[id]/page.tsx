@@ -1358,6 +1358,14 @@ export default function ProjectPage() {
     );
   }, []);
 
+  const updateBomNote = useCallback((materialId: string, note: string) => {
+    setBom((prev) =>
+      prev.map((b) =>
+        b.material_id === materialId ? { ...b, note } : b
+      )
+    );
+  }, []);
+
   const updateHouseholdDeductionMode = useCallback(async (joint: boolean) => {
     const previous = householdDeductionJoint;
     setHouseholdDeductionJoint(joint);
@@ -2276,6 +2284,7 @@ export default function ProjectPage() {
               onApplySupplierPrice={applyBomPriceOverride}
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
+              onUpdateNote={updateBomNote}
               style={isMobileEditor ? undefined : { width: bomWidth }}
               sceneJs={sceneJs}
               projectName={projectName}
