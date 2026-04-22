@@ -269,6 +269,60 @@ export default function ProjectList({
     setAggregateError(false);
   }
 
+  function selectAllVisible() {
+    setSelectedProjectIds(filteredProjects.map((p) => p.id));
+    setAggregate(null);
+  }
+
+  const [bulkConfirmAction, setBulkConfirmAction] = useState<"archive" | "delete" | null>(null);
+  const [bulkTagInput, setBulkTagInput] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  async function executeBulkAction(action: "archive" | "delete") {
+    if (selectedProjectIds.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const result = await api.bulkProjectAction(selectedProjectIds, action);
+      if (action === "archive") {
+        setProjects((prev) => prev.map((p) =>
+          selectedProjectIds.includes(p.id) ? { ...p, status: "archived" as ProjectStatus } : p
+        ));
+        toast(t("bulkActions.archiveSuccess", { count: result.affected }), "success");
+      } else {
+        setProjects((prev) => prev.filter((p) => !selectedProjectIds.includes(p.id)));
+        toast(t("bulkActions.deleteSuccess", { count: result.affected }), "success");
+      }
+      clearProjectSelection();
+      track(`bulk_${action}`, { count: result.affected });
+    } catch {
+      toast(t("bulkActions.error"), "error");
+    } finally {
+      setBulkLoading(false);
+      setBulkConfirmAction(null);
+    }
+  }
+
+  async function bulkAddTag() {
+    const tag = bulkTagInput.trim();
+    if (!tag || selectedProjectIds.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const result = await api.bulkProjectAction(selectedProjectIds, "add_tags", { tags: [tag] });
+      setProjects((prev) => prev.map((p) => {
+        if (!selectedProjectIds.includes(p.id)) return p;
+        const existing = p.tags ?? [];
+        return { ...p, tags: Array.from(new Set([...existing, tag])) };
+      }));
+      toast(t("bulkActions.tagSuccess", { count: result.affected }), "success");
+      setBulkTagInput("");
+      track("bulk_add_tag", { tag, count: result.affected });
+    } catch {
+      toast(t("bulkActions.error"), "error");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
   function exportAggregateCsv() {
     if (!aggregate) return;
     const escape = (value: string | number | null | undefined) => `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -681,6 +735,16 @@ export default function ProjectList({
                   </button>
                   <button
                     className="btn btn-ghost"
+                    onClick={selectedProjectIds.length === filteredProjects.length && filteredProjects.length > 0 ? clearProjectSelection : selectAllVisible}
+                    disabled={filteredProjects.length === 0}
+                    style={{ fontSize: 12 }}
+                  >
+                    {selectedProjectIds.length === filteredProjects.length && filteredProjects.length > 0
+                      ? t("bulkActions.deselectAll")
+                      : t("bulkActions.selectAll")}
+                  </button>
+                  <button
+                    className="btn btn-ghost"
                     onClick={clearProjectSelection}
                     disabled={selectedProjectIds.length === 0 || aggregateLoading}
                   >
@@ -696,6 +760,59 @@ export default function ProjectList({
                       {project.name}
                     </span>
                   ))}
+                </div>
+              )}
+
+              {selectedProjectIds.length > 0 && (
+                <div style={{
+                  display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
+                  marginTop: 14, paddingTop: 14,
+                  borderTop: "1px solid var(--border-subtle)"
+                }}>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setBulkConfirmAction("archive")}
+                    disabled={bulkLoading}
+                    style={{ gap: 4, fontSize: 13 }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" />
+                    </svg>
+                    {t("bulkActions.archive")}
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setBulkConfirmAction("delete")}
+                    disabled={bulkLoading}
+                    style={{ gap: 4, fontSize: 13, color: "var(--color-error, #ef4444)" }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    {t("bulkActions.delete")}
+                  </button>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center", marginLeft: "auto" }}>
+                    <input
+                      type="text"
+                      className="input"
+                      value={bulkTagInput}
+                      onChange={(e) => setBulkTagInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") bulkAddTag(); }}
+                      placeholder={t("bulkActions.addTagPlaceholder")}
+                      style={{ width: 140, height: 32, fontSize: 13 }}
+                      disabled={bulkLoading}
+                    />
+                    <button
+                      className="btn btn-ghost"
+                      onClick={bulkAddTag}
+                      disabled={!bulkTagInput.trim() || bulkLoading}
+                      style={{ fontSize: 13 }}
+                    >
+                      {t("bulkActions.addTag")}
+                    </button>
+                  </div>
+                  {bulkLoading && <span className="btn-spinner" />}
                 </div>
               )}
 
@@ -1078,6 +1195,19 @@ export default function ProjectList({
         variant="danger"
         onConfirm={confirmPermanentDelete}
         onCancel={() => setPermanentDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmAction !== null}
+        title={bulkConfirmAction === "archive"
+          ? t("bulkActions.archiveConfirm", { count: selectedProjectIds.length })
+          : t("bulkActions.deleteConfirm", { count: selectedProjectIds.length })}
+        message={selectedProjects.map((p) => p.name).join(", ")}
+        confirmText={bulkConfirmAction === "archive" ? t("bulkActions.archive") : t("bulkActions.delete")}
+        cancelText={t('dialog.cancel')}
+        variant={bulkConfirmAction === "delete" ? "danger" : undefined}
+        onConfirm={() => bulkConfirmAction && executeBulkAction(bulkConfirmAction)}
+        onCancel={() => setBulkConfirmAction(null)}
       />
     </div>
   );

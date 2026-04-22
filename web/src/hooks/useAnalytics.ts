@@ -43,6 +43,9 @@ export type AnalyticsEvent =
   | "auth_login"
   | "auth_google_login"
   | "auth_apple_login"
+  | "bulk_archive"
+  | "bulk_delete"
+  | "bulk_add_tag"
   | "page_view";
 
 // ── Property maps per event ────────────────────────────────────────
@@ -76,6 +79,9 @@ export interface AnalyticsEventProps {
   auth_login: Record<string, never>;
   auth_google_login: Record<string, never>;
   auth_apple_login: Record<string, never>;
+  bulk_archive: { count: number };
+  bulk_delete: { count: number };
+  bulk_add_tag: { tag: string; count: number };
   page_view: { path: string };
 }
 
