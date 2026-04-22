@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 const mockGetBuilding = vi.fn();
+const mockGenerateBuilding = vi.fn();
 const mockTrack = vi.fn();
 
 vi.mock("@/components/LocaleProvider", () => ({
@@ -19,6 +20,7 @@ vi.mock("@/components/LocaleProvider", () => ({
 vi.mock("@/lib/api", () => ({
   api: {
     getBuilding: (...args: unknown[]) => mockGetBuilding(...args),
+    generateBuilding: (...args: unknown[]) => mockGenerateBuilding(...args),
   },
 }));
 
@@ -59,6 +61,13 @@ const mockBuilding = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetBuilding.mockResolvedValue(mockBuilding);
+  mockGenerateBuilding.mockResolvedValue({
+    ...mockBuilding,
+    confidence: "manual",
+    data_sources: ["User-corrected building details"],
+    building_info: { ...mockBuilding.building_info, area_m2: 180 },
+    scene_js: "box(12,10,6)",
+  });
 });
 
 describe("AddressSearch compact mode", () => {
@@ -274,11 +283,37 @@ describe("AddressSearch full mode", () => {
     fireEvent.click(screen.getByLabelText("search.searchButton"));
     await waitFor(() => {
       expect(screen.getByText("search.yearBuilt")).toBeInTheDocument();
+      expect(screen.getByText("search.type")).toBeInTheDocument();
       expect(screen.getByText("search.area")).toBeInTheDocument();
       expect(screen.getByText("search.floors")).toBeInTheDocument();
       expect(screen.getByText("search.material")).toBeInTheDocument();
       expect(screen.getByText("search.heating")).toBeInTheDocument();
+      expect(screen.getByText("search.roofType")).toBeInTheDocument();
       expect(screen.getByText("search.bomRows")).toBeInTheDocument();
+    });
+  });
+
+  it("allows estimated building details to be corrected", async () => {
+    mockGetBuilding.mockResolvedValue({ ...mockBuilding, confidence: "estimated" });
+    render(<AddressSearch onCreateProject={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("search.placeholder"), { target: { value: "Helsinki" } });
+    fireEvent.click(screen.getByLabelText("search.searchButton"));
+
+    await waitFor(() => {
+      expect(screen.getByText("search.editHint")).toBeInTheDocument();
+    });
+
+    fireEvent.blur(screen.getByLabelText("search.area"), { target: { value: "180" } });
+
+    await waitFor(() => {
+      expect(mockGenerateBuilding).toHaveBeenCalledWith(expect.objectContaining({
+        address: mockBuilding.address,
+        coordinates: mockBuilding.coordinates,
+        building_info: expect.objectContaining({ area_m2: 180 }),
+      }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("confidence-badge")).toHaveTextContent("manual");
     });
   });
 

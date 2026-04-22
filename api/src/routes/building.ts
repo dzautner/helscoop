@@ -76,7 +76,7 @@ interface BuildingData {
 }
 
 interface ExternalBuildingResult extends BuildingData {
-  confidence: "verified" | "estimated";
+  confidence: "verified" | "estimated" | "manual";
   data_sources: string[];
 }
 
@@ -208,19 +208,23 @@ function generateGenericBuilding(address: string): BuildingData {
       roof_material: profile.roofMaterial,
     },
     scene_js: generateGenericScene(profile.buildingType, profile.floors, profile.area),
-    bom_suggestion: [
-      { material_id: "pine_48x148_c24", quantity: Math.round(profile.area * 0.6), unit: "jm" },
-      { material_id: "pine_48x98_c24", quantity: Math.round(profile.area * 0.4), unit: "jm" },
-      // osb_9mm: OSB 9mm sheathing sheets (2400×1200 mm ≈ 2.88 m²/sheet; area*0.35 m² → sheets)
-      { material_id: "osb_9mm", quantity: Math.ceil(profile.area * 0.35 / 2.88), unit: "sheet" },
-      // insulation_100mm: Mineraalivilla 100mm, priced per sqm
-      { material_id: "insulation_100mm", quantity: Math.round(profile.area * 0.7), unit: "sqm" },
-      // concrete_block: Betoniharkko 200mm, priced per kpl (~13 blocks/m³)
-      { material_id: "concrete_block", quantity: Math.round(profile.area * 0.06 * 13), unit: "kpl" },
-      // galvanized_roofing: Peltikatto Sinkitty (Ruukki), priced per sqm
-      { material_id: "galvanized_roofing", quantity: Math.round(profile.area * 0.55), unit: "sqm" },
-    ],
+    bom_suggestion: generateBomSuggestion(profile.area),
   };
+}
+
+function generateBomSuggestion(area: number): BomItem[] {
+  return [
+    { material_id: "pine_48x148_c24", quantity: Math.round(area * 0.6), unit: "jm" },
+    { material_id: "pine_48x98_c24", quantity: Math.round(area * 0.4), unit: "jm" },
+    // osb_9mm: OSB 9mm sheathing sheets (2400x1200 mm ~= 2.88 m2/sheet; area*0.35 m2 -> sheets)
+    { material_id: "osb_9mm", quantity: Math.ceil(area * 0.35 / 2.88), unit: "sheet" },
+    // insulation_100mm: Mineraalivilla 100mm, priced per sqm
+    { material_id: "insulation_100mm", quantity: Math.round(area * 0.7), unit: "sqm" },
+    // concrete_block: Betoniharkko 200mm, priced per kpl (~13 blocks/m3)
+    { material_id: "concrete_block", quantity: Math.round(area * 0.06 * 13), unit: "kpl" },
+    // galvanized_roofing: Peltikatto Sinkitty (Ruukki), priced per sqm
+    { material_id: "galvanized_roofing", quantity: Math.round(area * 0.55), unit: "sqm" },
+  ];
 }
 
 function inferGenericBuildingProfile(address: string, postalCode: string): {
@@ -434,6 +438,55 @@ function generateGenericScene(
   lines += `scene.add(roof_right, {material: "metal", color: ${roofColor}});\n`;
 
   return lines;
+}
+
+const BUILDING_TYPES = ["omakotitalo", "rivitalo", "kerrostalo", "paritalo"] as const;
+const BUILDING_MATERIALS = ["puu", "tiili", "betoni", "hirsi"] as const;
+const HEATING_TYPES = ["kaukolampo", "sahko", "maalampopumppu", "maalampo", "oljy"] as const;
+const ROOF_TYPES = ["harjakatto", "tasakatto", "mansardikatto", "pulpettikatto"] as const;
+
+function coerceEnum<T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]): T[number] {
+  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+}
+
+function coerceNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function coerceInteger(value: unknown, fallback: number, min: number, max: number): number {
+  return Math.round(coerceNumber(value, fallback, min, max));
+}
+
+function sanitizeGeneratedBuildingInfo(input: Partial<BuildingInfo> | undefined): BuildingInfo {
+  const type = coerceEnum(input?.type, BUILDING_TYPES, "omakotitalo");
+  const floors = coerceInteger(input?.floors, type === "kerrostalo" ? 5 : 2, 1, 10);
+  const area = coerceNumber(input?.area_m2, type === "kerrostalo" ? 72 : 130, 20, 2000);
+  const material = coerceEnum(input?.material, BUILDING_MATERIALS, type === "kerrostalo" ? "betoni" : "puu");
+  const roofType = coerceEnum(input?.roof_type, ROOF_TYPES, type === "kerrostalo" ? "tasakatto" : "harjakatto");
+  const roofMaterial = typeof input?.roof_material === "string" && input.roof_material.trim()
+    ? input.roof_material.trim().slice(0, 80)
+    : roofType === "tasakatto" ? "bitumi" : "pelti";
+
+  return {
+    type,
+    year_built: coerceInteger(input?.year_built, 1990, 1800, new Date().getFullYear() + 1),
+    material,
+    floors,
+    area_m2: Math.round(area * 10) / 10,
+    heating: coerceEnum(input?.heating, HEATING_TYPES, "kaukolampo"),
+    roof_type: roofType,
+    roof_material: roofMaterial,
+  };
+}
+
+function sanitizeCoordinates(input: unknown): { lat: number; lon: number } {
+  const coords = input && typeof input === "object" ? input as { lat?: unknown; lon?: unknown } : {};
+  return {
+    lat: coerceNumber(coords.lat, 60.17, -90, 90),
+    lon: coerceNumber(coords.lon, 24.94, -180, 180),
+  };
 }
 
 const DEFAULT_RYHTI_API_URL =
@@ -895,6 +948,30 @@ async function lookupFinnishRegistry(address: string): Promise<RegistryLookupOut
     return { error: `Finnish registry lookup failed: ${detail}` };
   }
 }
+
+// POST /building/generate
+router.post("/generate", (req: Request, res: Response) => {
+  const body = (req.body ?? {}) as {
+    address?: unknown;
+    coordinates?: unknown;
+    building_info?: Partial<BuildingInfo>;
+  };
+  const address = typeof body.address === "string" && body.address.trim()
+    ? body.address.trim().slice(0, MAX_ADDRESS_LENGTH)
+    : "User-corrected building";
+  const buildingInfo = sanitizeGeneratedBuildingInfo(body.building_info);
+  const result = {
+    address,
+    coordinates: sanitizeCoordinates(body.coordinates),
+    building_info: buildingInfo,
+    confidence: "manual" as const,
+    data_sources: ["User-corrected building details", "Generated parametric model"],
+    scene_js: generateGenericScene(buildingInfo.type, buildingInfo.floors, buildingInfo.area_m2),
+    bom_suggestion: generateBomSuggestion(buildingInfo.area_m2),
+  };
+
+  return res.json(result);
+});
 
 // GET /building?address=<address>
 router.get("/", async (req: Request, res: Response) => {

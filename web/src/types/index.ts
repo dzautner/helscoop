@@ -103,7 +103,7 @@ export interface BuildingResult {
     roof_material?: string;
     units?: number;
   };
-  confidence: "verified" | "estimated" | "template";
+  confidence: "verified" | "estimated" | "template" | "manual";
   data_sources: string[];
   climate_zone?: string;
   heating_degree_days?: number;

@@ -1,5 +1,7 @@
 import type {
   AdminStats,
+  BuildingInfo,
+  BuildingResult,
   EnergySubsidyRequest,
   BomSubstitutionResponse,
   KeskoProduct,
@@ -399,6 +401,12 @@ export const api = {
     apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/submit`, { method: "POST" }),
   getRyhtiStatus: (projectId: string) =>
     apiFetch(`/ryhti/projects/${encodeURIComponent(projectId)}/status`),
+  generateBuilding: (payload: {
+    address?: string;
+    coordinates?: { lat: number; lon: number };
+    building_info: Partial<BuildingInfo>;
+  }): Promise<BuildingResult> =>
+    apiFetch("/building/generate", { method: "POST", body: JSON.stringify(payload) }),
 
   getCategories: () => apiFetch("/categories"),
   getTemplates: () => apiFetch("/templates"),
