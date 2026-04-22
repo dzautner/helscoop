@@ -26,7 +26,7 @@ import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
 import OnboardingTour from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { generateAraGrantPdf, generateQuotePdf } from "@/lib/pdf";
+import { generateAraGrantPdf } from "@/lib/pdf";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -884,6 +884,21 @@ export default function ProjectPage() {
     [locale]
   );
 
+  const exportQuotePdf = useCallback(async () => {
+    setShowExportMenu(false);
+    setExportingFormat("pdf");
+    try {
+      await save();
+      track("bom_exported", { format: "pdf" });
+      await api.exportPdf(projectId, projectName, locale);
+      toast(t("toast.bomExported"), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [locale, projectId, projectName, save, t, toast, track]);
+
   const exportAraGrantPackage = useCallback(() => {
     setShowAraChecklist(false);
     setShowExportMenu(false);
@@ -993,15 +1008,7 @@ export default function ProjectPage() {
             <polyline points="14 2 14 8 20 8" />
           </svg>
         ),
-        action: () => {
-          try {
-            track("bom_exported", { format: "pdf" });
-            generateQuotePdf({ projectName, projectDescription: projectDesc, bom, locale });
-            toast(t("toast.bomExported"), "success");
-          } catch (err) {
-            toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
-          }
-        },
+        action: () => { void exportQuotePdf(); },
       },
       {
         id: "export-ara-grant",
@@ -1170,7 +1177,7 @@ export default function ProjectPage() {
         isActive: showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportQuotePdf]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -1731,19 +1738,7 @@ export default function ProjectPage() {
                   role="menuitem"
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
-                  onClick={async () => {
-                    setShowExportMenu(false);
-                    setExportingFormat("pdf");
-                    try {
-                      track("bom_exported", { format: "pdf" });
-                      generateQuotePdf({ projectName, projectDescription: projectDesc, bom, locale });
-                      toast(t('toast.bomExported'), "success");
-                    } catch (err) {
-                      toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
-                    } finally {
-                      setExportingFormat(null);
-                    }
-                  }}
+                  onClick={() => { void exportQuotePdf(); }}
                   style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "pdf" ? 0.4 : 1 }}
                 >
                   {exportingFormat === "pdf" ? (
