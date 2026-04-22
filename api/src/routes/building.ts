@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 
 const router = Router();
@@ -123,13 +123,16 @@ interface ClimateLookup {
 
 function loadDemoData(): BuildingData[] {
   const dataDir = join(__dirname, "..", "..", "..", "data", "demo");
-  const files = ["ribbingintie-109.json", "uunimaentie-1.json"];
+  const files = readdirSync(dataDir)
+    .filter((file) => file.endsWith(".json"))
+    .sort();
   const buildings: BuildingData[] = [];
 
   for (const file of files) {
     try {
       const raw = readFileSync(join(dataDir, file), "utf-8");
-      buildings.push(JSON.parse(raw));
+      const parsed = JSON.parse(raw) as BuildingData | BuildingData[];
+      buildings.push(...(Array.isArray(parsed) ? parsed : [parsed]));
     } catch (e) {
       console.warn(`Could not load demo data file ${file}:`, e);
     }
@@ -146,6 +149,8 @@ const demoBuildings = loadDemoData();
  */
 function normalizeAddress(addr: string): string {
   return addr
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[,.\-]/g, " ")
     .replace(/\s+/g, " ")
@@ -160,88 +165,177 @@ function matchesDemoAddress(query: string, demoAddress: string): boolean {
   const normQ = normalizeAddress(query);
   const normD = normalizeAddress(demoAddress);
 
-  // Extract the street name and number (first part before postal code)
-  const streetPart = normD.split(/\d{5}/)[0].trim();
-  if (!streetPart) return false;
+  const queryKey = parseStreetAddressKey(normQ);
+  const demoKey = parseStreetAddressKey(normD);
+  if (!queryKey || !demoKey) return normQ.includes(normD) || normD.includes(normQ);
 
-  // Try exact substring match on the street portion
-  if (normQ.includes(streetPart)) return true;
-
-  // Also try matching just the street name (without house number suffix)
-  const words = streetPart.split(" ");
-  const streetName = words[0];
-  if (streetName && streetName.length > 4 && normQ.includes(streetName)) {
+  if (queryKey.streetName === demoKey.streetName && queryKey.houseNumber === demoKey.houseNumber) {
     return true;
   }
 
   return false;
 }
 
+function parseStreetAddressKey(normalizedAddress: string): { streetName: string; houseNumber: string } | null {
+  const streetPart = normalizedAddress.split(/\b\d{5}\b/)[0].trim();
+  const match = streetPart.match(/^(.+?)\s+(\d+)\b/);
+  if (!match) return null;
+  return {
+    streetName: match[1].trim(),
+    houseNumber: match[2],
+  };
+}
+
 /**
  * Generate a generic building based on postal code area characteristics.
  */
 function generateGenericBuilding(address: string): BuildingData {
-  // Try to extract postal code
   const postalMatch = address.match(/\b(\d{5})\b/);
   const postalCode = postalMatch ? postalMatch[1] : "00100";
-  const prefix = postalCode.substring(0, 2);
-
-  // Helsinki downtown (001-002): likely apartment
-  // Helsinki suburbs (003-009): likely detached/row house
-  // Espoo (02): mixed
-  // Vantaa (01): mixed suburban
-  let buildingType = "omakotitalo";
-  let floors = 2;
-  let area = 120;
-  let yearBuilt = 1990;
-  let material = "puu";
-
-  if (prefix === "00" && parseInt(postalCode) < 300) {
-    buildingType = "kerrostalo";
-    floors = 5;
-    area = 65;
-    yearBuilt = 1960;
-    material = "betoni";
-  } else if (prefix === "00" && parseInt(postalCode) >= 300) {
-    buildingType = "omakotitalo";
-    floors = 2;
-    area = 130;
-    yearBuilt = 1985;
-    material = "puu";
-  } else if (prefix === "02") {
-    buildingType = "omakotitalo";
-    floors = 2;
-    area = 145;
-    yearBuilt = 1995;
-    material = "puu";
-  }
+  const profile = inferGenericBuildingProfile(address, postalCode);
 
   return {
     address,
-    coordinates: { lat: 60.17, lon: 24.94 },
+    coordinates: profile.coordinates,
     building_info: {
-      type: buildingType,
-      year_built: yearBuilt,
-      material: material,
-      floors: floors,
-      area_m2: area,
-      heating: "kaukolampo",
-      roof_type: "harjakatto",
-      roof_material: "pelti",
+      type: profile.buildingType,
+      year_built: profile.yearBuilt,
+      material: profile.material,
+      floors: profile.floors,
+      area_m2: profile.area,
+      heating: profile.heating,
+      roof_type: profile.roofType,
+      roof_material: profile.roofMaterial,
     },
-    scene_js: generateGenericScene(buildingType, floors, area),
+    scene_js: generateGenericScene(profile.buildingType, profile.floors, profile.area),
     bom_suggestion: [
-      { material_id: "pine_48x148_c24", quantity: Math.round(area * 0.6), unit: "jm" },
-      { material_id: "pine_48x98_c24", quantity: Math.round(area * 0.4), unit: "jm" },
+      { material_id: "pine_48x148_c24", quantity: Math.round(profile.area * 0.6), unit: "jm" },
+      { material_id: "pine_48x98_c24", quantity: Math.round(profile.area * 0.4), unit: "jm" },
       // osb_9mm: OSB 9mm sheathing sheets (2400×1200 mm ≈ 2.88 m²/sheet; area*0.35 m² → sheets)
-      { material_id: "osb_9mm", quantity: Math.ceil(area * 0.35 / 2.88), unit: "sheet" },
+      { material_id: "osb_9mm", quantity: Math.ceil(profile.area * 0.35 / 2.88), unit: "sheet" },
       // insulation_100mm: Mineraalivilla 100mm, priced per sqm
-      { material_id: "insulation_100mm", quantity: Math.round(area * 0.7), unit: "sqm" },
+      { material_id: "insulation_100mm", quantity: Math.round(profile.area * 0.7), unit: "sqm" },
       // concrete_block: Betoniharkko 200mm, priced per kpl (~13 blocks/m³)
-      { material_id: "concrete_block", quantity: Math.round(area * 0.06 * 13), unit: "kpl" },
+      { material_id: "concrete_block", quantity: Math.round(profile.area * 0.06 * 13), unit: "kpl" },
       // galvanized_roofing: Peltikatto Sinkitty (Ruukki), priced per sqm
-      { material_id: "galvanized_roofing", quantity: Math.round(area * 0.55), unit: "sqm" },
+      { material_id: "galvanized_roofing", quantity: Math.round(profile.area * 0.55), unit: "sqm" },
     ],
+  };
+}
+
+function inferGenericBuildingProfile(address: string, postalCode: string): {
+  buildingType: string;
+  floors: number;
+  area: number;
+  yearBuilt: number;
+  material: string;
+  heating: string;
+  roofType: string;
+  roofMaterial: string;
+  coordinates: { lat: number; lon: number };
+} {
+  const postal = Number(postalCode);
+  const prefix = postalCode.substring(0, 2);
+  const normalized = normalizeAddress(address);
+  const streetLooksSmall = ["polku", "kuja", "rinne", "kaari", "metsatie", "rantatie", "puistotie", "niityntie", "raitio"]
+    .some((part) => normalized.includes(part));
+  const streetLooksUrban = ["katu", "bulevardi", "aukio", "hameentie", "mannerheimintie", "raitti", "ranta"]
+    .some((part) => normalized.includes(part));
+
+  if (prefix === "00" && postal < 300) {
+    return {
+      buildingType: "kerrostalo",
+      floors: streetLooksUrban ? 7 : 5,
+      area: streetLooksUrban ? 72 : 64,
+      yearBuilt: postal < 200 ? 1938 : 1968,
+      material: "betoni",
+      heating: "kaukolampo",
+      roofType: "tasakatto",
+      roofMaterial: "bitumi",
+      coordinates: { lat: 60.171, lon: 24.938 },
+    };
+  }
+
+  if (prefix === "00" && postal < 700) {
+    return {
+      buildingType: streetLooksUrban ? "kerrostalo" : "rivitalo",
+      floors: streetLooksUrban ? 6 : 2,
+      area: streetLooksUrban ? 68 : 128,
+      yearBuilt: streetLooksUrban ? 1972 : 1986,
+      material: streetLooksUrban ? "betoni" : "tiili",
+      heating: "kaukolampo",
+      roofType: streetLooksUrban ? "tasakatto" : "harjakatto",
+      roofMaterial: streetLooksUrban ? "bitumi" : "pelti",
+      coordinates: { lat: 60.204, lon: 24.955 },
+    };
+  }
+
+  if (prefix === "00") {
+    return {
+      buildingType: streetLooksSmall ? "paritalo" : "omakotitalo",
+      floors: 2,
+      area: streetLooksSmall ? 108 : 142,
+      yearBuilt: streetLooksSmall ? 2002 : 1984,
+      material: "puu",
+      heating: "kaukolampo",
+      roofType: "harjakatto",
+      roofMaterial: "pelti",
+      coordinates: { lat: 60.244, lon: 25.025 },
+    };
+  }
+
+  if (prefix === "01") {
+    return {
+      buildingType: streetLooksSmall ? "paritalo" : "rivitalo",
+      floors: 2,
+      area: streetLooksSmall ? 118 : 160,
+      yearBuilt: postal >= 1300 ? 2014 : 1982,
+      material: "tiili",
+      heating: "kaukolampo",
+      roofType: "harjakatto",
+      roofMaterial: "tiili",
+      coordinates: { lat: 60.294, lon: 25.04 },
+    };
+  }
+
+  if (prefix === "02") {
+    return {
+      buildingType: streetLooksUrban ? "kerrostalo" : streetLooksSmall ? "paritalo" : "omakotitalo",
+      floors: streetLooksUrban ? 5 : 2,
+      area: streetLooksUrban ? 76 : streetLooksSmall ? 126 : 158,
+      yearBuilt: streetLooksUrban ? 2016 : streetLooksSmall ? 2007 : 1994,
+      material: streetLooksUrban ? "betoni" : "puu",
+      heating: "maalampo",
+      roofType: streetLooksUrban ? "tasakatto" : "harjakatto",
+      roofMaterial: streetLooksUrban ? "bitumi" : "pelti",
+      coordinates: { lat: 60.204, lon: 24.656 },
+    };
+  }
+
+  if (prefix === "04" || prefix === "05") {
+    return {
+      buildingType: "omakotitalo",
+      floors: 2,
+      area: 150,
+      yearBuilt: 1998,
+      material: normalized.includes("hirsi") ? "hirsi" : "puu",
+      heating: "sahko",
+      roofType: "harjakatto",
+      roofMaterial: "pelti",
+      coordinates: { lat: 60.53, lon: 25.1 },
+    };
+  }
+
+  return {
+    buildingType: "omakotitalo",
+    floors: 2,
+    area: 125,
+    yearBuilt: 1990,
+    material: "puu",
+    heating: "kaukolampo",
+    roofType: "harjakatto",
+    roofMaterial: "pelti",
+    coordinates: { lat: 60.17, lon: 24.94 },
   };
 }
 
@@ -253,18 +347,19 @@ function generateGenericScene(
   const floorHeight = 2.7;
   // Approximate footprint from area
   const ratio = 1.2; // length/width ratio
-  const width = Math.sqrt(area / floors / ratio);
-  const length = width * ratio;
+  const footprintRatio = type === "rivitalo" ? 3.2 : type === "kerrostalo" ? 1.7 : type === "paritalo" ? 2.0 : ratio;
+  const width = Math.sqrt(area / floors / footprintRatio);
+  const length = width * footprintRatio;
   const w = Math.round(width * 10) / 10;
   const l = Math.round(length * 10) / 10;
   const wallThickness = 0.2;
 
   // Colors
   const foundationColor = "[0.55, 0.55, 0.52]";
-  const wallFrontColor = "[0.76, 0.60, 0.42]";
-  const wallBackColor = "[0.72, 0.56, 0.38]";
-  const wallLeftColor = "[0.68, 0.53, 0.35]";
-  const wallRightColor = "[0.70, 0.55, 0.37]";
+  const wallFrontColor = type === "kerrostalo" ? "[0.78, 0.77, 0.72]" : type === "rivitalo" ? "[0.64, 0.34, 0.27]" : "[0.76, 0.60, 0.42]";
+  const wallBackColor = type === "kerrostalo" ? "[0.70, 0.70, 0.67]" : type === "rivitalo" ? "[0.58, 0.31, 0.24]" : "[0.72, 0.56, 0.38]";
+  const wallLeftColor = type === "kerrostalo" ? "[0.74, 0.73, 0.69]" : type === "rivitalo" ? "[0.60, 0.32, 0.25]" : "[0.68, 0.53, 0.35]";
+  const wallRightColor = type === "kerrostalo" ? "[0.74, 0.73, 0.69]" : type === "rivitalo" ? "[0.60, 0.32, 0.25]" : "[0.70, 0.55, 0.37]";
   const slabColor = "[0.60, 0.60, 0.58]";
   const roofColor = "[0.25, 0.22, 0.20]";
 
@@ -302,6 +397,26 @@ function generateGenericScene(
     }
 
     lines += `\n`;
+  }
+
+  if (type === "rivitalo" || type === "paritalo") {
+    const units = type === "rivitalo" ? 4 : 2;
+    for (let i = 1; i < units; i++) {
+      const x = (-l / 2 + (l / units) * i).toFixed(2);
+      lines += `const unit_divider_${i} = translate(box(0.16, ${floorHeight}, ${w}), ${x}, 1.65, 0);\n`;
+      lines += `scene.add(unit_divider_${i}, {material: "concrete", color: [0.58, 0.58, 0.55]});\n`;
+    }
+    lines += `\n`;
+  }
+
+  if (type === "kerrostalo") {
+    const roofY = (0.3 + floors * floorHeight + (floors - 1) * 0.25 + 0.12).toFixed(2);
+    lines += `// Flat roof and stair core\n`;
+    lines += `const flat_roof = translate(box(${l}, 0.24, ${w}), 0, ${roofY}, 0);\n`;
+    lines += `scene.add(flat_roof, {material: "concrete", color: ${slabColor}});\n`;
+    lines += `const stair_core = translate(box(${(l * 0.18).toFixed(1)}, 1.1, ${(w * 0.22).toFixed(1)}), ${(l * 0.28).toFixed(2)}, ${(Number(roofY) + 0.6).toFixed(2)}, 0);\n`;
+    lines += `scene.add(stair_core, {material: "concrete", color: [0.62, 0.62, 0.60]});\n`;
+    return lines;
   }
 
   // Pitched roof
@@ -808,7 +923,7 @@ router.get("/", async (req: Request, res: Response) => {
       const result = {
         ...building,
         confidence: "verified" as const,
-        data_sources: ["Helsinki CityGML", "K-Rauta hinnat 04/2026"],
+        data_sources: ["Curated Helsinki metro demo data", "K-Rauta hinnat 04/2026"],
       };
       setCache(cacheKey, result);
       return res.json(result);
@@ -828,8 +943,8 @@ router.get("/", async (req: Request, res: Response) => {
   const generic = generateGenericBuilding(address);
   const partial = registryOutcome?.partial;
   const dataSources = partial
-    ? [...partial.data_sources, "Yleinen kerrostalomalli"]
-    : ["Yleinen kerrostalomalli"];
+    ? [...partial.data_sources, `Yleinen ${generic.building_info.type}malli`]
+    : [`Yleinen ${generic.building_info.type}malli`];
   const result = {
     ...generic,
     ...(partial ? { address: partial.address, coordinates: partial.coordinates } : {}),
