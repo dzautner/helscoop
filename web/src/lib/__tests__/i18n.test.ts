@@ -602,7 +602,12 @@ describe("exhaustive i18n key parity", () => {
     // building
     "building.omakotitalo", "building.rivitalo", "building.kerrostalo", "building.paritalo",
     // bom
-    "bom.donutChartAriaLabel", "bom.exportCsv",
+    "bom.donutChartAriaLabel", "bom.exportCsv", "bom.importBom",
+    "bom.importNoRows", "bom.importFailed", "bom.importDrop",
+    "bom.importPreview", "bom.importMatched", "bom.importMerge",
+    "bom.importReplace", "bom.importUnmatched", "bom.importedRow",
+    "bom.quantity", "bom.matchedMaterial", "bom.confidence", "bom.row",
+    "bom.chooseMaterial", "bom.unmatched", "bom.importApply", "bom.importSuccess",
     "bom.csvMaterial", "bom.csvQuantity", "bom.csvUnit",
     "bom.csvUnitPrice", "bom.csvTotal", "bom.csvSupplier", "bom.csvCategory",
     "bom.inStock", "bom.lowStock", "bom.outOfStock", "bom.stockUnknown",

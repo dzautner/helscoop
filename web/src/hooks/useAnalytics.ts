@@ -18,6 +18,7 @@ export type AnalyticsEvent =
   | "project_created"
   | "editor_session"
   | "bom_item_added"
+  | "bom_imported"
   | "bom_item_removed"
   | "bom_item_undo_remove"
   | "bom_package_material_replaced"
@@ -47,6 +48,7 @@ export interface AnalyticsEventProps {
   project_created: { source: "address" | "template" | "blank"; building_type?: string };
   editor_session: { duration_s: number; used_code_editor: boolean; used_chat: boolean };
   bom_item_added: { material_id: string; category?: string };
+  bom_imported: { count: number; mode: "merge" | "replace" };
   bom_item_removed: { material_id: string };
   bom_item_undo_remove: { material_id: string };
   bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string; source?: string };
