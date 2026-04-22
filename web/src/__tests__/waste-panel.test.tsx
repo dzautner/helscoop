@@ -28,12 +28,12 @@ const mockEstimate: WasteEstimateResponse = {
   totalWeightKg: 450,
   totalVolumeM3: 3.2,
   totalDisposalCost: 120,
-  containerRecommendation: { count: 1, size: "4 m\u00B3", costEur: 250 },
+  containerRecommendation: { count: 1, size: "4 m\u00B3", totalCost: 250 },
   categories: [
-    { type: "puujate", weightKg: 200, volumeM3: 1.5, recyclable: true, disposalCost: 0 },
-    { type: "metallijate", weightKg: 100, volumeM3: 0.4, recyclable: true, disposalCost: 0 },
-    { type: "sekajate", weightKg: 80, volumeM3: 0.8, recyclable: false, disposalCost: 80 },
-    { type: "vaarallinen_jate", weightKg: 70, volumeM3: 0.5, recyclable: false, disposalCost: 40 },
+    { type: "puujate", weightKg: 200, volumeM3: 1.5, recyclable: true, disposalCostEur: 0 },
+    { type: "metallijate", weightKg: 100, volumeM3: 0.4, recyclable: true, disposalCostEur: 0 },
+    { type: "sekajate", weightKg: 80, volumeM3: 0.8, recyclable: false, disposalCostEur: 80 },
+    { type: "vaarallinen_jate", weightKg: 70, volumeM3: 0.5, recyclable: false, disposalCostEur: 40 },
   ],
   sortingGuide: [
     {
