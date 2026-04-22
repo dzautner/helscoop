@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -10,6 +11,18 @@ import HeroIllustration from "@/components/HeroIllustration";
 import TrustLayer from "@/components/TrustLayer";
 import ScrollReveal from "@/components/ScrollReveal";
 import type { BuildingResult } from "@/types";
+
+const HeroViewport = dynamic(() => import("@/components/HeroViewport"), {
+  ssr: false,
+  loading: () => (
+    <div style={{
+      width: "100%",
+      height: 200,
+      borderRadius: "var(--radius-lg)",
+      background: "var(--bg-secondary)",
+    }} />
+  ),
+});
 
 type GoogleIdentity = {
   accounts: {
@@ -212,6 +225,12 @@ export default function LoginForm({
               </div>
             </ScrollReveal>
           )}
+
+          <ScrollReveal delay={0.15}>
+            <div style={{ marginBottom: 28 }}>
+              <HeroViewport />
+            </div>
+          </ScrollReveal>
 
           <div style={{ display: "flex", flexDirection: "column", marginBottom: 36 }}>
             {features.map((item, i) => (
