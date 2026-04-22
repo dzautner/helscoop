@@ -4227,3 +4227,47 @@ const translations = {
     },
   },
 } as const;
+
+type Translations = typeof translations;
+type TranslationTree = Translations[Locale];
+
+/** Resolve a dot-notated key like 'auth.login' from the translations object */
+function resolve(obj: Record<string, unknown>, path: string): string {
+  const parts = path.split('.');
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current && typeof current === 'object' && part in (current as Record<string, unknown>)) {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return path;
+    }
+  }
+  return typeof current === 'string' ? current : path;
+}
+
+export function getTranslation(locale: Locale) {
+  const tree = translations[locale] as unknown as Record<string, unknown>;
+  return function t(key: string, params?: Record<string, string | number>): string {
+    let value = resolve(tree, key);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        value = value.replace(`{{${k}}}`, String(v));
+      }
+    }
+    return value;
+  };
+}
+
+export function detectLocale(): Locale {
+  if (typeof window === 'undefined') return 'fi';
+  const stored = localStorage.getItem('helscoop_locale');
+  if (stored === 'fi' || stored === 'en' || stored === 'sv') return stored;
+  const browserLang = navigator.language.toLowerCase();
+  if (browserLang.startsWith('en')) return 'en';
+  if (browserLang.startsWith('sv')) return 'sv';
+  return 'fi';
+}
+
+export function persistLocale(locale: Locale) {
+  localStorage.setItem('helscoop_locale', locale);
+}
