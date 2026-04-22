@@ -20,6 +20,7 @@ import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
+import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
@@ -1240,6 +1241,40 @@ export default function ProjectPage() {
     [track],
   );
 
+  const importBomItems = useCallback(
+    (items: BomItem[], mode: BomImportMode) => {
+      setBom((prev) => {
+        if (mode === "replace") return items;
+
+        const merged = new Map(prev.map((item) => [item.material_id, item]));
+        for (const item of items) {
+          const existing = merged.get(item.material_id);
+          if (!existing) {
+            merged.set(item.material_id, item);
+            continue;
+          }
+
+          const quantity = Number(existing.quantity || 0) + Number(item.quantity || 0);
+          const unitPrice = Number(item.unit_price ?? existing.unit_price ?? 0);
+          merged.set(item.material_id, {
+            ...existing,
+            ...item,
+            quantity,
+            unit_price: unitPrice,
+            total: unitPrice * quantity,
+            note: item.note || existing.note,
+          });
+        }
+        return Array.from(merged.values());
+      });
+
+      track("bom_imported", { count: items.length, mode });
+      playSound("bomAdd");
+      toast(t("bom.importSuccess", { count: items.length }), "success");
+    },
+    [playSound, t, toast, track],
+  );
+
   const replaceBomMaterial = useCallback(
     (fromMaterialId: string, toMaterialId: string, options?: { undo?: boolean; source?: string }) => {
       const mat = materials.find((m) => m.id === toMaterialId);
@@ -2414,6 +2449,7 @@ export default function ProjectPage() {
               materials={materials}
               onAdd={addBomItem}
               onAddImported={addImportedBomItem}
+              onImportBom={importBomItems}
               onReplaceMaterial={replaceBomMaterial}
               onApplySupplierPrice={applyBomPriceOverride}
               onRemove={removeBomItem}

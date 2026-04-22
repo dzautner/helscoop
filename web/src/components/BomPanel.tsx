@@ -20,6 +20,14 @@ import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import { detectHeatingGrantOpportunity } from "@/lib/heating-grant-context";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
 import { buildSavingsRecommendations } from "@/lib/bom-savings";
+import {
+  buildImportedBomItem,
+  matchImportedBomRows,
+  parseBomImportFile,
+  parseBomImportText,
+  type BomImportMode,
+  type BomImportPreviewRow,
+} from "@/lib/bom-import";
 import type { QuoteConfig } from "@/lib/quote-engine";
 import type {
   BomItem,
@@ -1804,6 +1812,7 @@ export default function BomPanel({
   materials,
   onAdd,
   onAddImported,
+  onImportBom,
   onReplaceMaterial,
   onApplySupplierPrice,
   onRemove,
@@ -1822,6 +1831,7 @@ export default function BomPanel({
   materials: Material[];
   onAdd: (materialId: string, qty: number) => void;
   onAddImported?: (item: BomItem, material: Material) => void;
+  onImportBom?: (items: BomItem[], mode: BomImportMode) => void;
   onReplaceMaterial?: (fromMaterialId: string, toMaterialId: string, options?: { undo?: boolean; source?: string }) => void;
   onApplySupplierPrice?: (override: BomPriceOverride) => void;
   onRemove: (materialId: string) => void;
@@ -1866,6 +1876,11 @@ export default function BomPanel({
   const [packageFlashKey, setPackageFlashKey] = useState(0);
   const [lockedPackageMaterials, setLockedPackageMaterials] = useState<Set<string>>(() => new Set());
   const [quoteRequestOpen, setQuoteRequestOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<BomImportPreviewRow[]>([]);
+  const [importMode, setImportMode] = useState<BomImportMode>("merge");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importDragging, setImportDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -2179,15 +2194,100 @@ export default function BomPanel({
     }
   }, [onAddImported, t]);
 
+  const openBomImportPreview = useCallback((rows: ReturnType<typeof parseBomImportText>) => {
+    if (rows.length === 0) {
+      setImportError(t("bom.importNoRows"));
+      return;
+    }
+    setImportPreview(matchImportedBomRows(rows, materials));
+    setImportError(null);
+  }, [materials, t]);
+
+  const handleBomImportFile = useCallback(async (file: File) => {
+    try {
+      openBomImportPreview(await parseBomImportFile(file));
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : t("bom.importFailed"));
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [openBomImportPreview, t]);
+
+  const handleBomPaste = useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+    const text = event.clipboardData.getData("text/plain");
+    if (!text || (!text.includes("\n") && !text.trim().startsWith("[") && !text.trim().startsWith("{"))) return;
+
+    try {
+      const rows = parseBomImportText(text);
+      if (rows.length === 0) return;
+      event.preventDefault();
+      openBomImportPreview(rows);
+    } catch {
+      // Let ordinary paste continue if the clipboard is not tabular BOM data.
+    }
+  }, [openBomImportPreview]);
+
+  const unresolvedImportCount = importPreview.filter((row) => !row.matchedMaterialId).length;
+  const resolvedImportCount = importPreview.length - unresolvedImportCount;
+
+  const handleBomImportConfirm = useCallback(() => {
+    if (!onImportBom || unresolvedImportCount > 0) return;
+    const items = importPreview.flatMap((row) => {
+      const material = materials.find((candidate) => candidate.id === row.matchedMaterialId);
+      return material ? [buildImportedBomItem(row.imported, material)] : [];
+    });
+    if (items.length === 0) return;
+    onImportBom(items, importMode);
+    setImportPreview([]);
+    setImportError(null);
+  }, [importMode, importPreview, materials, onImportBom, unresolvedImportCount]);
+
   return (
     <div
       className="editor-bom-panel panel-glow"
       data-tour="bom-panel"
-      style={style}
+      style={{ position: "relative", ...style }}
       ref={glow.ref}
       onMouseMove={glow.onMouseMove}
       onMouseLeave={glow.onMouseLeave}
+      onPaste={handleBomPaste}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          setImportDragging(true);
+        }
+      }}
+      onDragLeave={() => setImportDragging(false)}
+      onDrop={(event) => {
+        const file = event.dataTransfer.files[0];
+        if (!file) return;
+        event.preventDefault();
+        setImportDragging(false);
+        void handleBomImportFile(file);
+      }}
     >
+      {importDragging && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 8,
+            zIndex: 20,
+            pointerEvents: "none",
+            border: "2px dashed var(--amber)",
+            borderRadius: "var(--radius-lg)",
+            background: "rgba(229, 160, 75, 0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--amber)",
+            fontWeight: 700,
+          }}
+        >
+          {t("bom.importDrop")}
+        </div>
+      )}
       <div style={{
         padding: "16px 20px",
         borderBottom: "1px solid var(--border)",
@@ -2196,6 +2296,29 @@ export default function BomPanel({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt,.json,.xlsx"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleBomImportFile(file);
+              }}
+            />
+            <button
+              className="bom-print-btn no-print"
+              onClick={() => fileInputRef.current?.click()}
+              title={t('bom.importBom')}
+              aria-label={t('bom.importBom')}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text-muted)", display: "inline-flex" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </button>
             <button
               className="bom-print-btn no-print"
               onClick={() => window.print()}
@@ -2235,6 +2358,22 @@ export default function BomPanel({
             )}
           </div>
         </div>
+        {importError && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 10,
+              padding: "8px 10px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              background: "rgba(239, 68, 68, 0.08)",
+              color: "var(--danger)",
+              fontSize: 12,
+            }}
+          >
+            {importError}
+          </div>
+        )}
         {bom.length > 0 && (
           <div className="package-switcher" data-has-choices={hasPackageChoices}>
             <div className="package-switcher-head">
@@ -3126,6 +3265,152 @@ export default function BomPanel({
           )}
         </div>
       </div>
+
+      {importPreview.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bom-import-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 120,
+            background: "rgba(0,0,0,0.62)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: "min(760px, 100%)",
+              maxHeight: "82vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <h3 id="bom-import-title" style={{ margin: 0, fontSize: 16 }}>{t("bom.importPreview")}</h3>
+                <p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: 12 }}>
+                  {t("bom.importMatched", { resolved: resolvedImportCount, total: importPreview.length })}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setImportPreview([])}
+                aria-label={t("dialog.close")}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: 16, borderBottom: "1px solid var(--border)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {(["merge", "replace"] as BomImportMode[]).map((mode) => (
+                <label
+                  key={mode}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="bom-import-mode"
+                    checked={importMode === mode}
+                    onChange={() => setImportMode(mode)}
+                  />
+                  {t(mode === "merge" ? "bom.importMerge" : "bom.importReplace")}
+                </label>
+              ))}
+              {unresolvedImportCount > 0 && (
+                <span className="badge badge-warning">
+                  {t("bom.importUnmatched", { count: unresolvedImportCount })}
+                </span>
+              )}
+            </div>
+
+            <div style={{ overflow: "auto", padding: 16 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.importedRow")}</th>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.quantity")}</th>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.matchedMaterial")}</th>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.confidence")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ fontWeight: 600 }}>{row.imported.materialKey}</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                          {t("bom.row")} {row.imported.rowNumber}
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
+                        {row.imported.quantity} {row.imported.unit}
+                      </td>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+                        <select
+                          className="input"
+                          value={row.matchedMaterialId ?? ""}
+                          onChange={(event) => {
+                            const value = event.target.value || null;
+                            setImportPreview((prev) =>
+                              prev.map((candidate) =>
+                                candidate.id === row.id
+                                  ? { ...candidate, matchedMaterialId: value, confidence: value ? 100 : 0 }
+                                  : candidate
+                              )
+                            );
+                          }}
+                          aria-label={t("bom.matchedMaterial")}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: 12 }}
+                        >
+                          <option value="">{t("bom.chooseMaterial")}</option>
+                          {materials.map((material) => (
+                            <option key={material.id} value={material.id}>
+                              {getLocalizedMaterialName(material, locale)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+                        <span className={`badge ${row.matchedMaterialId ? "badge-forest" : "badge-warning"}`}>
+                          {row.matchedMaterialId ? `${row.confidence}%` : t("bom.unmatched")}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ padding: 16, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setImportPreview([])}>
+                {t("dialog.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={unresolvedImportCount > 0 || !onImportBom}
+                onClick={handleBomImportConfirm}
+              >
+                {t("bom.importApply")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(() => {
         const pickerItem = materialPickerId ? bom.find((item) => item.material_id === materialPickerId) : null;
