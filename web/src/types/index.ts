@@ -94,6 +94,8 @@ export interface BomAggregateProject {
   name: string;
   estimated_cost: number;
   bom_rows: number;
+  area_m2: number | null;
+  cost_per_m2: number | null;
 }
 
 export interface BomAggregateBreakdown {

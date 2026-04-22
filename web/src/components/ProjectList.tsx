@@ -19,6 +19,12 @@ import type { BomAggregateResponse, Project, ProjectStatus, Template, BuildingRe
 
 type SortKey = "modified" | "created" | "name" | "cost";
 
+const CATEGORY_COLORS = ["#d69f45", "#7ab3e0", "#8bc48b", "#c98b8b", "#a78bfa", "#f59e0b"];
+
+function formatEuro(value: number, locale: string): string {
+  return `${value.toLocaleString(locale === "fi" ? "fi-FI" : "en-US", { maximumFractionDigits: 0 })} €`;
+}
+
 export default function ProjectList({
   onCreateFromBuilding,
 }: {
@@ -382,6 +388,23 @@ export default function ProjectList({
     [projects, selectedProjectIds],
   );
 
+  const comparisonProjects = aggregate?.projects.slice(0, 4) ?? [];
+  const maxComparisonCost = Math.max(...comparisonProjects.map((project) => project.estimated_cost), 1);
+  const categoryBreakdown = useMemo(() => {
+    const totals: Record<string, Record<string, number>> = {};
+    if (!aggregate) return totals;
+    for (const project of aggregate.projects) totals[project.id] = {};
+    for (const item of aggregate.items) {
+      const category = item.category_name || t("bomAggregate.uncategorized");
+      for (const part of item.project_breakdown) {
+        totals[part.project_id] ||= {};
+        totals[part.project_id][category] = (totals[part.project_id][category] || 0) + part.total;
+      }
+    }
+    return totals;
+  }, [aggregate, t]);
+  const sharedMaterials = aggregate?.items.filter((item) => item.source_project_count > 1).slice(0, 4) ?? [];
+
   return (
     <div style={{ minHeight: "100vh" }}>
       {/* Top bar */}
@@ -710,6 +733,104 @@ export default function ProjectList({
                       <span className="dash-stat-label">{t("bomAggregate.bulkCandidates")}</span>
                     </div>
                   </div>
+
+                  {comparisonProjects.length >= 2 && (
+                    <div style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: 14,
+                      marginBottom: 14,
+                      background: "var(--bg-secondary)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                        <div>
+                          <h3 className="heading-display" style={{ fontSize: 18, marginBottom: 4 }}>
+                            {t("bomAggregate.compareTitle")}
+                          </h3>
+                          <p style={{ color: "var(--text-muted)", fontSize: 12, margin: 0 }}>
+                            {t("bomAggregate.compareSubtitle")}
+                          </p>
+                        </div>
+                        {aggregate.projects.length > 4 && (
+                          <span className="badge badge-muted">
+                            {t("bomAggregate.compareLimit", { count: 4 })}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {comparisonProjects.map((project, index) => {
+                          const categories = Object.entries(categoryBreakdown[project.id] || {})
+                            .sort(([, a], [, b]) => b - a);
+                          return (
+                            <div key={project.id} style={{ display: "grid", gap: 7 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                                <strong style={{ fontSize: 13 }}>{project.name}</strong>
+                                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)" }}>
+                                  {formatEuro(project.estimated_cost, locale)}
+                                  {" · "}
+                                  {project.cost_per_m2
+                                    ? t("bomAggregate.costPerM2", { cost: project.cost_per_m2.toLocaleString(locale === "fi" ? "fi-FI" : "en-US", { maximumFractionDigits: 0 }) })
+                                    : t("bomAggregate.costPerM2Missing")}
+                                </span>
+                              </div>
+                              <div style={{ height: 10, borderRadius: 999, background: "var(--bg-tertiary)", overflow: "hidden" }}>
+                                <div style={{
+                                  width: `${Math.max(4, (project.estimated_cost / maxComparisonCost) * 100)}%`,
+                                  height: "100%",
+                                  background: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+                                  borderRadius: 999,
+                                }} />
+                              </div>
+                              {categories.length > 0 && (
+                                <div style={{ display: "flex", height: 8, borderRadius: 999, overflow: "hidden", background: "var(--bg-tertiary)" }}>
+                                  {categories.slice(0, 6).map(([category, value], categoryIndex) => (
+                                    <span
+                                      key={category}
+                                      title={`${category}: ${formatEuro(value, locale)}`}
+                                      style={{
+                                        width: `${Math.max(3, (value / Math.max(project.estimated_cost, 1)) * 100)}%`,
+                                        background: CATEGORY_COLORS[categoryIndex % CATEGORY_COLORS.length],
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                              {categories.length > 0 && (
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                  {categories.slice(0, 3).map(([category, value], categoryIndex) => (
+                                    <span key={category} style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--text-muted)", fontSize: 11 }}>
+                                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: CATEGORY_COLORS[categoryIndex % CATEGORY_COLORS.length] }} />
+                                      {category}: {formatEuro(value, locale)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                        <div className="label-mono" style={{ marginBottom: 8 }}>
+                          {t("bomAggregate.sharedMaterials")}
+                        </div>
+                        {sharedMaterials.length > 0 ? (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {sharedMaterials.map((item) => (
+                              <span key={`${item.material_id}-${item.unit}`} className="badge badge-amber">
+                                {item.material_name} · {item.quantity.toLocaleString(locale === "fi" ? "fi-FI" : "en-US")} {item.unit}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: "var(--text-muted)", fontSize: 12, margin: 0 }}>
+                            {t("bomAggregate.noSharedMaterials")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
                     <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 12 }}>

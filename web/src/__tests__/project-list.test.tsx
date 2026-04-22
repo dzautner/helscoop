@@ -182,8 +182,8 @@ beforeEach(() => {
     total_cost: 302.5,
     bulk_opportunity_count: 1,
     projects: [
-      { id: "p1", name: "Sauna Reno", estimated_cost: 100, bom_rows: 1 },
-      { id: "p2", name: "Kitchen Update", estimated_cost: 200, bom_rows: 1 },
+      { id: "p1", name: "Sauna Reno", estimated_cost: 100, bom_rows: 1, area_m2: 10, cost_per_m2: 10 },
+      { id: "p2", name: "Kitchen Update", estimated_cost: 200, bom_rows: 1, area_m2: 20, cost_per_m2: 10 },
     ],
     items: [
       {
@@ -336,6 +336,8 @@ describe("ProjectList", () => {
     });
     expect(screen.getByText("Pine 48x148 C24")).toBeInTheDocument();
     expect(screen.getByText("110 jm")).toBeInTheDocument();
+    expect(screen.getByText("bomAggregate.compareTitle")).toBeInTheDocument();
+    expect(screen.getAllByText((text) => text.includes('bomAggregate.costPerM2:{"cost":"10"}')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('bomAggregate.bulkCandidate:{"threshold":100,"unit":"jm"}')).toBeInTheDocument();
   });
 
