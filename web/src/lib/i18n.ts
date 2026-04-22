@@ -137,6 +137,12 @@ const translations = {
       copyAriaLabel: 'Kopioi projekti {{name}}',
       deleteAriaLabel: 'Poista projekti {{name}}',
     },
+    dashboard: {
+      totalCost: 'Arvioitu kokonaishinta',
+      activeProjects: 'Aktiiviset projektit',
+      lastActivity: 'Viimeisin muokkaus',
+      justNow: 'Juuri nyt',
+    },
     toast: {
       projectCreated: 'Projekti luotu',
       projectDeleted: 'Projekti siirretty roskakoriin',
@@ -1377,6 +1383,12 @@ const translations = {
       openAriaLabel: 'Open project {{name}}',
       copyAriaLabel: 'Copy project {{name}}',
       deleteAriaLabel: 'Delete project {{name}}',
+    },
+    dashboard: {
+      totalCost: 'Total estimated cost',
+      activeProjects: 'Active projects',
+      lastActivity: 'Last activity',
+      justNow: 'Just now',
     },
     toast: {
       projectCreated: 'Project created',

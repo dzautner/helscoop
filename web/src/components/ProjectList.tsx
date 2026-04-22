@@ -271,6 +271,27 @@ export default function ProjectList({
     return sorted;
   }, [projects, searchQuery, sortKey, locale]);
 
+  const dashboardStats = useMemo(() => {
+    if (projects.length === 0) return null;
+    const totalCost = projects.reduce((sum, p) => sum + (Number(p.estimated_cost) || 0), 0);
+    const activeCount = projects.length;
+    const latest = projects.reduce((max, p) => {
+      const t = new Date(p.updated_at).getTime();
+      return t > max ? t : max;
+    }, 0);
+    const now = Date.now();
+    const diffMs = now - latest;
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffH = Math.floor(diffMin / 60);
+    const diffD = Math.floor(diffH / 24);
+    let lastActivity: string;
+    if (diffMin < 1) lastActivity = t("dashboard.justNow");
+    else if (diffMin < 60) lastActivity = `${diffMin} min`;
+    else if (diffH < 24) lastActivity = `${diffH}h`;
+    else lastActivity = `${diffD}d`;
+    return { totalCost, activeCount, lastActivity };
+  }, [projects, t]);
+
   return (
     <div style={{ minHeight: "100vh" }}>
       {/* Top bar */}
@@ -493,6 +514,25 @@ export default function ProjectList({
                 <option value="cost">{t('project.sortByCost')}</option>
               </select>
             </div>
+
+            {dashboardStats && (
+              <div className="anim-up delay-1 dash-summary-strip">
+                <div className="dash-stat-card">
+                  <span className="dash-stat-value">
+                    {dashboardStats.totalCost.toLocaleString(locale === "fi" ? "fi-FI" : "en-US", { maximumFractionDigits: 0 })} €
+                  </span>
+                  <span className="dash-stat-label">{t("dashboard.totalCost")}</span>
+                </div>
+                <div className="dash-stat-card">
+                  <span className="dash-stat-value">{dashboardStats.activeCount}</span>
+                  <span className="dash-stat-label">{t("dashboard.activeProjects")}</span>
+                </div>
+                <div className="dash-stat-card">
+                  <span className="dash-stat-value">{dashboardStats.lastActivity}</span>
+                  <span className="dash-stat-label">{t("dashboard.lastActivity")}</span>
+                </div>
+              </div>
+            )}
 
             {filteredProjects.length === 0 ? (
               <div className="anim-up dash-no-results">

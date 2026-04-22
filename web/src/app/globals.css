@@ -3858,6 +3858,39 @@ select:focus {
   margin-bottom: 18px;
 }
 
+.dash-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 600px) {
+  .dash-summary-strip { grid-template-columns: 1fr 1fr; }
+}
+.dash-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.dash-stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+.dash-stat-label {
+  font-size: 11px;
+  font-family: var(--font-body);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .dash-project-grid {
   display: grid;
   gap: 10px;
