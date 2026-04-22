@@ -4907,6 +4907,34 @@ select:focus {
   }
 }
 
+/* Viewport orientation cube (top-right HUD) */
+.view-cube {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 100px;
+  height: 100px;
+  z-index: 10;
+  border-radius: 8px;
+  background: rgba(17, 17, 19, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.view-cube:hover {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+@media (max-width: 640px) {
+  .view-cube {
+    display: none;
+  }
+}
+
 /* Viewport camera toolbar (floating over 3D canvas) */
 .viewport-cam-bar {
   position: absolute;
