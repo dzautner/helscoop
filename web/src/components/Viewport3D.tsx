@@ -278,6 +278,12 @@ function CameraToolbar({
   onToggleMeasurementMode,
   onClearMeasurements,
   onCycleMeasurementUnit,
+  sectionMode,
+  sectionAxis,
+  sectionPos,
+  onToggleSectionMode,
+  onCycleSectionAxis,
+  onSetSectionPos,
 }: {
   cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
   controlsRef: React.RefObject<OrbitControls | null>;
@@ -291,6 +297,12 @@ function CameraToolbar({
   onToggleMeasurementMode: () => void;
   onClearMeasurements: () => void;
   onCycleMeasurementUnit: () => void;
+  sectionMode: boolean;
+  sectionAxis: "x" | "y" | "z";
+  sectionPos: number;
+  onToggleSectionMode: () => void;
+  onCycleSectionAxis: () => void;
+  onSetSectionPos: (pos: number) => void;
 }) {
   const { t } = useTranslation();
   const { play: playSfx } = useAmbientSound();
@@ -398,6 +410,40 @@ function CameraToolbar({
             {measurementUnit}
           </button>
         )}
+        <button
+          className="viewport-cam-btn"
+          data-active={sectionMode}
+          onClick={onToggleSectionMode}
+          data-tooltip={`${t("editor.sectionViewTooltip")} (X)`}
+          aria-label={t("editor.sectionView")}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="12" y1="3" x2="12" y2="21" />
+          </svg>
+        </button>
+        {sectionMode && (
+          <>
+            <button
+              className="viewport-cam-btn"
+              onClick={onCycleSectionAxis}
+              data-tooltip={t("editor.sectionAxisLabel")}
+              aria-label={t("editor.sectionAxisLabel")}
+            >
+              {sectionAxis.toUpperCase()}
+            </button>
+            <input
+              type="range"
+              min={-10}
+              max={10}
+              step={0.1}
+              value={sectionPos}
+              onChange={(e) => onSetSectionPos(parseFloat(e.target.value))}
+              aria-label={t("editor.sectionPositionLabel")}
+              style={{ width: 80, accentColor: "var(--accent)" }}
+            />
+          </>
+        )}
       </div>
       <ScreenshotPopover
         imageDataUrl={screenshotDataUrl}
@@ -445,6 +491,10 @@ export default function Viewport3D({
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [measurementStart, setMeasurementStart] = useState<THREE.Vector3 | null>(null);
   const [measurementPreviewEnd, setMeasurementPreviewEnd] = useState<THREE.Vector3 | null>(null);
+  const [sectionMode, setSectionMode] = useState(false);
+  const [sectionAxis, setSectionAxis] = useState<"x" | "y" | "z">("z");
+  const [sectionPos, setSectionPos] = useState(0);
+  const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));
   const updateIdRef = useRef(0);
   const hasAppliedInitialPresentationPresetRef = useRef(false);
   const { t, locale } = useTranslation();
@@ -721,6 +771,7 @@ export default function Viewport3D({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
+    renderer.localClippingEnabled = true;
     renderer.domElement.setAttribute("aria-hidden", "true");
     renderer.domElement.setAttribute("tabindex", "-1");
     container.appendChild(renderer.domElement);
@@ -1202,6 +1253,9 @@ export default function Viewport3D({
       if (e.key.toLowerCase() === "r") {
         e.preventDefault();
         setMeasurementMode((active) => !active);
+      } else if (e.key.toLowerCase() === "x" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setSectionMode((active) => !active);
       } else if (e.key === "Escape" && measurementMode) {
         e.preventDefault();
         if (measurementStart) {
@@ -1216,6 +1270,29 @@ export default function Viewport3D({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [clearMeasurements, measurementMode, measurementStart]);
+
+  useEffect(() => {
+    const group = objectGroupRef.current;
+    if (!group) return;
+    const normal = new THREE.Vector3(
+      sectionAxis === "x" ? -1 : 0,
+      sectionAxis === "y" ? -1 : 0,
+      sectionAxis === "z" ? -1 : 0
+    );
+    const plane = clippingPlaneRef.current;
+    plane.normal.copy(normal);
+    plane.constant = sectionPos;
+
+    const planes = sectionMode ? [plane] : [];
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        const mat = child.material as THREE.Material;
+        mat.clippingPlanes = planes;
+        mat.clipShadows = sectionMode;
+        mat.needsUpdate = true;
+      }
+    });
+  }, [sectionMode, sectionAxis, sectionPos]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -1486,6 +1563,12 @@ export default function Viewport3D({
         onToggleMeasurementMode={toggleMeasurementMode}
         onClearMeasurements={clearMeasurements}
         onCycleMeasurementUnit={cycleMeasurementUnit}
+        sectionMode={sectionMode}
+        sectionAxis={sectionAxis}
+        sectionPos={sectionPos}
+        onToggleSectionMode={() => setSectionMode((s) => !s)}
+        onCycleSectionAxis={() => setSectionAxis((a) => a === "x" ? "y" : a === "y" ? "z" : "x")}
+        onSetSectionPos={setSectionPos}
       />
       {measurementMode && (
         <div className="viewport-measure-hint">
