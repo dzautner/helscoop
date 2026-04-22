@@ -10,15 +10,23 @@ export function LanguageSwitcher() {
     transition: "color 0.15s ease",
   });
 
+  const cycleLocale = () => {
+    if (locale === "fi") setLocale("en");
+    else if (locale === "en") setLocale("sv");
+    else setLocale("fi");
+  };
+
   return (
     <button
       className="lang-switch"
       aria-label={t("aria.switchLanguage")}
-      onClick={() => setLocale(locale === "fi" ? "en" : "fi")}
+      onClick={cycleLocale}
     >
       <span style={languageStyle(locale === "fi")}>FI</span>
       <span style={{ color: "var(--text-secondary)" }}>|</span>
       <span style={languageStyle(locale === "en")}>EN</span>
+      <span style={{ color: "var(--text-secondary)" }}>|</span>
+      <span style={languageStyle(locale === "sv")}>SV</span>
     </button>
   );
 }

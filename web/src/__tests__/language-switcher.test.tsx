@@ -16,10 +16,11 @@ vi.mock("@/components/LocaleProvider", () => ({
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 describe("LanguageSwitcher", () => {
-  it("renders FI and EN labels", () => {
+  it("renders FI, EN, and SV labels", () => {
     render(<LanguageSwitcher />);
     expect(screen.getByText("FI")).toBeInTheDocument();
     expect(screen.getByText("EN")).toBeInTheDocument();
+    expect(screen.getByText("SV")).toBeInTheDocument();
   });
 
   it("has aria-label", () => {
@@ -27,22 +28,30 @@ describe("LanguageSwitcher", () => {
     expect(screen.getByLabelText("aria.switchLanguage")).toBeInTheDocument();
   });
 
-  it("switches from en to fi on click", () => {
-    mockLocale = "en";
-    render(<LanguageSwitcher />);
-    fireEvent.click(screen.getByRole("button"));
-    expect(mockSetLocale).toHaveBeenCalledWith("fi");
-  });
-
-  it("switches from fi to en on click", () => {
+  it("cycles fi → en on click", () => {
     mockLocale = "fi";
     render(<LanguageSwitcher />);
     fireEvent.click(screen.getByRole("button"));
     expect(mockSetLocale).toHaveBeenCalledWith("en");
   });
 
-  it("renders separator", () => {
+  it("cycles en → sv on click", () => {
+    mockLocale = "en";
     render(<LanguageSwitcher />);
-    expect(screen.getByText("|")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockSetLocale).toHaveBeenCalledWith("sv");
+  });
+
+  it("cycles sv → fi on click", () => {
+    mockLocale = "sv";
+    render(<LanguageSwitcher />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockSetLocale).toHaveBeenCalledWith("fi");
+  });
+
+  it("renders separators", () => {
+    render(<LanguageSwitcher />);
+    const separators = screen.getAllByText("|");
+    expect(separators).toHaveLength(2);
   });
 });

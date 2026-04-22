@@ -66,12 +66,18 @@ const freshnessColors = {
   never: "var(--text-muted)",
 };
 
-function formatNumber(value: number, locale: "fi" | "en") {
-  return new Intl.NumberFormat(locale === "fi" ? "fi-FI" : "en-GB").format(value);
+function localeTag(locale: string): string {
+  if (locale === "fi") return "fi-FI";
+  if (locale === "sv") return "sv-SE";
+  return "en-GB";
 }
 
-function formatCurrency(value: number, locale: "fi" | "en") {
-  return new Intl.NumberFormat(locale === "fi" ? "fi-FI" : "en-GB", {
+function formatNumber(value: number, locale: string) {
+  return new Intl.NumberFormat(localeTag(locale)).format(value);
+}
+
+function formatCurrency(value: number, locale: string) {
+  return new Intl.NumberFormat(localeTag(locale), {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 0,

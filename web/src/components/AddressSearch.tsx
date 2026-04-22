@@ -568,7 +568,7 @@ export default function AddressSearch({
                       )
                       : resolveRoofType(result.building_info.roof_type ?? "harjakatto"),
                   },
-                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
+                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : locale === 'sv' ? 'st' : 'pcs'}` },
                 ].map((item, i) => (
                   <div key={i} style={{
                     padding: "10px 12px",

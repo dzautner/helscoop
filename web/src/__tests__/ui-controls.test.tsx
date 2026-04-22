@@ -60,11 +60,11 @@ describe("LanguageSwitcher", () => {
     expect(mockSetLocale).toHaveBeenCalledWith("en");
   });
 
-  it("switches from en to fi on click", () => {
+  it("switches from en to sv on click", () => {
     mockLocale = "en";
     render(<LanguageSwitcher />);
     fireEvent.click(screen.getByLabelText("aria.switchLanguage"));
-    expect(mockSetLocale).toHaveBeenCalledWith("fi");
+    expect(mockSetLocale).toHaveBeenCalledWith("sv");
   });
 
   it("highlights active locale (FI emphasized when fi)", () => {
