@@ -345,6 +345,7 @@ const translations = {
       toBuy: 'Osta',
       paramSliderLabel: '{{name}} — liukusäädin',
       computing: 'Laskee\u2026',
+      viewBom: 'Näytä materiaaliluettelo',
     },
     share: {
       title: 'Jaa projekti',
@@ -1720,6 +1721,7 @@ const translations = {
       toBuy: 'Buy',
       paramSliderLabel: '{{name}} slider',
       computing: 'Computing\u2026',
+      viewBom: 'View BOM',
     },
     share: {
       title: 'Share project',
