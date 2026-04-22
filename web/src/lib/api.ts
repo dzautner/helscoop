@@ -1,4 +1,5 @@
 import type {
+  AdminStats,
   EnergySubsidyRequest,
   BomSubstitutionResponse,
   KeskoProduct,
@@ -368,6 +369,9 @@ export const api = {
   getProjectMaterialTrends: (projectId: string): Promise<ProjectMaterialTrendResponse> =>
     apiFetch(`/pricing/trends/project/${encodeURIComponent(projectId)}`),
   getStalePrices: () => apiFetch("/pricing/stale"),
+  getAdminStats: (): Promise<AdminStats> => apiFetch("/admin/stats"),
+  requestSupplierRescrape: (supplierId: string) =>
+    apiFetch(`/admin/suppliers/${encodeURIComponent(supplierId)}/rescrape`, { method: "POST" }),
   searchKeskoProducts: (q: string, branchCode?: string) => {
     const params = new URLSearchParams({ q });
     if (branchCode) params.set("branchCode", branchCode);
