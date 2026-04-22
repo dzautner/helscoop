@@ -2,6 +2,11 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import SceneAutocomplete, {
+  type AutocompleteItem,
+  getAutocompleteContext,
+  filterCompletions,
+} from "@/components/SceneAutocomplete";
 
 /* ── Find / Replace helpers ──────────────────────────────────────── */
 interface FindMatch {
@@ -113,6 +118,7 @@ export default function SceneEditor({
   onChange,
   error,
   errorLine,
+  materials,
 }: {
   sceneJs: string;
   onChange: (code: string) => void;
@@ -120,6 +126,7 @@ export default function SceneEditor({
   error?: string | null;
   /** 1-based line number of the error in the script, or null. */
   errorLine?: number | null;
+  materials?: { id: string; name: string }[];
 }) {
   const { t } = useTranslation();
 
@@ -137,6 +144,58 @@ export default function SceneEditor({
   const [findQuery, setFindQuery] = useState("");
   const [replaceValue, setReplaceValue] = useState("");
   const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
+
+  /* ── Autocomplete state ──────────────────────────────────────── */
+  const [acItems, setAcItems] = useState<AutocompleteItem[]>([]);
+  const [acIndex, setAcIndex] = useState(0);
+  const [acPosition, setAcPosition] = useState({ top: 0, left: 0 });
+  const acVisible = acItems.length > 0;
+
+  const dismissAutocomplete = useCallback(() => {
+    setAcItems([]);
+    setAcIndex(0);
+  }, []);
+
+  const updateAutocomplete = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta || !document.activeElement || document.activeElement !== ta) {
+      dismissAutocomplete();
+      return;
+    }
+    const cursor = ta.selectionStart;
+    const ctx = getAutocompleteContext(ta.value, cursor);
+    const items = filterCompletions(ctx, materials);
+    if (items.length === 0) {
+      dismissAutocomplete();
+      return;
+    }
+    const before = ta.value.slice(0, cursor);
+    const linesBefore = before.split("\n");
+    const line = linesBefore.length - 1;
+    const col = linesBefore[linesBefore.length - 1].length;
+    const charWidth = 7.8;
+    setAcPosition({
+      top: (line + 1) * EDITOR_LINE_HEIGHT + EDITOR_PADDING_TOP - ta.scrollTop,
+      left: col * charWidth + 20,
+    });
+    setAcItems(items);
+    setAcIndex((prev) => Math.min(prev, items.length - 1));
+  }, [materials, dismissAutocomplete]);
+
+  const acceptCompletion = useCallback((item: AutocompleteItem) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart;
+    const ctx = getAutocompleteContext(ta.value, cursor);
+    const newValue = ta.value.slice(0, ctx.startPos) + item.insertText + ta.value.slice(cursor);
+    onChange(newValue);
+    const newCursor = ctx.startPos + item.insertText.length;
+    dismissAutocomplete();
+    setTimeout(() => {
+      ta.selectionStart = ta.selectionEnd = newCursor;
+      ta.focus();
+    }, 0);
+  }, [onChange, dismissAutocomplete]);
 
   const findMatches = useMemo(() => findAllMatches(sceneJs, findQuery), [sceneJs, findQuery]);
 
@@ -692,12 +751,16 @@ export default function SceneEditor({
             onChange={(e) => {
               onChange(e.target.value);
               updateCursorLine();
+              setTimeout(updateAutocomplete, 0);
             }}
             onScroll={syncScroll}
             onKeyUp={updateCursorLine}
             onMouseUp={updateCursorLine}
             onFocus={startCursorTracking}
-            onBlur={stopCursorTracking}
+            onBlur={() => {
+              stopCursorTracking();
+              dismissAutocomplete();
+            }}
             spellCheck={false}
             aria-label={t("editor.scene")}
             style={{
@@ -720,6 +783,28 @@ export default function SceneEditor({
                 e.preventDefault();
                 openFindReplace();
                 return;
+              }
+              if (acVisible) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setAcIndex((prev) => (prev + 1) % acItems.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setAcIndex((prev) => (prev - 1 + acItems.length) % acItems.length);
+                  return;
+                }
+                if (e.key === "Tab" || e.key === "Enter") {
+                  e.preventDefault();
+                  acceptCompletion(acItems[acIndex]);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  dismissAutocomplete();
+                  return;
+                }
               }
               if (e.key === "Tab") {
                 e.preventDefault();
@@ -787,6 +872,14 @@ export default function SceneEditor({
               </div>
             </div>
           )}
+
+          {/* Autocomplete popup */}
+          <SceneAutocomplete
+            items={acItems}
+            selectedIndex={acIndex}
+            position={acPosition}
+            onSelect={acceptCompletion}
+          />
         </div>
       </div>
 
