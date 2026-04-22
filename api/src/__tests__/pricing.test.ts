@@ -5,6 +5,7 @@
  * price history retrieval, stale price detection, and authorization boundaries.
  *
  * Covers: GET /pricing/compare/:materialId, GET /pricing/stock/:materialId,
+ *         GET /pricing/trends/project/:projectId,
  *         PUT /pricing/:materialId/:supplierId,
  *         GET /pricing/history/:materialId, GET /pricing/stale
  *
@@ -346,7 +347,80 @@ describe("GET /pricing/stock/:materialId", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. GET /pricing/history/:materialId — price history
+// 4. GET /pricing/trends/project/:projectId — project material cost trends
+// ---------------------------------------------------------------------------
+describe("GET /pricing/trends/project/:projectId", () => {
+  it("returns BOM-level trend summary for an owned project", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            material_id: "roof_tile",
+            material_name: "Roof tile",
+            category_name: "Roofing",
+            quantity: "10",
+            unit: "m2",
+            pricing_id: "11111111-1111-1111-1111-111111111111",
+            unit_price: "20",
+            line_cost: "210",
+          },
+        ],
+      } as never)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            pricing_id: "11111111-1111-1111-1111-111111111111",
+            unit_price: "18",
+            scraped_at: "2026-01-15T00:00:00.000Z",
+          },
+          {
+            pricing_id: "11111111-1111-1111-1111-111111111111",
+            unit_price: "20",
+            scraped_at: "2026-02-15T00:00:00.000Z",
+          },
+        ],
+      } as never);
+
+    const res = await makeRequest("GET", "/pricing/trends/project/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      projectId: string;
+      totalCurrentCost: number;
+      dataSources: string[];
+      items: Array<{ materialId: string; source: string; points: unknown[] }>;
+    };
+    expect(body.projectId).toBe("proj-1");
+    expect(body.totalCurrentCost).toBe(210);
+    expect(body.dataSources).toEqual(["retailer_history"]);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].materialId).toBe("roof_tile");
+    expect(body.items[0].source).toBe("retailer_history");
+    expect(body.items[0].points).toHaveLength(2);
+  });
+
+  it("returns 404 when the project is not owned by the user", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/pricing/trends/project/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("other-user")}` },
+    });
+
+    expect(res.status).toBe(404);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires authentication", async () => {
+    const res = await makeRequest("GET", "/pricing/trends/project/proj-1");
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. GET /pricing/history/:materialId — price history
 // ---------------------------------------------------------------------------
 describe("GET /pricing/history/:materialId", () => {
   it("returns price history for material", async () => {
@@ -385,7 +459,7 @@ describe("GET /pricing/history/:materialId", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. GET /pricing/stale — stale price detection (admin only)
+// 6. GET /pricing/stale — stale price detection (admin only)
 // ---------------------------------------------------------------------------
 describe("GET /pricing/stale", () => {
   it("rejects unauthenticated request", async () => {

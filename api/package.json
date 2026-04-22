@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "digest:weekly": "tsx src/jobs/weekly-digest.ts",
+    "prices:snapshot": "tsx src/jobs/snapshot-price-history.ts",
     "db:migrate": "tsx ../db/migrate.ts migrate",
     "db:status": "tsx ../db/migrate.ts status"
   },

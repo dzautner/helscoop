@@ -601,6 +601,15 @@ describe("exhaustive i18n key parity", () => {
     "bom.packageBasic", "bom.packageStandard", "bom.packagePremium",
     "bom.packageCurrent", "bom.packageChanges", "bom.packageLocked",
     "bom.packageLock", "bom.packageUnlock",
+    // BOM trends
+    "bomTrends.eyebrow", "bomTrends.title", "bomTrends.loading",
+    "bomTrends.noAverage", "bomTrends.aboveAverage", "bomTrends.belowAverage",
+    "bomTrends.nearAverage", "bomTrends.waitSavings", "bomTrends.bestMonth",
+    "bomTrends.nowVs12m", "bomTrends.buyNowCount", "bomTrends.waitCount",
+    "bomTrends.watchCount", "bomTrends.modelNote",
+    "bomTrends.source.retailer_history", "bomTrends.source.seasonal_model",
+    "bomTrends.recommendation.buy_now", "bomTrends.recommendation.wait",
+    "bomTrends.recommendation.watch",
     // quote request
     "quoteRequest.eyebrow", "quoteRequest.title", "quoteRequest.subtitle",
     "quoteRequest.open", "quoteRequest.emptyDisabled", "quoteRequest.summaryProject",
