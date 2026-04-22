@@ -2076,7 +2076,7 @@ export default function ProjectPage() {
       })()}
 
       {/* Main content */}
-      <div className="editor-main">
+      <main id="main-content" className="editor-main" tabIndex={-1}>
         {/* Left: Viewport + Code */}
         <div className="editor-viewport-area">
           {/* 3D Viewport */}
@@ -2441,7 +2441,7 @@ export default function ProjectPage() {
             />
           </div>
         )}
-      </div>
+      </main>
 
       {!isMobileEditor && (
         <EditorStatusBar

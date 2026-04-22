@@ -5010,6 +5010,30 @@ select:focus {
 }
 
 /* === Focus-visible — keyboard accessibility === */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10000;
+  transform: translateY(-150%);
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.18s ease;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset), var(--shadow-lg);
+}
+
 /* Base focus ring: consistent amber glow with perceptual depth via layered shadows */
 .btn:focus-visible,
 .card-interactive:focus-visible,
@@ -5026,6 +5050,23 @@ select:focus {
 .bom-item-card:focus-visible,
 .category-chip:focus-visible,
 .avatar-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-ring-offset);
+}
+
+:where(
+  a[href],
+  button,
+  input,
+  textarea,
+  select,
+  summary,
+  [role="button"],
+  [role="menuitem"],
+  [role="tab"],
+  [role="application"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
   outline: none;
   box-shadow: var(--focus-ring), var(--focus-ring-offset);
 }

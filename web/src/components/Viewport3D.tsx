@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useId, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { evaluateSceneWorker, initWorker } from "@/lib/manifold-worker-client";
@@ -59,6 +59,15 @@ interface Measurement {
 }
 
 const MEASUREMENT_UNITS: MeasurementUnit[] = ["mm", "cm", "m"];
+const VIEWPORT_KEY_ROTATION_STEP = Math.PI / 18;
+const VIEWPORT_KEY_ZOOM_IN = 0.88;
+const VIEWPORT_KEY_ZOOM_OUT = 1.12;
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 function formatMeasurementDistance(distanceMeters: number, unit: MeasurementUnit, locale: string): string {
   const localeTag = locale === "fi" ? "fi-FI" : "en-GB";
@@ -190,6 +199,14 @@ function animateCamera(
   const startTarget = controls.target.clone();
   const endPos = new THREE.Vector3(...toPos);
   const endTarget = new THREE.Vector3(...toTarget);
+
+  if (duration <= 0 || prefersReducedMotion()) {
+    camera.position.copy(endPos);
+    controls.target.copy(endTarget);
+    controls.update();
+    return;
+  }
+
   const startTime = performance.now();
 
   function step() {
@@ -414,6 +431,7 @@ export default function Viewport3D({
   const measurementLabelRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const surfacePointerDownRef = useRef<{ x: number; y: number; button: number } | null>(null);
   const animFrameRef = useRef<number>(0);
+  const viewportDescriptionId = useId();
   const lastValidSceneRef = useRef<string>(sceneJs);
   const sceneBoundsRef = useRef<{ center: THREE.Vector3; size: number } | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -700,6 +718,8 @@ export default function Viewport3D({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
+    renderer.domElement.setAttribute("aria-hidden", "true");
+    renderer.domElement.setAttribute("tabindex", "-1");
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -1205,6 +1225,95 @@ export default function Viewport3D({
     setContextMenuPos(null);
   }, []);
 
+  const rotateViewportCamera = useCallback((deltaTheta: number, deltaPhi: number) => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+
+    const offset = camera.position.clone().sub(controls.target);
+    if (offset.lengthSq() === 0) return;
+
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    const minPhi = Math.max(0.1, controls.minPolarAngle);
+    const maxPhi = Math.min(Math.PI - 0.1, controls.maxPolarAngle);
+    spherical.theta += deltaTheta;
+    spherical.phi = THREE.MathUtils.clamp(spherical.phi + deltaPhi, minPhi, maxPhi);
+    offset.setFromSpherical(spherical);
+
+    camera.position.copy(controls.target).add(offset);
+    camera.lookAt(controls.target);
+    controls.update();
+  }, []);
+
+  const zoomViewportCamera = useCallback((scale: number) => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+
+    const offset = camera.position.clone().sub(controls.target);
+    const distance = THREE.MathUtils.clamp(
+      offset.length() * scale,
+      controls.minDistance,
+      controls.maxDistance,
+    );
+    offset.setLength(distance);
+    camera.position.copy(controls.target).add(offset);
+    camera.lookAt(controls.target);
+    controls.update();
+  }, []);
+
+  const resetViewportCamera = useCallback(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const p = computePresets(sceneBoundsRef.current);
+    animateCamera(camera, controls, p[3].position, p[3].target);
+  }, []);
+
+  const handleViewportKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const rotationStep = e.shiftKey ? VIEWPORT_KEY_ROTATION_STEP / 2 : VIEWPORT_KEY_ROTATION_STEP;
+
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        e.stopPropagation();
+        rotateViewportCamera(rotationStep, 0);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        e.stopPropagation();
+        rotateViewportCamera(-rotationStep, 0);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        e.stopPropagation();
+        rotateViewportCamera(0, -rotationStep);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        e.stopPropagation();
+        rotateViewportCamera(0, rotationStep);
+        break;
+      case "+":
+      case "=":
+        e.preventDefault();
+        e.stopPropagation();
+        zoomViewportCamera(VIEWPORT_KEY_ZOOM_IN);
+        break;
+      case "-":
+      case "_":
+        e.preventDefault();
+        e.stopPropagation();
+        zoomViewportCamera(VIEWPORT_KEY_ZOOM_OUT);
+        break;
+      case "Home":
+        e.preventDefault();
+        e.stopPropagation();
+        resetViewportCamera();
+        break;
+    }
+  }, [resetViewportCamera, rotateViewportCamera, zoomViewportCamera]);
+
   const handleScreenshot = useCallback(() => {
     const renderer = rendererRef.current;
     const scene = sceneRef.current;
@@ -1308,7 +1417,12 @@ export default function Viewport3D({
   return (
     <div
       ref={containerRef}
+      role="application"
+      tabIndex={0}
+      aria-label={t("editor.viewportA11yLabel")}
+      aria-describedby={viewportDescriptionId}
       onContextMenu={handleContextMenu}
+      onKeyDown={handleViewportKeyDown}
       onPointerDown={(e) => {
         handleSurfacePointerDown(e);
         handleMeasurementPointerDown(e);
@@ -1326,6 +1440,9 @@ export default function Viewport3D({
         position: "relative",
       }}
     >
+      <p id={viewportDescriptionId} className="sr-only">
+        {t("editor.viewportA11yDescription")} {t("editor.viewportA11yKeyboardHelp")}
+      </p>
       {isComputing && (
         <>
           <div
