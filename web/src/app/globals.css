@@ -2954,6 +2954,46 @@ select:focus {
   background: var(--bg-base);
 }
 
+.price-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 16px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.price-delta-badge {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  animation: priceDeltaFade 1.5s ease forwards;
+}
+
+@keyframes priceDeltaFade {
+  0% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+
+.price-summary-link {
+  background: none;
+  border: none;
+  color: var(--amber);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.price-summary-link:hover {
+  background: rgba(229, 160, 75, 0.08);
+}
+
 .resize-handle-v {
   /* Visible hit-zone: 5px wide, touch pseudo-element expands to 44px (WCAG 2.5.5) */
   width: 5px;
