@@ -9,6 +9,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme, DARK_MOODS, type DarkMood } from "@/components/ThemeProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { resetOnboarding } from "@/components/OnboardingTour";
+import { getAmbientSoundEnabled, setAmbientSoundEnabled } from "@/hooks/useAmbientSound";
+import { playSound } from "@/lib/sounds";
 import { Skeleton, SkeletonBlock } from "@/components/Skeleton";
 import Link from "next/link";
 
@@ -40,6 +42,9 @@ export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
+  // Ambient sound
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -61,6 +66,7 @@ export default function SettingsPage() {
         setName(u.name || "");
         setEmail(u.email || "");
         setEmailNotifications(u.email_notifications !== false);
+        setSoundEnabled(getAmbientSoundEnabled());
         setLoading(false);
       })
       .catch(() => {
@@ -531,6 +537,49 @@ export default function SettingsPage() {
               onChange={(e) => handleNotificationToggle(e.target.checked)}
             />
             {t("settings.weeklyDigest")}
+          </label>
+        </div>
+
+        {/* Ambient sound section */}
+        <div
+          className="card anim-up delay-2 settings-card"
+          style={{ marginBottom: 20 }}
+        >
+          <h2
+            className="heading-display"
+            style={{ fontSize: 20, marginBottom: 4 }}
+          >
+            {t("settings.ambientSound")}
+          </h2>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 14,
+              marginBottom: 20,
+            }}
+          >
+            {t("settings.ambientSoundDesc")}
+          </p>
+          <label
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={soundEnabled}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setSoundEnabled(next);
+                setAmbientSoundEnabled(next);
+                if (next) playSound("save");
+              }}
+            />
+            {t("settings.ambientSoundToggle")}
           </label>
         </div>
 

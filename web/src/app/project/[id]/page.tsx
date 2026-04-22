@@ -35,6 +35,7 @@ import { useAnalytics, useEditorSession } from "@/hooks/useAnalytics";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useAmbientSound } from "@/hooks/useAmbientSound";
 import type { SaveableFields } from "@/hooks/useAutoSave";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
@@ -205,6 +206,7 @@ export default function ProjectPage() {
   const { t, locale } = useTranslation();
   const { toggle: toggleTheme, resolved: resolvedTheme } = useTheme();
   const { track } = useAnalytics();
+  const { play: playSound } = useAmbientSound();
   const { markCodeEditor, markChat } = useEditorSession();
   const isMobileEditor = useMediaQuery(MOBILE_EDITOR_QUERY);
 
@@ -415,10 +417,12 @@ export default function ProjectPage() {
           // Version history should not block core saving.
         });
         toast(t('toast.saved'), "success");
+        playSound("save");
       },
       onSaveError: (err: unknown) => {
         setSaveStatus("error");
         toast(err instanceof Error ? err.message : t('toast.saveFailed'), "error");
+        playSound("error");
         setSaveFailCount((c) => c + 1);
         setSaveErrorVisible(true);
       },
@@ -1194,6 +1198,7 @@ export default function ProjectPage() {
       const pricing = mat.pricing?.find((p) => p.is_primary) || mat.pricing?.[0];
 
       track("bom_item_added", { material_id: materialId, category: mat.category_name || "" });
+      playSound("bomAdd");
       setBom((prev) => [
         ...prev,
         {
@@ -1213,7 +1218,7 @@ export default function ProjectPage() {
         },
       ]);
     },
-    [materials, track]
+    [materials, track, playSound]
   );
 
   const addImportedBomItem = useCallback(
@@ -1433,6 +1438,7 @@ export default function ProjectPage() {
       return prev.filter((b) => b.material_id !== materialId);
     });
     track("bom_item_removed", { material_id: materialId });
+    playSound("bomRemove");
 
     // Show undo toast — if the user clicks "Undo" within 5s, re-add the item
     if (removedItem) {
@@ -1448,7 +1454,7 @@ export default function ProjectPage() {
         },
       });
     }
-  }, [track, toast, t]);
+  }, [track, toast, t, playSound]);
 
   const updateBomQty = useCallback((materialId: string, qty: number) => {
     setBom((prev) =>
