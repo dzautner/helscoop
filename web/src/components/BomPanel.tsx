@@ -1356,6 +1356,10 @@ function BomItemCard({
   onTogglePriceWatch,
   onOpenMaterialPicker,
   onUpdateNote,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragTarget = false,
 }: {
   item: BomItem;
   materials: Material[];
@@ -1375,6 +1379,10 @@ function BomItemCard({
   onTogglePriceWatch?: (item: BomItem) => void;
   onOpenMaterialPicker: (materialId: string) => void;
   onUpdateNote?: (materialId: string, note: string) => void;
+  onDragStart?: (index: number) => void;
+  onDragOver?: (index: number) => void;
+  onDragEnd?: () => void;
+  isDragTarget?: boolean;
 }) {
   const { t } = useTranslation();
   const [localQty, setLocalQty] = useState(String(item.quantity));
@@ -1525,11 +1533,22 @@ function BomItemCard({
   return (
     <div
       ref={cardRef}
-      className={`bom-item-card${isFocused ? ' bom-item-focused' : ''}`}
+      className={`bom-item-card${isFocused ? ' bom-item-focused' : ''}${isDragTarget ? ' bom-drag-target' : ''}`}
       tabIndex={0}
       role="row"
       aria-label={t('editor.bomItemRow', { name: materialName, qty: localQty, total: Number(item.total || 0).toFixed(2) })}
       data-bom-index={index}
+      draggable={!!onDragStart}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart?.(index);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        onDragOver?.(index);
+      }}
+      onDragEnd={() => onDragEnd?.()}
       onClick={() => onCompare(item.material_id, materialName)}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -1540,6 +1559,15 @@ function BomItemCard({
     >
       <div className="bom-item-header">
         <div className="bom-item-info">
+          {onDragStart && (
+            <span className="bom-drag-handle" aria-hidden="true" onMouseDown={(e) => e.stopPropagation()}>
+              <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor" opacity="0.3">
+                <circle cx="2" cy="2" r="1.2" /><circle cx="6" cy="2" r="1.2" />
+                <circle cx="2" cy="7" r="1.2" /><circle cx="6" cy="7" r="1.2" />
+                <circle cx="2" cy="12" r="1.2" /><circle cx="6" cy="12" r="1.2" />
+              </svg>
+            </span>
+          )}
           {item.image_url ? (
             <img
               src={item.image_url}
@@ -1849,6 +1877,7 @@ export default function BomPanel({
   onRemove,
   onUpdateQty,
   onUpdateNote,
+  onReorder,
   style,
   sceneJs,
   projectName,
@@ -1868,6 +1897,7 @@ export default function BomPanel({
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
   onUpdateNote?: (materialId: string, note: string) => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
   style?: React.CSSProperties;
   /** Scene script for extracting material declarations */
   sceneJs?: string;
@@ -1913,6 +1943,8 @@ export default function BomPanel({
   const [importError, setImportError] = useState<string | null>(null);
   const [importDragging, setImportDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -2916,6 +2948,16 @@ export default function BomPanel({
                 if (onReplaceMaterial) setMaterialPickerId(id);
               }}
               onUpdateNote={onUpdateNote}
+              onDragStart={onReorder ? setDragFrom : undefined}
+              onDragOver={onReorder ? setDragOver : undefined}
+              onDragEnd={onReorder ? () => {
+                if (dragFrom !== null && dragOver !== null && dragFrom !== dragOver) {
+                  onReorder(dragFrom, dragOver);
+                }
+                setDragFrom(null);
+                setDragOver(null);
+              } : undefined}
+              isDragTarget={dragOver === idx}
             />
           ))
         )}
