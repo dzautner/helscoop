@@ -46,6 +46,21 @@ export function getToken(): string | null {
   return token;
 }
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  // Keep the object URL alive long enough for browser download managers and
+  // Playwright's download observer to resolve the blob-backed navigation.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
 export class ApiError extends Error {
   status: number;
   statusText: string;
@@ -397,12 +412,7 @@ export const api = {
       );
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `helscoop_${projectName.replace(/\s+/g, '_')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `helscoop_${projectName.replace(/\s+/g, '_')}.csv`);
   },
   exportIFC: async (projectId: string, projectName: string) => {
     const t = getToken();
@@ -417,12 +427,7 @@ export const api = {
       );
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `helscoop_permit_${projectName.replace(/\s+/g, '_')}.ifc`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `helscoop_permit_${projectName.replace(/\s+/g, '_')}.ifc`);
   },
   exportPdf: async (projectId: string, projectName: string, lang: string) => {
     const t = getToken();
@@ -437,12 +442,7 @@ export const api = {
       );
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `helscoop_${projectName.replace(/\s+/g, '_')}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `helscoop_${projectName.replace(/\s+/g, '_')}.pdf`);
   },
   saveBOM: (projectId: string, items: { material_id: string; quantity: number; unit: string }[]) =>
     apiFetch(`/projects/${projectId}/bom`, {
