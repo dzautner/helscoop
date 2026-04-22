@@ -1843,93 +1843,6 @@ export default function ProjectPage() {
       <div className="editor-main">
         {/* Left: Viewport + Code */}
         <div className="editor-viewport-area">
-          {/* Toolbar */}
-          <div className="viewport-toolbar">
-            <button
-              className="viewport-toolbar-btn"
-              data-active={showCode}
-              onClick={toggleCodePanel}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              {showCode ? t('editor.hideCode') : t('editor.showCode')}
-            </button>
-            <button
-              className="viewport-toolbar-btn"
-              data-active={wireframe}
-              onClick={() => setWireframe(!wireframe)}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-              {t('editor.wireframe')}
-            </button>
-            <button
-              className="viewport-toolbar-btn"
-              onClick={() => {
-                const container = viewportRef.current;
-                if (container) {
-                  const el = container.querySelector("div") as HTMLDivElement & { resetCamera?: () => void };
-                  el?.resetCamera?.();
-                }
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 4v6h6" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-              {t('editor.resetCamera')}
-            </button>
-            <button
-              className="viewport-toolbar-btn"
-              data-active={showDocs}
-              onClick={toggleDocsPanel}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              {t('editor.docs') || "Docs"}
-            </button>
-            {sceneParams.length > 0 && (
-              <button
-                className="viewport-toolbar-btn"
-                data-active={showParams}
-                onClick={toggleParamsPanel}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="21" x2="4" y2="14" />
-                  <line x1="4" y1="10" x2="4" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12" y2="3" />
-                  <line x1="20" y1="21" x2="20" y2="16" />
-                  <line x1="20" y1="12" x2="20" y2="3" />
-                </svg>
-                {t('editor.params') || "Params"}
-              </button>
-            )}
-            <div style={{ flex: 1 }} />
-            <span
-              className="viewport-status"
-              data-error={!!sceneError}
-              title={sceneError && sceneError.length > 40 ? sceneError : undefined}
-            >
-              {sceneError
-                ? `${t('editor.sceneErrorPrefix')}: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
-                : t('editor.objectCount', { count: objectCount })}
-            </span>
-            {sceneJs.length > 100 * 1024 && (
-              <span className="viewport-status" data-error style={{ marginLeft: 8 }} title={t('editor.scriptSizeWarning')}>
-                {Math.round(sceneJs.length / 1024)} KB
-              </span>
-            )}
-          </div>
-
           {/* 3D Viewport */}
           <div
             ref={viewportRef}
@@ -2043,6 +1956,89 @@ export default function ProjectPage() {
                 projectName={projectName}
               />
             </ErrorBoundary>
+          </div>
+
+          {/* Floating viewport toolbar */}
+          <div className="viewport-toolbar">
+            <button
+              className="viewport-toolbar-btn"
+              data-active={wireframe}
+              onClick={() => setWireframe(!wireframe)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              {t('editor.wireframe')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              onClick={() => {
+                const container = viewportRef.current;
+                if (container) {
+                  const el = container.querySelector("div") as HTMLDivElement & { resetCamera?: () => void };
+                  el?.resetCamera?.();
+                }
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 4v6h6" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              {t('editor.resetCamera')}
+            </button>
+            <span className="viewport-toolbar-sep" />
+            <button
+              className="viewport-toolbar-btn"
+              data-active={showCode}
+              onClick={toggleCodePanel}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              {showCode ? t('editor.hideCode') : t('editor.showCode')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={showDocs}
+              onClick={toggleDocsPanel}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              {t('editor.docs') || "Docs"}
+            </button>
+            {sceneParams.length > 0 && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showParams}
+                onClick={toggleParamsPanel}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="21" x2="4" y2="14" />
+                  <line x1="4" y1="10" x2="4" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12" y2="3" />
+                  <line x1="20" y1="21" x2="20" y2="16" />
+                  <line x1="20" y1="12" x2="20" y2="3" />
+                </svg>
+                {t('editor.params') || "Params"}
+              </button>
+            )}
+            <span className="viewport-toolbar-sep" />
+            <span
+              className="viewport-status"
+              data-error={!!sceneError}
+              title={sceneError && sceneError.length > 40 ? sceneError : undefined}
+            >
+              {sceneError
+                ? `${t('editor.sceneErrorPrefix')}: ${sceneError.substring(0, 40)}${sceneError.length > 40 ? "..." : ""}`
+                : t('editor.objectCount', { count: objectCount })}
+            </span>
           </div>
 
           {/* Scene validation warnings */}
