@@ -206,7 +206,7 @@ export interface QuoteRequestPayload {
   contact_phone?: string;
   postcode: string;
   work_scope: string;
-  locale?: "fi" | "en";
+  locale?: "fi" | "en" | "sv";
 }
 
 export interface QuoteRequestResponse {

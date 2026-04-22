@@ -390,7 +390,7 @@ export default function AddressSearch({
                   { label: t('search.floors'), value: String(result.building_info.floors) },
                   { label: t('search.material'), value: resolveMaterial(result.building_info.material) },
                   { label: t('search.heating'), value: resolveHeating(result.building_info.heating) },
-                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
+                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : locale === 'sv' ? 'st' : 'pcs'}` },
                 ].map((item, i) => (
                   <div key={i} style={{
                     padding: "10px 12px",

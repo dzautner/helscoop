@@ -228,6 +228,9 @@ export default function ProjectList({
     if (locale === 'fi') {
       return `${count} projekti${count !== 1 ? "a" : ""}`;
     }
+    if (locale === 'sv') {
+      return `${count} projekt`;
+    }
     return `${count} project${count !== 1 ? "s" : ""}`;
   }
 
