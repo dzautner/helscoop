@@ -6,6 +6,7 @@ import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme, DARK_MOODS, type DarkMood } from "@/components/ThemeProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { resetOnboarding } from "@/components/OnboardingTour";
 import { Skeleton, SkeletonBlock } from "@/components/Skeleton";
@@ -46,6 +47,7 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { mood, setMood, resolved } = useTheme();
 
   useEffect(() => {
     if (!getToken()) {
@@ -343,6 +345,61 @@ export default function SettingsPage() {
             </div>
           </form>
         </div>
+
+        {/* Appearance — dark mode mood */}
+        {resolved === "dark" && (
+          <div
+            className="card anim-up settings-card"
+            style={{ marginBottom: 20 }}
+          >
+            <h2
+              className="heading-display"
+              style={{ fontSize: 20, marginBottom: 4 }}
+            >
+              {t("settings.appearance")}
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16 }}>
+              {t("settings.moodDescription")}
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              {(DARK_MOODS as DarkMood[]).map((m) => {
+                const colors: Record<DarkMood, string[]> = {
+                  warm: ["#0b0a09", "#131210", "#1a1816", "#211f1b"],
+                  cool: ["#090a0d", "#10121a", "#171a24", "#1d2030"],
+                  black: ["#000000", "#0a0a0a", "#121212", "#1a1a1a"],
+                };
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setMood(m)}
+                    style={{
+                      flex: 1,
+                      maxWidth: 140,
+                      background: "none",
+                      border: mood === m ? "1px solid var(--amber)" : "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: 8,
+                      cursor: "pointer",
+                      transition: "border-color 0.2s",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+                      {colors[m].map((c, i) => (
+                        <div key={i} style={{ height: 14, background: c }} />
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 11, color: mood === m ? "var(--amber)" : "var(--text-secondary)" }}>
+                        {t(`settings.mood_${m}`)}
+                      </span>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)", opacity: mood === m ? 1 : 0.3 }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Security section */}
         <div
