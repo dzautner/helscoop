@@ -5076,6 +5076,81 @@ select:focus {
   border-style: dashed;
 }
 
+.viewport-dimension-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 19;
+  display: grid;
+  gap: 3px;
+  min-width: 152px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(229, 160, 75, 0.42);
+  background: rgba(9, 9, 11, 0.82);
+  color: #fff3df;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.34);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: opacity var(--transition-quick);
+}
+
+.viewport-dimension-label span {
+  color: var(--amber);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.viewport-dimension-label strong {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.viewport-scale-indicator {
+  position: absolute;
+  right: 12px;
+  bottom: 72px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(9, 9, 11, 0.72);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.viewport-scale-indicator strong {
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.viewport-scale-rule {
+  width: 44px;
+  height: 8px;
+  border-left: 2px solid var(--amber);
+  border-right: 2px solid var(--amber);
+  border-bottom: 2px solid var(--amber);
+  opacity: 0.95;
+}
+
 /* === Viewport tessellation progress bar === */
 .viewport-progress-bar {
   position: absolute;

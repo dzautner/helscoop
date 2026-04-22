@@ -44,6 +44,7 @@ interface Viewport3DProps {
   initialPresentationPreset?: PresentationPresetId;
   onToggleWireframe?: () => void;
   onMaterialSurfaceSelect?: (selection: ViewportMaterialSelection) => void;
+  onMeasurementModeChange?: (active: boolean) => void;
   projectName?: string;
 }
 
@@ -59,6 +60,14 @@ interface Measurement {
   id: string;
   start: THREE.Vector3;
   end: THREE.Vector3;
+}
+
+interface DimensionOverlay {
+  id: string;
+  anchor: THREE.Vector3;
+  width: number;
+  height: number;
+  depth: number;
 }
 
 const MEASUREMENT_UNITS: MeasurementUnit[] = ["mm", "cm", "m"];
@@ -81,6 +90,14 @@ function formatMeasurementDistance(distanceMeters: number, unit: MeasurementUnit
     return `${(distanceMeters * 100).toLocaleString(localeTag, { maximumFractionDigits: 1 })} cm`;
   }
   return `${distanceMeters.toLocaleString(localeTag, { maximumFractionDigits: 3 })} m`;
+}
+
+function formatDimensionMeters(distanceMeters: number, locale: string): string {
+  const localeTag = locale === "fi" ? "fi-FI" : "en-GB";
+  return `${distanceMeters.toLocaleString(localeTag, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} m`;
 }
 
 function disposeMeasurementGroup(group: THREE.Group) {
@@ -384,7 +401,7 @@ function CameraToolbar({
           className="viewport-cam-btn"
           data-active={measurementMode}
           onClick={onToggleMeasurementMode}
-          data-tooltip={`${t("editor.ruler")} (R)`}
+          data-tooltip={`${t("editor.ruler")} (${shortcutLabel("Cmd+M")})`}
           aria-label={t("editor.rulerTooltip")}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -468,6 +485,7 @@ export default function Viewport3D({
   initialPresentationPreset,
   onToggleWireframe,
   onMaterialSurfaceSelect,
+  onMeasurementModeChange,
   projectName,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -480,6 +498,8 @@ export default function Viewport3D({
   const measurementsRef = useRef<Measurement[]>([]);
   const previewMeasurementRef = useRef<Measurement | null>(null);
   const measurementLabelRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const dimensionOverlayRef = useRef<DimensionOverlay | null>(null);
+  const dimensionLabelRef = useRef<HTMLDivElement | null>(null);
   const surfacePointerDownRef = useRef<{ x: number; y: number; button: number } | null>(null);
   const animFrameRef = useRef<number>(0);
   const viewportDescriptionId = useId();
@@ -493,6 +513,7 @@ export default function Viewport3D({
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [measurementStart, setMeasurementStart] = useState<THREE.Vector3 | null>(null);
   const [measurementPreviewEnd, setMeasurementPreviewEnd] = useState<THREE.Vector3 | null>(null);
+  const [dimensionOverlay, setDimensionOverlay] = useState<DimensionOverlay | null>(null);
   const [sectionMode, setSectionMode] = useState(false);
   const [sectionAxis, setSectionAxis] = useState<"x" | "y" | "z">("z");
   const [sectionPos, setSectionPos] = useState(0);
@@ -536,6 +557,49 @@ export default function Viewport3D({
       node.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
       node.style.opacity = projected.z > 1 ? "0" : "1";
     }
+
+    const dimensionNode = dimensionLabelRef.current;
+    const dimension = dimensionOverlayRef.current;
+    if (dimensionNode && dimension) {
+      const projected = dimension.anchor.clone().project(camera);
+      const x = (projected.x * 0.5 + 0.5) * rect.width;
+      const y = (-projected.y * 0.5 + 0.5) * rect.height;
+      dimensionNode.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 14px))`;
+      dimensionNode.style.opacity = projected.z > 1 ? "0" : "1";
+    }
+  }, []);
+
+  const pickDimensionOverlay = useCallback((clientX: number, clientY: number): DimensionOverlay | null => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    const group = objectGroupRef.current;
+    if (!renderer || !camera || !group) return null;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const hit = raycaster
+      .intersectObjects(group.children, true)
+      .find((candidate) => candidate.object instanceof THREE.Mesh);
+    if (!hit) return null;
+
+    const mesh = hit.object as THREE.Mesh;
+    const bounds = new THREE.Box3().setFromObject(mesh);
+    if (bounds.isEmpty()) return null;
+
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    return {
+      id: typeof mesh.userData.objectId === "string" ? mesh.userData.objectId : mesh.uuid,
+      anchor: new THREE.Vector3(center.x, bounds.max.y, center.z),
+      width: size.x,
+      height: size.y,
+      depth: size.z,
+    };
   }, []);
 
   const pickMeasurementPoint = useCallback((clientX: number, clientY: number): THREE.Vector3 | null => {
@@ -991,6 +1055,7 @@ export default function Viewport3D({
       const thisId = ++updateIdRef.current;
       setIsComputing(true);
       setTessProgress(null);
+      setDimensionOverlay(null);
 
       // Yield to browser so the spinner renders before heavy WASM work
       await new Promise((r) => setTimeout(r, 0));
@@ -1212,6 +1277,9 @@ export default function Viewport3D({
     if (controlsRef.current) {
       controlsRef.current.enabled = !measurementMode;
     }
+    if (measurementMode) {
+      setDimensionOverlay(null);
+    }
     if (!measurementMode) {
       setMeasurementStart(null);
       setMeasurementPreviewEnd(null);
@@ -1227,6 +1295,20 @@ export default function Viewport3D({
   const toggleMeasurementMode = useCallback(() => {
     setMeasurementMode((active) => !active);
   }, []);
+
+  useEffect(() => {
+    onMeasurementModeChange?.(measurementMode);
+  }, [measurementMode, onMeasurementModeChange]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const viewportApi = container as HTMLDivElement & { toggleMeasurementMode?: () => void };
+    viewportApi.toggleMeasurementMode = toggleMeasurementMode;
+    return () => {
+      delete viewportApi.toggleMeasurementMode;
+    };
+  }, [toggleMeasurementMode]);
 
   const cycleMeasurementUnit = useCallback(() => {
     setMeasurementUnit((unit) => {
@@ -1269,6 +1351,40 @@ export default function Viewport3D({
     if (point) setMeasurementPreviewEnd(point);
   }, [measurementMode, measurementStart, pickMeasurementPoint]);
 
+  const handleDimensionPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (measurementMode) {
+      setDimensionOverlay(null);
+      return;
+    }
+
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("a") || target.closest("input") || target.closest("select") || target.closest("textarea")) {
+      setDimensionOverlay(null);
+      return;
+    }
+
+    const nextOverlay = pickDimensionOverlay(e.clientX, e.clientY);
+    setDimensionOverlay((current) => {
+      if (!nextOverlay) return current ? null : current;
+      if (
+        current &&
+        current.id === nextOverlay.id &&
+        current.anchor.distanceToSquared(nextOverlay.anchor) < 0.000001 &&
+        Math.abs(current.width - nextOverlay.width) < 0.000001 &&
+        Math.abs(current.height - nextOverlay.height) < 0.000001 &&
+        Math.abs(current.depth - nextOverlay.depth) < 0.000001
+      ) {
+        return current;
+      }
+      return nextOverlay;
+    });
+  }, [measurementMode, pickDimensionOverlay]);
+
+  const handleViewportPointerLeave = useCallback(() => {
+    setDimensionOverlay(null);
+    setMeasurementPreviewEnd(null);
+  }, []);
+
   const handleSurfacePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!onMaterialSurfaceSelect || measurementMode || e.button !== 0) return;
     const target = e.target as HTMLElement;
@@ -1300,7 +1416,10 @@ export default function Viewport3D({
         target?.isContentEditable;
       if (isTyping) return;
 
-      if (e.key.toLowerCase() === "r") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        setMeasurementMode((active) => !active);
+      } else if (e.key.toLowerCase() === "r" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setMeasurementMode((active) => !active);
       } else if (e.key.toLowerCase() === "x" && !e.metaKey && !e.ctrlKey) {
@@ -1320,6 +1439,11 @@ export default function Viewport3D({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [clearMeasurements, measurementMode, measurementStart]);
+
+  useEffect(() => {
+    dimensionOverlayRef.current = dimensionOverlay;
+    updateMeasurementLabelPositions();
+  }, [dimensionOverlay, updateMeasurementLabelPositions]);
 
   useEffect(() => {
     const group = objectGroupRef.current;
@@ -1558,7 +1682,11 @@ export default function Viewport3D({
         handleMeasurementPointerDown(e);
       }}
       onPointerUp={handleSurfacePointerUp}
-      onPointerMove={handleMeasurementPointerMove}
+      onPointerMove={(e) => {
+        handleMeasurementPointerMove(e);
+        handleDimensionPointerMove(e);
+      }}
+      onPointerLeave={handleViewportPointerLeave}
       data-measuring={measurementMode}
       style={{
         width: "100%",
@@ -1646,9 +1774,32 @@ export default function Viewport3D({
           {measurementStart ? t("editor.measurePickSecond") : t("editor.measurePickFirst")}
         </div>
       )}
+      <div className="viewport-scale-indicator" aria-label={t("editor.gridScale")}>
+        <span className="viewport-scale-rule" />
+        <span>{t("editor.gridScale")}</span>
+        <strong>1 m</strong>
+      </div>
       {onMaterialSurfaceSelect && !measurementMode && (
         <div className="viewport-measure-hint" style={{ left: 12, right: "auto" }}>
           {t("editor.materialConfiguratorHint")}
+        </div>
+      )}
+      {dimensionOverlay && (
+        <div
+          ref={dimensionLabelRef}
+          className="viewport-dimension-label"
+          aria-live="polite"
+        >
+          <span>{t("editor.dimensions")}</span>
+          <strong>
+            {t("editor.measureWidth")} {formatDimensionMeters(dimensionOverlay.width, locale)}
+          </strong>
+          <strong>
+            {t("editor.measureHeight")} {formatDimensionMeters(dimensionOverlay.height, locale)}
+          </strong>
+          <strong>
+            {t("editor.measureDepth")} {formatDimensionMeters(dimensionOverlay.depth, locale)}
+          </strong>
         </div>
       )}
       <div className="viewport-measure-label-layer" aria-hidden="true">

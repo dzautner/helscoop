@@ -38,6 +38,20 @@ describe("accessibility foundation", () => {
     expect(viewport).toContain('setAttribute("aria-hidden", "true")');
   });
 
+  it("keeps viewport measurement controls discoverable from keyboard and toolbar", () => {
+    const viewport = readSource("../components/Viewport3D.tsx");
+    const editor = readSource("../app/project/[id]/page.tsx");
+    const css = readSource("../app/globals.css");
+
+    expect(viewport).toContain('shortcutLabel("Cmd+M")');
+    expect(viewport).toContain("pickDimensionOverlay");
+    expect(viewport).toContain("viewport-scale-indicator");
+    expect(editor).toContain("toggleViewportMeasurementMode");
+    expect(editor).toContain("viewportMeasurementMode");
+    expect(css).toContain(".viewport-dimension-label");
+    expect(css).toContain(".viewport-scale-indicator");
+  });
+
   it("announces new chat messages politely", () => {
     const chatPanel = readSource("../components/ChatPanel.tsx");
 

@@ -249,6 +249,7 @@ export default function ProjectPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
+  const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
@@ -950,6 +951,24 @@ export default function ProjectPage() {
     }
   }, [projectId, projectName, t, toast, track]);
 
+  type ViewportDomApi = HTMLDivElement & {
+    resetCamera?: () => void;
+    toggleMeasurementMode?: () => void;
+  };
+
+  const getViewportApi = useCallback(() => {
+    const container = viewportRef.current;
+    return container?.querySelector("div") as ViewportDomApi | null;
+  }, []);
+
+  const resetViewportCamera = useCallback(() => {
+    getViewportApi()?.resetCamera?.();
+  }, [getViewportApi]);
+
+  const toggleViewportMeasurementMode = useCallback(() => {
+    getViewportApi()?.toggleMeasurementMode?.();
+  }, [getViewportApi]);
+
   /* ── Command palette commands ───────────────────────────── */
   const paletteCommands = useMemo<Command[]>(() => {
     const icon = (d: string) => (
@@ -972,13 +991,16 @@ export default function ProjectPage() {
         labelKey: "commandPalette.resetCamera",
         labelSecondaryKey: "commandPalette.resetCameraEn",
         icon: icon("M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10"),
-        action: () => {
-          const container = viewportRef.current;
-          if (container) {
-            const el = container.querySelector("div") as HTMLDivElement & { resetCamera?: () => void };
-            el?.resetCamera?.();
-          }
-        },
+        action: resetViewportCamera,
+      },
+      {
+        id: "toggle-ruler",
+        labelKey: "commandPalette.toggleRuler",
+        labelSecondaryKey: "commandPalette.toggleRulerEn",
+        shortcut: "Cmd+M",
+        icon: icon("M3 17L17 3l4 4L7 21l-4-4zM14 6l4 4M11 9l2 2M8 12l4 4M5 15l2 2"),
+        action: toggleViewportMeasurementMode,
+        isActive: viewportMeasurementMode,
       },
       {
         id: "toggle-code-editor",
@@ -1191,7 +1213,7 @@ export default function ProjectPage() {
         isActive: showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportQuotePdf]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -2254,6 +2276,7 @@ export default function ProjectPage() {
                 presentationRef={presentationRef}
                 onToggleWireframe={() => setWireframe(!wireframe)}
                 onMaterialSurfaceSelect={handleViewportMaterialSurfaceSelect}
+                onMeasurementModeChange={setViewportMeasurementMode}
                 projectName={projectName}
               />
             </ErrorBoundary>
@@ -2275,13 +2298,20 @@ export default function ProjectPage() {
             </button>
             <button
               className="viewport-toolbar-btn"
-              onClick={() => {
-                const container = viewportRef.current;
-                if (container) {
-                  const el = container.querySelector("div") as HTMLDivElement & { resetCamera?: () => void };
-                  el?.resetCamera?.();
-                }
-              }}
+              data-active={viewportMeasurementMode}
+              onClick={toggleViewportMeasurementMode}
+              title={`${t('editor.ruler')} (Cmd+M)`}
+              aria-label={t('editor.rulerTooltip')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 17L17 3l4 4L7 21l-4-4z" />
+                <path d="M14 6l4 4M11 9l2 2M8 12l4 4M5 15l2 2" />
+              </svg>
+              {t('editor.ruler')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              onClick={resetViewportCamera}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M1 4v6h6" />
