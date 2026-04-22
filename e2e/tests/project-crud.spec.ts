@@ -145,12 +145,18 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     const nameInput = page.locator('input[value="Original Name"]');
     await expect(nameInput).toBeVisible({ timeout: 10_000 });
 
-    await nameInput.fill("Renamed Project");
+    const saveResponse = page.waitForResponse((response) => {
+      return response.url().includes(`/projects/${project.id}`)
+        && response.request().method() === "PUT"
+        && response.ok();
+    }, { timeout: 15_000 });
 
-    // Wait for auto-save
-    await expect(
-      page.getByText(/tallennettu|saved/i)
-    ).toBeVisible({ timeout: 15_000 });
+    await nameInput.fill("Renamed Project");
+    await saveResponse;
+
+    const saveStatus = page.locator(".save-status-pill");
+    await expect(saveStatus).toHaveAttribute("data-status", "saved", { timeout: 15_000 });
+    await expect(saveStatus).toContainText(/tallennettu|saved/i);
   });
 
   test("deletes a project", async ({ page }) => {
