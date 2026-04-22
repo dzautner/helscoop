@@ -8,6 +8,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import type { DataProvenance } from "@/lib/confidence";
 import type { BuildingResult } from "@/types";
+import MapPreview from "@/components/MapPreview";
 
 /** Map a BuildingResult confidence string to a DataProvenance object */
 function buildingResultToProvenance(result: BuildingResult): DataProvenance {
@@ -411,6 +412,10 @@ export default function AddressSearch({
               )}
 
               <DataSourceWarning message={result.data_source_error} />
+
+              {result.coordinates && (
+                <MapPreview lat={result.coordinates.lat} lon={result.coordinates.lon} />
+              )}
 
               {createError && (
                 <div className="inline-error-banner">
