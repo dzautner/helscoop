@@ -32,6 +32,7 @@ import subsidiesRouter from "./routes/subsidies";
 import keskoRouter from "./routes/kesko";
 import araGrantRouter from "./routes/ara-grant";
 import ryhtiRouter from "./routes/ryhti";
+import photoEstimateRouter from "./routes/photo-estimate";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 import { logProjectView } from "./notifications";
@@ -76,8 +77,9 @@ app.use(
 // before the JSON parser mutates it.
 app.post("/entitlements/credits/webhook", express.raw({ type: "application/json" }), handleCreditCheckoutWebhook);
 
-// Request body size limit
-app.use(express.json({ limit: "1mb" }));
+// Request body size limit. Photo-estimate uploads send compressed image data URLs,
+// so the API needs a larger JSON envelope than the rest of the editor.
+app.use(express.json({ limit: "8mb" }));
 
 // ---------------------------------------------------------------------------
 // Request ID middleware — tags every request with a unique ID for correlation
@@ -710,6 +712,7 @@ app.use("/subsidies", authenticatedLimiter, subsidiesRouter);
 app.use("/kesko", authenticatedLimiter, keskoRouter);
 app.use("/ara-grant", authenticatedLimiter, araGrantRouter);
 app.use("/ryhti", authenticatedLimiter, ryhtiRouter);
+app.use("/photo-estimate", authenticatedLimiter, photoEstimateRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 

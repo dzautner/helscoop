@@ -10,6 +10,8 @@ import type {
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
+  PhotoEstimateResponse,
+  PhotoEstimateUpload,
   ProjectMaterialTrendResponse,
   QuoteRequestPayload,
   RyhtiPermitMetadata,
@@ -416,6 +418,14 @@ export const api = {
     apiFetch("/bom/aggregate", {
       method: "POST",
       body: JSON.stringify({ project_ids: projectIds }),
+    }),
+  estimatePhotoRenovation: (
+    projectId: string,
+    data: { photos: PhotoEstimateUpload[]; building_info?: BuildingInfo | null },
+  ): Promise<PhotoEstimateResponse> =>
+    apiFetch(`/photo-estimate/projects/${encodeURIComponent(projectId)}/analyze`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
   exportBOMCsv: async (projectId: string, projectName: string) => {
     const t = getToken();

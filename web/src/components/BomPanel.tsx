@@ -14,6 +14,7 @@ import QuoteRequestModal from "@/components/QuoteRequestModal";
 import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import RenovationRoiPanel from "@/components/RenovationRoiPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
+import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -2373,6 +2374,14 @@ export default function BomPanel({
           >
             {importError}
           </div>
+        )}
+        {projectId && onImportBom && (
+          <PhotoEstimatePanel
+            projectId={projectId}
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            onImportBom={onImportBom}
+          />
         )}
         {bom.length > 0 && (
           <div className="package-switcher" data-has-choices={hasPackageChoices}>
