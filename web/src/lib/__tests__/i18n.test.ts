@@ -411,6 +411,16 @@ describe("exhaustive i18n key parity", () => {
     "project.emptyCta", "project.noSearchResultsCta", "project.useTemplate",
     "project.openAriaLabel", "project.copyAriaLabel", "project.deleteAriaLabel",
     "project.viewCount",
+    // BOM aggregate
+    "bomAggregate.eyebrow", "bomAggregate.title", "bomAggregate.subtitle",
+    "bomAggregate.selectProject", "bomAggregate.selectShort",
+    "bomAggregate.selectedCount", "bomAggregate.combine", "bomAggregate.clear",
+    "bomAggregate.selectHint", "bomAggregate.error", "bomAggregate.projects",
+    "bomAggregate.mergedRows", "bomAggregate.totalCost", "bomAggregate.bulkCandidates",
+    "bomAggregate.tableHint", "bomAggregate.empty", "bomAggregate.exportCsv",
+    "bomAggregate.exported", "bomAggregate.material", "bomAggregate.quantity",
+    "bomAggregate.cost", "bomAggregate.bulk", "bomAggregate.projectBreakdown",
+    "bomAggregate.bulkCandidate", "bomAggregate.noBulk",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
     "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",

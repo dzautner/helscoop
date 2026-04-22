@@ -9,6 +9,7 @@ const mockCreateProject = vi.fn();
 const mockDeleteProject = vi.fn();
 const mockDuplicateProject = vi.fn();
 const mockGetTrashProjects = vi.fn();
+const mockAggregateBOM = vi.fn();
 const mockTrack = vi.fn();
 const mockToast = vi.fn();
 const mockPush = vi.fn();
@@ -50,6 +51,7 @@ vi.mock("@/lib/api", () => ({
     deleteProject: (...args: unknown[]) => mockDeleteProject(...args),
     duplicateProject: (...args: unknown[]) => mockDuplicateProject(...args),
     getTrashProjects: (...args: unknown[]) => mockGetTrashProjects(...args),
+    aggregateBOM: (...args: unknown[]) => mockAggregateBOM(...args),
     saveBOM: vi.fn().mockResolvedValue(undefined),
     restoreProject: vi.fn().mockResolvedValue(undefined),
     permanentDeleteProject: vi.fn().mockResolvedValue(undefined),
@@ -63,9 +65,32 @@ vi.mock("@/components/Skeleton", () => ({
 }));
 
 vi.mock("@/components/ProjectCard", () => ({
-  default: ({ project, onDuplicate, onDelete }: { project: Project; index: number; onDuplicate: (id: string) => void; onDelete: (id: string) => void }) => (
+  default: ({
+    project,
+    onDuplicate,
+    onDelete,
+    selectable,
+    selected,
+    onSelectChange,
+  }: {
+    project: Project;
+    index: number;
+    onDuplicate: (id: string) => void;
+    onDelete: (id: string) => void;
+    selectable?: boolean;
+    selected?: boolean;
+    onSelectChange?: (checked: boolean) => void;
+  }) => (
     <div data-testid={`project-card-${project.id}`}>
       <span>{project.name}</span>
+      {selectable && (
+        <input
+          type="checkbox"
+          checked={Boolean(selected)}
+          aria-label={`bomAggregate.selectProject:${JSON.stringify({ name: project.name })}`}
+          onChange={(event) => onSelectChange?.(event.currentTarget.checked)}
+        />
+      )}
       <button onClick={() => onDuplicate(project.id)}>Duplicate</button>
       <button onClick={() => onDelete(project.id)}>Delete</button>
     </div>
@@ -150,6 +175,41 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetProjects.mockResolvedValue(mockProjects);
   mockGetTemplates.mockResolvedValue(mockTemplatesData);
+  mockAggregateBOM.mockResolvedValue({
+    project_ids: ["p1", "p2"],
+    project_count: 2,
+    item_count: 1,
+    total_cost: 302.5,
+    bulk_opportunity_count: 1,
+    projects: [
+      { id: "p1", name: "Sauna Reno", estimated_cost: 100, bom_rows: 1 },
+      { id: "p2", name: "Kitchen Update", estimated_cost: 200, bom_rows: 1 },
+    ],
+    items: [
+      {
+        material_id: "pine_48x148_c24",
+        material_name: "Pine 48x148 C24",
+        category_name: "Lumber",
+        unit: "jm",
+        quantity: 110,
+        unit_price: 2.5,
+        supplier_name: "K-Rauta",
+        total: 302.5,
+        source_project_count: 2,
+        bulk_discount: {
+          eligible: true,
+          threshold: 100,
+          estimated_savings_pct: 5,
+          estimated_savings_eur: 15.13,
+          note: "Estimated",
+        },
+        project_breakdown: [
+          { project_id: "p1", project_name: "Sauna Reno", quantity: 40, total: 110 },
+          { project_id: "p2", project_name: "Kitchen Update", quantity: 70, total: 192.5 },
+        ],
+      },
+    ],
+  });
 });
 
 describe("ProjectList", () => {
@@ -261,6 +321,22 @@ describe("ProjectList", () => {
       expect(screen.getByText("dashboard.activeProjects")).toBeInTheDocument();
       expect(screen.getByText("dashboard.lastActivity")).toBeInTheDocument();
     });
+  });
+
+  it("aggregates selected project BOMs", async () => {
+    render(<ProjectList />);
+    await waitFor(() => { expect(screen.getByText("Sauna Reno")).toBeInTheDocument(); });
+
+    fireEvent.click(screen.getByLabelText('bomAggregate.selectProject:{"name":"Sauna Reno"}'));
+    fireEvent.click(screen.getByLabelText('bomAggregate.selectProject:{"name":"Kitchen Update"}'));
+    fireEvent.click(screen.getByText("bomAggregate.combine"));
+
+    await waitFor(() => {
+      expect(mockAggregateBOM).toHaveBeenCalledWith(["p1", "p2"]);
+    });
+    expect(screen.getByText("Pine 48x148 C24")).toBeInTheDocument();
+    expect(screen.getByText("110 jm")).toBeInTheDocument();
+    expect(screen.getByText('bomAggregate.bulkCandidate:{"threshold":100,"unit":"jm"}')).toBeInTheDocument();
   });
 
   it("renders active project count in stats", async () => {

@@ -21,6 +21,7 @@ export type AnalyticsEvent =
   | "bom_imported"
   | "bom_item_removed"
   | "bom_item_undo_remove"
+  | "bom_aggregated"
   | "bom_package_material_replaced"
   | "bom_optimization_applied"
   | "bom_optimization_dismissed"
@@ -51,6 +52,7 @@ export interface AnalyticsEventProps {
   bom_imported: { count: number; mode: "merge" | "replace" };
   bom_item_removed: { material_id: string };
   bom_item_undo_remove: { material_id: string };
+  bom_aggregated: { project_count: number; item_count: number };
   bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string; source?: string };
   bom_optimization_applied: { type: string; material_id: string; savings_amount: number };
   bom_optimization_dismissed: { type: string; material_id: string; savings_amount: number };

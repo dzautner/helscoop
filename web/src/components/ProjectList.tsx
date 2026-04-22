@@ -15,7 +15,7 @@ import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
 import AddressSearch from "@/components/AddressSearch";
 import Link from "next/link";
-import type { Project, ProjectStatus, Template, BuildingResult } from "@/types";
+import type { BomAggregateResponse, Project, ProjectStatus, Template, BuildingResult } from "@/types";
 
 type SortKey = "modified" | "created" | "name" | "cost";
 
@@ -40,6 +40,10 @@ export default function ProjectList({
   const [showTrash, setShowTrash] = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<string | null>(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [aggregate, setAggregate] = useState<BomAggregateResponse | null>(null);
+  const [aggregateLoading, setAggregateLoading] = useState(false);
+  const [aggregateError, setAggregateError] = useState(false);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
@@ -112,6 +116,8 @@ export default function ProjectList({
     try {
       await api.deleteProject(id);
       setProjects(projects.filter((p) => p.id !== id));
+      setSelectedProjectIds((current) => current.filter((projectId) => projectId !== id));
+      setAggregate(null);
       toast(t('toast.projectDeleted'), "success");
     } catch (err) {
       toast(err instanceof Error ? err.message : t('toast.deleteFailed'), "error");
@@ -224,6 +230,68 @@ export default function ProjectList({
     }
   }
 
+  function toggleProjectSelection(projectId: string, checked: boolean) {
+    setAggregate(null);
+    setAggregateError(false);
+    setSelectedProjectIds((current) => (
+      checked
+        ? Array.from(new Set([...current, projectId]))
+        : current.filter((id) => id !== projectId)
+    ));
+  }
+
+  async function aggregateSelectedProjects() {
+    if (selectedProjectIds.length < 2) return;
+    setAggregateLoading(true);
+    setAggregateError(false);
+    try {
+      const result = await api.aggregateBOM(selectedProjectIds);
+      setAggregate(result);
+      track("bom_aggregated", { project_count: selectedProjectIds.length, item_count: result.item_count });
+    } catch (err) {
+      setAggregate(null);
+      setAggregateError(true);
+      toast(err instanceof Error ? err.message : t("bomAggregate.error"), "error");
+    } finally {
+      setAggregateLoading(false);
+    }
+  }
+
+  function clearProjectSelection() {
+    setSelectedProjectIds([]);
+    setAggregate(null);
+    setAggregateError(false);
+  }
+
+  function exportAggregateCsv() {
+    if (!aggregate) return;
+    const escape = (value: string | number | null | undefined) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["Material", "Category", "Quantity", "Unit", "Total EUR", "Supplier", "Projects", "Bulk candidate"],
+      ...aggregate.items.map((item) => [
+        item.material_name,
+        item.category_name ?? "",
+        item.quantity,
+        item.unit,
+        item.total.toFixed(2),
+        item.supplier_name ?? "",
+        item.project_breakdown.map((part) => `${part.project_name}: ${part.quantity} ${item.unit}`).join("; "),
+        item.bulk_discount?.eligible ? "yes" : "no",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(escape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `helscoop_combined_bom_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    toast(t("bomAggregate.exported"), "success");
+  }
+
   function projectCountText(count: number): string {
     if (locale === 'fi') {
       return `${count} projekti${count !== 1 ? "a" : ""}`;
@@ -308,6 +376,11 @@ export default function ProjectList({
     else lastActivity = `${diffD}d`;
     return { totalCost, activeCount, lastActivity };
   }, [projects, t]);
+
+  const selectedProjects = useMemo(
+    () => projects.filter((project) => selectedProjectIds.includes(project.id)),
+    [projects, selectedProjectIds],
+  );
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -559,6 +632,160 @@ export default function ProjectList({
               )}
             </div>
 
+            <div className="anim-up delay-1 card" style={{ padding: 18, marginBottom: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+                <div style={{ minWidth: 220, flex: 1 }}>
+                  <div className="label-mono" style={{ marginBottom: 6 }}>{t("bomAggregate.eyebrow")}</div>
+                  <h2 className="heading-display" style={{ fontSize: 22, marginBottom: 6 }}>
+                    {t("bomAggregate.title")}
+                  </h2>
+                  <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0, maxWidth: 640 }}>
+                    {t("bomAggregate.subtitle")}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <span className="badge badge-muted" style={{ alignSelf: "center" }}>
+                    {t("bomAggregate.selectedCount", { count: selectedProjectIds.length })}
+                  </span>
+                  <button
+                    className={selectedProjectIds.length >= 2 ? "btn btn-primary" : "btn btn-ghost"}
+                    onClick={aggregateSelectedProjects}
+                    disabled={selectedProjectIds.length < 2 || aggregateLoading}
+                    style={{ gap: 6 }}
+                  >
+                    {aggregateLoading ? <span className="btn-spinner" /> : null}
+                    {t("bomAggregate.combine")}
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={clearProjectSelection}
+                    disabled={selectedProjectIds.length === 0 || aggregateLoading}
+                  >
+                    {t("bomAggregate.clear")}
+                  </button>
+                </div>
+              </div>
+
+              {selectedProjects.length > 0 && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+                  {selectedProjects.map((project) => (
+                    <span key={project.id} className="badge badge-amber">
+                      {project.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {aggregateError && (
+                <div className="inline-error-banner" style={{ marginTop: 14 }}>
+                  {t("bomAggregate.error")}
+                </div>
+              )}
+
+              {!aggregate && !aggregateLoading && selectedProjectIds.length < 2 && (
+                <p style={{ margin: "14px 0 0", color: "var(--text-muted)", fontSize: 12 }}>
+                  {t("bomAggregate.selectHint")}
+                </p>
+              )}
+
+              {aggregate && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
+                    <div className="dash-stat-card">
+                      <span className="dash-stat-value">{aggregate.project_count}</span>
+                      <span className="dash-stat-label">{t("bomAggregate.projects")}</span>
+                    </div>
+                    <div className="dash-stat-card">
+                      <span className="dash-stat-value">{aggregate.item_count}</span>
+                      <span className="dash-stat-label">{t("bomAggregate.mergedRows")}</span>
+                    </div>
+                    <div className="dash-stat-card">
+                      <span className="dash-stat-value">
+                        {aggregate.total_cost.toLocaleString(locale === "fi" ? "fi-FI" : "en-US", { maximumFractionDigits: 0 })} €
+                      </span>
+                      <span className="dash-stat-label">{t("bomAggregate.totalCost")}</span>
+                    </div>
+                    <div className="dash-stat-card">
+                      <span className="dash-stat-value">{aggregate.bulk_opportunity_count}</span>
+                      <span className="dash-stat-label">{t("bomAggregate.bulkCandidates")}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+                    <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 12 }}>
+                      {aggregate.items.length === 0 ? t("bomAggregate.empty") : t("bomAggregate.tableHint")}
+                    </p>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={exportAggregateCsv}
+                      disabled={aggregate.items.length === 0}
+                      style={{ fontSize: 12 }}
+                    >
+                      {t("bomAggregate.exportCsv")}
+                    </button>
+                  </div>
+
+                  {aggregate.items.length > 0 && (
+                    <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-md)" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760, fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)", textAlign: "left" }}>
+                            <th style={{ padding: "10px 12px" }}>{t("bomAggregate.material")}</th>
+                            <th style={{ padding: "10px 12px" }}>{t("bomAggregate.quantity")}</th>
+                            <th style={{ padding: "10px 12px" }}>{t("bomAggregate.cost")}</th>
+                            <th style={{ padding: "10px 12px" }}>{t("bomAggregate.projects")}</th>
+                            <th style={{ padding: "10px 12px" }}>{t("bomAggregate.bulk")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {aggregate.items.map((item) => (
+                            <tr key={`${item.material_id}-${item.unit}`} style={{ borderTop: "1px solid var(--border)" }}>
+                              <td style={{ padding: "10px 12px", verticalAlign: "top" }}>
+                                <div style={{ fontWeight: 700 }}>{item.material_name}</div>
+                                <div style={{ color: "var(--text-muted)", fontSize: 11 }}>{item.category_name || item.material_id}</div>
+                              </td>
+                              <td style={{ padding: "10px 12px", verticalAlign: "top", fontFamily: "var(--font-mono)" }}>
+                                {item.quantity.toLocaleString(locale === "fi" ? "fi-FI" : "en-US")} {item.unit}
+                              </td>
+                              <td style={{ padding: "10px 12px", verticalAlign: "top", fontFamily: "var(--font-mono)" }}>
+                                {item.total.toLocaleString(locale === "fi" ? "fi-FI" : "en-US", { maximumFractionDigits: 0 })} €
+                              </td>
+                              <td style={{ padding: "10px 12px", verticalAlign: "top" }}>
+                                <details>
+                                  <summary style={{ cursor: "pointer", color: "var(--text-secondary)" }}>
+                                    {t("bomAggregate.projectBreakdown", { count: item.source_project_count })}
+                                  </summary>
+                                  <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+                                    {item.project_breakdown.map((part) => (
+                                      <div key={part.project_id} style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                                        {part.project_name}: {part.quantity.toLocaleString(locale === "fi" ? "fi-FI" : "en-US")} {item.unit}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </details>
+                              </td>
+                              <td style={{ padding: "10px 12px", verticalAlign: "top" }}>
+                                {item.bulk_discount?.eligible ? (
+                                  <span className="badge badge-amber" title={item.bulk_discount.note}>
+                                    {t("bomAggregate.bulkCandidate", {
+                                      threshold: item.bulk_discount.threshold,
+                                      unit: item.unit,
+                                    })}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{t("bomAggregate.noBulk")}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {dashboardStats && (
               <div className="anim-up delay-1 dash-summary-strip">
                 <div className="dash-stat-card">
@@ -610,6 +837,9 @@ export default function ProjectList({
                     index={i}
                     onDuplicate={duplicateProject}
                     onDelete={deleteProject}
+                    selectable
+                    selected={selectedProjectIds.includes(p.id)}
+                    onSelectChange={(checked) => toggleProjectSelection(p.id, checked)}
                   />
                 ))}
               </div>

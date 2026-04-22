@@ -89,6 +89,50 @@ export interface ProjectVersionCompareResponse {
   cost_delta: number;
 }
 
+export interface BomAggregateProject {
+  id: string;
+  name: string;
+  estimated_cost: number;
+  bom_rows: number;
+}
+
+export interface BomAggregateBreakdown {
+  project_id: string;
+  project_name: string;
+  quantity: number;
+  total: number;
+}
+
+export interface BomAggregateItem {
+  material_id: string;
+  material_name: string;
+  category_name: string | null;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  supplier_name: string | null;
+  total: number;
+  project_breakdown: BomAggregateBreakdown[];
+  source_project_count: number;
+  bulk_discount: {
+    eligible: boolean;
+    threshold: number;
+    estimated_savings_pct: number;
+    estimated_savings_eur: number;
+    note: string;
+  } | null;
+}
+
+export interface BomAggregateResponse {
+  project_ids: string[];
+  project_count: number;
+  item_count: number;
+  total_cost: number;
+  bulk_opportunity_count: number;
+  projects: BomAggregateProject[];
+  items: BomAggregateItem[];
+}
+
 export interface BuildingResult {
   address: string;
   coordinates: { lat: number; lon: number };
