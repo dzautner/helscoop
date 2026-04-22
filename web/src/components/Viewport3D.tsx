@@ -10,6 +10,7 @@ import ViewportContextMenu, { type ContextMenuItem } from "@/components/Viewport
 import ScreenshotPopover from "@/components/ScreenshotPopover";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import { getPresentationPreset, type PresentationPresetId } from "@/lib/presentation-export";
+import { useAmbientSound } from "@/hooks/useAmbientSound";
 
 export interface ViewportPresentationApi {
   captureFrame: (options?: {
@@ -292,6 +293,7 @@ function CameraToolbar({
   onCycleMeasurementUnit: () => void;
 }) {
   const { t } = useTranslation();
+  const { play: playSfx } = useAmbientSound();
   const [activePreset, setActivePreset] = useState(3);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
 
@@ -303,8 +305,9 @@ function CameraToolbar({
       setActivePreset(index);
       const presets = computePresets(sceneBoundsRef.current);
       animateCamera(camera, controls, presets[index].position, presets[index].target);
+      playSfx("cameraSnap");
     },
-    [cameraRef, controlsRef, sceneBoundsRef]
+    [cameraRef, controlsRef, sceneBoundsRef, playSfx]
   );
 
   const handleScreenshot = useCallback(() => {

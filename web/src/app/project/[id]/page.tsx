@@ -901,6 +901,7 @@ export default function ProjectPage() {
       track("bom_exported", { format: "pdf" });
       await api.exportPdf(projectId, projectName, locale);
       toast(t("toast.bomExported"), "success");
+      playSound("exportDone");
     } catch (err) {
       toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
     } finally {
@@ -925,6 +926,7 @@ export default function ProjectPage() {
         manualChecklist: araChecklistItems,
       });
       toast(locale === "fi" ? "ARA-avustuspaketti viety" : "ARA grant package exported", "success");
+      playSound("exportDone");
     } catch (err) {
       toast(err instanceof Error ? err.message : t("toast.bomExportFailed"), "error");
     } finally {
@@ -939,6 +941,7 @@ export default function ProjectPage() {
       track("project_exported", { format: "ifc4x3_permit" });
       await api.exportIFC(projectId, projectName);
       toast(t("ifcExport.generated"), "success");
+      playSound("exportDone");
     } catch (err) {
       toast(err instanceof Error ? err.message : t("ifcExport.generateFailed"), "error");
     } finally {
@@ -1086,6 +1089,7 @@ export default function ProjectPage() {
             a.click();
             URL.revokeObjectURL(url);
             toast(t("toast.projectExported"), "success");
+            playSound("exportDone");
           } catch (err) {
             toast(err instanceof Error ? err.message : t("toast.projectExportFailed"), "error");
           }
@@ -1866,6 +1870,7 @@ export default function ProjectPage() {
                       track("bom_exported", { format: "csv" });
                       await api.exportBOMCsv(projectId, projectName);
                       toast(t('toast.bomExported'), "success");
+                      playSound("exportDone");
                     } catch (err) {
                       toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
                     } finally {
@@ -1906,6 +1911,7 @@ export default function ProjectPage() {
                       a.click();
                       URL.revokeObjectURL(url);
                       toast(t('toast.bomExported'), "success");
+                      playSound("exportDone");
                     } catch (err) {
                       toast(err instanceof Error ? err.message : t('toast.bomExportFailed'), "error");
                     } finally {
@@ -1962,6 +1968,7 @@ export default function ProjectPage() {
                       a.click();
                       URL.revokeObjectURL(url);
                       toast(t('toast.projectExported'), "success");
+                      playSound("exportDone");
                     } catch (err) {
                       toast(err instanceof Error ? err.message : t('toast.projectExportFailed'), "error");
                     }
