@@ -5,13 +5,16 @@ import { LocaleProvider } from "@/components/LocaleProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ConnectionBanner from "@/components/ConnectionBanner";
 
+const SITE_TITLE = "Helscoop — Suunnittele remonttisi 3D:ssä";
+const SITE_DESCRIPTION =
+  "Suunnittele talosi remontti 3D-mallinnuksella. Näe muutokset reaaliajassa, saa automaattinen materiaaliluettelo ja hinnat K-Raudasta. Ilmainen työkalu suomalaisille kodinrakentajille.";
+
 export const metadata: Metadata = {
   title: {
-    default: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    default: SITE_TITLE,
     template: "%s | Helscoop",
   },
-  description:
-    "Suunnittele talosi remontti 3D-mallinnuksella. Näe muutokset reaaliajassa, saa automaattinen materiaaliluettelo ja hinnat K-Raudasta. Ilmainen työkalu suomalaisille kodinrakentajille.",
+  description: SITE_DESCRIPTION,
   keywords: [
     "remontti",
     "talosuunnittelu",
@@ -37,7 +40,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   openGraph: {
-    title: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    title: SITE_TITLE,
     description:
       "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa. Ilmainen työkalu suomalaisille kodinrakentajille.",
     type: "website",
@@ -47,7 +50,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    title: SITE_TITLE,
     description:
       "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa.",
   },
