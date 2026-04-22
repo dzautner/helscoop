@@ -1278,6 +1278,7 @@ function BomItemCard({
   isPackageLocked = false,
   onTogglePackageLock,
   onOpenMaterialPicker,
+  onUpdateNote,
 }: {
   item: BomItem;
   materials: Material[];
@@ -1292,6 +1293,7 @@ function BomItemCard({
   isPackageLocked?: boolean;
   onTogglePackageLock?: (materialId: string) => void;
   onOpenMaterialPicker: (materialId: string) => void;
+  onUpdateNote?: (materialId: string, note: string) => void;
 }) {
   const { t } = useTranslation();
   const [localQty, setLocalQty] = useState(String(item.quantity));
@@ -1614,6 +1616,17 @@ function BomItemCard({
           </svg>
         </div>
       )}
+      {onUpdateNote && (
+        <input
+          type="text"
+          className="bom-item-note"
+          placeholder={t("bom.addNote")}
+          defaultValue={item.note || ""}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={(e) => onUpdateNote(item.material_id, e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        />
+      )}
       {stockLevel === "out_of_stock" && (
         <button
           type="button"
@@ -1678,6 +1691,7 @@ function generateBomCsv(
     t('bom.csvTotal'),
     t('bom.csvSupplier'),
     t('bom.csvCategory'),
+    t('bom.csvNote'),
   ];
 
   const rows = bom.map((item) => {
@@ -1700,6 +1714,7 @@ function generateBomCsv(
       formatNumber(item.total ?? 0),
       escapeCsvField(supplier, sep),
       escapeCsvField(category, sep),
+      escapeCsvField(item.note || '', sep),
     ].join(sep);
   });
 
@@ -1727,6 +1742,7 @@ export default function BomPanel({
   onApplySupplierPrice,
   onRemove,
   onUpdateQty,
+  onUpdateNote,
   style,
   sceneJs,
   projectName,
@@ -1744,6 +1760,7 @@ export default function BomPanel({
   onApplySupplierPrice?: (override: BomPriceOverride) => void;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
+  onUpdateNote?: (materialId: string, note: string) => void;
   style?: React.CSSProperties;
   /** Scene script for extracting material declarations */
   sceneJs?: string;
@@ -2515,6 +2532,7 @@ export default function BomPanel({
               onOpenMaterialPicker={(id) => {
                 if (onReplaceMaterial) setMaterialPickerId(id);
               }}
+              onUpdateNote={onUpdateNote}
             />
           ))
         )}

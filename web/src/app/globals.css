@@ -1164,6 +1164,24 @@ body::before {
   gap: 4px;
 }
 
+.bom-item-note {
+  width: 100%;
+  margin-top: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--transition-micro);
+}
+
+.bom-item-note::placeholder { color: var(--text-muted); opacity: 0.5; }
+.bom-item-note:hover { border-color: var(--border); }
+.bom-item-note:focus { border-color: var(--amber-border); color: var(--text-primary); }
+
 /* ── Material browse card ────────────────────────── */
 .material-browse-card {
   padding: 8px 10px;

@@ -143,6 +143,7 @@ export interface BomItem {
   stock_level?: StockLevel | null;
   store_location?: string | null;
   stock_last_checked_at?: string | null;
+  note?: string;
 }
 
 export interface QuoteRequestPayload {
