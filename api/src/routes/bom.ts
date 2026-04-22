@@ -45,6 +45,20 @@ interface AggregatedItem {
   } | null;
 }
 
+function extractAreaM2(buildingInfo: unknown): number | null {
+  if (typeof buildingInfo === "string") {
+    try {
+      return extractAreaM2(JSON.parse(buildingInfo));
+    } catch {
+      return null;
+    }
+  }
+  if (!buildingInfo || typeof buildingInfo !== "object") return null;
+  const rawArea = (buildingInfo as { area_m2?: unknown }).area_m2;
+  const area = Number(rawArea);
+  return Number.isFinite(area) && area > 0 ? area : null;
+}
+
 function normalizeProjectIds(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   const ids = input
@@ -97,7 +111,7 @@ router.post("/aggregate", requireAuth, requirePermission("project:read_own"), as
   }
 
   const projectsResult = await query(
-    `SELECT id::text AS id, name,
+    `SELECT id::text AS id, name, building_info,
        (SELECT COALESCE(SUM(pb.quantity * COALESCE(p.unit_price, 0) * COALESCE(m.waste_factor, 1)), 0)
         FROM project_bom pb
         JOIN materials m ON pb.material_id = m.id
@@ -184,14 +198,21 @@ router.post("/aggregate", requireAuth, requirePermission("project:read_own"), as
   const projects = projectsResult.rows.map((project: {
     id: string;
     name: string;
+    building_info?: unknown;
     estimated_cost: string | number;
     bom_rows: string | number;
-  }) => ({
-    id: project.id,
-    name: project.name,
-    estimated_cost: roundMoney(Number(project.estimated_cost) || 0),
-    bom_rows: Number(project.bom_rows) || 0,
-  }));
+  }) => {
+    const estimatedCost = roundMoney(Number(project.estimated_cost) || 0);
+    const areaM2 = extractAreaM2(project.building_info);
+    return {
+      id: project.id,
+      name: project.name,
+      estimated_cost: estimatedCost,
+      bom_rows: Number(project.bom_rows) || 0,
+      area_m2: areaM2,
+      cost_per_m2: areaM2 ? roundMoney(estimatedCost / areaM2) : null,
+    };
+  });
 
   res.json({
     project_ids: projectIds,

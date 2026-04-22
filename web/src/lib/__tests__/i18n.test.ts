@@ -420,7 +420,11 @@ describe("exhaustive i18n key parity", () => {
     "bomAggregate.tableHint", "bomAggregate.empty", "bomAggregate.exportCsv",
     "bomAggregate.exported", "bomAggregate.material", "bomAggregate.quantity",
     "bomAggregate.cost", "bomAggregate.bulk", "bomAggregate.projectBreakdown",
-    "bomAggregate.bulkCandidate", "bomAggregate.noBulk",
+    "bomAggregate.bulkCandidate", "bomAggregate.compareTitle",
+    "bomAggregate.compareSubtitle", "bomAggregate.compareLimit",
+    "bomAggregate.costPerM2", "bomAggregate.costPerM2Missing",
+    "bomAggregate.sharedMaterials", "bomAggregate.noSharedMaterials",
+    "bomAggregate.uncategorized", "bomAggregate.noBulk",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
     "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",

@@ -126,8 +126,8 @@ describe("POST /bom/aggregate", () => {
     mockQuery
       .mockResolvedValueOnce({
         rows: [
-          { id: "p1", name: "Sauna", estimated_cost: "250", bom_rows: 2 },
-          { id: "p2", name: "Terrace", estimated_cost: "180", bom_rows: 1 },
+          { id: "p1", name: "Sauna", building_info: { area_m2: 25 }, estimated_cost: "250", bom_rows: 2 },
+          { id: "p2", name: "Terrace", building_info: { area_m2: 30 }, estimated_cost: "180", bom_rows: 1 },
         ],
       } as never)
       .mockResolvedValueOnce({
@@ -182,6 +182,7 @@ describe("POST /bom/aggregate", () => {
       item_count: number;
       total_cost: number;
       bulk_opportunity_count: number;
+      projects: Array<{ id: string; area_m2: number | null; cost_per_m2: number | null }>;
       items: Array<{
         material_id: string;
         quantity: number;
@@ -196,6 +197,10 @@ describe("POST /bom/aggregate", () => {
     expect(body.item_count).toBe(2);
     expect(body.total_cost).toBe(347.5);
     expect(body.bulk_opportunity_count).toBe(1);
+    expect(body.projects).toEqual([
+      expect.objectContaining({ id: "p1", area_m2: 25, cost_per_m2: 10 }),
+      expect.objectContaining({ id: "p2", area_m2: 30, cost_per_m2: 6 }),
+    ]);
 
     const pine = body.items.find((item) => item.material_id === "pine_48x148_c24");
     expect(pine).toMatchObject({
