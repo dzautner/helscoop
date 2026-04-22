@@ -320,6 +320,8 @@ export const api = {
     apiFetch(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteProject: (id: string) =>
     apiFetch(`/projects/${id}`, { method: "DELETE" }),
+  bulkProjectAction: (ids: string[], action: string, extra?: { status?: string; tags?: string[] }) =>
+    apiFetch("/projects/bulk", { method: "POST", body: JSON.stringify({ ids, action, ...extra }) }),
   getTrashProjects: () => apiFetch("/projects/trash"),
   restoreProject: (id: string) =>
     apiFetch(`/projects/${id}/restore`, { method: "POST" }),

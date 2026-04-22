@@ -404,6 +404,91 @@ router.get("/trash", async (req, res) => {
   res.json(result.rows);
 });
 
+router.post("/bulk", async (req, res) => {
+  const { ids, action, status, tags } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) {
+    return res.status(400).json({ error: "ids must be an array of 1-100 project IDs" });
+  }
+  const VALID_ACTIONS = ["archive", "unarchive", "delete", "add_tags", "remove_tags", "set_status"];
+  if (!action || !VALID_ACTIONS.includes(action)) {
+    return res.status(400).json({ error: `action must be one of: ${VALID_ACTIONS.join(", ")}` });
+  }
+  const userId = req.user!.id;
+
+  try {
+    let result;
+    switch (action) {
+      case "archive":
+        result = await query(
+          `UPDATE projects SET status = 'archived', updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId]
+        );
+        break;
+      case "unarchive":
+        result = await query(
+          `UPDATE projects SET status = 'planning', updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL AND status = 'archived' RETURNING id`,
+          [ids, userId]
+        );
+        break;
+      case "delete":
+        result = await query(
+          `UPDATE projects SET deleted_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId]
+        );
+        break;
+      case "add_tags": {
+        if (!Array.isArray(tags) || tags.length === 0) {
+          return res.status(400).json({ error: "tags must be a non-empty array" });
+        }
+        const safeTags = tags.filter((t: unknown) => typeof t === "string" && t.trim()).map((t: string) => t.trim().slice(0, 50));
+        result = await query(
+          `UPDATE projects SET tags = (
+             SELECT ARRAY(SELECT DISTINCT unnest FROM unnest(tags || $3::text[]) LIMIT 20)
+           ), updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId, safeTags]
+        );
+        break;
+      }
+      case "remove_tags": {
+        if (!Array.isArray(tags) || tags.length === 0) {
+          return res.status(400).json({ error: "tags must be a non-empty array" });
+        }
+        const removeTags = tags.filter((t: unknown) => typeof t === "string");
+        result = await query(
+          `UPDATE projects SET tags = (
+             SELECT ARRAY(SELECT unnest(tags) EXCEPT SELECT unnest($3::text[]))
+           ), updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId, removeTags]
+        );
+        break;
+      }
+      case "set_status": {
+        const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
+        if (!status || !VALID_STATUSES.includes(status)) {
+          return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(", ")}` });
+        }
+        result = await query(
+          `UPDATE projects SET status = $3, updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId, status]
+        );
+        break;
+      }
+    }
+    const affected = result?.rows.length ?? 0;
+    logAuditEvent(userId, `project.bulk_${action}`, { ids, affected, ip: req.ip });
+    res.json({ ok: true, affected });
+  } catch (err) {
+    console.error("Bulk project action failed:", err);
+    res.status(500).json({ error: "Bulk action failed" });
+  }
+});
+
 router.post("/", requirePermission("project:create"), async (req, res) => {
   const { name, description, scene_js, building_info, tags, status } = req.body;
   if (!name || typeof name !== "string") {
