@@ -9,6 +9,7 @@ import { SkeletonProjectEditor } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel, { matchSceneMaterial } from "@/components/BomPanel";
+import EnergyDashboard from "@/components/EnergyDashboard";
 import MaterialPicker from "@/components/MaterialPicker";
 import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -288,6 +289,7 @@ export default function ProjectPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showVersionPanel, setShowVersionPanel] = useState(false);
+  const [showEnergyDashboard, setShowEnergyDashboard] = useState(false);
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
@@ -2642,6 +2644,17 @@ export default function ProjectPage() {
             </div>
             <button
               className="viewport-toolbar-btn"
+              data-active={showEnergyDashboard}
+              onClick={() => setShowEnergyDashboard((v) => !v)}
+              title={t('energy.toolbarLabel')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              {t('energy.toolbarLabel')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
               data-active={viewportMeasurementMode}
               onClick={toggleViewportMeasurementMode}
               title={`${t('editor.ruler')} (Cmd+M)`}
@@ -2726,6 +2739,15 @@ export default function ProjectPage() {
                 <span>{t('editor.thermalHigh')}</span>
               </div>
             </div>
+          )}
+
+          {/* Energy dashboard */}
+          {showEnergyDashboard && (
+            <EnergyDashboard
+              materials={materials}
+              bom={bom}
+              onClose={() => setShowEnergyDashboard(false)}
+            />
           )}
 
           {/* Scene validation warnings */}

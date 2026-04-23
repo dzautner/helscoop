@@ -3931,6 +3931,279 @@ select:focus {
   .viewport-thermal-legend { display: none; }
 }
 
+/* Energy dashboard */
+.energy-dashboard {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 25;
+  width: 340px;
+  max-height: calc(100% - 70px);
+  overflow-y: auto;
+  background: rgba(17, 17, 19, 0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeInUp 0.2s ease-out;
+}
+
+.energy-dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.energy-dashboard-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.energy-dashboard-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.energy-dashboard-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.energy-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.energy-control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.energy-control-row label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.energy-price-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--amber);
+}
+
+.energy-control-row select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.energy-control-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--amber);
+  height: 4px;
+}
+
+.energy-price-presets {
+  display: flex;
+  gap: 4px;
+}
+
+.energy-price-preset {
+  flex: 1;
+  font-size: 10px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.energy-price-preset:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.energy-price-preset[data-active="true"] {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.energy-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.energy-metric {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.energy-metric-value {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: #fff;
+}
+
+.energy-metric-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.energy-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.energy-chart-title {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.energy-chart-bars {
+  display: flex;
+  gap: 2px;
+  height: 120px;
+  align-items: flex-end;
+}
+
+.energy-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.energy-bar-value {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+.energy-bar-track {
+  width: 100%;
+  height: 80px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.energy-bar-fill {
+  width: 100%;
+  background: linear-gradient(to top, var(--amber), #f59e0b);
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+  min-height: 2px;
+}
+
+.energy-bar-fill[data-peak="true"] {
+  background: linear-gradient(to top, #ef4444, #f87171);
+}
+
+.energy-bar-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.energy-bar-temp {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.energy-sensitivity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.energy-sensitivity-title {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.energy-sensitivity-row {
+  display: flex;
+  gap: 4px;
+}
+
+.energy-sensitivity-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.energy-sensitivity-item[data-active="true"] {
+  border-color: var(--amber);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.energy-sensitivity-price {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.energy-sensitivity-cost {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: #fff;
+}
+
+.energy-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  padding: 20px 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .energy-dashboard {
+    width: calc(100% - 20px);
+    max-height: 50vh;
+    top: auto;
+    bottom: 55px;
+  }
+}
+
 /* Shopping list modal */
 .shopping-list-overlay {
   position: fixed;
