@@ -3927,6 +3927,48 @@ select:focus {
   color: var(--text-muted);
 }
 
+.thermal-compliance-row {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.thermal-compliance-title {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+
+.thermal-compliance-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.thermal-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.thermal-badge-pass {
+  background: color-mix(in srgb, #22c55e 20%, transparent);
+  color: #16a34a;
+}
+
+.thermal-badge-warn {
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
+  color: #d97706;
+}
+
+.thermal-badge-fail {
+  background: color-mix(in srgb, #ef4444 20%, transparent);
+  color: #dc2626;
+}
+
 @media (max-width: 640px) {
   .viewport-thermal-legend { display: none; }
 }
