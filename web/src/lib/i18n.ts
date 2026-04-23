@@ -833,6 +833,8 @@ const translations = {
       exportAraGrantEn: 'Export ARA grant package',
       exportIfcPermit: 'Vie IFC-rakennuslupaan',
       exportIfcPermitEn: 'Export IFC for permit',
+      exportPermitPack: 'Vie rakennuslupapaketti ZIP',
+      exportPermitPackEn: 'Export permit pack ZIP',
       shareProject: 'Jaa projekti',
       shareProjectEn: 'Share project',
       toggleTheme: 'Vaihda tumma/vaalea teema',
@@ -1378,6 +1380,11 @@ const translations = {
       lupapiste: 'Lupapiste-yhteensopiva',
       ifcFormat: 'IFC4x3-muoto',
       includesBom: 'Sis\u00e4lt\u00e4\u00e4 materiaalit',
+    },
+    permitPack: {
+      exportMenu: 'Rakennuslupapaketti ZIP',
+      generated: 'Rakennuslupapaketti luotu',
+      generateFailed: 'Rakennuslupapaketin luonti epäonnistui',
     },
     compliance: {
       title: 'Rakennusmääräystarkistus',
@@ -2316,6 +2323,8 @@ const translations = {
       exportAraGrantEn: 'Export ARA grant package',
       exportIfcPermit: 'Export IFC for permit',
       exportIfcPermitEn: 'Export IFC for permit',
+      exportPermitPack: 'Export permit pack ZIP',
+      exportPermitPackEn: 'Export permit pack ZIP',
       shareProject: 'Share project',
       shareProjectEn: 'Share project',
       toggleTheme: 'Toggle dark/light theme',
@@ -2861,6 +2870,11 @@ const translations = {
       lupapiste: 'Lupapiste compatible',
       ifcFormat: 'IFC4x3 format',
       includesBom: 'Includes materials',
+    },
+    permitPack: {
+      exportMenu: 'Permit pack ZIP',
+      generated: 'Permit pack generated',
+      generateFailed: 'Failed to generate permit pack',
     },
     compliance: {
       title: 'Building code compliance',
@@ -3712,6 +3726,8 @@ const translations = {
       exportAraGrantEn: 'Export ARA grant package',
       exportIfcPermit: 'Exportera IFC för bygglov',
       exportIfcPermitEn: 'Export IFC for permit',
+      exportPermitPack: 'Exportera bygglovspaket ZIP',
+      exportPermitPackEn: 'Export permit pack ZIP',
       shareProject: 'Dela projekt',
       shareProjectEn: 'Share project',
       toggleTheme: 'Växla mörkt/ljust tema',
@@ -4253,6 +4269,11 @@ const translations = {
       lupapiste: 'Lupapiste-kompatibel',
       ifcFormat: 'IFC4x3-format',
       includesBom: 'Inkluderar material',
+    },
+    permitPack: {
+      exportMenu: 'Bygglovspaket ZIP',
+      generated: 'Bygglovspaket skapat',
+      generateFailed: 'Kunde inte skapa bygglovspaket',
     },
     compliance: {
       title: 'Byggföreskriftsefterlevnad',
