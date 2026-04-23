@@ -700,6 +700,85 @@ export interface ProjectMaterialTrendResponse {
   items: MaterialTrendItem[];
 }
 
+export type RenovationCostUnit = "m2" | "m" | "unit" | "project";
+export type RenovationCostSourceStatus = "live" | "fallback";
+
+export interface RenovationCostSource {
+  name: "Tilastokeskus";
+  statistic: "Rakennuskustannusindeksi";
+  attribution: string;
+  tableId: string;
+  apiUrl: string;
+  url: string;
+  status: RenovationCostSourceStatus;
+  latestPeriod: string;
+  updatedAt: string | null;
+  error?: string;
+}
+
+export interface RenovationCostCategory {
+  id: string;
+  labelFi: string;
+  labelEn: string;
+  unit: RenovationCostUnit;
+  baseCostExVat: number;
+  materialShare: number;
+  labourShare: number;
+  serviceShare: number;
+  notes: string;
+  statfinMultiplier: number;
+  currentCostExVat: number;
+  currentCostInclVat: number;
+}
+
+export interface RenovationCostIndexResponse {
+  generatedAt: string;
+  source: RenovationCostSource;
+  cache: {
+    hit: boolean;
+    ttlHours: number;
+    expiresAt: string;
+  };
+  vatRate: number;
+  baseYear: string;
+  index: {
+    period: string;
+    updatedAt: string | null;
+    baseYear: string;
+    values: {
+      total: number;
+      labour: number;
+      materials: number;
+      services: number;
+    };
+    multipliers: {
+      total: number;
+      labour: number;
+      materials: number;
+      services: number;
+    };
+  };
+  categories: RenovationCostCategory[];
+}
+
+export interface RenovationCostEstimateRequest {
+  categoryId: string;
+  quantity: number;
+}
+
+export interface RenovationCostEstimateResponse {
+  generatedAt: string;
+  category: RenovationCostCategory;
+  quantity: number;
+  unit: RenovationCostUnit;
+  subtotalExVat: number;
+  vatRate: number;
+  vatAmount: number;
+  totalInclVat: number;
+  formula: string;
+  source: RenovationCostSource;
+}
+
 export type PriceAlertEmailFrequency = "off" | "daily" | "weekly";
 
 export interface AppNotification {

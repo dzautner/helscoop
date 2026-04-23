@@ -689,6 +689,10 @@ describe("exhaustive i18n key parity", () => {
     "renovationRoi.category.energy", "renovationRoi.category.roof", "renovationRoi.category.kitchen",
     "renovationRoi.category.bathroom", "renovationRoi.category.facade", "renovationRoi.category.windows",
     "renovationRoi.category.outdoor", "renovationRoi.category.general",
+    // renovation cost index
+    "renovationCostIndex.eyebrow", "renovationCostIndex.title", "renovationCostIndex.loading",
+    "renovationCostIndex.loadFailed", "renovationCostIndex.summary",
+    "renovationCostIndex.updated", "renovationCostIndex.fallback",
     // BOM savings
     "bomSavings.eyebrow", "bomSavings.title", "bomSavings.totalAvailable",
     "bomSavings.noSavings", "bomSavings.supplier_switch", "bomSavings.material_substitution",
