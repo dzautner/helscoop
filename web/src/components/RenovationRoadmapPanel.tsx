@@ -71,14 +71,41 @@ const COPY = {
     assumptions: "Assumptions",
     diyHint: "DIY mode: reserve tools, lifting, waste handling, and inspections before this phase starts.",
   },
+  sv: {
+    eyebrow: "Genomförandeväg",
+    title: "Renoveringsplan",
+    subtitle: "Omvandla materialförteckningen till arbetsfaser, tillståndssteg och entreprenörsansvar.",
+    duration: "Uppskattad varaktighet",
+    permit: "Tillståndsuppskattning",
+    cost: "Material",
+    weeks: "veckor",
+    copy: "Kopiera för entreprenör",
+    copied: "Kopierat",
+    print: "Skriv ut / PDF",
+    contractorMode: "Entreprenörer",
+    diyMode: "Gör det själv",
+    critical: "Kritisk väg",
+    overlap: "Kan överlappa",
+    bomRows: "BOM-rader",
+    noRows: "Inga direkta materialrader",
+    checklist: "Tillstånds- och inspektionschecklista",
+    required: "Obligatoriskt / sannolikt",
+    optional: "Kontrollera vid behov",
+    owner: "Ansvar",
+    timing: "Tidpunkt",
+    fee: "Avgift",
+    assumptions: "Antaganden",
+    diyHint: "Gör det själv: reservera verktyg, lyft, avfallshantering och inspektioner innan denna fas börjar.",
+  },
 } as const;
 
-function text(value: LocalizedText, locale: "fi" | "en"): string {
+function text(value: LocalizedText, locale: "fi" | "en" | "sv"): string {
+  if (locale === "sv") return value.en ?? value.fi;
   return value[locale] ?? value.en;
 }
 
 function formatEur(value: number, locale: string): string {
-  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} €`;
+  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} €`;
 }
 
 function phaseTone(index: number): { background: string; border: string; color: string } {
@@ -99,7 +126,7 @@ export default function RenovationRoadmapPanel({
   projectDescription,
 }: RenovationRoadmapPanelProps) {
   const { locale } = useTranslation();
-  const roadmapLocale: "fi" | "en" = locale === "fi" ? "fi" : "en";
+  const roadmapLocale: "fi" | "en" | "sv" = locale === "fi" ? "fi" : locale === "sv" ? "sv" : "en";
   const copy = COPY[roadmapLocale];
   const [deliveryMode, setDeliveryMode] = useState<"contractor" | "diy">("contractor");
   const [copied, setCopied] = useState(false);
@@ -112,7 +139,7 @@ export default function RenovationRoadmapPanel({
   if (bom.length === 0) return null;
 
   const copyHandoff = async () => {
-    await navigator.clipboard.writeText(formatRoadmapHandoff(roadmap, roadmapLocale));
+    await navigator.clipboard.writeText(formatRoadmapHandoff(roadmap, roadmapLocale === "sv" ? "en" : roadmapLocale));
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -336,7 +363,7 @@ function TimelineRow({
   phase: RoadmapPhase;
   index: number;
   totalWeeks: number;
-  locale: "fi" | "en";
+  locale: "fi" | "en" | "sv";
 }) {
   const tone = phaseTone(index);
   const left = `${Math.max(0, (phase.startWeek / totalWeeks) * 100)}%`;

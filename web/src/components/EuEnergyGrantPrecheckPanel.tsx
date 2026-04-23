@@ -25,23 +25,23 @@ const COPY = {
   fi: {
     eyebrow: "Rahoituspolku",
     title: "EU- ja energiatukien esitarkistus",
-    subtitle: "Tarkista Business Finland, EU Energy Communities Facility ja Motivan neuvonta ennen kuin tyot tilataan.",
+    subtitle: "Tarkista Business Finland, EU Energy Communities Facility ja Motivan neuvonta ennen kuin työt tilataan.",
     applicant: "Hakija",
     building: "Rakennus",
     year: "Rakennusvuosi",
     location: "Sijainti",
     stage: "Vaihe",
-    scopes: "Remontin sisalto",
+    scopes: "Remontin sisältö",
     badge: "Mahdollinen tuki",
     noCash: "Ei automaattista rahasignaalia",
-    source: "Virallinen lahde",
+    source: "Virallinen lähde",
     next: "Seuraavat askeleet",
     blockers: "Esteet",
     disclaimerPrefix: "Huomio",
     applicantTypes: {
       private_owner: "Yksityinen omistaja",
-      housing_company: "Taloyhtio",
-      energy_community: "Energiayhteiso",
+      housing_company: "Taloyhtiö",
+      energy_community: "Energiayhteisö",
       company_or_municipality: "Yritys / kunta",
     },
     buildingTypes: {
@@ -56,11 +56,11 @@ const COPY = {
       ordered_or_started: "Tilattu tai aloitettu",
     },
     scopeLabels: {
-      heating: "Lammitys",
+      heating: "Lämmitys",
       insulation: "Eristys",
       windows: "Ikkunat",
       solar: "Aurinkoenergia",
-      smart_controls: "Alyohjaus",
+      smart_controls: "Älyohjaus",
       storage: "Varastointi",
       ev_charging: "Lataus",
     },
@@ -120,10 +120,59 @@ const COPY = {
       info: "Advice",
     },
   },
+  sv: {
+    eyebrow: "Finansieringsväg",
+    title: "EU- och energibidrag förkontroll",
+    subtitle: "Kontrollera Business Finland, EU Energy Communities Facility och Motivas rådgivning innan arbetet beställs.",
+    applicant: "Sökande",
+    building: "Byggnad",
+    year: "Byggnadsår",
+    location: "Plats",
+    stage: "Fas",
+    scopes: "Renoveringsomfattning",
+    badge: "Potentiellt bidrag",
+    noCash: "Ingen automatisk kassasignal",
+    source: "Officiell källa",
+    next: "Nästa steg",
+    blockers: "Blockerare",
+    disclaimerPrefix: "Observera",
+    applicantTypes: {
+      private_owner: "Privat ägare",
+      housing_company: "Bostadsaktiebolag",
+      energy_community: "Energigemenskap",
+      company_or_municipality: "Företag / kommun",
+    },
+    buildingTypes: {
+      omakotitalo: "Egnahemshus",
+      rivitalo: "Rad- eller parhus",
+      kerrostalo: "Flervåningshus",
+      non_residential: "Icke-bostadsbyggnad",
+      unknown: "Okänd",
+    },
+    stages: {
+      planning: "Planering, ej beställt",
+      ordered_or_started: "Beställt eller påbörjat",
+    },
+    scopeLabels: {
+      heating: "Uppvärmning",
+      insulation: "Isolering",
+      windows: "Fönster",
+      solar: "Solenergi",
+      smart_controls: "Smart styrning",
+      storage: "Lagring",
+      ev_charging: "Laddning",
+    },
+    status: {
+      eligible: "Berättigad",
+      maybe: "Möjlig",
+      not_eligible: "Blockerad",
+      info: "Rådgivning",
+    },
+  },
 } as const;
 
 function formatEur(value: number, locale: string): string {
-  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} EUR`;
+  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} EUR`;
 }
 
 function statusTone(status: EuGrantStatus): { border: string; background: string; color: string } {
@@ -143,7 +192,7 @@ export default function EuEnergyGrantPrecheckPanel({
   totalCost = 0,
 }: EuEnergyGrantPrecheckPanelProps) {
   const { locale } = useTranslation();
-  const grantLocale: "fi" | "en" = locale === "fi" ? "fi" : "en";
+  const grantLocale: "fi" | "en" | "sv" = locale === "fi" ? "fi" : locale === "sv" ? "sv" : "en";
   const copy = COPY[grantLocale];
   const inferred = useMemo(
     () => buildEuEnergyGrantPrecheck({ bom, materials, buildingInfo, totalCost }),
