@@ -299,6 +299,9 @@ export default function ProjectPage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [thermalView, setThermalView] = useState(false);
+  const [lightingPreset, setLightingPreset] = useState<import("@/components/Viewport3D").LightingPresetId>("default");
+  const [showLightingMenu, setShowLightingMenu] = useState(false);
+  const lightingMenuRef = useRef<HTMLDivElement>(null);
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
   const [priceChangeSummary, setPriceChangeSummary] = useState<ProjectPriceChangeSummary | null>(null);
   const [duplicating, setDuplicating] = useState(false);
@@ -626,6 +629,23 @@ export default function ProjectPage() {
       document.removeEventListener("keydown", onKey);
     };
   }, [showHeaderMenu]);
+
+  useEffect(() => {
+    if (!showLightingMenu) return;
+    const close = (e: MouseEvent) => {
+      if (lightingMenuRef.current?.contains(e.target as Node)) return;
+      setShowLightingMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowLightingMenu(false);
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showLightingMenu]);
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -2554,6 +2574,7 @@ export default function ProjectPage() {
                 projectName={projectName}
                 thermalView={thermalView}
                 thermalColorMap={thermalColorMap}
+                lightingPreset={lightingPreset}
               />
             </ErrorBoundary>
           </div>
@@ -2583,6 +2604,42 @@ export default function ProjectPage() {
               </svg>
               {t('editor.thermal')}
             </button>
+            <div className="viewport-lighting-wrap" ref={lightingMenuRef}>
+              <button
+                className="viewport-toolbar-btn"
+                data-active={lightingPreset !== "default"}
+                onClick={() => setShowLightingMenu((v) => !v)}
+                title={t('editor.lighting')}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+                {t('editor.lighting')}
+              </button>
+              {showLightingMenu && (
+                <div className="viewport-lighting-menu">
+                  {(["default", "summer", "winter", "evening"] as const).map((id) => (
+                    <button
+                      key={id}
+                      className="viewport-lighting-option"
+                      data-active={lightingPreset === id}
+                      onClick={() => { setLightingPreset(id); setShowLightingMenu(false); }}
+                    >
+                      <span className={`viewport-lighting-swatch viewport-lighting-swatch--${id}`} />
+                      {t(`editor.lighting${id.charAt(0).toUpperCase() + id.slice(1)}` as any)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               className="viewport-toolbar-btn"
               data-active={viewportMeasurementMode}

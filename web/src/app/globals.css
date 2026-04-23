@@ -3799,6 +3799,83 @@ select:focus {
   background: rgba(0, 0, 0, 0.08);
 }
 
+.viewport-lighting-wrap {
+  position: relative;
+}
+
+.viewport-lighting-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(17, 17, 19, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  min-width: 130px;
+  z-index: 30;
+  animation: fadeInUp 0.15s ease-out;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.viewport-lighting-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-family: var(--font-body);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.viewport-lighting-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.viewport-lighting-option[data-active="true"] {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--amber);
+}
+
+.viewport-lighting-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.viewport-lighting-swatch--default {
+  background: linear-gradient(135deg, #2a3545, #3a3428);
+}
+
+.viewport-lighting-swatch--summer {
+  background: linear-gradient(135deg, #88bbee, #ffe8c0);
+}
+
+.viewport-lighting-swatch--winter {
+  background: linear-gradient(135deg, #6680aa, #dde4f0);
+}
+
+.viewport-lighting-swatch--evening {
+  background: linear-gradient(135deg, #554488, #ffaa55);
+}
+
 .viewport-status {
   font-size: 11px;
   font-family: var(--font-mono);
