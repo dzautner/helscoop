@@ -174,6 +174,11 @@ describe("getTranslation — English (en)", () => {
     expect(t("editor.redo")).toBe("Redo");
   });
 
+  it("resolves layer panel keys", () => {
+    expect(t("layers.title")).toBe("Layers");
+    expect(t("layers.costApprox")).toBe("Approximate cost");
+  });
+
   it("resolves toast keys", () => {
     expect(t("toast.projectCreated")).toBe("Project created");
     expect(t("toast.saveFailed")).toBe("Save failed");
@@ -597,6 +602,10 @@ describe("exhaustive i18n key parity", () => {
     "legal.termsChangesBody",
     // screenshot
     "screenshot.dialogTitle", "screenshot.popoverLabel", "screenshot.download", "screenshot.copy", "screenshot.copied",
+    // layers
+    "layers.eyebrow", "layers.title", "layers.empty", "layers.layerCount",
+    "layers.showLayer", "layers.hideLayer", "layers.lockLayer", "layers.unlockLayer",
+    "layers.openMaterial", "layers.costApprox", "layers.noCost", "layers.viewportHint",
     // commandPalette
     "commandPalette.title", "commandPalette.placeholder", "commandPalette.noResults",
     "commandPalette.navigate", "commandPalette.execute", "commandPalette.close",
