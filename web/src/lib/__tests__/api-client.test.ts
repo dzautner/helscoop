@@ -128,4 +128,22 @@ describe("blob-backed downloads", () => {
     vi.advanceTimersByTime(30_000);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:pdf-download");
   });
+
+  it("returns generated IFC text for preview without triggering a download", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () => "ISO-10303-21; IFC4X3_ADD2;",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const ifcText = await api.getIFC("project-1");
+
+    expect(ifcText).toBe("ISO-10303-21; IFC4X3_ADD2;");
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:3001/ifc-export/generate?projectId=project-1", {
+      headers: { Authorization: "Bearer download-token" },
+    });
+    expect(document.querySelector("a[download]")).toBeNull();
+  });
 });

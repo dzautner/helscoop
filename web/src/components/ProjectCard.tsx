@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Project, ProjectStatus } from "@/types";
 import AchievementBadges from "@/components/AchievementBadges";
 import { buildEuEnergyGrantPrecheck } from "@/lib/eu-energy-grants";
+import { readIfcReadinessBadge, type IfcReadinessBadge } from "@/lib/ifc-preview";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   planning: "var(--amber, #e5a04b)",
@@ -58,6 +59,11 @@ export default function ProjectCard({
     }).fundingBadge,
     [project.bom, project.building_info, project.estimated_cost],
   );
+  const [ifcReadiness, setIfcReadiness] = useState<IfcReadinessBadge>(() => readIfcReadinessBadge(project.id, project.updated_at));
+
+  useEffect(() => {
+    setIfcReadiness(readIfcReadinessBadge(project.id, project.updated_at));
+  }, [project.id, project.updated_at]);
 
   return (
     <div
@@ -144,6 +150,11 @@ export default function ProjectCard({
             {fundingSignal.show && (
               <span className="badge" style={{ borderColor: "rgba(74,124,89,0.36)", color: "var(--forest)" }}>
                 {locale === "fi" ? "Tukia" : "Funding"} {fundingSignal.amount.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} &euro;
+              </span>
+            )}
+            {ifcReadiness.show && (
+              <span className="badge" style={{ borderColor: "rgba(37,99,235,0.28)", color: "var(--info, #2563eb)" }}>
+                {locale === "fi" ? "Lupapiste valmis" : ifcReadiness.label}
               </span>
             )}
             {Number(project.view_count || 0) > 0 && (
