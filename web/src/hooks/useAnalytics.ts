@@ -46,6 +46,7 @@ export type AnalyticsEvent =
   | "project_imported"
   | "chat_message_sent"
   | "chat_code_applied"
+  | "chat_code_validation_failed"
   | "auth_register"
   | "auth_login"
   | "auth_google_login"
@@ -89,6 +90,7 @@ export interface AnalyticsEventProps {
   project_imported: { format: "helscoop" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;
+  chat_code_validation_failed: Record<string, never>;
   auth_register: Record<string, never>;
   auth_login: Record<string, never>;
   auth_google_login: Record<string, never>;
