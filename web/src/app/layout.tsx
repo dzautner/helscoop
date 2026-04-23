@@ -102,6 +102,11 @@ export default function RootLayout({
             __html: `(function(){try{var l=localStorage.getItem("helscoop_locale")||"fi";document.documentElement.lang=l}catch(e){}})()`
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if("serviceWorker"in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js")})}`
+          }}
+        />
         {/* Google Identity Services — for Google Sign-In */}
         <script src="https://accounts.google.com/gsi/client" async defer />
         {/* Apple JS SDK — for Sign in with Apple */}
