@@ -88,7 +88,7 @@ export interface AnalyticsEventProps {
   financing_partner_clicked: { partner: string; loan_amount: number; term_years: number; target: "loan_comparison" | "materials_bnpl" };
   financing_conversion_reported: { partner: string; amount: number; status: "started" | "qualified" | "approved" | "rejected" };
   bom_exported: { format: "pdf" | "csv" | "json" };
-  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" | "permit_pack_zip" | "photo_overlay_png" };
+  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" | "permit_pack_zip" | "photo_overlay_png" | "proposal_pdf" };
   project_imported: { format: "helscoop" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;

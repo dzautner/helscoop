@@ -27,13 +27,14 @@ const mockDoc = {
   getNumberOfPages: vi.fn(() => 1),
   setPage: vi.fn(),
   save: vi.fn(),
+  splitTextToSize: vi.fn((text: string) => [text]),
 };
 
 vi.mock("jspdf", () => ({
   jsPDF: vi.fn(() => mockDoc),
 }));
 
-import { generateAraGrantPdf, generateQuotePdf } from "@/lib/pdf";
+import { generateAraGrantPdf, generateProposalPdf, generateQuotePdf } from "@/lib/pdf";
 import type { BomItem } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -114,6 +115,42 @@ describe("generateQuotePdf — basic", () => {
         locale: "fi",
       })
     ).not.toThrow();
+  });
+});
+
+describe("generateProposalPdf — branded proposal", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDoc.getNumberOfPages.mockReturnValue(3);
+    mockDoc.splitTextToSize.mockImplementation((text: string) => [text]);
+  });
+
+  it("generates a multi-page proposal PDF with project visuals and costs", () => {
+    generateProposalPdf({
+      projectName: "Sauna Renovation",
+      projectDescription: "New sauna cladding and terrace",
+      bom: [makeBomItem(), makeBomItem({ category_name: "Windows", material_name: "Triple glazed window", total: 900 })],
+      locale: "en",
+      buildingInfo: {
+        address: "Testikatu 1",
+        year_built: 1984,
+        area_m2: 142,
+        heating: "District heat",
+        type: "Detached house",
+      },
+      sceneJs: "scene.add(box(1,1,1));",
+      sceneImage: "data:image/png;base64,scene",
+      beforeImage: "data:image/jpeg;base64,before",
+      householdDeductionJoint: true,
+    });
+
+    const textCalls = mockDoc.text.mock.calls.map((call: unknown[]) => String(call[0]));
+    expect(textCalls).toContain("Helscoop — Renovation Proposal");
+    expect(textCalls).toContain("Building overview");
+    expect(textCalls).toContain("Before / after views");
+    expect(textCalls).toContain("Cost summary");
+    expect(mockDoc.addImage).toHaveBeenCalled();
+    expect(mockDoc.save).toHaveBeenCalledWith("helscoop_proposal_Sauna_Renovation.pdf");
   });
 });
 
