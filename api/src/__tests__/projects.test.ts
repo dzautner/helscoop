@@ -507,7 +507,41 @@ describe("PUT /projects/:id", () => {
     expect(res.status).toBe(200);
     expect((res.body as { household_deduction_joint: boolean }).household_deduction_joint).toBe(true);
     expect(mockQuery.mock.calls[0][0]).toContain("household_deduction_joint=COALESCE");
-    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, null, null, "proj-1", "user-1"]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, null, null, null, "proj-1", "user-1"]);
+  });
+
+  it("persists scene parameter presets", async () => {
+    const param_presets = [
+      { name: "Budget", values: { roofPitch: 22, insulationDepth: 250 } },
+      { name: "Premium", values: { roofPitch: 30, insulationDepth: 350 } },
+    ];
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", param_presets }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { param_presets },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { param_presets: typeof param_presets }).param_presets).toEqual(param_presets);
+    expect(mockQuery.mock.calls[0][0]).toContain("param_presets=COALESCE");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      null,
+      JSON.stringify(param_presets),
+      "proj-1",
+      "user-1",
+    ]);
   });
 });
 
