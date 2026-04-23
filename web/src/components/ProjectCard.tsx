@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Project, ProjectStatus } from "@/types";
+import AchievementBadges from "@/components/AchievementBadges";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   planning: "var(--amber, #e5a04b)",
@@ -199,6 +200,7 @@ export default function ProjectCard({
             </div>
           </div>
         )}
+        <AchievementBadges project={project} />
         <div className="project-card-actions" style={{ marginTop: 10, position: "relative", zIndex: 1 }}>
           <button className="btn btn-ghost" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", fontSize: 11, gap: 4 }} aria-label={t('project.copyAriaLabel', { name: project.name })} onClick={() => onDuplicate(project.id)}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
