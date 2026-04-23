@@ -400,6 +400,38 @@
   background: rgba(229, 160, 75, 0.1);
 }
 
+.timelapse-transport-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.timelapse-nav-btn {
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.timelapse-nav-btn:hover:not(:disabled) {
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.3);
+  background: rgba(229, 160, 75, 0.06);
+}
+
+.timelapse-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .timelapse-cost {
   font-size: 10px;
   color: var(--text-muted);
