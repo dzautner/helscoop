@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -9,6 +9,7 @@ import { useCursorGlow } from "@/hooks/useCursorGlow";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { buildSavingsRecommendations } from "@/lib/bom-savings";
+import { countSceneAddCalls } from "@/lib/scene-a11y";
 import type { ChatMessage, BomItem, Material } from "@/types";
 
 interface ChatContextBuildingInfo {
@@ -188,14 +189,6 @@ export default function ChatPanel({
     return match ? match[1].trim() : null;
   }
 
-  /** Count scene.add calls in code to show preview hint */
-  const countSceneObjects = useMemo(() => {
-    return (code: string): number => {
-      const matches = code.match(/scene\.add\(/g);
-      return matches ? matches.length : 0;
-    };
-  }, []);
-
   return (
     <div className="chat-embedded panel-glow" ref={glow.ref} onMouseMove={glow.onMouseMove} onMouseLeave={glow.onMouseLeave}>
       {/* Messages area - expands when there are messages */}
@@ -224,6 +217,7 @@ export default function ChatPanel({
                 .replace(/```(?:javascript|js)?\n[\s\S]*?```/g, "")
                 .trim();
               const grouped = shouldGroup(msg, messages[i - 1]);
+              const codeObjectCount = code ? countSceneAddCalls(code) : 0;
 
               return (
                 <div
@@ -256,7 +250,7 @@ export default function ChatPanel({
                           {t('editor.applyToScene')}
                         </button>
                         <span className="chat-apply-hint">
-                          {countSceneObjects(code)} {countSceneObjects(code) === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
+                          {codeObjectCount} {codeObjectCount === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
                         </span>
                       </div>
                     )}

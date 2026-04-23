@@ -59,4 +59,17 @@ describe("accessibility foundation", () => {
     expect(chatPanel).toContain('aria-live="polite"');
     expect(chatPanel).toContain('aria-relevant="additions text"');
   });
+
+  it("announces scene modifications after viewport-affecting actions", () => {
+    const editor = readSource("../app/project/[id]/page.tsx");
+
+    expect(editor).toContain("sceneA11yAnnouncement");
+    expect(editor).toContain("queueSceneAnnouncement");
+    expect(editor).toContain("countSceneAddCalls");
+    expect(editor).toContain('data-testid="scene-a11y-announcer"');
+    expect(editor).toContain('role="status"');
+    expect(editor).toContain('aria-live="polite"');
+    expect(editor).toContain('aria-atomic="true"');
+    expect(editor).toContain("editor.sceneChangeAnnouncement");
+  });
 });
