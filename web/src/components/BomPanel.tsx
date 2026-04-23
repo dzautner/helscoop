@@ -13,6 +13,7 @@ import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsP
 import QuoteRequestModal from "@/components/QuoteRequestModal";
 import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import RenovationRoiPanel from "@/components/RenovationRoiPanel";
+import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
 import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
@@ -2751,6 +2752,15 @@ export default function BomPanel({
         )}
         {projectId && (
           <RyhtiSubmissionPanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
+        )}
+        {bom.length > 0 && (
+          <RenovationRoadmapPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            projectName={projectName}
+            projectDescription={projectDescription}
+          />
         )}
         {bom.length > 0 && (
           <button
