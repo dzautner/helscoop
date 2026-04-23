@@ -1072,6 +1072,18 @@ export default function ProjectPage() {
     if (mode === "advanced") markCodeEditor();
   }, [markCodeEditor, track]);
 
+  const handleBlueprintSceneApply = useCallback(
+    (code: string) => {
+      queueSceneAnnouncement("editor.sceneUpdatedFromEditor");
+      setSceneJs(code);
+      pushHistory(code);
+      handleEditorModeChange("advanced");
+      setShowCode(true);
+      if (isMobileEditor) setActiveMobilePanel("code");
+    },
+    [handleEditorModeChange, isMobileEditor, pushHistory, queueSceneAnnouncement],
+  );
+
   const applyGuidedPlan = useCallback(
     (plan: GuidedRenovationPlan, state: RenovationWizardState, advanced = false) => {
       track("renovation_wizard_completed", {
@@ -4006,6 +4018,7 @@ export default function ProjectPage() {
               projectId={projectId}
               householdDeductionJoint={householdDeductionJoint}
               onHouseholdDeductionJointChange={updateHouseholdDeductionMode}
+              onApplyScene={handleBlueprintSceneApply}
             />
           </>
         )}
