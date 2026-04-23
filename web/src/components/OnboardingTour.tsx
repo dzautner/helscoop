@@ -331,6 +331,49 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     }
   }, [currentStep, targetRect]);
 
+  const handlePrev = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
+
+  const handleNext = useCallback(() => {
+    if (currentStep < visibleSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      onComplete();
+    }
+  }, [currentStep, visibleSteps.length, onComplete]);
+
+  const handleSkip = useCallback(() => {
+    onComplete();
+  }, [onComplete]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      switch (e.key) {
+        case "Escape":
+          handleSkip();
+          break;
+        case "Enter":
+        case "ArrowRight":
+          handleNext();
+          break;
+        case "ArrowLeft":
+          handlePrev();
+          break;
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSkip, handleNext, handlePrev]);
+
+  useEffect(() => {
+    if (tooltipRef.current) {
+      tooltipRef.current.focus();
+    }
+  }, [currentStep]);
+
   if (visibleSteps.length === 0 || !step) {
     onComplete();
     return null;
@@ -338,7 +381,6 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
 
   const padding = 8;
 
-  // Build the spotlight clip-path (inverted rectangle)
   const spotlightStyle: React.CSSProperties = targetRect
     ? {
         boxShadow: `0 0 0 9999px rgba(0,0,0,0.55), 0 0 16px 4px rgba(229,160,75,0.1)`,
@@ -368,51 +410,6 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
         tooltipSize.height
       )
     : { top: window.innerHeight / 2 - 75, left: window.innerWidth / 2 - tooltipWidth / 2 };
-
-  const handlePrev = useCallback(() => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  }, [currentStep]);
-
-  const handleNext = useCallback(() => {
-    if (currentStep < visibleSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onComplete();
-    }
-  }, [currentStep, visibleSteps.length, onComplete]);
-
-  const handleSkip = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
-
-  // Keyboard navigation: Escape to skip, Enter/ArrowRight for next, ArrowLeft for previous
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      switch (e.key) {
-        case "Escape":
-          handleSkip();
-          break;
-        case "Enter":
-        case "ArrowRight":
-          handleNext();
-          break;
-        case "ArrowLeft":
-          handlePrev();
-          break;
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSkip, handleNext, handlePrev]);
-
-  // Auto-focus tooltip when it appears or step changes
-  useEffect(() => {
-    if (tooltipRef.current) {
-      tooltipRef.current.focus();
-    }
-  }, [currentStep]);
 
   const isLast = currentStep === visibleSteps.length - 1;
   return (
