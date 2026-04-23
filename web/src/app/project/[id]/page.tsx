@@ -28,7 +28,7 @@ import {
 } from "@/lib/scene-geometry-bom";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
-import { calculateThermalLoss, heatFluxToColor } from "@/lib/thermal-engine";
+import { calculateThermalLoss, heatFluxToColor, getComplianceSummary } from "@/lib/thermal-engine";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
@@ -707,15 +707,18 @@ export default function ProjectPage() {
 
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
 
-  const thermalColorMap = useMemo(() => {
+  const thermalData = useMemo(() => {
     if (!thermalView || materials.length === 0) return undefined;
     const result = calculateThermalLoss(materials);
     const colorMap = new Map<string, [number, number, number]>();
     result.surfaces.forEach((data) => {
       colorMap.set(data.materialId, heatFluxToColor(data.heatFluxDensity, result.minHeatFlux, result.maxHeatFlux));
     });
-    return colorMap;
+    const compliance = getComplianceSummary(result.surfaces);
+    return { colorMap, compliance };
   }, [thermalView, materials]);
+
+  const thermalColorMap = thermalData?.colorMap;
 
   const renovationRoi = useMemo(
     () => estimateRenovationRoi(bom, materials, project?.building_info ?? null, { coupleMode: householdDeductionJoint }),
@@ -2758,6 +2761,22 @@ export default function ProjectPage() {
                 <span>{t('editor.thermalLow')}</span>
                 <span>{t('editor.thermalHigh')}</span>
               </div>
+              {thermalData?.compliance && (thermalData.compliance.pass + thermalData.compliance.warn + thermalData.compliance.fail) > 0 && (
+                <div className="thermal-compliance-row">
+                  <span className="thermal-compliance-title">{t('editor.codeCompliance')}</span>
+                  <div className="thermal-compliance-badges">
+                    {thermalData.compliance.pass > 0 && (
+                      <span className="thermal-badge thermal-badge-pass">{t('editor.compliancePass')} {thermalData.compliance.pass}</span>
+                    )}
+                    {thermalData.compliance.warn > 0 && (
+                      <span className="thermal-badge thermal-badge-warn">{t('editor.complianceWarn')} {thermalData.compliance.warn}</span>
+                    )}
+                    {thermalData.compliance.fail > 0 && (
+                      <span className="thermal-badge thermal-badge-fail">{t('editor.complianceFail')} {thermalData.compliance.fail}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

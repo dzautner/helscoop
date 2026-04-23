@@ -129,6 +129,56 @@ export function getHeatLossRating(heatFlux: number): string {
   return "severe";
 }
 
+// --- Finnish building code reference U-values (YM decree 1010/2017) ---
+
+export type ComplianceStatus = "pass" | "warn" | "fail";
+
+export interface CodeComplianceResult {
+  category: string;
+  uValue: number;
+  referenceU: number;
+  status: ComplianceStatus;
+}
+
+const REFERENCE_U_VALUES: Record<string, number> = {
+  insulation: 0.17,
+  opening: 1.0,
+  roofing: 0.09,
+  cladding: 0.17,
+  sheathing: 0.17,
+};
+
+export function checkCodeCompliance(
+  category: string,
+  uValue: number,
+): CodeComplianceResult {
+  const referenceU = REFERENCE_U_VALUES[category] ?? 0.17;
+  let status: ComplianceStatus;
+  if (uValue <= referenceU) {
+    status = "pass";
+  } else if (uValue <= referenceU * 1.2) {
+    status = "warn";
+  } else {
+    status = "fail";
+  }
+  return { category, uValue, referenceU, status };
+}
+
+export function getComplianceSummary(
+  surfaces: Map<string, SurfaceThermalData>,
+): { pass: number; warn: number; fail: number; results: CodeComplianceResult[] } {
+  const results: CodeComplianceResult[] = [];
+  let pass = 0, warn = 0, fail = 0;
+  surfaces.forEach((data) => {
+    const result = checkCodeCompliance(data.category, data.uValue);
+    results.push(result);
+    if (result.status === "pass") pass++;
+    else if (result.status === "warn") warn++;
+    else fail++;
+  });
+  return { pass, warn, fail, results };
+}
+
 // --- Climate data and annual energy cost calculation ---
 
 export interface ClimateLocation {
