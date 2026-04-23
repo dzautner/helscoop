@@ -67,7 +67,7 @@ describe("ProjectCard", () => {
       bom: [{ material_id: "solar-panel", material_name: "Solar panel", category_name: "solar", quantity: 80, unit: "pcs" }],
     };
     render(<ProjectCard project={fundedProject} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);
-    expect(screen.getByText(/Funding 45,000/)).toBeInTheDocument();
+    expect(screen.getByText(/project\.fundingBadge/)).toBeInTheDocument();
   });
 
   it("renders Lupapiste readiness badge after IFC validation has passed", () => {
@@ -83,7 +83,7 @@ describe("ProjectCard", () => {
 
     render(<ProjectCard project={mockProject} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);
 
-    expect(screen.getByText("Ready for Lupapiste")).toBeInTheDocument();
+    expect(screen.getByText("project.ifcReady")).toBeInTheDocument();
   });
 
   it("hides cost badge when estimated_cost is 0", () => {

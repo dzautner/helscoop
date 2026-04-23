@@ -149,12 +149,12 @@ export default function ProjectCard({
             )}
             {fundingSignal.show && (
               <span className="badge" style={{ borderColor: "rgba(74,124,89,0.36)", color: "var(--forest)" }}>
-                {locale === "fi" ? "Tukia" : "Funding"} {fundingSignal.amount.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} &euro;
+                {t("project.fundingBadge")} {fundingSignal.amount.toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} &euro;
               </span>
             )}
             {ifcReadiness.show && (
               <span className="badge" style={{ borderColor: "rgba(37,99,235,0.28)", color: "var(--info, #2563eb)" }}>
-                {locale === "fi" ? "Lupapiste valmis" : ifcReadiness.label}
+                {t("project.ifcReady")}
               </span>
             )}
             {Number(project.view_count || 0) > 0 && (
@@ -208,7 +208,7 @@ export default function ProjectCard({
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{project.description || t('project.emptyDescription')}</span>
             <span style={{ opacity: 0.5 }}>&middot;</span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
-              {new Date(project.updated_at).toLocaleDateString(locale === 'fi' ? 'fi-FI' : 'en-GB')}
+              {new Date(project.updated_at).toLocaleDateString(locale === 'fi' ? 'fi-FI' : locale === 'sv' ? 'sv-SE' : 'en-GB')}
             </span>
           </div>
         </div>
