@@ -576,7 +576,7 @@ function SuppliersTab() {
                       rel="noopener noreferrer"
                       style={{ color: "var(--accent)", textDecoration: "none" }}
                     >
-                      {new URL(s.website).hostname}
+                      {(() => { try { return new URL(s.website).hostname; } catch { return s.website; } })()}
                     </a>
                   ) : (
                     <span style={{ color: "var(--text-muted)" }}>-</span>

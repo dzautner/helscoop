@@ -323,7 +323,7 @@ export default function AddressSearch({
                   }
                 }}
                 disabled={creating}
-                style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontWeight: 600 }}
+                style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontWeight: 600, opacity: creating ? 0.7 : 1 }}
               >
                 {creating ? t('search.creatingProject') : t('search.createFromBuilding')}
               </button>

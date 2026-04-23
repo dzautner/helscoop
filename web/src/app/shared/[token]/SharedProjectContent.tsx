@@ -67,7 +67,7 @@ export default function SharedProjectContent({ token }: { token: string }) {
         color: "var(--text-muted)",
         fontSize: 14,
       }} role="status" aria-live="polite" aria-busy="true">
-        {t('editor.loadingProject')}
+        <h1 style={{ fontSize: 14, fontWeight: 400, margin: 0 }}>{t('editor.loadingProject')}</h1>
       </div>
     );
   }
