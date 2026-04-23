@@ -55,6 +55,17 @@ describe("ProjectCard", () => {
     expect(screen.getByText(/8500/)).toBeInTheDocument();
   });
 
+  it("renders funding badge for community energy projects", () => {
+    const fundedProject: Project = {
+      ...mockProject,
+      estimated_cost: 60000,
+      building_info: { type: "kerrostalo", units: 24 },
+      bom: [{ material_id: "solar-panel", material_name: "Solar panel", category_name: "solar", quantity: 80, unit: "pcs" }],
+    };
+    render(<ProjectCard project={fundedProject} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);
+    expect(screen.getByText(/Funding 45,000/)).toBeInTheDocument();
+  });
+
   it("hides cost badge when estimated_cost is 0", () => {
     const noCost = { ...mockProject, estimated_cost: 0 };
     const { container } = render(<ProjectCard project={noCost} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);
