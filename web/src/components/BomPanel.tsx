@@ -17,6 +17,7 @@ import RenovationFinancingPanel from "@/components/RenovationFinancingPanel";
 import EuEnergyGrantPrecheckPanel from "@/components/EuEnergyGrantPrecheckPanel";
 import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
+import IfcPreviewPanel from "@/components/IfcPreviewPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
 import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
 import PermitCheckerPanel from "@/components/PermitCheckerPanel";
@@ -2766,6 +2767,9 @@ export default function BomPanel({
         )}
         {bom.length > 0 && projectId && (
           <WasteEstimatePanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
+        )}
+        {projectId && (
+          <IfcPreviewPanel projectId={projectId} projectName={projectName} />
         )}
         {projectId && (
           <RyhtiSubmissionPanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />

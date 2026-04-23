@@ -20,6 +20,7 @@ vi.mock("@/components/LocaleProvider", () => ({
 }));
 
 import ProjectCard from "@/components/ProjectCard";
+import { IFC_READINESS_STORAGE_KEY } from "@/lib/ifc-preview";
 import type { Project } from "@/types";
 
 const mockProject: Project = {
@@ -36,7 +37,10 @@ const mockProject: Project = {
 const mockOnDuplicate = vi.fn();
 const mockOnDelete = vi.fn();
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
 describe("ProjectCard", () => {
   it("renders project name as link", () => {
@@ -64,6 +68,22 @@ describe("ProjectCard", () => {
     };
     render(<ProjectCard project={fundedProject} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);
     expect(screen.getByText(/Funding 45,000/)).toBeInTheDocument();
+  });
+
+  it("renders Lupapiste readiness badge after IFC validation has passed", () => {
+    localStorage.setItem(IFC_READINESS_STORAGE_KEY, JSON.stringify({
+      [mockProject.id]: {
+        ready: true,
+        schema: "IFC4X3_ADD2",
+        checkedAt: "2026-04-23T00:00:00.000Z",
+        warningCount: 0,
+        blockingIssueCount: 0,
+      },
+    }));
+
+    render(<ProjectCard project={mockProject} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);
+
+    expect(screen.getByText("Ready for Lupapiste")).toBeInTheDocument();
   });
 
   it("hides cost badge when estimated_cost is 0", () => {

@@ -514,6 +514,20 @@ export const api = {
     const blob = await res.blob();
     downloadBlob(blob, `helscoop_permit_${projectName.replace(/\s+/g, '_')}.ifc`);
   },
+  getIFC: async (projectId: string): Promise<string> => {
+    const t = getToken();
+    const res = await fetch(`${API_URL}/ifc-export/generate?projectId=${encodeURIComponent(projectId)}`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        ERROR_MESSAGES[res.status] || `Virhe ${res.status} / Error ${res.status}`,
+        res.status,
+        res.statusText
+      );
+    }
+    return res.text();
+  },
   exportPermitPack: async (projectId: string, projectName: string) => {
     const t = getToken();
     const res = await fetch(`${API_URL}/permit-pack/projects/${encodeURIComponent(projectId)}/export`, {
