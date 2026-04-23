@@ -2334,6 +2334,7 @@ export default function BomPanel({
   return (
     <div
       className="editor-bom-panel panel-glow"
+      data-panel="bom"
       data-tour="bom-panel"
       style={{ position: "relative", ...style }}
       ref={glow.ref}

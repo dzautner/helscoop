@@ -17,6 +17,7 @@ import { getPresentationPreset, type PresentationPresetId } from "@/lib/presenta
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ViewCube from "@/components/ViewCube";
 import Minimap from "@/components/Minimap";
+import { groupLayerSeeds, type LayerSeed } from "@/lib/scene-layers";
 
 export interface ViewportPresentationApi {
   captureFrame: (options?: {
@@ -48,11 +49,16 @@ interface Viewport3DProps {
   initialPresentationPreset?: PresentationPresetId;
   onToggleWireframe?: () => void;
   onMaterialSurfaceSelect?: (selection: ViewportMaterialSelection) => void;
+  onObjectSurfaceSelect?: (objectId: string) => void;
+  onRenderedLayersChange?: (layers: LayerSeed[]) => void;
   onMeasurementModeChange?: (active: boolean) => void;
   projectName?: string;
   thermalView?: boolean;
   thermalColorMap?: Map<string, [number, number, number]>;
   lightingPreset?: LightingPresetId;
+  selectedObjectId?: string | null;
+  hiddenObjectIds?: Set<string>;
+  lockedObjectIds?: Set<string>;
 }
 
 export type LightingPresetId = "default" | "summer" | "winter" | "evening";
@@ -260,6 +266,9 @@ function addSingleTessellatedMesh(
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData.materialId = tess.material;
   mesh.userData.objectId = tess.objectId;
+  mesh.userData.baseColor = tess.color;
+  mesh.userData.baseOpacity = pbr.opacity ?? 1;
+  mesh.userData.baseTransparent = Boolean(pbr.transparent);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   parent.add(mesh);
@@ -274,6 +283,16 @@ function addTessellatedMeshes(
     addSingleTessellatedMesh(parent, tess, wireframe);
   }
   return meshes.length;
+}
+
+function buildRenderedLayerSeeds(meshes: TessellatedObject[]): LayerSeed[] {
+  return groupLayerSeeds(
+    meshes.map((mesh) => ({
+      objectId: mesh.objectId,
+      materialId: mesh.material,
+      color: mesh.color,
+    })),
+  );
 }
 
 function animateCamera(
@@ -553,11 +572,16 @@ export default function Viewport3D({
   initialPresentationPreset,
   onToggleWireframe,
   onMaterialSurfaceSelect,
+  onObjectSurfaceSelect,
+  onRenderedLayersChange,
   onMeasurementModeChange,
   projectName,
   thermalView = false,
   thermalColorMap,
   lightingPreset = "default",
+  selectedObjectId = null,
+  hiddenObjectIds,
+  lockedObjectIds,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -579,6 +603,7 @@ export default function Viewport3D({
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [isComputing, setIsComputing] = useState(false);
   const [tessProgress, setTessProgress] = useState<{ done: number; total: number } | null>(null);
+  const [sceneRenderTick, setSceneRenderTick] = useState(0);
   const [measurementMode, setMeasurementMode] = useState(false);
   const [measurementUnit, setMeasurementUnit] = useState<MeasurementUnit>("mm");
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -647,11 +672,11 @@ export default function Viewport3D({
     }
   }, []);
 
-  const pickDimensionOverlay = useCallback((clientX: number, clientY: number): DimensionOverlay | null => {
+  const getSceneIntersections = useCallback((clientX: number, clientY: number): THREE.Intersection[] => {
     const renderer = rendererRef.current;
     const camera = cameraRef.current;
     const group = objectGroupRef.current;
-    if (!renderer || !camera || !group) return null;
+    if (!renderer || !camera || !group) return [];
 
     const rect = renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
@@ -660,9 +685,38 @@ export default function Viewport3D({
     );
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
-    const hit = raycaster
-      .intersectObjects(group.children, true)
-      .find((candidate) => candidate.object instanceof THREE.Mesh);
+    return raycaster.intersectObjects(group.children, true);
+  }, []);
+
+  const pickSceneIntersection = useCallback((
+    clientX: number,
+    clientY: number,
+    options?: {
+      requireMaterial?: boolean;
+      requireObjectId?: boolean;
+      ignoreLocked?: boolean;
+    },
+  ): THREE.Intersection | null => {
+    const intersections = getSceneIntersections(clientX, clientY);
+    return intersections.find((candidate) => {
+      const object = candidate.object;
+      if (!(object instanceof THREE.Mesh) || !object.visible) return false;
+
+      const objectId = typeof object.userData.objectId === "string" ? object.userData.objectId : null;
+      if (options?.requireObjectId && !objectId) return false;
+      if (options?.ignoreLocked !== false && objectId && lockedObjectIds?.has(objectId)) return false;
+
+      if (options?.requireMaterial) {
+        const materialId = object.userData.materialId;
+        return typeof materialId === "string" && materialId.length > 0 && materialId !== "default";
+      }
+
+      return true;
+    }) ?? null;
+  }, [getSceneIntersections, lockedObjectIds]);
+
+  const pickDimensionOverlay = useCallback((clientX: number, clientY: number): DimensionOverlay | null => {
+    const hit = pickSceneIntersection(clientX, clientY, { ignoreLocked: false });
     if (!hit) return null;
 
     const mesh = hit.object as THREE.Mesh;
@@ -678,23 +732,15 @@ export default function Viewport3D({
       height: size.y,
       depth: size.z,
     };
-  }, []);
+  }, [pickSceneIntersection]);
 
   const pickMeasurementPoint = useCallback((clientX: number, clientY: number): THREE.Vector3 | null => {
-    const renderer = rendererRef.current;
     const camera = cameraRef.current;
-    const group = objectGroupRef.current;
-    if (!renderer || !camera || !group) return null;
+    const renderer = rendererRef.current;
+    if (!camera || !renderer) return null;
 
     const rect = renderer.domElement.getBoundingClientRect();
-    const mouse = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -(((clientY - rect.top) / rect.height) * 2 - 1),
-    );
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
-    const intersections = raycaster.intersectObjects(group.children, true);
-    const hit = intersections[0];
+    const hit = pickSceneIntersection(clientX, clientY, { ignoreLocked: false });
     if (!hit) return null;
 
     const mesh = hit.object instanceof THREE.Mesh ? hit.object : null;
@@ -775,26 +821,10 @@ export default function Viewport3D({
     }
 
     return nearest ?? hit.point.clone();
-  }, []);
+  }, [pickSceneIntersection]);
 
   const pickMaterialSurface = useCallback((clientX: number, clientY: number): ViewportMaterialSelection | null => {
-    const renderer = rendererRef.current;
-    const camera = cameraRef.current;
-    const group = objectGroupRef.current;
-    if (!renderer || !camera || !group) return null;
-
-    const rect = renderer.domElement.getBoundingClientRect();
-    const mouse = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -(((clientY - rect.top) / rect.height) * 2 - 1),
-    );
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
-    const intersections = raycaster.intersectObjects(group.children, true);
-    const hit = intersections.find((candidate) => {
-      const materialId = candidate.object.userData.materialId;
-      return typeof materialId === "string" && materialId.length > 0 && materialId !== "default";
-    });
+    const hit = pickSceneIntersection(clientX, clientY, { requireMaterial: true });
     if (!hit) return null;
 
     return {
@@ -804,7 +834,13 @@ export default function Viewport3D({
       clientX,
       clientY,
     };
-  }, []);
+  }, [pickSceneIntersection]);
+
+  const pickObjectSurface = useCallback((clientX: number, clientY: number): string | null => {
+    const hit = pickSceneIntersection(clientX, clientY, { requireObjectId: true });
+    const objectId = hit?.object.userData.objectId;
+    return typeof objectId === "string" && objectId.length > 0 ? objectId : null;
+  }, [pickSceneIntersection]);
 
   const rebuildMeasurementVisuals = useCallback(() => {
     const group = measurementGroupRef.current;
@@ -1226,7 +1262,9 @@ export default function Viewport3D({
             disposeObject(group);
             parentScene.add(freshGroup);
             objectGroupRef.current = freshGroup;
+            setSceneRenderTick((tick) => tick + 1);
             onObjectCount?.(count);
+            onRenderedLayersChange?.(buildRenderedLayerSeeds(fallback.meshes));
           }
         }
         setIsComputing(false);
@@ -1239,11 +1277,13 @@ export default function Viewport3D({
       disposeObject(group);
       parentScene.add(stagingGroup);
       objectGroupRef.current = stagingGroup;
+      setSceneRenderTick((tick) => tick + 1);
 
       lastValidSceneRef.current = script;
       onError?.(null);
       onErrorLine?.(null);
       onObjectCount?.(result.meshes.length);
+      onRenderedLayersChange?.(buildRenderedLayerSeeds(result.meshes));
       setIsComputing(false);
       setTessProgress(null);
 
@@ -1361,7 +1401,7 @@ export default function Viewport3D({
         }
       }
     },
-    [initialPresentationPreset, onObjectCount, onError, onErrorLine, onWarnings]
+    [initialPresentationPreset, onObjectCount, onError, onErrorLine, onRenderedLayersChange, onWarnings]
   );
 
   // Debounced scene update — 100ms for snappy param slider response
@@ -1372,39 +1412,50 @@ export default function Viewport3D({
     return () => clearTimeout(timer);
   }, [sceneJs, wireframe, updateScene]);
 
-  // Thermal view: override mesh colors when active, restore originals when off
-  const originalColorsRef = useRef<Map<THREE.Mesh, THREE.Color>>(new Map());
-
-  useEffect(() => {
+  const refreshMeshAppearance = useCallback(() => {
     const group = objectGroupRef.current;
     if (!group) return;
 
-    if (thermalView && thermalColorMap) {
-      group.traverse((child) => {
-        if (!(child instanceof THREE.Mesh)) return;
-        const mid = child.userData.materialId as string | undefined;
-        if (!mid) return;
-        const mat = child.material as THREE.MeshStandardMaterial;
-        if (!originalColorsRef.current.has(child)) {
-          originalColorsRef.current.set(child, mat.color.clone());
-        }
-        const rgb = thermalColorMap.get(mid);
-        if (rgb) {
-          mat.color.setRGB(rgb[0], rgb[1], rgb[2]);
-          mat.emissive.setRGB(rgb[0] * 0.15, rgb[1] * 0.15, rgb[2] * 0.15);
-          mat.needsUpdate = true;
-        }
-      });
-    } else {
-      originalColorsRef.current.forEach((color, mesh) => {
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        mat.color.copy(color);
-        mat.emissive.setRGB(0, 0, 0);
-        mat.needsUpdate = true;
-      });
-      originalColorsRef.current.clear();
-    }
-  }, [thermalView, thermalColorMap]);
+    group.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+
+      const mat = child.material as THREE.MeshStandardMaterial;
+      const materialId = child.userData.materialId as string | undefined;
+      const objectId = child.userData.objectId as string | undefined;
+      const baseColor = Array.isArray(child.userData.baseColor)
+        ? child.userData.baseColor as [number, number, number]
+        : [1, 1, 1] as [number, number, number];
+      const baseOpacity = typeof child.userData.baseOpacity === "number" ? child.userData.baseOpacity : 1;
+      const baseTransparent = Boolean(child.userData.baseTransparent);
+      const thermalRgb = thermalView && materialId ? thermalColorMap?.get(materialId) : undefined;
+      const displayColor = thermalRgb ?? baseColor;
+      const isSelected = Boolean(objectId && selectedObjectId === objectId);
+      const isHidden = Boolean(objectId && hiddenObjectIds?.has(objectId));
+
+      child.visible = !isHidden;
+      mat.transparent = baseTransparent;
+      mat.opacity = baseOpacity;
+      mat.color.setRGB(displayColor[0], displayColor[1], displayColor[2]);
+
+      const emissiveBase: [number, number, number] = thermalRgb
+        ? [thermalRgb[0] * 0.15, thermalRgb[1] * 0.15, thermalRgb[2] * 0.15]
+        : [0, 0, 0];
+      if (isSelected) {
+        mat.emissive.setRGB(
+          Math.min(1, emissiveBase[0] + 0.45),
+          Math.min(1, emissiveBase[1] + 0.24),
+          Math.min(1, emissiveBase[2] + 0.06),
+        );
+      } else {
+        mat.emissive.setRGB(emissiveBase[0], emissiveBase[1], emissiveBase[2]);
+      }
+      mat.needsUpdate = true;
+    });
+  }, [hiddenObjectIds, selectedObjectId, thermalColorMap, thermalView]);
+
+  useEffect(() => {
+    refreshMeshAppearance();
+  }, [refreshMeshAppearance, sceneRenderTick]);
 
   // Lighting preset: update lights, fog, ground, bloom, and env map
   useEffect(() => {
@@ -1703,14 +1754,14 @@ export default function Viewport3D({
   }, []);
 
   const handleSurfacePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!onMaterialSurfaceSelect || measurementMode || e.button !== 0) return;
+    if ((!onMaterialSurfaceSelect && !onObjectSurfaceSelect) || measurementMode || e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest("button") || target.closest("a") || target.closest("input") || target.closest("select") || target.closest("textarea")) return;
     surfacePointerDownRef.current = { x: e.clientX, y: e.clientY, button: e.button };
-  }, [measurementMode, onMaterialSurfaceSelect]);
+  }, [measurementMode, onMaterialSurfaceSelect, onObjectSurfaceSelect]);
 
   const handleSurfacePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!onMaterialSurfaceSelect || measurementMode) return;
+    if ((!onMaterialSurfaceSelect && !onObjectSurfaceSelect) || measurementMode) return;
     const start = surfacePointerDownRef.current;
     surfacePointerDownRef.current = null;
     if (!start || start.button !== e.button || e.button !== 0) return;
@@ -1719,9 +1770,16 @@ export default function Viewport3D({
     const dy = e.clientY - start.y;
     if (dx * dx + dy * dy > 36) return;
 
-    const selection = pickMaterialSurface(e.clientX, e.clientY);
-    if (selection) onMaterialSurfaceSelect(selection);
-  }, [measurementMode, onMaterialSurfaceSelect, pickMaterialSurface]);
+    if (onObjectSurfaceSelect) {
+      const objectId = pickObjectSurface(e.clientX, e.clientY);
+      if (objectId) onObjectSurfaceSelect(objectId);
+    }
+
+    if (onMaterialSurfaceSelect) {
+      const selection = pickMaterialSurface(e.clientX, e.clientY);
+      if (selection) onMaterialSurfaceSelect(selection);
+    }
+  }, [measurementMode, onMaterialSurfaceSelect, onObjectSurfaceSelect, pickMaterialSurface, pickObjectSurface]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -2096,7 +2154,12 @@ export default function Viewport3D({
         <span>{t("editor.gridScale")}</span>
         <strong>1 m</strong>
       </div>
-      {onMaterialSurfaceSelect && !measurementMode && (
+      {onObjectSurfaceSelect && !measurementMode && (
+        <div className="viewport-measure-hint" style={{ left: 12, right: "auto" }}>
+          {t("layers.viewportHint")}
+        </div>
+      )}
+      {!onObjectSurfaceSelect && onMaterialSurfaceSelect && !measurementMode && (
         <div className="viewport-measure-hint" style={{ left: 12, right: "auto" }}>
           {t("editor.materialConfiguratorHint")}
         </div>

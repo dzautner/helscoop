@@ -19,6 +19,7 @@ import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
+import LayerPanel from "@/components/LayerPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import {
   analyzeSceneGeometry,
@@ -57,6 +58,7 @@ import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import PriceSummaryBar from "@/components/PriceSummaryBar";
 import type { DataProvenance } from "@/lib/confidence";
+import { buildSceneLayers, type LayerSeed } from "@/lib/scene-layers";
 
 /** Parse a validation warning key like "validation.typoDetected:scene" into
  *  an i18n key and parameters, then resolve via the translation function. */
@@ -285,6 +287,7 @@ export default function ProjectPage() {
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [showParams, setShowParams] = useState(true);
+  const [showLayers, setShowLayers] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
@@ -305,6 +308,10 @@ export default function ProjectPage() {
   const [showLightingMenu, setShowLightingMenu] = useState(false);
   const lightingMenuRef = useRef<HTMLDivElement>(null);
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [hiddenLayerIds, setHiddenLayerIds] = useState<Set<string>>(() => new Set());
+  const [lockedLayerIds, setLockedLayerIds] = useState<Set<string>>(() => new Set());
+  const [renderedLayers, setRenderedLayers] = useState<LayerSeed[]>([]);
   const [priceChangeSummary, setPriceChangeSummary] = useState<ProjectPriceChangeSummary | null>(null);
   const [duplicating, setDuplicating] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
@@ -714,6 +721,7 @@ export default function ProjectPage() {
     });
     return colorMap;
   }, [thermalView, materials]);
+  const sceneLayers = useMemo(() => buildSceneLayers(renderedLayers, bom), [bom, renderedLayers]);
 
   const renovationRoi = useMemo(
     () => estimateRenovationRoi(bom, materials, project?.building_info ?? null, { coupleMode: householdDeductionJoint }),
@@ -723,6 +731,29 @@ export default function ProjectPage() {
     () => Array.from(manualBomOverrideIds).sort().join("|"),
     [manualBomOverrideIds],
   );
+
+  useEffect(() => {
+    const nextIds = new Set(sceneLayers.map((layer) => layer.id));
+    const hasSameMembers = (left: Set<string>, right: Set<string>) => left.size === right.size && Array.from(left).every((id) => right.has(id));
+
+    setSelectedLayerId((current) => (current && nextIds.has(current) ? current : null));
+    setHiddenLayerIds((current) => {
+      const filtered = new Set(Array.from(current).filter((id) => nextIds.has(id)));
+      return hasSameMembers(current, filtered) ? current : filtered;
+    });
+    setLockedLayerIds((current) => {
+      const filtered = new Set(Array.from(current).filter((id) => nextIds.has(id)));
+      return hasSameMembers(current, filtered) ? current : filtered;
+    });
+  }, [sceneLayers]);
+
+  useEffect(() => {
+    if (!showLayers) setSelectedLayerId(null);
+  }, [showLayers]);
+
+  useEffect(() => {
+    if (showLayers) setSurfacePickerMaterialId(null);
+  }, [showLayers]);
 
   useEffect(() => {
     if (!initialLoadDone) return;
@@ -882,6 +913,11 @@ export default function ProjectPage() {
     });
   }, [isMobileEditor]);
 
+  const toggleLayersPanel = useCallback(() => {
+    if (isMobileEditor) return;
+    setShowLayers((visible) => !visible);
+  }, [isMobileEditor]);
+
   const duplicateProject = useCallback(async () => {
     setShowHeaderMenu(false);
     setDuplicating(true);
@@ -953,6 +989,7 @@ export default function ProjectPage() {
     setShowExportMenu(false);
     setShowHeaderMenu(false);
     setShowDocs(false);
+    setShowLayers(false);
     if (isMobileEditor) setActiveMobilePanel("viewport");
   }, [isMobileEditor]);
 
@@ -1590,6 +1627,36 @@ export default function ProjectPage() {
     [bom, materials, pushHistory, queueSceneAnnouncement, t, toast, track],
   );
 
+  const handleSelectLayer = useCallback((layerId: string) => {
+    setSelectedLayerId(layerId);
+  }, []);
+
+  const handleToggleLayerVisibility = useCallback((layerId: string, options?: { solo?: boolean }) => {
+    setHiddenLayerIds((current) => {
+      if (options?.solo) {
+        return new Set(sceneLayers.filter((layer) => layer.id !== layerId).map((layer) => layer.id));
+      }
+
+      const next = new Set(current);
+      if (next.has(layerId)) next.delete(layerId);
+      else next.add(layerId);
+      return next;
+    });
+  }, [sceneLayers]);
+
+  const handleToggleLayerLock = useCallback((layerId: string) => {
+    setLockedLayerIds((current) => {
+      const next = new Set(current);
+      if (next.has(layerId)) next.delete(layerId);
+      else next.add(layerId);
+      return next;
+    });
+  }, []);
+
+  const handleViewportObjectSelect = useCallback((objectId: string) => {
+    setSelectedLayerId(objectId);
+  }, []);
+
   const surfacePickerContext = useMemo(() => {
     if (!surfacePickerMaterialId) return null;
 
@@ -1607,6 +1674,20 @@ export default function ProjectPage() {
       bomItem,
     };
   }, [bom, materials, surfacePickerMaterialId]);
+
+  const handleOpenLayerMaterial = useCallback((layerId: string) => {
+    const layer = sceneLayers.find((entry) => entry.id === layerId);
+    if (!layer) return;
+
+    const hasBomMaterial = bom.some((item) => item.material_id === layer.materialId);
+    const matchedMaterial = matchSceneMaterial(layer.materialId, materials);
+    if (!hasBomMaterial && !matchedMaterial) {
+      toast(t("materialPicker.surfaceNoMatch", { material: layer.materialId }), "info");
+      return;
+    }
+
+    setSurfacePickerMaterialId(layer.materialId);
+  }, [bom, materials, sceneLayers, t, toast]);
 
   const handleViewportMaterialSurfaceSelect = useCallback((selection: ViewportMaterialSelection) => {
     const hasBomMaterial = bom.some((item) => item.material_id === selection.materialId);
@@ -2575,12 +2656,17 @@ export default function ProjectPage() {
                 captureRef={captureThumbRef}
                 presentationRef={presentationRef}
                 onToggleWireframe={() => setWireframe(!wireframe)}
-                onMaterialSurfaceSelect={handleViewportMaterialSurfaceSelect}
+                onMaterialSurfaceSelect={showLayers ? undefined : handleViewportMaterialSurfaceSelect}
+                onObjectSurfaceSelect={showLayers ? handleViewportObjectSelect : undefined}
+                onRenderedLayersChange={setRenderedLayers}
                 onMeasurementModeChange={setViewportMeasurementMode}
                 projectName={projectName}
                 thermalView={thermalView}
                 thermalColorMap={thermalColorMap}
                 lightingPreset={lightingPreset}
+                selectedObjectId={showLayers ? selectedLayerId : null}
+                hiddenObjectIds={hiddenLayerIds}
+                lockedObjectIds={lockedLayerIds}
               />
             </ErrorBoundary>
           </div>
@@ -2719,6 +2805,24 @@ export default function ProjectPage() {
                   <line x1="20" y1="12" x2="20" y2="3" />
                 </svg>
                 {t('editor.params') || "Params"}
+              </button>
+            )}
+            {!isMobileEditor && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showLayers}
+                onClick={toggleLayersPanel}
+                title={t("layers.title")}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 6h16" />
+                  <path d="M4 12h16" />
+                  <path d="M4 18h16" />
+                  <circle cx="8" cy="6" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="16" cy="18" r="1.5" />
+                </svg>
+                {t("layers.title")}
               </button>
             )}
             <span className="viewport-toolbar-sep" />
@@ -2864,7 +2968,7 @@ export default function ProjectPage() {
           <PriceSummaryBar
             bom={bom}
             onViewBom={showBom ? undefined : () => {
-              const el = document.querySelector(".editor-bom-panel");
+              const el = document.querySelector('[data-panel="bom"]');
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }}
           />
@@ -3016,6 +3120,19 @@ export default function ProjectPage() {
           <SceneParamsPanel
             params={sceneParams}
             onParamChange={handleParamChange}
+          />
+        )}
+
+        {showLayers && !isMobileEditor && (
+          <LayerPanel
+            layers={sceneLayers}
+            selectedLayerId={selectedLayerId}
+            hiddenLayerIds={hiddenLayerIds}
+            lockedLayerIds={lockedLayerIds}
+            onSelectLayer={handleSelectLayer}
+            onToggleLayerVisibility={handleToggleLayerVisibility}
+            onToggleLayerLock={handleToggleLayerLock}
+            onOpenLayerMaterial={handleOpenLayerMaterial}
           />
         )}
 
