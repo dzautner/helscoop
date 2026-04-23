@@ -17,6 +17,7 @@ import RenovationFinancingPanel from "@/components/RenovationFinancingPanel";
 import EuEnergyGrantPrecheckPanel from "@/components/EuEnergyGrantPrecheckPanel";
 import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
 import PhasedRenovationPlannerPanel from "@/components/PhasedRenovationPlannerPanel";
+import KrautaProPartnerPanel from "@/components/KrautaProPartnerPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import IfcPreviewPanel from "@/components/IfcPreviewPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
@@ -2731,6 +2732,14 @@ export default function BomPanel({
             bom={bom}
             materials={materials}
             buildingInfo={buildingInfo}
+          />
+        )}
+        {bom.length > 0 && (
+          <KrautaProPartnerPanel
+            bom={bom}
+            materials={materials}
+            projectName={projectName}
+            projectDescription={projectDescription}
           />
         )}
         {bom.length > 0 && (
