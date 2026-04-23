@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import {
   calculateSunPosition,
@@ -74,6 +74,41 @@ export default function DaylightPanel({
     [],
   );
 
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const rafRef = useRef<number>(0);
+  const lastFrameRef = useRef<number>(0);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    if (!playing) return;
+    timeRef.current = hour * 60 + minute;
+
+    const tick = (timestamp: number) => {
+      if (!lastFrameRef.current) lastFrameRef.current = timestamp;
+      const elapsed = timestamp - lastFrameRef.current;
+      lastFrameRef.current = timestamp;
+
+      const minutesPerSecond = (24 * 60) / 20 * speed;
+      timeRef.current += (elapsed / 1000) * minutesPerSecond;
+      if (timeRef.current >= 24 * 60) timeRef.current -= 24 * 60;
+
+      const nextHour = Math.floor(timeRef.current / 60);
+      const nextMinute = Math.floor(timeRef.current % 60);
+      setHour(nextHour);
+      setMinute(nextMinute);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    lastFrameRef.current = 0;
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, speed]);
+
   const monthLabel = useMemo(() => {
     const loc = locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB";
     const d = new Date(2026, month, 1);
@@ -144,14 +179,40 @@ export default function DaylightPanel({
               min={0}
               max={23}
               value={hour}
-              onChange={(e) => setHour(Number(e.target.value))}
+              onChange={(e) => { setPlaying(false); setHour(Number(e.target.value)); setMinute(0); }}
               className="daylight-slider"
             />
             <span className="daylight-value">
-              {String(hour).padStart(2, "0")}:00
+              {String(hour).padStart(2, "0")}:{String(minute).padStart(2, "0")}
             </span>
           </div>
         </label>
+        <div className="daylight-playback-row">
+          <button
+            type="button"
+            className="daylight-play-btn"
+            onClick={() => setPlaying((v) => !v)}
+            aria-label={playing ? t("editor.daylightPause") : t("editor.daylightPlay")}
+            title={playing ? t("editor.daylightPause") : t("editor.daylightPlay")}
+          >
+            {playing ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z" /></svg>
+            )}
+          </button>
+          {[1, 2, 4].map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="daylight-speed-btn"
+              data-active={speed === s}
+              onClick={() => setSpeed(s)}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="daylight-panel-sun-times">
