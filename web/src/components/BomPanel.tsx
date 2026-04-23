@@ -17,6 +17,7 @@ import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
 import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
 import PermitCheckerPanel from "@/components/PermitCheckerPanel";
+import ShoppingListModal from "@/components/ShoppingListModal";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
@@ -1902,6 +1903,7 @@ export default function BomPanel({
   const [searchFocused, setSearchFocused] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [activePackage, setActivePackage] = useState<PackageTierId>("standard");
+  const [showShoppingList, setShowShoppingList] = useState(false);
   const [packageDelta, setPackageDelta] = useState<number | null>(null);
   const [packageFlashKey, setPackageFlashKey] = useState(0);
   const [lockedPackageMaterials, setLockedPackageMaterials] = useState<Set<string>>(() => new Set());
@@ -2745,7 +2747,55 @@ export default function BomPanel({
             {t('bom.exportCsv')}
           </button>
         )}
+        {bom.length > 0 && (
+          <button
+            onClick={() => setShowShoppingList(true)}
+            aria-label={t('shoppingList.title')}
+            style={{
+              marginTop: 6,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "var(--font-body)",
+              color: "var(--text-secondary)",
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-secondary)";
+              e.currentTarget.style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--bg-tertiary)";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            {t('shoppingList.title')}
+          </button>
+        )}
       </div>
+
+      {showShoppingList && (
+        <ShoppingListModal
+          bom={bom}
+          materials={materials}
+          projectName={projectName}
+          onClose={() => setShowShoppingList(false)}
+        />
+      )}
 
       {/* Scene material sync banner */}
       {unmatchedSceneMaterials.length > 0 && unmatchedSceneMaterials.some((u) => u.matched) && (
