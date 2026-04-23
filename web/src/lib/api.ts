@@ -22,6 +22,7 @@ import type {
   RenovationCostEstimateResponse,
   RenovationCostIndexResponse,
   RyhtiPermitMetadata,
+  TerrainGrid,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -647,6 +648,8 @@ export const api = {
 
   getBuilding: (address: string) =>
     apiFetch(`/building?address=${encodeURIComponent(address)}`),
+  getTerrain: (bbox: [number, number, number, number], crs: "3067" | "4326" = "3067"): Promise<TerrainGrid> =>
+    apiFetch(`/terrain?bbox=${bbox.join(",")}&crs=${crs}`),
 
   // Entitlements
   getEntitlements: () => apiFetch("/entitlements"),
