@@ -297,6 +297,8 @@ export interface BomItem {
   store_location?: string | null;
   stock_last_checked_at?: string | null;
   note?: string;
+  manual_override?: boolean;
+  geometry_driven?: boolean;
 }
 
 export interface QuoteRequestPayload {
