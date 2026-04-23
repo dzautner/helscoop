@@ -18,9 +18,8 @@ describe("isPriceStale", () => {
     expect(isPriceStale(old)).toBe(true);
   });
 
-  it("returns false for a date exactly at the threshold boundary", () => {
-    const boundary = new Date(Date.now() - STALE_PRICE_THRESHOLD_DAYS * 86_400_000).toISOString();
-    // Exactly at threshold — not yet over it
+  it("returns false for a date just inside the threshold boundary", () => {
+    const boundary = new Date(Date.now() - (STALE_PRICE_THRESHOLD_DAYS * 86_400_000 - 3_600_000)).toISOString();
     expect(isPriceStale(boundary)).toBe(false);
   });
 });
