@@ -40,7 +40,7 @@ import OnboardingTour from "@/components/OnboardingTour";
 import DaylightPanel from "@/components/DaylightPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ConfettiCelebration from "@/components/ConfettiCelebration";
-import { generateAraGrantPdf } from "@/lib/pdf";
+import { generateAraGrantPdf, generateProposalPdf } from "@/lib/pdf";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -323,7 +323,7 @@ export default function ProjectPage() {
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
-  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | "permit" | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "proposal" | "csv" | "json" | "ara" | "ifc" | "permit" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showAraChecklist, setShowAraChecklist] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -1374,6 +1374,39 @@ export default function ProjectPage() {
     }
   }, [locale, projectId, projectName, save, t, toast, track]);
 
+  const exportProposalPdf = useCallback(async () => {
+    setShowExportMenu(false);
+    setExportingFormat("proposal");
+    try {
+      await save();
+      const sceneImage = presentationRef.current?.captureFrame({
+        presetId: "iso",
+        width: 1600,
+        height: 900,
+        watermark: false,
+      }) ?? captureThumbRef.current?.() ?? project?.thumbnail_url ?? null;
+      track("project_exported", { format: "proposal_pdf" });
+      generateProposalPdf({
+        projectName,
+        projectDescription: projectDesc,
+        bom,
+        locale,
+        buildingInfo: project?.building_info,
+        sceneJs,
+        sceneImage,
+        beforeImage: photoOverlay?.data_url ?? null,
+        householdDeductionJoint,
+      });
+      toast(t("proposal.generated"), "success");
+      playSound("exportDone");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("proposal.generateFailed"), "error");
+      playSound("error");
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [bom, householdDeductionJoint, locale, photoOverlay, playSound, project?.building_info, project?.thumbnail_url, projectDesc, projectName, save, sceneJs, t, toast, track]);
+
   const exportAraGrantPackage = useCallback(() => {
     setShowAraChecklist(false);
     setShowExportMenu(false);
@@ -1522,6 +1555,18 @@ export default function ProjectPage() {
           </svg>
         ),
         action: () => { void exportQuotePdf(); },
+      },
+      {
+        id: "export-proposal-pdf",
+        labelKey: "commandPalette.exportProposal",
+        labelSecondaryKey: "commandPalette.exportProposalEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16v16H4z" />
+            <path d="M8 8h8M8 12h5M8 16h8" />
+          </svg>
+        ),
+        action: () => { void exportProposalPdf(); },
       },
       {
         id: "export-ara-grant",
@@ -1705,7 +1750,7 @@ export default function ProjectPage() {
         isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -2507,6 +2552,25 @@ export default function ProjectPage() {
                     </svg>
                   )}
                   PDF
+                </button>
+                <button
+                  role="menuitem"
+                  className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
+                  onClick={() => { void exportProposalPdf(); }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "proposal" ? 0.4 : 1 }}
+                >
+                  {exportingFormat === "proposal" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16v16H4z" />
+                      <path d="M8 8h8M8 12h5M8 16h8" />
+                    </svg>
+                  )}
+                  {t("proposal.exportMenu")}
                 </button>
                 <button
                   role="menuitem"

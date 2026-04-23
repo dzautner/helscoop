@@ -588,6 +588,11 @@ const translations = {
       pitchMode: 'Contractor pitch',
       pitchModeDesc: 'Jaettu 3D-näkymä, kustannusarvio ja materiaalilista yhdessä linkissä.',
     },
+    proposal: {
+      exportMenu: 'Remonttiehdotus',
+      generated: 'Remonttiehdotus viety PDF-tiedostona',
+      generateFailed: 'Remonttiehdotuksen vienti epäonnistui',
+    },
     shortcuts: {
       title: 'Pikanäppäimet',
       close: 'Sulje',
@@ -991,6 +996,8 @@ const translations = {
       toggleBomEn: 'Toggle BOM panel',
       exportPdf: 'Vie PDF-tiedostona',
       exportPdfEn: 'Export as PDF',
+      exportProposal: 'Vie remonttiehdotus',
+      exportProposalEn: 'Export proposal',
       exportAraGrant: 'Vie ARA-avustuspaketti',
       exportAraGrantEn: 'Export ARA grant package',
       exportIfcPermit: 'Vie IFC-rakennuslupaan',
@@ -2268,6 +2275,11 @@ const translations = {
       pitchMode: 'Contractor pitch',
       pitchModeDesc: 'Shared 3D view, cost estimate, and material list in one link.',
     },
+    proposal: {
+      exportMenu: 'Renovation proposal',
+      generated: 'Renovation proposal exported as PDF',
+      generateFailed: 'Failed to export renovation proposal',
+    },
     shortcuts: {
       title: 'Keyboard shortcuts',
       close: 'Close',
@@ -2682,6 +2694,8 @@ const translations = {
       toggleBomEn: 'Toggle BOM panel',
       exportPdf: 'Export as PDF',
       exportPdfEn: 'Export as PDF',
+      exportProposal: 'Export proposal',
+      exportProposalEn: 'Export proposal',
       exportAraGrant: 'Export ARA grant package',
       exportAraGrantEn: 'Export ARA grant package',
       exportIfcPermit: 'Export IFC for permit',
@@ -3874,6 +3888,11 @@ const translations = {
       pitchMode: 'Entreprenörpitch',
       pitchModeDesc: 'Delad 3D-vy, kostnadsuppskattning och materiallista i en länk.',
     },
+    proposal: {
+      exportMenu: 'Renoveringsförslag',
+      generated: 'Renoveringsförslag exporterades som PDF',
+      generateFailed: 'Kunde inte exportera renoveringsförslag',
+    },
     shortcuts: {
       title: 'Kortkommandon',
       close: 'Stäng',
@@ -4286,6 +4305,8 @@ const translations = {
       toggleBomEn: 'Toggle BOM panel',
       exportPdf: 'Exportera som PDF',
       exportPdfEn: 'Export as PDF',
+      exportProposal: 'Exportera förslag',
+      exportProposalEn: 'Export proposal',
       exportAraGrant: 'Exportera ARA-bidragspaket',
       exportAraGrantEn: 'Export ARA grant package',
       exportIfcPermit: 'Exportera IFC för bygglov',
