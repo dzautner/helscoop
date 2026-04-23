@@ -29,6 +29,7 @@ export interface Project {
   thumbnail_url?: string | null;
   building_info?: BuildingInfo | null;
   permit_metadata?: RyhtiPermitMetadata | null;
+  photo_overlay?: PhotoOverlayState | null;
   share_token?: string | null;
   share_token_expires_at?: string | null;
   view_count?: number;
@@ -39,6 +40,19 @@ export interface Project {
   bom?: BomItem[];
   comments?: SharedProjectComment[];
   param_presets?: ParamPreset[];
+}
+
+export interface PhotoOverlayState {
+  data_url: string;
+  file_name?: string | null;
+  opacity: number;
+  compare_mode: boolean;
+  compare_position: number;
+  offset_x: number;
+  offset_y: number;
+  scale: number;
+  rotation: number;
+  updated_at?: string;
 }
 
 export interface SharedProjectComment {

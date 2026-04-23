@@ -56,6 +56,7 @@ import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary } from "@/types";
+import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
@@ -63,6 +64,12 @@ import ConfidenceBadge from "@/components/ConfidenceBadge";
 import PriceSummaryBar from "@/components/PriceSummaryBar";
 import type { DataProvenance } from "@/lib/confidence";
 import { buildSceneLayers, type LayerSeed } from "@/lib/scene-layers";
+import {
+  PHOTO_OVERLAY_DEFAULTS,
+  composePhotoOverlayExport,
+  normalizePhotoOverlayState,
+  readPhotoOverlayFile,
+} from "@/lib/photo-overlay";
 
 /** Parse a validation warning key like "validation.typoDetected:scene" into
  *  an i18n key and parameters, then resolve via the translation function. */
@@ -308,10 +315,7 @@ export default function ProjectPage() {
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [showEnergyDashboard, setShowEnergyDashboard] = useState(false);
   const [showDaylightPanel, setShowDaylightPanel] = useState(false);
-  const [photoOverlayUrl, setPhotoOverlayUrl] = useState<string | null>(null);
-  const [photoOverlayOpacity, setPhotoOverlayOpacity] = useState(0.4);
-  const [photoCompareMode, setPhotoCompareMode] = useState(false);
-  const [photoComparePos, setPhotoComparePos] = useState(50);
+  const [photoOverlay, setPhotoOverlay] = useState<PhotoOverlayState | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const compareDragging = useRef(false);
   const [sunDirection, setSunDirection] = useState<[number, number, number] | undefined>();
@@ -370,6 +374,74 @@ export default function ProjectPage() {
   const activeVersionBranchRef = useRef<string | null>(null);
   const geometryBaselineRef = useRef<{ sceneJs: string; metrics: SceneGeometryMetrics } | null>(null);
   const dismissedGeometrySceneRef = useRef<string | null>(null);
+
+  const photoOverlayUrl = photoOverlay?.data_url ?? null;
+  const photoOverlayOpacity = photoOverlay?.opacity ?? PHOTO_OVERLAY_DEFAULTS.opacity;
+  const photoCompareMode = photoOverlay?.compare_mode ?? PHOTO_OVERLAY_DEFAULTS.compare_mode;
+  const photoComparePos = photoOverlay?.compare_position ?? PHOTO_OVERLAY_DEFAULTS.compare_position;
+  const photoOffsetX = photoOverlay?.offset_x ?? PHOTO_OVERLAY_DEFAULTS.offset_x;
+  const photoOffsetY = photoOverlay?.offset_y ?? PHOTO_OVERLAY_DEFAULTS.offset_y;
+  const photoScale = photoOverlay?.scale ?? PHOTO_OVERLAY_DEFAULTS.scale;
+  const photoRotation = photoOverlay?.rotation ?? PHOTO_OVERLAY_DEFAULTS.rotation;
+
+  const updatePhotoOverlay = useCallback((patch: Partial<PhotoOverlayState>) => {
+    setPhotoOverlay((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        ...patch,
+        updated_at: new Date().toISOString(),
+      };
+    });
+  }, []);
+
+  const handlePhotoOverlayFile = useCallback(async (file: File | null | undefined) => {
+    if (!file) return;
+    try {
+      const next = await readPhotoOverlayFile(file);
+      setPhotoOverlay(next);
+      toast(t("photoOverlay.uploaded"), "success");
+      track("project_photo_overlay_uploaded", { file_type: file.type });
+    } catch (err) {
+      const message = err instanceof Error ? t(err.message) : t("photoOverlay.readFailed");
+      toast(message, "error");
+    }
+  }, [t, toast, track]);
+
+  const clearPhotoOverlay = useCallback(() => {
+    setPhotoOverlay(null);
+  }, []);
+
+  const resetPhotoOverlayAlignment = useCallback(() => {
+    updatePhotoOverlay({
+      offset_x: PHOTO_OVERLAY_DEFAULTS.offset_x,
+      offset_y: PHOTO_OVERLAY_DEFAULTS.offset_y,
+      scale: PHOTO_OVERLAY_DEFAULTS.scale,
+      rotation: PHOTO_OVERLAY_DEFAULTS.rotation,
+    });
+  }, [updatePhotoOverlay]);
+
+  const exportPhotoOverlayPng = useCallback(async () => {
+    if (!photoOverlay) return;
+    const modelFrame = presentationRef.current?.captureFrame({ watermark: false });
+    if (!modelFrame) {
+      toast(t("photoOverlay.exportFailed"), "error");
+      return;
+    }
+    try {
+      const dataUrl = await composePhotoOverlayExport(modelFrame, photoOverlay);
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `${projectName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "_") || "helscoop"}_photo_overlay.png`;
+      link.click();
+      toast(t("photoOverlay.exported"), "success");
+      track("project_exported", { format: "photo_overlay_png" });
+      playSound("exportDone");
+    } catch {
+      toast(t("photoOverlay.exportFailed"), "error");
+      playSound("error");
+    }
+  }, [photoOverlay, playSound, projectName, t, toast, track]);
 
   const queueSceneAnnouncement = useCallback((actionKey: SceneAnnouncementKey) => {
     pendingSceneAnnouncementRef.current = actionKey;
@@ -443,6 +515,8 @@ export default function ProjectPage() {
           setShareToken(proj.share_token);
           setShareExpiresAt(proj.share_token_expires_at ?? null);
         }
+        const initialPhotoOverlay = normalizePhotoOverlayState(proj.photo_overlay);
+        setPhotoOverlay(initialPhotoOverlay);
         setParamPresets(proj.param_presets || []);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
@@ -471,6 +545,7 @@ export default function ProjectPage() {
             quantity: b.quantity,
             unit: b.unit,
           })),
+          photo_overlay: initialPhotoOverlay,
         });
         setTimeout(() => {
           initialLoadDoneRef.current = true;
@@ -515,8 +590,9 @@ export default function ProjectPage() {
       description: projectDesc,
       scene_js: sceneJs,
       bom: bomForSave,
+      photo_overlay: photoOverlay,
     }),
-    [projectName, projectDesc, sceneJs, bomForSave]
+    [projectName, projectDesc, sceneJs, bomForSave, photoOverlay]
   );
   const currentVersionSnapshot = useMemo(
     () => buildProjectVersionSnapshot({
@@ -1123,12 +1199,13 @@ export default function ProjectPage() {
         description: snapshot.description || "",
         scene_js: snapshot.scene_js || DEFAULT_SCENE,
         bom: snapshot.bom,
+        photo_overlay: photoOverlay,
       });
       pushHistory(snapshot.scene_js || DEFAULT_SCENE);
       setViewportKey((key) => key + 1);
       toast(t("versions.restoreSuccess"), "success");
     },
-    [materials, pushHistory, queueSceneAnnouncement, setSavedSnapshot, t, toast],
+    [materials, photoOverlay, pushHistory, queueSceneAnnouncement, setSavedSnapshot, t, toast],
   );
 
   useEffect(() => {
@@ -2789,6 +2866,18 @@ export default function ProjectPage() {
             ref={viewportRef}
             className="editor-viewport-shell"
             data-tour="viewport"
+            onDragOver={(event) => {
+              if (Array.from(event.dataTransfer.items).some((item) => item.kind === "file" && item.type.startsWith("image/"))) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+              }
+            }}
+            onDrop={(event) => {
+              const file = Array.from(event.dataTransfer.files).find((item) => item.type.startsWith("image/"));
+              if (!file) return;
+              event.preventDefault();
+              void handlePhotoOverlayFile(file);
+            }}
             style={{
               flex: 1,
               minHeight: 0,
@@ -2917,18 +3006,26 @@ export default function ProjectPage() {
               <div
                 className="photo-overlay"
                 style={{
-                  position: "absolute",
-                  inset: 8,
-                  borderRadius: "var(--radius-md)",
-                  backgroundImage: `url(${photoOverlayUrl})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
                   opacity: photoCompareMode ? 1 : photoOverlayOpacity,
-                  pointerEvents: "none",
-                  zIndex: 5,
                   clipPath: photoCompareMode ? `inset(0 ${100 - photoComparePos}% 0 0)` : undefined,
                 }}
-              />
+              >
+                <img
+                  src={photoOverlayUrl}
+                  alt=""
+                  className="photo-overlay-image"
+                  style={{
+                    transform: `translate(${photoOffsetX}%, ${photoOffsetY}%) rotate(${photoRotation}deg) scale(${photoScale})`,
+                  }}
+                />
+                <div className="photo-alignment-guides" aria-hidden="true">
+                  <span className="photo-guide-horizon" />
+                  <span className="photo-guide-corner photo-guide-corner--tl" />
+                  <span className="photo-guide-corner photo-guide-corner--tr" />
+                  <span className="photo-guide-corner photo-guide-corner--bl" />
+                  <span className="photo-guide-corner photo-guide-corner--br" />
+                </div>
+              </div>
             )}
 
             {photoOverlayUrl && photoCompareMode && (
@@ -2945,9 +3042,10 @@ export default function ProjectPage() {
                   if (!container) return;
                   const rect = container.getBoundingClientRect();
                   const x = Math.max(0, Math.min(1, (e.clientX - rect.left - 8) / (rect.width - 16)));
-                  setPhotoComparePos(Math.round(x * 100));
+                  updatePhotoOverlay({ compare_position: Math.round(x * 100) });
                 }}
                 onPointerUp={() => { compareDragging.current = false; }}
+                onPointerCancel={() => { compareDragging.current = false; }}
               >
                 <div className="photo-compare-thumb">
                   <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
@@ -2969,18 +3067,20 @@ export default function ProjectPage() {
                     min={0}
                     max={100}
                     value={Math.round(photoOverlayOpacity * 100)}
-                    onChange={(e) => setPhotoOverlayOpacity(Number(e.target.value) / 100)}
+                    onChange={(e) => updatePhotoOverlay({ opacity: Number(e.target.value) / 100 })}
                     className="daylight-slider"
                     disabled={photoCompareMode}
                     style={photoCompareMode ? { opacity: 0.4 } : undefined}
+                    aria-label={t("photoOverlay.opacity")}
                   />
                   <span className="photo-overlay-value">{Math.round(photoOverlayOpacity * 100)}%</span>
                 </label>
                 <button
                   type="button"
                   className={`photo-compare-toggle${photoCompareMode ? " active" : ""}`}
-                  onClick={() => setPhotoCompareMode(!photoCompareMode)}
+                  onClick={() => updatePhotoOverlay({ compare_mode: !photoCompareMode })}
                   title={t("editor.photoCompare")}
+                  aria-pressed={photoCompareMode}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="2" x2="12" y2="22" />
@@ -2990,12 +3090,70 @@ export default function ProjectPage() {
                 </button>
                 <button
                   type="button"
+                  className="photo-overlay-action"
+                  onClick={() => { void exportPhotoOverlayPng(); }}
+                  title={t("photoOverlay.exportPng")}
+                >
+                  PNG
+                </button>
+                <button
+                  type="button"
+                  className="photo-overlay-action"
+                  onClick={resetPhotoOverlayAlignment}
+                  title={t("photoOverlay.resetAlignment")}
+                >
+                  0
+                </button>
+                <button
+                  type="button"
                   className="photo-overlay-clear"
-                  onClick={() => { setPhotoOverlayUrl(null); setPhotoCompareMode(false); }}
+                  onClick={clearPhotoOverlay}
                   aria-label={t("editor.photoOverlayClear")}
                 >
                   &times;
                 </button>
+                <div className="photo-alignment-controls" aria-label={t("photoOverlay.alignmentControls")}>
+                  <label>
+                    <span>{t("photoOverlay.offsetX")}</span>
+                    <input
+                      type="range"
+                      min={-40}
+                      max={40}
+                      value={photoOffsetX}
+                      onChange={(e) => updatePhotoOverlay({ offset_x: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    <span>{t("photoOverlay.offsetY")}</span>
+                    <input
+                      type="range"
+                      min={-40}
+                      max={40}
+                      value={photoOffsetY}
+                      onChange={(e) => updatePhotoOverlay({ offset_y: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    <span>{t("photoOverlay.scale")}</span>
+                    <input
+                      type="range"
+                      min={60}
+                      max={180}
+                      value={Math.round(photoScale * 100)}
+                      onChange={(e) => updatePhotoOverlay({ scale: Number(e.target.value) / 100 })}
+                    />
+                  </label>
+                  <label>
+                    <span>{t("photoOverlay.rotation")}</span>
+                    <input
+                      type="range"
+                      min={-15}
+                      max={15}
+                      value={photoRotation}
+                      onChange={(e) => updatePhotoOverlay({ rotation: Number(e.target.value) })}
+                    />
+                  </label>
+                </div>
               </div>
             )}
           </div>
@@ -3103,7 +3261,7 @@ export default function ProjectPage() {
               data-active={!!photoOverlayUrl}
               onClick={() => {
                 if (photoOverlayUrl) {
-                  setPhotoOverlayUrl(null);
+                  clearPhotoOverlay();
                 } else {
                   photoInputRef.current?.click();
                 }
@@ -3120,14 +3278,11 @@ export default function ProjectPage() {
             <input
               ref={photoInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png"
               style={{ display: "none" }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => setPhotoOverlayUrl(reader.result as string);
-                reader.readAsDataURL(file);
+                void handlePhotoOverlayFile(file);
                 e.target.value = "";
               }}
             />
