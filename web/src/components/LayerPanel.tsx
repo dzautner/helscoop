@@ -13,6 +13,7 @@ interface LayerPanelProps {
   onToggleLayerVisibility: (layerId: string, options?: { solo?: boolean }) => void;
   onToggleLayerLock: (layerId: string) => void;
   onOpenLayerMaterial?: (layerId: string) => void;
+  onFocusLayer?: (layerId: string) => void;
   style?: React.CSSProperties;
 }
 
@@ -61,6 +62,7 @@ export default function LayerPanel({
   onToggleLayerVisibility,
   onToggleLayerLock,
   onOpenLayerMaterial,
+  onFocusLayer,
   style,
 }: LayerPanelProps) {
   const { t, locale } = useTranslation();
@@ -181,7 +183,10 @@ export default function LayerPanel({
                 aria-disabled={locked}
                 tabIndex={selected ? 0 : -1}
                 onClick={() => {
-                  if (!locked) onSelectLayer(layer.id);
+                  if (!locked) {
+                    onSelectLayer(layer.id);
+                    onFocusLayer?.(layer.id);
+                  }
                 }}
                 onDoubleClick={() => {
                   if (!locked) onOpenLayerMaterial?.(layer.id);

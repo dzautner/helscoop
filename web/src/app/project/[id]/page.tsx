@@ -354,6 +354,7 @@ export default function ProjectPage() {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const captureThumbRef = useRef<(() => string | null) | null>(null);
   const presentationRef = useRef<ViewportPresentationApi | null>(null);
+  const focusObjectRef = useRef<((objectId: string) => void) | null>(null);
   const resizingRef = useRef(false);
   const activeVersionBranchRef = useRef<string | null>(null);
   const geometryBaselineRef = useRef<{ sceneJs: string; metrics: SceneGeometryMetrics } | null>(null);
@@ -2776,6 +2777,7 @@ export default function ProjectPage() {
                 lockedObjectIds={lockedLayerIds}
                 sunDirection={sunDirection}
                 sunAltitude={sunAltitude}
+                focusObjectRef={focusObjectRef}
               />
             </ErrorBoundary>
           </div>
@@ -3300,6 +3302,7 @@ export default function ProjectPage() {
             onToggleLayerVisibility={handleToggleLayerVisibility}
             onToggleLayerLock={handleToggleLayerLock}
             onOpenLayerMaterial={handleOpenLayerMaterial}
+            onFocusLayer={(layerId) => focusObjectRef.current?.(layerId)}
           />
         )}
 

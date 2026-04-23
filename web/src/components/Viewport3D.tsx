@@ -63,6 +63,7 @@ interface Viewport3DProps {
   lockedObjectIds?: Set<string>;
   sunDirection?: [number, number, number];
   sunAltitude?: number;
+  focusObjectRef?: React.MutableRefObject<((objectId: string) => void) | null>;
 }
 
 export type LightingPresetId = "default" | "summer" | "winter" | "evening";
@@ -590,6 +591,7 @@ export default function Viewport3D({
   lockedObjectIds,
   sunDirection,
   sunAltitude,
+  focusObjectRef,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -1467,6 +1469,41 @@ export default function Viewport3D({
     refreshMeshAppearance();
   }, [refreshMeshAppearance, sceneRenderTick]);
 
+  useEffect(() => {
+    if (!focusObjectRef) return;
+    focusObjectRef.current = (objectId: string) => {
+      const group = objectGroupRef.current;
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!group || !camera || !controls) return;
+
+      const box = new THREE.Box3();
+      let found = false;
+      group.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.userData.objectId === objectId && child.visible) {
+          box.expandByObject(child);
+          found = true;
+        }
+      });
+      if (!found) return;
+
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z, 0.5);
+      const dist = maxDim * 2.5;
+      const offset = new THREE.Vector3(dist * 0.6, dist * 0.5, dist * 0.7);
+      const pos: [number, number, number] = [
+        center.x + offset.x,
+        center.y + offset.y,
+        center.z + offset.z,
+      ];
+      animateCamera(camera, controls, pos, [center.x, center.y, center.z], 500);
+    };
+    return () => { focusObjectRef.current = null; };
+  }, [focusObjectRef]);
+
   // Lighting preset: update lights, fog, ground, bloom, and env map
   useEffect(() => {
     const config = LIGHTING_PRESETS[lightingPreset];
@@ -2147,6 +2184,12 @@ export default function Viewport3D({
         animateCamera(camera, controls, p[3].position, p[3].target);
       },
     },
+    ...(selectedObjectId ? [{
+      id: "focus-selection",
+      label: t("editor.focusSelection"),
+      icon: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7",
+      onClick: () => { focusObjectRef?.current?.(selectedObjectId); },
+    }] : []),
   ];
 
   return (
