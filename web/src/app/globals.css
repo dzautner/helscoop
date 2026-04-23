@@ -4251,6 +4251,159 @@ select:focus {
   background: rgba(0, 0, 0, 0.08);
 }
 
+.renovation-compare-shell {
+  --compare-split: 50%;
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+
+.renovation-compare-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.renovation-compare-pane--current {
+  flex: 0 0 var(--compare-split);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.renovation-compare-pane--planned {
+  flex: 1 1 0;
+}
+
+.renovation-compare-label {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 12;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(14, 14, 17, 0.74);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+
+.renovation-compare-label--planned {
+  left: auto;
+  right: 12px;
+  color: var(--amber);
+  border-color: var(--amber-border);
+  background: color-mix(in srgb, var(--amber-glow) 56%, rgba(14, 14, 17, 0.76));
+}
+
+.renovation-compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--compare-split);
+  z-index: 16;
+  width: 44px;
+  transform: translateX(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--amber);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.renovation-compare-divider-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, var(--amber), transparent);
+  box-shadow: 0 0 18px rgba(229, 160, 75, 0.55);
+}
+
+.renovation-compare-divider-thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--amber-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+  box-shadow: var(--shadow-md), 0 0 24px rgba(229, 160, 75, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.renovation-compare-divider:focus-visible .renovation-compare-divider-thumb {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+.renovation-cost-compare {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 78px;
+  z-index: 18;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-md);
+  background: rgba(14, 14, 17, 0.78);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.renovation-cost-compare div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.renovation-cost-compare span {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.renovation-cost-compare strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.renovation-cost-compare div:nth-child(2) strong {
+  color: var(--amber);
+}
+
+[data-theme="light"] .renovation-compare-label,
+[data-theme="light"] .renovation-cost-compare {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .renovation-compare-pane--current {
+  border-right-color: var(--border);
+}
+
 .viewport-lighting-wrap {
   position: relative;
 }
@@ -5976,6 +6129,52 @@ select:focus {
     flex: 0 0 auto;
     min-width: 44px;
     min-height: 44px;
+    padding: 8px 10px;
+  }
+
+  .renovation-compare-shell {
+    flex-direction: column;
+  }
+
+  .renovation-compare-pane--current {
+    flex-basis: var(--compare-split);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .renovation-compare-divider {
+    top: var(--compare-split);
+    right: 0;
+    bottom: auto;
+    left: 0;
+    width: 100%;
+    height: 44px;
+    transform: translateY(-50%);
+    cursor: row-resize;
+  }
+
+  .renovation-compare-divider-line {
+    top: 50%;
+    bottom: auto;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  }
+
+  .renovation-compare-divider-thumb {
+    width: 42px;
+    height: 34px;
+  }
+
+  .renovation-cost-compare {
+    top: 12px;
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    grid-template-columns: 1fr;
+    gap: 6px;
     padding: 8px 10px;
   }
 

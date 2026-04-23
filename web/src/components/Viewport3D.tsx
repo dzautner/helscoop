@@ -37,6 +37,11 @@ export interface ViewportMaterialSelection {
   clientY: number;
 }
 
+export interface ViewportCameraState {
+  position: [number, number, number];
+  target: [number, number, number];
+}
+
 interface Viewport3DProps {
   sceneJs: string;
   wireframe?: boolean;
@@ -61,6 +66,8 @@ interface Viewport3DProps {
   selectedObjectId?: string | null;
   hiddenObjectIds?: Set<string>;
   lockedObjectIds?: Set<string>;
+  cameraSyncState?: ViewportCameraState | null;
+  onCameraSyncChange?: (state: ViewportCameraState) => void;
   sunDirection?: [number, number, number];
   sunAltitude?: number;
   focusObjectRef?: React.MutableRefObject<((objectId: string) => void) | null>;
@@ -338,6 +345,17 @@ function animateCamera(
   requestAnimationFrame(step);
 }
 
+function readViewportCameraState(camera: THREE.PerspectiveCamera, controls: OrbitControls): ViewportCameraState {
+  return {
+    position: [camera.position.x, camera.position.y, camera.position.z],
+    target: [controls.target.x, controls.target.y, controls.target.z],
+  };
+}
+
+function cameraStateSignature(state: ViewportCameraState): string {
+  return [...state.position, ...state.target].map((value) => value.toFixed(4)).join(":");
+}
+
 function computePresets(bounds: { center: THREE.Vector3; size: number } | null): CameraPreset[] {
   if (!bounds) {
     return [
@@ -590,6 +608,8 @@ export default function Viewport3D({
   selectedObjectId = null,
   hiddenObjectIds,
   lockedObjectIds,
+  cameraSyncState = null,
+  onCameraSyncChange,
   sunDirection,
   sunAltitude,
   focusObjectRef,
@@ -637,7 +657,14 @@ export default function Viewport3D({
   const hasAppliedInitialPresentationPresetRef = useRef(false);
   const [explodeFactor, setExplodeFactor] = useState(0.5);
   const originalPositionsRef = useRef<Map<THREE.Object3D, THREE.Vector3>>(new Map());
+  const onCameraSyncChangeRef = useRef(onCameraSyncChange);
+  const applyingCameraSyncRef = useRef(false);
+  const lastCameraSyncSignatureRef = useRef("");
   const { t, locale } = useTranslation();
+
+  useEffect(() => {
+    onCameraSyncChangeRef.current = onCameraSyncChange;
+  }, [onCameraSyncChange]);
 
   useEffect(() => {
     hasAppliedInitialPresentationPresetRef.current = false;
@@ -980,6 +1007,17 @@ export default function Viewport3D({
     controls.maxPolarAngle = Math.PI * 0.85;
     controls.update();
     controlsRef.current = controls;
+    const emitCameraSyncChange = () => {
+      if (applyingCameraSyncRef.current) return;
+      const callback = onCameraSyncChangeRef.current;
+      if (!callback) return;
+      const state = readViewportCameraState(camera, controls);
+      const signature = cameraStateSignature(state);
+      if (signature === lastCameraSyncSignatureRef.current) return;
+      lastCameraSyncSignatureRef.current = signature;
+      callback(state);
+    };
+    controls.addEventListener("change", emitCameraSyncChange);
 
     // Procedural environment map for subtle PBR reflections (Nordic twilight palette)
     let envCanvas: HTMLCanvasElement | null = document.createElement("canvas");
@@ -1135,6 +1173,7 @@ export default function Viewport3D({
       resizeObserver.disconnect();
       cancelAnimationFrame(animFrameRef.current);
       cancelAnimationFrame(revealAnimRef.current);
+      controls.removeEventListener("change", emitCameraSyncChange);
       controls.dispose();
 
       // Dispose all meshes in the object group (user scene objects)
@@ -1211,6 +1250,27 @@ export default function Viewport3D({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!cameraSyncState) return;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+
+    const nextSignature = cameraStateSignature(cameraSyncState);
+    if (cameraStateSignature(readViewportCameraState(camera, controls)) === nextSignature) return;
+
+    applyingCameraSyncRef.current = true;
+    try {
+      camera.position.set(...cameraSyncState.position);
+      controls.target.set(...cameraSyncState.target);
+      camera.lookAt(controls.target);
+      controls.update();
+      lastCameraSyncSignatureRef.current = nextSignature;
+    } finally {
+      applyingCameraSyncRef.current = false;
+    }
+  }, [cameraSyncState]);
 
   const hasAutoFitRef = useRef(false);
   const hasRevealedRef = useRef(false);

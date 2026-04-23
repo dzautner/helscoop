@@ -157,6 +157,67 @@ describe("POST /projects", () => {
     expect((res.body as { name: string }).name).toBe("My House");
   });
 
+  it("captures the initial scene as the renovation comparison baseline", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Roof plan", user_id: "user-1" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const scene = "scene.add(box(1,1,1));";
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { name: "Roof plan", scene_js: scene },
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[0][0]).toContain("original_scene_js");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      "user-1",
+      "Roof plan",
+      undefined,
+      scene,
+      scene,
+      null,
+      [],
+      "planning",
+    ]);
+  });
+
+  it("accepts an explicit original_scene_js baseline on import", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Imported plan", user_id: "user-1" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: {
+        name: "Imported plan",
+        scene_js: "scene.add(box(2,1,1));",
+        original_scene_js: "scene.add(box(1,1,1));",
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[0][1]?.[4]).toBe("scene.add(box(1,1,1));");
+  });
+
+  it("rejects oversized original_scene_js baselines", async () => {
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { name: "Too large", scene_js: "", original_scene_js: "x".repeat(512 * 1024 + 1) },
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("Original scene script");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("rejects non-string project name", async () => {
     const res = await makeRequest("POST", "/projects", {
       headers: { Authorization: `Bearer ${authToken()}` },
