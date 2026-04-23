@@ -352,6 +352,66 @@
   background: rgba(229, 160, 75, 0.06);
 }
 
+.timelapse-controls {
+  padding: 6px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--glass-mid-border);
+}
+
+.timelapse-step-label {
+  font-size: 11px;
+  color: var(--amber);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: timelapse-fade-in 0.3s ease-out;
+}
+
+.timelapse-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timelapse-speed-btn {
+  min-width: 28px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.timelapse-speed-btn:hover {
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.3);
+}
+
+.timelapse-speed-btn.active {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: rgba(229, 160, 75, 0.1);
+}
+
+.timelapse-cost {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  animation: timelapse-fade-in 0.3s ease-out;
+}
+
+@keyframes timelapse-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 [data-theme="light"] .chat-messages-area {
   background: rgba(250, 250, 250, 0.7);
   backdrop-filter: blur(14px) saturate(1.2);
