@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Project, ProjectStatus } from "@/types";
 import AchievementBadges from "@/components/AchievementBadges";
+import { buildEuEnergyGrantPrecheck } from "@/lib/eu-energy-grants";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   planning: "var(--amber, #e5a04b)",
@@ -49,6 +50,14 @@ export default function ProjectCard({
     const completed = phases.filter((p) => p.done).length;
     return { phases, completed, total: phases.length, pct: Math.round((completed / phases.length) * 100) };
   }, [project.scene_js, project.bom, project.estimated_cost, project.status]);
+  const fundingSignal = useMemo(
+    () => buildEuEnergyGrantPrecheck({
+      bom: project.bom ?? [],
+      buildingInfo: project.building_info,
+      totalCost: project.estimated_cost,
+    }).fundingBadge,
+    [project.bom, project.building_info, project.estimated_cost],
+  );
 
   return (
     <div
@@ -130,6 +139,11 @@ export default function ProjectCard({
             {project.estimated_cost > 0 && (
               <span className="badge badge-amber">
                 {Number(project.estimated_cost).toFixed(0)} &euro;
+              </span>
+            )}
+            {fundingSignal.show && (
+              <span className="badge" style={{ borderColor: "rgba(74,124,89,0.36)", color: "var(--forest)" }}>
+                {locale === "fi" ? "Tukia" : "Funding"} {fundingSignal.amount.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} &euro;
               </span>
             )}
             {Number(project.view_count || 0) > 0 && (

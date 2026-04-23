@@ -14,6 +14,7 @@ import QuoteRequestModal from "@/components/QuoteRequestModal";
 import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import RenovationRoiPanel from "@/components/RenovationRoiPanel";
 import RenovationFinancingPanel from "@/components/RenovationFinancingPanel";
+import EuEnergyGrantPrecheckPanel from "@/components/EuEnergyGrantPrecheckPanel";
 import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
@@ -2717,6 +2718,14 @@ export default function BomPanel({
             bom={bom}
             materials={materials}
             buildingInfo={buildingInfo}
+          />
+        )}
+        {bom.length > 0 && (
+          <EuEnergyGrantPrecheckPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            totalCost={total}
           />
         )}
         <button
