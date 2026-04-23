@@ -113,16 +113,19 @@ function ResetPasswordForm() {
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div>
-          <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+          <label htmlFor="reset-password-new" className="label-mono" style={{ display: "block", marginBottom: 8 }}>
             {t("auth.resetPasswordNew")}
           </label>
           <input
+            id="reset-password-new"
             className="input"
             type="password"
             placeholder={t("auth.resetPasswordNewPlaceholder")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            aria-required="true"
+            aria-describedby={error ? "reset-password-error" : undefined}
             minLength={8}
             autoComplete="new-password"
             autoFocus
@@ -130,23 +133,26 @@ function ResetPasswordForm() {
         </div>
 
         <div>
-          <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+          <label htmlFor="reset-password-confirm" className="label-mono" style={{ display: "block", marginBottom: 8 }}>
             {t("auth.resetPasswordConfirm")}
           </label>
           <input
+            id="reset-password-confirm"
             className="input"
             type="password"
             placeholder={t("auth.resetPasswordConfirmPlaceholder")}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
+            aria-required="true"
+            aria-describedby={error ? "reset-password-error" : undefined}
             minLength={8}
             autoComplete="new-password"
           />
         </div>
 
         {error && (
-          <div style={{
+          <div id="reset-password-error" role="alert" style={{
             padding: "10px 14px",
             borderRadius: "var(--radius-md)",
             background: "var(--danger-dim)",

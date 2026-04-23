@@ -72,4 +72,33 @@ describe("accessibility foundation", () => {
     expect(editor).toContain('aria-atomic="true"');
     expect(editor).toContain("editor.sceneChangeAnnouncement");
   });
+
+  it("associates required auth and password fields with labels and ARIA required state", () => {
+    const forgotPassword = readSource("../app/forgot-password/page.tsx");
+    const resetPassword = readSource("../app/reset-password/page.tsx");
+    const settings = readSource("../app/settings/page.tsx");
+    const loginForm = readSource("../components/LoginForm.tsx");
+
+    expect(forgotPassword).toContain('htmlFor="forgot-password-email"');
+    expect(forgotPassword).toContain('id="forgot-password-email"');
+    expect(forgotPassword).toContain('aria-required="true"');
+    expect(forgotPassword).toContain('id="forgot-password-error"');
+    expect(forgotPassword).toContain('role="alert"');
+
+    expect(resetPassword).toContain('htmlFor="reset-password-new"');
+    expect(resetPassword).toContain('id="reset-password-new"');
+    expect(resetPassword).toContain('htmlFor="reset-password-confirm"');
+    expect(resetPassword).toContain('id="reset-password-confirm"');
+    expect(resetPassword.match(/aria-required="true"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(resetPassword).toContain('id="reset-password-error"');
+    expect(resetPassword).toContain('role="alert"');
+
+    expect(settings.match(/aria-required="true"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(settings).toContain('autoComplete="current-password"');
+    expect(settings).toContain('autoComplete="new-password"');
+
+    expect(loginForm.match(/aria-required="true"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(loginForm).toContain('htmlFor="login-email"');
+    expect(loginForm).toContain('htmlFor="login-password"');
+  });
 });
