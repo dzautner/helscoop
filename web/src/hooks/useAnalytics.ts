@@ -38,6 +38,9 @@ export type AnalyticsEvent =
   | "presentation_link_copied"
   | "presentation_render_downloaded"
   | "quote_request_submitted"
+  | "financing_widget_viewed"
+  | "financing_partner_clicked"
+  | "financing_conversion_reported"
   | "bom_exported"
   | "project_exported"
   | "project_imported"
@@ -78,6 +81,9 @@ export interface AnalyticsEventProps {
   presentation_link_copied: { preset: string };
   presentation_render_downloaded: { preset: string; watermarked: boolean };
   quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
+  financing_widget_viewed: { bom_total: number; loan_amount: number; term_years: number; offer_count: number; energy_grant_signal: boolean };
+  financing_partner_clicked: { partner: string; loan_amount: number; term_years: number; target: "loan_comparison" | "materials_bnpl" };
+  financing_conversion_reported: { partner: string; amount: number; status: "started" | "qualified" | "approved" | "rejected" };
   bom_exported: { format: "pdf" | "csv" | "json" };
   project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" | "permit_pack_zip" };
   project_imported: { format: "helscoop" };

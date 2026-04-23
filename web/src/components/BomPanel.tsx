@@ -13,6 +13,7 @@ import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsP
 import QuoteRequestModal from "@/components/QuoteRequestModal";
 import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
 import RenovationRoiPanel from "@/components/RenovationRoiPanel";
+import RenovationFinancingPanel from "@/components/RenovationFinancingPanel";
 import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
@@ -2709,6 +2710,13 @@ export default function BomPanel({
             materials={materials}
             buildingInfo={buildingInfo}
             coupleMode={householdDeductionJoint}
+          />
+        )}
+        {bom.length > 0 && (
+          <RenovationFinancingPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
           />
         )}
         <button
