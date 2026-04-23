@@ -377,6 +377,16 @@ export const api = {
 
   getSuppliers: () => apiFetch("/suppliers"),
   getSupplier: (id: string) => apiFetch(`/suppliers/${id}`),
+  recordAffiliateClick: (data: {
+    material_id: string;
+    supplier_id: string;
+    click_url: string;
+    partner_id?: string | null;
+  }) =>
+    apiFetch("/affiliates/click", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   comparePrices: (materialId: string) =>
     apiFetch(`/pricing/compare/${materialId}`),
