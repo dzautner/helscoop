@@ -4640,6 +4640,60 @@ select:focus {
   opacity: 1;
 }
 
+.achievement-badges {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.achievement-badges-title {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.achievement-badges-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.achievement-badge {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg-tertiary);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.achievement-badge--earned {
+  border-color: var(--amber, #e5a04b);
+  background: color-mix(in srgb, var(--amber, #e5a04b) 12%, var(--bg-tertiary));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--amber, #e5a04b) 25%, transparent);
+}
+
+.achievement-badge--earned:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--amber, #e5a04b) 40%, transparent);
+}
+
+.achievement-badge--locked {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+
+.achievement-badge-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
 .project-card-actions {
   display: flex;
   gap: 4px;
