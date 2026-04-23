@@ -92,23 +92,26 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               <div>
-                <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+                <label htmlFor="forgot-password-email" className="label-mono" style={{ display: "block", marginBottom: 8 }}>
                   {t("auth.email")}
                 </label>
                 <input
+                  id="forgot-password-email"
                   className="input"
                   type="email"
                   placeholder={t("auth.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  aria-required="true"
+                  aria-describedby={error ? "forgot-password-error" : undefined}
                   autoComplete="email"
                   autoFocus
                 />
               </div>
 
               {error && (
-                <div role="alert" style={{
+                <div id="forgot-password-error" role="alert" style={{
                   padding: "10px 14px",
                   borderRadius: "var(--radius-md)",
                   background: "var(--danger-dim)",

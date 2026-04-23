@@ -551,6 +551,8 @@ export default function SettingsPage() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder={t("settings.currentPassword")}
                 required
+                aria-required="true"
+                autoComplete="current-password"
               />
             </div>
             <div>
@@ -569,6 +571,8 @@ export default function SettingsPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder={t("settings.newPassword")}
                 required
+                aria-required="true"
+                autoComplete="new-password"
               />
             </div>
             <div>
@@ -587,6 +591,8 @@ export default function SettingsPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder={t("settings.confirmPassword")}
                 required
+                aria-required="true"
+                autoComplete="new-password"
               />
             </div>
             <div>

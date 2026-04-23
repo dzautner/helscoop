@@ -303,6 +303,7 @@ export default function LoginForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  aria-required="true"
                   autoComplete="name"
                 />
               </div>
@@ -317,6 +318,7 @@ export default function LoginForm({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                aria-required="true"
                 autoComplete="email"
               />
             </div>
@@ -330,6 +332,7 @@ export default function LoginForm({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                aria-required="true"
                 minLength={isRegister ? 8 : undefined}
                 autoComplete={isRegister ? "new-password" : "current-password"}
               />
