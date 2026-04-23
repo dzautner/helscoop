@@ -16,6 +16,10 @@ import { useCallback, useEffect, useRef } from "react";
 export type AnalyticsEvent =
   | "address_search"
   | "project_created"
+  | "renovation_wizard_opened"
+  | "renovation_wizard_step_viewed"
+  | "renovation_wizard_completed"
+  | "editor_mode_changed"
   | "editor_session"
   | "bom_item_added"
   | "bom_imported"
@@ -51,7 +55,11 @@ export type AnalyticsEvent =
 // ── Property maps per event ────────────────────────────────────────
 export interface AnalyticsEventProps {
   address_search: { query_length: number; had_result: boolean };
-  project_created: { source: "address" | "template" | "blank"; building_type?: string };
+  project_created: { source: "address" | "template" | "blank" | "wizard"; building_type?: string };
+  renovation_wizard_opened: { source: "project_list" | "editor" };
+  renovation_wizard_step_viewed: { source: "project_list" | "editor"; step: number; step_id: string; renovation_type: string };
+  renovation_wizard_completed: { source: "project_list" | "editor"; renovation_type: string; estimated_cost: number; bom_count: number };
+  editor_mode_changed: { mode: "simple" | "advanced" };
   editor_session: { duration_s: number; used_code_editor: boolean; used_chat: boolean };
   bom_item_added: { material_id: string; category?: string };
   bom_imported: { count: number; mode: "merge" | "replace" };

@@ -20,6 +20,7 @@ import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
+import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import {
   analyzeSceneGeometry,
@@ -55,6 +56,7 @@ import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary } from "@/types";
+import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
@@ -293,6 +295,8 @@ export default function ProjectPage() {
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const defaultParamsRef = useRef<Record<string, number>>({});
   const [showCode, setShowCode] = useState(false);
+  const [editorMode, setEditorMode] = useState<"simple" | "advanced">("simple");
+  const [showGuidedWizard, setShowGuidedWizard] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
@@ -746,6 +750,7 @@ export default function ProjectPage() {
     return { colorMap, compliance };
   }, [thermalView, materials]);
   const sceneLayers = useMemo(() => buildSceneLayers(renderedLayers, bom), [bom, renderedLayers]);
+  const isAdvancedMode = editorMode === "advanced";
 
   const thermalColorMap = thermalData?.colorMap;
 
@@ -926,6 +931,42 @@ export default function ProjectPage() {
     [pushHistory, markChat, queueSceneAnnouncement]
   );
 
+  const handleEditorModeChange = useCallback((mode: "simple" | "advanced") => {
+    setEditorMode(mode);
+    track("editor_mode_changed", { mode });
+    if (mode === "advanced") markCodeEditor();
+  }, [markCodeEditor, track]);
+
+  const applyGuidedPlan = useCallback(
+    (plan: GuidedRenovationPlan, state: RenovationWizardState, advanced = false) => {
+      track("renovation_wizard_completed", {
+        source: "editor",
+        renovation_type: state.renovationType,
+        estimated_cost: plan.estimatedCost,
+        bom_count: plan.bom.length,
+      });
+      queueSceneAnnouncement("editor.sceneUpdatedFromEditor");
+      setProjectName(plan.name);
+      previousNameRef.current = plan.name;
+      setProjectDesc(plan.description);
+      setSceneJs(plan.sceneJs);
+      pushHistory(plan.sceneJs);
+      setBom(plan.bom);
+      setManualBomOverrideIds(new Set(plan.bom.map((item) => item.material_id)));
+      setGeometryBomUpdate(null);
+      setShowBom(true);
+      setShowGuidedWizard(false);
+      if (advanced) {
+        handleEditorModeChange("advanced");
+        setShowCode(true);
+      } else {
+        handleEditorModeChange("simple");
+      }
+      toast(locale === "fi" ? "Ohjattu suunnitelma otettu kayttoon" : "Guided plan applied", "success");
+    },
+    [handleEditorModeChange, locale, pushHistory, queueSceneAnnouncement, toast, track],
+  );
+
   const handleMobilePanelChange = useCallback(
     (panel: MobileEditorPanel) => {
       setActiveMobilePanel(panel);
@@ -946,10 +987,21 @@ export default function ProjectPage() {
     "viewport",
     "chat",
     "bom",
-    "code",
-    ...(sceneParams.length > 0 ? (["params"] as MobileEditorPanel[]) : []),
-    ...(showDocs ? (["docs"] as MobileEditorPanel[]) : []),
-  ], [sceneParams.length, showDocs]);
+    ...(isAdvancedMode ? (["code"] as MobileEditorPanel[]) : []),
+    ...(isAdvancedMode && sceneParams.length > 0 ? (["params"] as MobileEditorPanel[]) : []),
+    ...(isAdvancedMode && showDocs ? (["docs"] as MobileEditorPanel[]) : []),
+  ], [isAdvancedMode, sceneParams.length, showDocs]);
+
+  useEffect(() => {
+    if (isAdvancedMode) return;
+    setShowCode(false);
+    setShowDocs(false);
+    setShowParams(false);
+    setShowLayers(false);
+    if (activeMobilePanel === "code" || activeMobilePanel === "params" || activeMobilePanel === "docs") {
+      setActiveMobilePanel("viewport");
+    }
+  }, [activeMobilePanel, isAdvancedMode]);
 
   const handleMobilePanelSwipe = useCallback((direction: MobileEditorSwipeDirection) => {
     if (direction === "up") {
@@ -974,7 +1026,10 @@ export default function ProjectPage() {
   }, [activeMobilePanel, handleMobilePanelChange, mobilePanelOrder]);
 
   const toggleCodePanel = useCallback(() => {
-    if (!showCode) markCodeEditor();
+    if (!showCode) {
+      setEditorMode("advanced");
+      markCodeEditor();
+    }
     setShowCode((visible) => {
       const next = !visible;
       if (isMobileEditor) setActiveMobilePanel(next ? "code" : "viewport");
@@ -983,6 +1038,7 @@ export default function ProjectPage() {
   }, [isMobileEditor, markCodeEditor, showCode]);
 
   const toggleDocsPanel = useCallback(() => {
+    setEditorMode("advanced");
     setShowDocs((visible) => {
       const next = !visible;
       if (isMobileEditor) setActiveMobilePanel(next ? "docs" : "viewport");
@@ -991,6 +1047,7 @@ export default function ProjectPage() {
   }, [isMobileEditor]);
 
   const toggleParamsPanel = useCallback(() => {
+    setEditorMode("advanced");
     setShowParams((visible) => {
       const next = !visible;
       if (isMobileEditor) setActiveMobilePanel(next ? "params" : "viewport");
@@ -1546,11 +1603,11 @@ export default function ProjectPage() {
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         ),
-        action: () => setShowDocs((v) => !v),
-        isActive: showDocs,
+        action: toggleDocsPanel,
+        isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -2025,6 +2082,24 @@ export default function ProjectPage() {
       data-mobile-panel-size={isMobileEditor ? mobilePanelSize : undefined}
     >
       {showConfetti && <ConfettiCelebration onComplete={() => setShowConfetti(false)} />}
+      {showGuidedWizard && (
+        <GuidedRenovationWizard
+          materials={materials}
+          buildingInfo={project?.building_info ?? null}
+          source="editor"
+          onClose={() => setShowGuidedWizard(false)}
+          onComplete={(plan, state) => applyGuidedPlan(plan, state, false)}
+          onCompleteAdvanced={(plan, state) => applyGuidedPlan(plan, state, true)}
+          onStepViewed={(step, stepId: WizardStepId, state) => {
+            track("renovation_wizard_step_viewed", {
+              source: "editor",
+              step,
+              step_id: stepId,
+              renovation_type: state.renovationType,
+            });
+          }}
+        />
+      )}
 
       {/* Header */}
       <div className="editor-header">
@@ -2084,6 +2159,41 @@ export default function ProjectPage() {
           <option value="completed">{t('project.statusCompleted')}</option>
           <option value="archived">{t('project.statusArchived')}</option>
         </select>
+        <div
+          role="group"
+          aria-label="Editor complexity mode"
+          style={{ display: "flex", gap: 2, padding: 2, border: "1px solid var(--border)", borderRadius: 999, background: "var(--bg-tertiary)" }}
+        >
+          {(["simple", "advanced"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className="btn btn-ghost"
+              aria-pressed={editorMode === mode}
+              data-active={editorMode === mode}
+              onClick={() => handleEditorModeChange(mode)}
+              style={{
+                padding: "4px 8px",
+                fontSize: 11,
+                border: "none",
+                color: editorMode === mode ? "var(--amber)" : "var(--text-muted)",
+              }}
+            >
+              {mode === "simple" ? "Simple" : "Advanced"}
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn btn-primary"
+          type="button"
+          onClick={() => {
+            track("renovation_wizard_opened", { source: "editor" });
+            setShowGuidedWizard(true);
+          }}
+          style={{ padding: "5px 10px", fontSize: 12 }}
+        >
+          Wizard
+        </button>
         <div className="editor-header-actions">
           <CreditBalancePill compact />
           <button
@@ -2904,30 +3014,34 @@ export default function ProjectPage() {
               {t('editor.resetCamera')}
             </button>
             <span className="viewport-toolbar-sep" />
-            <button
-              className="viewport-toolbar-btn"
-              data-active={showCode}
-              onClick={toggleCodePanel}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              {showCode ? t('editor.hideCode') : t('editor.showCode')}
-            </button>
-            <button
-              className="viewport-toolbar-btn"
-              data-active={showDocs}
-              onClick={toggleDocsPanel}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              {t('editor.docs') || "Docs"}
-            </button>
-            {sceneParams.length > 0 && (
+            {isAdvancedMode && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showCode}
+                onClick={toggleCodePanel}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+                {showCode ? t('editor.hideCode') : t('editor.showCode')}
+              </button>
+            )}
+            {isAdvancedMode && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showDocs}
+                onClick={toggleDocsPanel}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                {t('editor.docs') || "Docs"}
+              </button>
+            )}
+            {isAdvancedMode && sceneParams.length > 0 && (
               <button
                 className="viewport-toolbar-btn"
                 data-active={showParams}
@@ -2944,7 +3058,7 @@ export default function ProjectPage() {
                 {t('editor.params') || "Params"}
               </button>
             )}
-            {!isMobileEditor && (
+            {isAdvancedMode && !isMobileEditor && (
               <button
                 className="viewport-toolbar-btn"
                 data-active={showLayers}
@@ -3094,7 +3208,7 @@ export default function ProjectPage() {
           )}
 
           {/* Collapsible Code Editor */}
-          {showCode && (
+          {isAdvancedMode && showCode && (
             <div
               className="editor-code-panel"
               style={{
@@ -3279,7 +3393,7 @@ export default function ProjectPage() {
         </div>
 
         {/* Scene parameters panel */}
-        {showParams && sceneParams.length > 0 && (
+        {isAdvancedMode && showParams && sceneParams.length > 0 && (
           <SceneParamsPanel
             params={sceneParams}
             onParamChange={handleParamChange}
@@ -3292,7 +3406,7 @@ export default function ProjectPage() {
           />
         )}
 
-        {showLayers && !isMobileEditor && (
+        {isAdvancedMode && showLayers && !isMobileEditor && (
           <LayerPanel
             layers={sceneLayers}
             selectedLayerId={selectedLayerId}
@@ -3344,7 +3458,7 @@ export default function ProjectPage() {
         )}
 
         {/* Scene API Reference panel */}
-        {showDocs && (
+        {isAdvancedMode && showDocs && (
           <div className="scene-docs-panel" style={{ width: 320, flexShrink: 0, height: "100%", overflow: "hidden" }}>
             <SceneApiReference
               onInsertCode={(code) => {

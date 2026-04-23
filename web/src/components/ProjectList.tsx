@@ -14,8 +14,10 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import ProjectCard from "@/components/ProjectCard";
 import TemplateGrid from "@/components/TemplateGrid";
 import AddressSearch from "@/components/AddressSearch";
+import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
 import Link from "next/link";
-import type { BomAggregateResponse, Project, ProjectStatus, Template, BuildingResult } from "@/types";
+import type { BomAggregateResponse, Project, ProjectStatus, Template, BuildingResult, Material } from "@/types";
+import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 
 type SortKey = "modified" | "created" | "name" | "cost";
 
@@ -50,6 +52,9 @@ export default function ProjectList({
   const [aggregate, setAggregate] = useState<BomAggregateResponse | null>(null);
   const [aggregateLoading, setAggregateLoading] = useState(false);
   const [aggregateError, setAggregateError] = useState(false);
+  const [showGuidedWizard, setShowGuidedWizard] = useState(false);
+  const [wizardMaterials, setWizardMaterials] = useState<Material[]>([]);
+  const [wizardMaterialsLoading, setWizardMaterialsLoading] = useState(false);
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
@@ -109,6 +114,53 @@ export default function ProjectList({
       toast(err instanceof Error ? err.message : t('toast.templateFailed'), "error");
     }
     setCreating(false);
+  }
+
+  async function openGuidedWizard() {
+    track("renovation_wizard_opened", { source: "project_list" });
+    setShowGuidedWizard(true);
+    if (wizardMaterials.length > 0 || wizardMaterialsLoading) return;
+    setWizardMaterialsLoading(true);
+    try {
+      setWizardMaterials(await api.getMaterials());
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("toast.loadMaterialsFailed"), "error");
+    } finally {
+      setWizardMaterialsLoading(false);
+    }
+  }
+
+  async function createFromWizard(plan: GuidedRenovationPlan, state: RenovationWizardState) {
+    setCreating(true);
+    try {
+      track("project_created", { source: "wizard" });
+      track("renovation_wizard_completed", {
+        source: "project_list",
+        renovation_type: state.renovationType,
+        estimated_cost: plan.estimatedCost,
+        bom_count: plan.bom.length,
+      });
+      const project = await api.createProject({
+        name: plan.name,
+        description: plan.description,
+        scene_js: plan.sceneJs,
+      });
+      if (plan.bomRows.length > 0) {
+        await api.saveBOM(project.id, plan.bomRows.map((row) => ({
+          material_id: row.material_id,
+          quantity: row.quantity,
+          unit: row.unit,
+        })));
+      }
+      setProjects([{ ...project, estimated_cost: plan.estimatedCost, bom: plan.bom }, ...projects]);
+      setShowGuidedWizard(false);
+      toast(t('toast.projectCreated'), "success");
+      router.push(`/project/${project.id}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t('toast.createProjectFailed'), "error");
+    } finally {
+      setCreating(false);
+    }
   }
 
   function deleteProject(id: string) {
@@ -464,6 +516,22 @@ export default function ProjectList({
 
   return (
     <div style={{ minHeight: "100vh" }}>
+      {showGuidedWizard && (
+        <GuidedRenovationWizard
+          materials={wizardMaterials}
+          source="project_list"
+          onClose={() => setShowGuidedWizard(false)}
+          onComplete={createFromWizard}
+          onStepViewed={(step, stepId: WizardStepId, state) => {
+            track("renovation_wizard_step_viewed", {
+              source: "project_list",
+              step,
+              step_id: stepId,
+              renovation_type: state.renovationType,
+            });
+          }}
+        />
+      )}
       {/* Top bar */}
       <div className="nav-bar">
         <div className="nav-inner" style={{ maxWidth: 1080 }}>
@@ -579,6 +647,15 @@ export default function ProjectList({
                 </svg>
               )}
               {t('project.import')}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => void openGuidedWizard()}
+              disabled={creating || wizardMaterialsLoading}
+              style={{ padding: "11px 18px", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              {wizardMaterialsLoading ? <span className="btn-spinner" /> : null}
+              Guided wizard
             </button>
           </div>
 
