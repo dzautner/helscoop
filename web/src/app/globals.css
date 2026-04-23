@@ -7434,3 +7434,41 @@ select:focus {
   .address-result-glow::before { animation: none; display: none; }
   .address-result-glow > .card { animation: none; box-shadow: none; }
 }
+
+/* Shared view export buttons */
+.shared-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: color 0.15s, border-color 0.15s;
+}
+.shared-export-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Print styles for shared project view */
+@media print {
+  body { background: white !important; color: black !important; }
+  .shared-export-btn,
+  .shared-presentation-badge,
+  .shared-presentation-card { display: none !important; }
+  canvas { display: none !important; }
+  .shared-project-layout { flex-direction: column !important; }
+  .shared-project-sidebar {
+    width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid #ddd !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+}

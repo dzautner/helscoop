@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
@@ -8,6 +8,48 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getPresentationPreset } from "@/lib/presentation-export";
 import type { BomItem, Project } from "@/types";
+
+function escapeCsvField(value: string, sep: string): string {
+  if (value.includes(sep) || value.includes('"') || value.includes('\n')) {
+    return '"' + value.replace(/"/g, '""') + '"';
+  }
+  return value;
+}
+
+function exportBomCsv(
+  bom: BomItem[],
+  projectName: string,
+  locale: string,
+  t: (key: string) => string,
+): void {
+  const isFi = locale === 'fi';
+  const sep = isFi ? ';' : ',';
+  const fmt = (n: number) => { const s = n.toFixed(2); return isFi ? s.replace('.', ',') : s; };
+
+  const headers = [
+    t('share.csvMaterial'), t('share.csvQuantity'), t('share.csvUnit'),
+    t('share.csvUnitPrice'), t('share.csvTotal'), t('share.csvSupplier'),
+  ];
+
+  const rows = bom.map((item) => [
+    escapeCsvField(item.material_name || item.material_id, sep),
+    fmt(item.quantity),
+    escapeCsvField(item.unit || '', sep),
+    fmt(item.unit_price ?? 0),
+    fmt(item.total ?? 0),
+    escapeCsvField(item.supplier || '', sep),
+  ].join(sep));
+
+  const csv = '\uFEFF' + headers.map((h) => escapeCsvField(h, sep)).join(sep) + '\n' + rows.join('\n') + '\n';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safe = projectName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40);
+  a.download = `helscoop-bom-${safe}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function Viewport3DLoading() {
   const { t } = useTranslation();
@@ -208,6 +250,9 @@ export default function SharedProjectContent({ token }: { token: string }) {
             <div style={{
               padding: "14px 16px 10px",
               borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}>
               <h2 style={{
                 fontSize: 12,
@@ -219,6 +264,33 @@ export default function SharedProjectContent({ token }: { token: string }) {
               }}>
                 {t('share.materials')}
               </h2>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button
+                  type="button"
+                  className="shared-export-btn"
+                  onClick={() => exportBomCsv(bom, project.name, locale, t)}
+                  title={t('share.exportCsv')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  CSV
+                </button>
+                <button
+                  type="button"
+                  className="shared-export-btn"
+                  onClick={() => window.print()}
+                  title={t('share.print')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div style={{
               flex: 1,
