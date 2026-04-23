@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { Project, ProjectStatus } from "@/types";
@@ -35,6 +36,18 @@ export default function ProjectCard({
   onSelectChange?: (checked: boolean) => void;
 }) {
   const { t, locale } = useTranslation();
+
+  const progress = useMemo(() => {
+    const phases = [
+      { key: "progressDesign", done: !!project.scene_js },
+      { key: "progressMaterials", done: (project.bom?.length ?? 0) > 0 },
+      { key: "progressBudget", done: project.estimated_cost > 0 },
+      { key: "progressExecution", done: project.status === "in_progress" || project.status === "completed" },
+      { key: "progressComplete", done: project.status === "completed" },
+    ];
+    const completed = phases.filter((p) => p.done).length;
+    return { phases, completed, total: phases.length, pct: Math.round((completed / phases.length) * 100) };
+  }, [project.scene_js, project.bom, project.estimated_cost, project.status]);
 
   return (
     <div
@@ -168,6 +181,24 @@ export default function ProjectCard({
             </span>
           </div>
         </div>
+        {progress.completed > 0 && progress.completed < progress.total && (
+          <div className="project-progress" style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span className="project-progress-label">{t("project.progressLabel")}</span>
+              <span className="project-progress-pct">{progress.pct}%</span>
+            </div>
+            <div className="project-progress-track">
+              <div className="project-progress-fill" style={{ width: `${progress.pct}%` }} />
+            </div>
+            <div className="project-progress-phases">
+              {progress.phases.map((p) => (
+                <span key={p.key} className={`project-progress-phase${p.done ? " done" : ""}`}>
+                  {p.done ? "\u2713" : "\u2022"} {t(`project.${p.key}`)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="project-card-actions" style={{ marginTop: 10, position: "relative", zIndex: 1 }}>
           <button className="btn btn-ghost" style={{ minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", fontSize: 11, gap: 4 }} aria-label={t('project.copyAriaLabel', { name: project.name })} onClick={() => onDuplicate(project.id)}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
