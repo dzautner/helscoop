@@ -2984,6 +2984,7 @@ export default function BomPanel({
                 }
               }}
               placeholder={t('pricing.searchMaterials')}
+              aria-label={t('pricing.searchMaterials')}
               data-bom-search
               style={{
                 width: "100%",

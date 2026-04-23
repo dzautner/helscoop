@@ -1855,6 +1855,8 @@ export default function ProjectPage() {
           <input
             className="editor-header-name"
             value={projectName}
+            aria-label={t('project.nameField')}
+            aria-describedby={projectName.length > 80 ? "project-name-count" : undefined}
             onChange={(e) => setProjectName(e.target.value)}
             onBlur={() => {
               const trimmed = projectName.trim();
@@ -1869,8 +1871,10 @@ export default function ProjectPage() {
           />
           {projectName.length > 80 && (
             <span
+              id="project-name-count"
               className="editor-header-name-count"
               data-near-limit={projectName.length >= 95}
+              aria-live="polite"
             >
               {projectName.length}/100
             </span>
@@ -3155,6 +3159,7 @@ export default function ProjectPage() {
               <input
                 className="input"
                 readOnly
+                aria-label={t('share.linkLabel')}
                 value={`${typeof window !== "undefined" ? window.location.origin : ""}/shared/${shareToken}`}
                 onClick={(e) => (e.target as HTMLInputElement).select()}
                 style={{
