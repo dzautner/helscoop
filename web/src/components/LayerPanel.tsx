@@ -71,10 +71,16 @@ export default function LayerPanel({
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const orderedIds = useMemo(() => layers.map((layer) => layer.id), [layers]);
 
+  const SPEED_OPTIONS = [1, 2, 4] as const;
+  const BASE_STEP_MS = 3000;
+
   const [autoplayActive, setAutoplayActive] = useState(false);
   const [autoplayStep, setAutoplayStep] = useState(0);
+  const [autoplaySpeed, setAutoplaySpeed] = useState<1 | 2 | 4>(1);
   const autoplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedHiddenRef = useRef<Set<string> | null>(null);
+  const speedRef = useRef(autoplaySpeed);
+  speedRef.current = autoplaySpeed;
 
   const stopAutoplay = useCallback(() => {
     setAutoplayActive(false);
@@ -98,7 +104,10 @@ export default function LayerPanel({
     onSetHiddenLayers?.(hiddenIds);
     onSelectLayer(orderedIds[step]);
     onFocusLayer?.(orderedIds[step]);
-    autoplayTimerRef.current = setTimeout(() => advanceAutoplay(step + 1), 3000);
+    autoplayTimerRef.current = setTimeout(
+      () => advanceAutoplay(step + 1),
+      BASE_STEP_MS / speedRef.current,
+    );
   }, [orderedIds, onSetHiddenLayers, onSelectLayer, onFocusLayer, stopAutoplay]);
 
   const startAutoplay = useCallback(() => {
@@ -106,9 +115,21 @@ export default function LayerPanel({
     savedHiddenRef.current = new Set(hiddenLayerIds);
     setAutoplayActive(true);
     setAutoplayStep(0);
+    setAutoplaySpeed(1);
     onSetHiddenLayers(new Set(orderedIds));
     setTimeout(() => advanceAutoplay(0), 500);
   }, [orderedIds, hiddenLayerIds, onSetHiddenLayers, advanceAutoplay]);
+
+  const runningCost = useMemo(() => {
+    if (!autoplayActive) return 0;
+    return layers
+      .slice(0, autoplayStep + 1)
+      .reduce((sum, layer) => sum + layer.approxCost, 0);
+  }, [autoplayActive, autoplayStep, layers]);
+
+  const currentLayerName = autoplayActive && layers[autoplayStep]
+    ? layers[autoplayStep].name
+    : "";
 
   useEffect(() => {
     return () => {
@@ -209,24 +230,55 @@ export default function LayerPanel({
       </div>
 
       {autoplayActive && (
-        <div style={{ padding: "0 14px 8px", display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{
-            flex: 1,
-            height: 3,
-            background: "var(--border)",
-            borderRadius: 2,
-            overflow: "hidden",
-          }}>
-            <div style={{
-              width: `${((autoplayStep + 1) / layers.length) * 100}%`,
-              height: "100%",
-              background: "var(--amber)",
-              transition: "width 0.4s ease-out",
-            }} />
+        <div className="timelapse-controls">
+          <div className="timelapse-step-label label-mono">
+            {t("layers.stepLabel", {
+              current: String(autoplayStep + 1),
+              total: String(layers.length),
+              name: currentLayerName,
+            })}
           </div>
-          <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-            {autoplayStep + 1}/{layers.length}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              flex: 1,
+              height: 3,
+              background: "var(--border)",
+              borderRadius: 2,
+              overflow: "hidden",
+            }}>
+              <div style={{
+                width: `${((autoplayStep + 1) / layers.length) * 100}%`,
+                height: "100%",
+                background: "var(--amber)",
+                transition: "width 0.4s ease-out",
+              }} />
+            </div>
+            <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              {autoplayStep + 1}/{layers.length}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div className="timelapse-speed-row">
+              <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                {t("layers.speedLabel")}
+              </span>
+              {SPEED_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`timelapse-speed-btn${autoplaySpeed === s ? " active" : ""}`}
+                  onClick={() => setAutoplaySpeed(s)}
+                >
+                  {s}×
+                </button>
+              ))}
+            </div>
+            {runningCost > 0 && (
+              <span className="timelapse-cost label-mono">
+                {t("layers.costSoFar", { cost: formatApproxCost(runningCost, locale) })}
+              </span>
+            )}
+          </div>
         </div>
       )}
 

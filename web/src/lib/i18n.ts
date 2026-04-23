@@ -927,6 +927,9 @@ const translations = {
       viewportHint: 'Klikkaa objektia valitaksesi sen tason',
       startAutoplay: 'Toista rakennusjärjestys',
       stopAutoplay: 'Pysäytä toisto',
+      speedLabel: 'Nopeus',
+      stepLabel: 'Vaihe {{current}}/{{total}}: {{name}}',
+      costSoFar: 'Materiaalit: {{cost}}',
     },
     commandPalette: {
       title: 'Komentovalikko',
@@ -2577,6 +2580,9 @@ const translations = {
       viewportHint: 'Click a mesh to select its layer',
       startAutoplay: 'Play build sequence',
       stopAutoplay: 'Stop playback',
+      speedLabel: 'Speed',
+      stepLabel: 'Step {{current}}/{{total}}: {{name}}',
+      costSoFar: 'Materials: {{cost}}',
     },
     commandPalette: {
       title: 'Command palette',
@@ -4142,6 +4148,9 @@ const translations = {
       viewportHint: 'Klicka på en mesh för att välja dess lager',
       startAutoplay: 'Spela byggsekvens',
       stopAutoplay: 'Stoppa uppspelning',
+      speedLabel: 'Hastighet',
+      stepLabel: 'Steg {{current}}/{{total}}: {{name}}',
+      costSoFar: 'Material: {{cost}}',
     },
     commandPalette: {
       title: 'Kommandopalett',
