@@ -463,6 +463,8 @@ describe("exhaustive i18n key parity", () => {
     "editor.applyToScene", "editor.thinking",
     "editor.message", "editor.messages",
     "editor.objectSingular", "editor.objectPlural",
+    "editor.bomItemSingular", "editor.bomItemPlural",
+    "editor.bomTotalAnnouncement",
     "editor.sceneChangeAnnouncement", "editor.sceneAppliedFromChat",
     "editor.sceneUpdatedFromEditor", "editor.sceneParameterChanged",
     "editor.sceneDraftRestored", "editor.sceneResetAnnounced",

@@ -9,6 +9,12 @@ vi.mock("@/lib/api", () => ({
     getCategories: vi.fn().mockResolvedValue([]),
     getMaterialPrices: vi.fn().mockResolvedValue({ prices: [], savings_per_unit: 0 }),
     getPriceHistory: vi.fn().mockResolvedValue([]),
+    getRenovationCostIndex: vi.fn().mockResolvedValue({
+      source: { latestPeriod: "2026M03" },
+      index: { multipliers: { total: 1 } },
+      vatRate: 0.255,
+      categories: [],
+    }),
   },
 }));
 
@@ -16,6 +22,10 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/lib/scene-interpreter", () => ({
   interpretScene: vi.fn().mockReturnValue({ error: "no scene", objects: [] }),
   extractSceneMaterials: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock("@/components/RenovationCostIndexPanel", () => ({
+  default: () => null,
 }));
 
 // Mock animated number hook
@@ -33,6 +43,11 @@ vi.mock("@/components/LocaleProvider", () => ({
         "editor.bomRowCount": "0 items",
         "editor.estimatedTotal": "Estimated Total",
         "editor.inclVat": "incl. VAT",
+        "editor.bomItemSingular": "item",
+        "editor.bomItemPlural": "items",
+        "editor.bomTotalAnnouncement": params
+          ? `Material list updated. ${params.count} ${params.items}, estimated total ${params.total}.`
+          : "Material list updated.",
         "editor.noMaterials": "No materials",
         "editor.noMaterialsHint": "Add materials to get started",
         "editor.noMaterialsCta": "Browse materials",
@@ -62,6 +77,16 @@ const makeMaterial = (id: string, name: string): Material => ({
   category_name_fi: null,
   image_url: null,
   pricing: [{ unit_price: 12.5, unit: "m", supplier_name: "TestShop", is_primary: true }],
+});
+
+const makeBomItem = (overrides: Partial<BomItem> = {}): BomItem => ({
+  material_id: "mat-1",
+  material_name: "Pine Beam",
+  quantity: 2,
+  unit: "m",
+  unit_price: 10,
+  total: 20,
+  ...overrides,
 });
 
 const defaultProps = {
@@ -129,5 +154,22 @@ describe("BomPanel material browser cards – keyboard accessibility (#619)", ()
     render(<BomPanel {...defaultProps} materials={materials} />);
     const card = screen.getByRole("button", { name: /Concrete/i });
     expect(card.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("announces BOM total updates through a polite live region", () => {
+    render(
+      <BomPanel
+        {...defaultProps}
+        bom={[makeBomItem()]}
+        materials={[makeMaterial("mat-1", "Pine Beam")]}
+      />,
+    );
+
+    const announcer = screen.getByTestId("bom-total-a11y-announcer");
+    expect(announcer.getAttribute("role")).toBe("status");
+    expect(announcer.getAttribute("aria-live")).toBe("polite");
+    expect(announcer.getAttribute("aria-atomic")).toBe("true");
+    expect(announcer.textContent).toContain("1 item");
+    expect(announcer.textContent).toContain("€20");
   });
 });
