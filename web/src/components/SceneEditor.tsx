@@ -293,6 +293,7 @@ export default function SceneEditor({
 
   /* ── Find-match highlight overlay HTML ───────────────────────── */
   const findHighlightRef = useRef<HTMLPreElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const findHighlightHtml = useMemo(() => {
     if (findMatches.length === 0) return "";
     // Build the text with invisible characters except where matches are highlighted
@@ -352,6 +353,10 @@ export default function SceneEditor({
 
   const stopCursorTracking = useCallback(() => {
     setIsFocused(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   }, []);
 
   /* ── Error line (0-based index, or -1 if no error line) ──────── */
