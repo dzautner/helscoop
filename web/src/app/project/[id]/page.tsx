@@ -3098,6 +3098,7 @@ export default function ProjectPage() {
               onClick={() => {
                 if (photoOverlayUrl) {
                   setPhotoOverlayUrl(null);
+                  setPhotoCompareMode(false);
                 } else {
                   photoInputRef.current?.click();
                 }
