@@ -1,12 +1,15 @@
 {
-  "name": "Helscoop",
+  "name": "Helscoop — Suunnittele remonttisi 3D:ssä",
   "short_name": "Helscoop",
   "description": "Finnish house visualization and renovation platform",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#12110f",
   "theme_color": "#12110f",
+  "categories": ["utilities", "lifestyle"],
+  "lang": "fi",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }
