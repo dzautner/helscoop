@@ -3565,6 +3565,70 @@ select:focus {
   white-space: nowrap;
 }
 
+.chat-diff-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.chat-diff-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.chat-diff-btn[aria-expanded="true"] {
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.3);
+}
+
+.chat-diff-preview {
+  margin-top: 6px;
+  padding: 8px 0;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.25);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.chat-diff-line {
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.chat-diff-marker {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  user-select: none;
+}
+
+.chat-diff-add {
+  background: rgba(74, 180, 100, 0.1);
+  color: #6ec87a;
+}
+
+.chat-diff-remove {
+  background: rgba(220, 80, 80, 0.1);
+  color: #e07070;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.chat-diff-context {
+  color: var(--text-muted);
+}
+
 .chat-input-bar {
   display: flex;
   align-items: flex-end;

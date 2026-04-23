@@ -921,10 +921,13 @@ export default function ProjectPage() {
     }
   }, [saveStatus, savedScript, clearDraft]);
 
+  const lastAiApplyRef = useRef<number>(0);
+
   const handleApplyCode = useCallback(
     (code: string) => {
       markChat();
       queueSceneAnnouncement("editor.sceneAppliedFromChat");
+      lastAiApplyRef.current = Date.now();
       setSceneJs(code);
       pushHistory(code);
     },
@@ -966,6 +969,13 @@ export default function ProjectPage() {
     },
     [handleEditorModeChange, locale, pushHistory, queueSceneAnnouncement, toast, track],
   );
+
+  useEffect(() => {
+    if (!sceneError || Date.now() - lastAiApplyRef.current > 3000) return;
+    toast(t('editor.aiErrorRecovery'), "warning", {
+      action: { label: t('editor.undo'), onClick: undo },
+    });
+  }, [sceneError, t, toast, undo]);
 
   const handleMobilePanelChange = useCallback(
     (panel: MobileEditorPanel) => {
