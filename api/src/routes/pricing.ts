@@ -4,6 +4,11 @@ import { requireAuth } from "../auth";
 import { normalizeRole, requirePermission } from "../permissions";
 import { buildMaterialTrend, buildProjectTrendSummary, type PriceHistoryInput } from "../material-trends";
 import { notifyPriceWatchers } from "../price-alerts";
+import {
+  estimateRenovationCost,
+  getRenovationCostIndexCatalog,
+  isRenovationCostCategoryId,
+} from "../statfin-cost-index";
 
 const router = Router();
 
@@ -157,6 +162,29 @@ router.get("/trends/project/:projectId", requireAuth, requirePermission("pricing
     dataSources: Array.from(new Set(items.map((item) => item.source))),
     ...buildProjectTrendSummary(items),
   });
+});
+
+// GET /pricing/renovation-cost-index — StatFin-indexed detached-house renovation baselines
+router.get("/renovation-cost-index", requireAuth, requirePermission("pricing:read"), async (_req, res) => {
+  const catalog = await getRenovationCostIndexCatalog();
+  res.json(catalog);
+});
+
+// POST /pricing/renovation-cost-estimate — base_cost x quantity x StatFin multiplier x ALV
+router.post("/renovation-cost-estimate", requireAuth, requirePermission("pricing:read"), async (req, res) => {
+  const { categoryId, quantity } = req.body as { categoryId?: unknown; quantity?: unknown };
+  const numericQuantity = Number(quantity);
+
+  if (!isRenovationCostCategoryId(categoryId)) {
+    return res.status(400).json({ error: "Unknown renovation cost category" });
+  }
+
+  if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+    return res.status(400).json({ error: "quantity must be a positive number" });
+  }
+
+  const catalog = await getRenovationCostIndexCatalog();
+  res.json(estimateRenovationCost(catalog, categoryId, numericQuantity));
 });
 
 // PUT /pricing/:materialId/:supplierId — update pricing (admin or partner with pricing:update)

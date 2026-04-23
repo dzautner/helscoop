@@ -18,6 +18,9 @@ import type {
   PhotoEstimateUpload,
   ProjectMaterialTrendResponse,
   QuoteRequestPayload,
+  RenovationCostEstimateRequest,
+  RenovationCostEstimateResponse,
+  RenovationCostIndexResponse,
   RyhtiPermitMetadata,
 } from "@/types";
 
@@ -383,6 +386,13 @@ export const api = {
     apiFetch(`/pricing/history/${materialId}`),
   getProjectMaterialTrends: (projectId: string): Promise<ProjectMaterialTrendResponse> =>
     apiFetch(`/pricing/trends/project/${encodeURIComponent(projectId)}`),
+  getRenovationCostIndex: (): Promise<RenovationCostIndexResponse> =>
+    apiFetch("/pricing/renovation-cost-index"),
+  estimateRenovationCost: (data: RenovationCostEstimateRequest): Promise<RenovationCostEstimateResponse> =>
+    apiFetch("/pricing/renovation-cost-estimate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   getNotifications: (limit = 20): Promise<AppNotification[]> =>
     apiFetch(`/notifications?limit=${encodeURIComponent(String(limit))}`),
   getUnreadNotificationCount: (): Promise<{ unread: number }> =>

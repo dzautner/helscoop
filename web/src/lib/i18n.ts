@@ -1214,6 +1214,15 @@ const translations = {
         general: 'Yleinen',
       },
     },
+    renovationCostIndex: {
+      eyebrow: 'TILASTOKESKUS',
+      title: 'Kuukausittainen kustannusindeksi',
+      loading: 'Haetaan Tilastokeskuksen kustannusindeksiä...',
+      loadFailed: 'Tilastokeskuksen kustannusindeksiä ei voitu hakea.',
+      summary: 'Perushinnat indeksoitu kertoimella {{multiplier}} ja näytetään ALV {{vat}} % sisältyen.',
+      updated: 'Päivitetty jaksolle {{period}}.',
+      fallback: 'Näytetään viimeisin varasisäinen indeksipiste.',
+    },
     bomSavings: {
       eyebrow: 'SÄÄSTÖT',
       title: 'Kustannusoptimointi',
@@ -2704,6 +2713,15 @@ const translations = {
         general: 'General',
       },
     },
+    renovationCostIndex: {
+      eyebrow: 'STATISTICS FINLAND',
+      title: 'Monthly cost index',
+      loading: 'Loading Statistics Finland cost index...',
+      loadFailed: 'Could not load the Statistics Finland cost index.',
+      summary: 'Base prices are indexed by {{multiplier}} and shown including {{vat}}% VAT.',
+      updated: 'Updated for period {{period}}.',
+      fallback: 'Showing the latest internal fallback index point.',
+    },
     bomSavings: {
       eyebrow: 'SAVINGS',
       title: 'Cost optimization',
@@ -4102,6 +4120,15 @@ const translations = {
         outdoor: 'Utomhus',
         general: 'Allmänt',
       },
+    },
+    renovationCostIndex: {
+      eyebrow: 'STATISTIKCENTRALEN',
+      title: 'Månatligt kostnadsindex',
+      loading: 'Hämtar Statistikcentralens kostnadsindex...',
+      loadFailed: 'Kunde inte hämta Statistikcentralens kostnadsindex.',
+      summary: 'Baspriserna indexeras med {{multiplier}} och visas inklusive {{vat}} % moms.',
+      updated: 'Uppdaterad för perioden {{period}}.',
+      fallback: 'Visar den senaste interna reservindexpunkten.',
     },
     bomSavings: {
       eyebrow: 'BESPARINGAR',
