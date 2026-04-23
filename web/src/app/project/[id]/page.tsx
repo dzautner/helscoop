@@ -20,6 +20,7 @@ import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
+import { calculateThermalLoss, heatFluxToColor } from "@/lib/thermal-engine";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
@@ -249,6 +250,7 @@ export default function ProjectPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
+  const [thermalView, setThermalView] = useState(false);
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
@@ -590,6 +592,17 @@ export default function ProjectPage() {
   }, [bomWidth]);
 
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
+
+  const thermalColorMap = useMemo(() => {
+    if (!thermalView || materials.length === 0) return undefined;
+    const result = calculateThermalLoss(materials);
+    const colorMap = new Map<string, [number, number, number]>();
+    result.surfaces.forEach((data) => {
+      colorMap.set(data.materialId, heatFluxToColor(data.heatFluxDensity, result.minHeatFlux, result.maxHeatFlux));
+    });
+    return colorMap;
+  }, [thermalView, materials]);
+
   const renovationRoi = useMemo(
     () => estimateRenovationRoi(bom, materials, project?.building_info ?? null, { coupleMode: householdDeductionJoint }),
     [bom, householdDeductionJoint, materials, project?.building_info],
@@ -849,6 +862,13 @@ export default function ProjectPage() {
       code: "w",
       action: () => setWireframe((v) => !v),
       descriptionKey: "shortcuts.wireframe",
+    },
+    {
+      key: "T",
+      mod: false,
+      code: "t",
+      action: () => setThermalView((v) => !v),
+      descriptionKey: "shortcuts.thermal",
     },
     {
       key: "E",
@@ -2278,6 +2298,8 @@ export default function ProjectPage() {
                 onMaterialSurfaceSelect={handleViewportMaterialSurfaceSelect}
                 onMeasurementModeChange={setViewportMeasurementMode}
                 projectName={projectName}
+                thermalView={thermalView}
+                thermalColorMap={thermalColorMap}
               />
             </ErrorBoundary>
           </div>
@@ -2295,6 +2317,17 @@ export default function ProjectPage() {
                 <path d="M2 12l10 5 10-5" />
               </svg>
               {t('editor.wireframe')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={thermalView}
+              onClick={() => setThermalView(!thermalView)}
+              title={`${t('editor.thermal')} (T)`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+              </svg>
+              {t('editor.thermal')}
             </button>
             <button
               className="viewport-toolbar-btn"
@@ -2371,6 +2404,18 @@ export default function ProjectPage() {
                 : t('editor.objectCount', { count: objectCount })}
             </span>
           </div>
+
+          {/* Thermal legend */}
+          {thermalView && (
+            <div className="viewport-thermal-legend">
+              <div className="viewport-thermal-legend-title">{t('editor.thermalLegend')}</div>
+              <div className="viewport-thermal-legend-bar" />
+              <div className="viewport-thermal-legend-labels">
+                <span>{t('editor.thermalLow')}</span>
+                <span>{t('editor.thermalHigh')}</span>
+              </div>
+            </div>
+          )}
 
           {/* Scene validation warnings */}
           {sceneWarnings.length > 0 && (
