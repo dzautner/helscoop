@@ -333,6 +333,25 @@
   border-left-color: rgba(0, 0, 0, 0.06);
 }
 
+.layer-autoplay-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.layer-autoplay-btn:hover {
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.3);
+  background: rgba(229, 160, 75, 0.06);
+}
+
 [data-theme="light"] .chat-messages-area {
   background: rgba(250, 250, 250, 0.7);
   backdrop-filter: blur(14px) saturate(1.2);

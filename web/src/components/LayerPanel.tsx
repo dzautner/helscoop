@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import type { SceneLayer } from "@/lib/scene-layers";
 
@@ -14,6 +14,7 @@ interface LayerPanelProps {
   onToggleLayerLock: (layerId: string) => void;
   onOpenLayerMaterial?: (layerId: string) => void;
   onFocusLayer?: (layerId: string) => void;
+  onSetHiddenLayers?: (ids: Set<string>) => void;
   style?: React.CSSProperties;
 }
 
@@ -63,11 +64,57 @@ export default function LayerPanel({
   onToggleLayerLock,
   onOpenLayerMaterial,
   onFocusLayer,
+  onSetHiddenLayers,
   style,
 }: LayerPanelProps) {
   const { t, locale } = useTranslation();
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const orderedIds = useMemo(() => layers.map((layer) => layer.id), [layers]);
+
+  const [autoplayActive, setAutoplayActive] = useState(false);
+  const [autoplayStep, setAutoplayStep] = useState(0);
+  const autoplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedHiddenRef = useRef<Set<string> | null>(null);
+
+  const stopAutoplay = useCallback(() => {
+    setAutoplayActive(false);
+    if (autoplayTimerRef.current) {
+      clearTimeout(autoplayTimerRef.current);
+      autoplayTimerRef.current = null;
+    }
+    if (savedHiddenRef.current !== null) {
+      onSetHiddenLayers?.(savedHiddenRef.current);
+      savedHiddenRef.current = null;
+    }
+  }, [onSetHiddenLayers]);
+
+  const advanceAutoplay = useCallback((step: number) => {
+    if (step >= orderedIds.length) {
+      stopAutoplay();
+      return;
+    }
+    setAutoplayStep(step);
+    const hiddenIds = new Set(orderedIds.slice(step + 1));
+    onSetHiddenLayers?.(hiddenIds);
+    onSelectLayer(orderedIds[step]);
+    onFocusLayer?.(orderedIds[step]);
+    autoplayTimerRef.current = setTimeout(() => advanceAutoplay(step + 1), 3000);
+  }, [orderedIds, onSetHiddenLayers, onSelectLayer, onFocusLayer, stopAutoplay]);
+
+  const startAutoplay = useCallback(() => {
+    if (orderedIds.length === 0 || !onSetHiddenLayers) return;
+    savedHiddenRef.current = new Set(hiddenLayerIds);
+    setAutoplayActive(true);
+    setAutoplayStep(0);
+    onSetHiddenLayers(new Set(orderedIds));
+    setTimeout(() => advanceAutoplay(0), 500);
+  }, [orderedIds, hiddenLayerIds, onSetHiddenLayers, advanceAutoplay]);
+
+  useEffect(() => {
+    return () => {
+      if (autoplayTimerRef.current) clearTimeout(autoplayTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedLayerId) return;
@@ -134,10 +181,54 @@ export default function LayerPanel({
           <div className="label-mono" style={{ marginBottom: 6 }}>{t("layers.eyebrow")}</div>
           <div className="heading-display" style={{ fontSize: 18 }}>{t("layers.title")}</div>
         </div>
-        <span className="badge badge-amber" aria-label={t("layers.layerCount", { count: layers.length })}>
-          {layers.length}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {layers.length > 1 && onSetHiddenLayers && (
+            <button
+              type="button"
+              className="layer-autoplay-btn"
+              onClick={autoplayActive ? stopAutoplay : startAutoplay}
+              aria-label={autoplayActive ? t("layers.stopAutoplay") : t("layers.startAutoplay")}
+              title={autoplayActive ? t("layers.stopAutoplay") : t("layers.startAutoplay")}
+            >
+              {autoplayActive ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="6,4 20,12 6,20" />
+                </svg>
+              )}
+            </button>
+          )}
+          <span className="badge badge-amber" aria-label={t("layers.layerCount", { count: layers.length })}>
+            {layers.length}
+          </span>
+        </div>
       </div>
+
+      {autoplayActive && (
+        <div style={{ padding: "0 14px 8px", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{
+            flex: 1,
+            height: 3,
+            background: "var(--border)",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}>
+            <div style={{
+              width: `${((autoplayStep + 1) / layers.length) * 100}%`,
+              height: "100%",
+              background: "var(--amber)",
+              transition: "width 0.4s ease-out",
+            }} />
+          </div>
+          <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+            {autoplayStep + 1}/{layers.length}
+          </span>
+        </div>
+      )}
 
       {layers.length === 0 ? (
         <div
