@@ -33,6 +33,52 @@ function shouldGroup(current: ChatMessage, prev: ChatMessage | undefined): boole
   return current.role === prev.role;
 }
 
+interface DiffLine {
+  type: "add" | "remove" | "context";
+  content: string;
+}
+
+function computeSimpleDiff(oldText: string, newText: string): DiffLine[] {
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
+  const result: DiffLine[] = [];
+  const maxLen = Math.max(oldLines.length, newLines.length);
+  const contextWindow = 2;
+  const changed = new Set<number>();
+
+  for (let i = 0; i < maxLen; i++) {
+    if (i >= oldLines.length || i >= newLines.length || oldLines[i] !== newLines[i]) {
+      for (let j = Math.max(0, i - contextWindow); j <= Math.min(maxLen - 1, i + contextWindow); j++) {
+        changed.add(j);
+      }
+    }
+  }
+
+  let lastShown = -2;
+  for (let i = 0; i < maxLen; i++) {
+    if (!changed.has(i)) continue;
+    if (i > lastShown + 1 && lastShown >= 0) {
+      result.push({ type: "context", content: "···" });
+    }
+    lastShown = i;
+
+    const oldLine = i < oldLines.length ? oldLines[i] : undefined;
+    const newLine = i < newLines.length ? newLines[i] : undefined;
+
+    if (oldLine === newLine) {
+      result.push({ type: "context", content: oldLine! });
+    } else {
+      if (oldLine !== undefined) result.push({ type: "remove", content: oldLine });
+      if (newLine !== undefined) result.push({ type: "add", content: newLine });
+    }
+  }
+
+  if (result.length === 0) {
+    result.push({ type: "context", content: "(no changes)" });
+  }
+  return result;
+}
+
 export default function ChatPanel({
   projectId,
   sceneJs,
@@ -73,6 +119,7 @@ export default function ChatPanel({
   const [loading, setLoading] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [skipConfirm, setSkipConfirm] = useState(false);
+  const [diffExpandedIdx, setDiffExpandedIdx] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -239,20 +286,48 @@ export default function ChatPanel({
                   <div className="chat-msg-content">
                     {textContent && <span>{textContent}</span>}
                     {code && (
-                      <div className="chat-apply-bar">
-                        <button
-                          className="chat-apply-btn"
-                          onClick={() => handleApplyClick(code)}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          {t('editor.applyToScene')}
-                        </button>
-                        <span className="chat-apply-hint">
-                          {codeObjectCount} {codeObjectCount === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
-                        </span>
-                      </div>
+                      <>
+                        <div className="chat-apply-bar">
+                          <button
+                            className="chat-apply-btn"
+                            onClick={() => handleApplyClick(code)}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            {t('editor.applyToScene')}
+                          </button>
+                          <button
+                            className="chat-diff-btn"
+                            onClick={() => setDiffExpandedIdx(diffExpandedIdx === i ? null : i)}
+                            aria-expanded={diffExpandedIdx === i}
+                            title={t('editor.previewDiff')}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 3v18M3 12h18" />
+                            </svg>
+                            {t('editor.previewDiff')}
+                          </button>
+                          <span className="chat-apply-hint">
+                            {codeObjectCount} {codeObjectCount === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
+                          </span>
+                        </div>
+                        {diffExpandedIdx === i && (
+                          <div className="chat-diff-preview" role="region" aria-label={t('editor.diffPreview')}>
+                            {computeSimpleDiff(sceneJs, code).map((line, li) => (
+                              <div
+                                key={li}
+                                className={`chat-diff-line chat-diff-${line.type}`}
+                              >
+                                <span className="chat-diff-marker">
+                                  {line.type === "add" ? "+" : line.type === "remove" ? "−" : " "}
+                                </span>
+                                {line.content}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
