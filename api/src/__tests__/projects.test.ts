@@ -507,7 +507,7 @@ describe("PUT /projects/:id", () => {
     expect(res.status).toBe(200);
     expect((res.body as { household_deduction_joint: boolean }).household_deduction_joint).toBe(true);
     expect(mockQuery.mock.calls[0][0]).toContain("household_deduction_joint=COALESCE");
-    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, null, null, null, "proj-1", "user-1"]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, null, null, null, false, null, "proj-1", "user-1"]);
   });
 
   it("persists scene parameter presets", async () => {
@@ -539,9 +539,81 @@ describe("PUT /projects/:id", () => {
       null,
       null,
       JSON.stringify(param_presets),
+      false,
+      null,
       "proj-1",
       "user-1",
     ]);
+  });
+
+  it("persists photo overlay metadata for before/after alignment", async () => {
+    const photo_overlay = {
+      data_url: "data:image/jpeg;base64,abc123",
+      file_name: "house.jpg",
+      opacity: 0.72,
+      compare_mode: true,
+      compare_position: 62,
+      offset_x: 12,
+      offset_y: -8,
+      scale: 1.24,
+      rotation: 4,
+      updated_at: "2026-04-23T00:00:00.000Z",
+    };
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", photo_overlay }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { photo_overlay },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][0]).toContain("photo_overlay=CASE WHEN");
+    expect(mockQuery.mock.calls[0][1][7]).toBe(true);
+    expect(JSON.parse(mockQuery.mock.calls[0][1][8] as string)).toMatchObject({
+      data_url: photo_overlay.data_url,
+      opacity: 0.72,
+      compare_mode: true,
+      compare_position: 62,
+      offset_x: 12,
+      offset_y: -8,
+      scale: 1.24,
+      rotation: 4,
+    });
+  });
+
+  it("clears photo overlay metadata when explicitly set to null", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", photo_overlay: null }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { photo_overlay: null },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][1][7]).toBe(true);
+    expect(mockQuery.mock.calls[0][1][8]).toBeNull();
+  });
+
+  it("rejects invalid photo overlay payloads", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { photo_overlay: { data_url: "https://example.com/house.jpg" } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 

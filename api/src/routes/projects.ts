@@ -9,6 +9,7 @@ import { sendEmail, type EmailAttachment } from "../email";
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHOTO_OVERLAY_DATA_URL_RE = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
 
 interface QuoteRequestBomRow {
   material_name: string;
@@ -54,6 +55,41 @@ function optionalText(value: unknown, maxLength: number): string | null {
   const cleaned = value.trim();
   if (!cleaned) return null;
   return cleaned.slice(0, maxLength);
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.min(max, Math.max(min, next));
+}
+
+function normalizePhotoOverlay(value: unknown): Record<string, unknown> | null {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") {
+    throw new Error("photo_overlay must be an object or null");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const dataUrl = typeof raw.data_url === "string" ? raw.data_url : "";
+  if (!PHOTO_OVERLAY_DATA_URL_RE.test(dataUrl)) {
+    throw new Error("photo_overlay.data_url must be a JPEG, PNG, or WebP data URL");
+  }
+  if (dataUrl.length > 7_500_000) {
+    throw new Error("photo_overlay.data_url is too large");
+  }
+
+  return {
+    data_url: dataUrl,
+    file_name: typeof raw.file_name === "string" ? raw.file_name.slice(0, 160) : null,
+    opacity: clampNumber(raw.opacity, 0, 1, 0.4),
+    compare_mode: Boolean(raw.compare_mode),
+    compare_position: clampNumber(raw.compare_position, 0, 100, 50),
+    offset_x: clampNumber(raw.offset_x, -50, 50, 0),
+    offset_y: clampNumber(raw.offset_y, -50, 50, 0),
+    scale: clampNumber(raw.scale, 0.5, 2.5, 1),
+    rotation: clampNumber(raw.rotation, -30, 30, 0),
+    updated_at: typeof raw.updated_at === "string" ? raw.updated_at : new Date().toISOString(),
+  };
 }
 
 function formatCurrency(value: number, locale: "fi" | "en"): string {
@@ -903,6 +939,15 @@ router.put("/:id", async (req, res) => {
     ? (Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : null)
     : null;
   const safePresets = param_presets !== undefined ? JSON.stringify(param_presets) : null;
+  const photoOverlayProvided = Object.prototype.hasOwnProperty.call(req.body, "photo_overlay");
+  let safePhotoOverlay: Record<string, unknown> | null = null;
+  if (photoOverlayProvided) {
+    try {
+      safePhotoOverlay = normalizePhotoOverlay(req.body.photo_overlay);
+    } catch (err) {
+      return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid photo_overlay" });
+    }
+  }
   const result = await query(
     `UPDATE projects SET
        name=COALESCE($1, name),
@@ -912,9 +957,22 @@ router.put("/:id", async (req, res) => {
        tags=COALESCE($5, tags),
        status=COALESCE($6, status),
        param_presets=COALESCE($7::jsonb, param_presets),
+       photo_overlay=CASE WHEN $8::boolean THEN $9::jsonb ELSE photo_overlay END,
        updated_at=now()
-     WHERE id=$8 AND user_id=$9 RETURNING *`,
-    [name?.trim(), description, scene_js, household_deduction_joint ?? null, safeTags, status ?? null, safePresets, req.params.id, req.user!.id]
+     WHERE id=$10 AND user_id=$11 RETURNING *`,
+    [
+      name?.trim(),
+      description,
+      scene_js,
+      household_deduction_joint ?? null,
+      safeTags,
+      status ?? null,
+      safePresets,
+      photoOverlayProvided,
+      safePhotoOverlay === null ? null : JSON.stringify(safePhotoOverlay),
+      req.params.id,
+      req.user!.id,
+    ]
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });

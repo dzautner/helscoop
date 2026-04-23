@@ -28,6 +28,7 @@ export type AnalyticsEvent =
   | "bom_aggregated"
   | "photo_estimate_generated"
   | "photo_estimate_imported"
+  | "project_photo_overlay_uploaded"
   | "bom_package_material_replaced"
   | "bom_optimization_applied"
   | "bom_optimization_dismissed"
@@ -72,6 +73,7 @@ export interface AnalyticsEventProps {
   bom_aggregated: { project_count: number; item_count: number };
   photo_estimate_generated: { project_id: string; photo_count: number; scope_count: number; estimate_mid: number };
   photo_estimate_imported: { project_id: string; item_count: number; estimate_mid: number };
+  project_photo_overlay_uploaded: { file_type: string };
   bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string; source?: string };
   bom_optimization_applied: { type: string; material_id: string; savings_amount: number };
   bom_optimization_dismissed: { type: string; material_id: string; savings_amount: number };
@@ -86,7 +88,7 @@ export interface AnalyticsEventProps {
   financing_partner_clicked: { partner: string; loan_amount: number; term_years: number; target: "loan_comparison" | "materials_bnpl" };
   financing_conversion_reported: { partner: string; amount: number; status: "started" | "qualified" | "approved" | "rejected" };
   bom_exported: { format: "pdf" | "csv" | "json" };
-  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" | "permit_pack_zip" };
+  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" | "permit_pack_zip" | "photo_overlay_png" };
   project_imported: { format: "helscoop" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;

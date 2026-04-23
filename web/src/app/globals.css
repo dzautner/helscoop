@@ -4616,6 +4616,74 @@ select:focus {
   .daylight-panel { display: none; }
 }
 
+.photo-overlay {
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.photo-overlay-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.photo-alignment-guides {
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+}
+
+.photo-guide-horizon {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, rgba(229, 160, 75, 0.9) 0 9px, transparent 9px 16px);
+}
+
+.photo-guide-corner {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-color: rgba(229, 160, 75, 0.78);
+}
+
+.photo-guide-corner--tl {
+  top: 12%;
+  left: 10%;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.photo-guide-corner--tr {
+  top: 12%;
+  right: 10%;
+  border-top: 2px solid;
+  border-right: 2px solid;
+}
+
+.photo-guide-corner--bl {
+  bottom: 12%;
+  left: 10%;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+}
+
+.photo-guide-corner--br {
+  right: 10%;
+  bottom: 12%;
+  border-right: 2px solid;
+  border-bottom: 2px solid;
+}
+
 .photo-overlay-controls {
   position: absolute;
   bottom: 16px;
@@ -4624,6 +4692,7 @@ select:focus {
   z-index: 10;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 12px;
   background: rgba(17, 17, 19, 0.85);
@@ -4670,6 +4739,50 @@ select:focus {
 
 .photo-overlay-clear:hover {
   color: var(--text-primary);
+}
+
+.photo-overlay-action {
+  min-width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.photo-overlay-action:hover {
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.3);
+  background: rgba(229, 160, 75, 0.08);
+}
+
+.photo-alignment-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  gap: 6px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.photo-alignment-controls label {
+  display: grid;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.photo-alignment-controls input[type="range"] {
+  width: 100%;
 }
 
 .photo-compare-toggle {

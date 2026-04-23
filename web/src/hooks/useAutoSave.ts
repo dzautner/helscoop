@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import type { PhotoOverlayState } from "@/types";
 
 /**
  * Fields that can be auto-saved. Each key maps to a saveable project field.
@@ -8,11 +9,12 @@ export interface SaveableFields {
   description: string;
   scene_js: string;
   bom: { material_id: string; quantity: number; unit: string }[];
+  photo_overlay?: PhotoOverlayState | null;
 }
 
 export interface AutoSaveCallbacks {
-  /** Called with only the changed project fields (name, description, scene_js). */
-  onSaveProject: (dirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js">>) => Promise<void>;
+  /** Called with only the changed project fields. */
+  onSaveProject: (dirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js" | "photo_overlay">>) => Promise<void>;
   /** Called when BOM has changed. */
   onSaveBom: (bom: SaveableFields["bom"]) => Promise<void>;
   /** Called when scene_js changed and save succeeded, to capture a new thumbnail. */
@@ -58,6 +60,10 @@ function bomEquals(
     }
   }
   return true;
+}
+
+function photoOverlayEquals(a: PhotoOverlayState | null | undefined, b: PhotoOverlayState | null | undefined): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
 /**
@@ -107,7 +113,7 @@ export function useAutoSave(
    */
   const computeDirtyFields = useCallback(
     (current: SaveableFields, saved: SaveableFields) => {
-      const projectDirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js">> = {};
+      const projectDirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js" | "photo_overlay">> = {};
       let hasProjectChanges = false;
       let sceneChanged = false;
 
@@ -123,6 +129,10 @@ export function useAutoSave(
         projectDirty.scene_js = current.scene_js;
         hasProjectChanges = true;
         sceneChanged = true;
+      }
+      if (!photoOverlayEquals(current.photo_overlay, saved.photo_overlay)) {
+        projectDirty.photo_overlay = current.photo_overlay ?? null;
+        hasProjectChanges = true;
       }
 
       const bomChanged = !bomEquals(current.bom, saved.bom);
@@ -267,6 +277,7 @@ export function useAutoSave(
     fields.name,
     fields.description,
     fields.scene_js,
+    fields.photo_overlay,
     fields.bom,
     initialLoadDone,
     scheduleAutoSave,
