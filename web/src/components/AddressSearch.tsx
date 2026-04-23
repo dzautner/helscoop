@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -157,14 +157,22 @@ export default function AddressSearch({
   const [searchError, setSearchError] = useState(false);
   const [updatingBuilding, setUpdatingBuilding] = useState(false);
   const [editError, setEditError] = useState(false);
+  const [revealDone, setRevealDone] = useState(false);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
+
+  const handleRevealComplete = useCallback(() => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => setRevealDone(true), 200);
+  }, []);
 
   const search = useCallback(async () => {
     if (!query.trim() || query.trim().length < 3) return;
     setLoading(true);
     setSearched(true);
     setSearchError(false);
+    setRevealDone(false);
     try {
       const data = await api.getBuilding(query.trim());
       setResult(data);
@@ -425,11 +433,18 @@ export default function AddressSearch({
                 wireframe={false}
                 onObjectCount={() => {}}
                 onError={() => {}}
+                onRevealComplete={handleRevealComplete}
               />
             </div>
 
-            {/* Building info + CTA */}
-            <div className="card" style={{ padding: "24px 28px", display: "flex", flexDirection: "column" }}>
+            {/* Building info + CTA — slides in after 3D reveal */}
+            <div className={`card ${revealDone ? "anim-slide-l" : ""}`} style={{
+              padding: "24px 28px",
+              display: "flex",
+              flexDirection: "column",
+              opacity: revealDone ? 1 : 0,
+              transition: "opacity 0.3s ease-out",
+            }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                 <div>
                   <h3 className="heading-display" style={{ fontSize: 20, marginBottom: 6 }}>
