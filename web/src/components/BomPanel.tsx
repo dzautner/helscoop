@@ -16,6 +16,7 @@ import RenovationRoiPanel from "@/components/RenovationRoiPanel";
 import RenovationFinancingPanel from "@/components/RenovationFinancingPanel";
 import EuEnergyGrantPrecheckPanel from "@/components/EuEnergyGrantPrecheckPanel";
 import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
+import PhasedRenovationPlannerPanel from "@/components/PhasedRenovationPlannerPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import IfcPreviewPanel from "@/components/IfcPreviewPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
@@ -2702,6 +2703,17 @@ export default function BomPanel({
           <HouseholdDeductionPanel
             bom={bom}
             materials={materials}
+            coupleMode={householdDeductionJoint}
+            onCoupleModeChange={onHouseholdDeductionJointChange || (() => undefined)}
+          />
+        )}
+        {bom.length > 0 && (
+          <PhasedRenovationPlannerPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            projectName={projectName}
+            projectDescription={projectDescription}
             coupleMode={householdDeductionJoint}
             onCoupleModeChange={onHouseholdDeductionJointChange || (() => undefined)}
           />
