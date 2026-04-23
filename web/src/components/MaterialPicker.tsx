@@ -1,10 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useTranslation } from "@/components/LocaleProvider";
 import { buildAffiliateRetailerUrl } from "@/lib/material-affiliate";
 import type { BomItem, Material, StockLevel } from "@/types";
+
+const MaterialPreviewBall = dynamic(() => import("@/components/MaterialPreviewBall"), {
+  ssr: false,
+});
 
 type MaterialSort = "price-asc" | "price-desc" | "thermal" | "availability";
 
@@ -154,6 +159,7 @@ export default function MaterialPicker({
   const [sort, setSort] = useState<MaterialSort>("price-asc");
   const [fireRatings, setFireRatings] = useState<Set<string>>(() => new Set());
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [previewMaterial, setPreviewMaterial] = useState<{ material: Material; rect: DOMRect } | null>(null);
 
   const close = useCallback(() => onClose(), [onClose]);
   useFocusTrap(dialogRef, true, close);
@@ -385,6 +391,21 @@ export default function MaterialPicker({
                         <h3>{metric.name}</h3>
                         <p>{metric.dimensions}</p>
                       </div>
+                      <button
+                        type="button"
+                        className="material-picker-preview-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const rect = (e.target as HTMLElement).getBoundingClientRect();
+                          setPreviewMaterial(
+                            previewMaterial?.material.id === metric.material.id
+                              ? null
+                              : { material: metric.material, rect }
+                          );
+                        }}
+                      >
+                        {t("materialPicker.preview3D")}
+                      </button>
                     </div>
                     <div className="material-picker-price-row">
                       <strong>{formatCurrency(metric.unitPrice, locale)}</strong>
@@ -520,6 +541,13 @@ export default function MaterialPicker({
           </div>
         )}
       </div>
+      {previewMaterial && (
+        <MaterialPreviewBall
+          material={previewMaterial.material}
+          anchorRect={previewMaterial.rect}
+          onClose={() => setPreviewMaterial(null)}
+        />
+      )}
     </div>
   );
 }
