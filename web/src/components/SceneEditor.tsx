@@ -293,6 +293,7 @@ export default function SceneEditor({
 
   /* ── Find-match highlight overlay HTML ───────────────────────── */
   const findHighlightRef = useRef<HTMLPreElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const findHighlightHtml = useMemo(() => {
     if (findMatches.length === 0) return "";
     // Build the text with invisible characters except where matches are highlighted
@@ -345,10 +346,17 @@ export default function SceneEditor({
   const startCursorTracking = useCallback(() => {
     setIsFocused(true);
     updateCursorLine();
+    if (textareaRef.current) textareaRef.current.dataset.tabTrapped = "true";
+    if (intervalRef.current) return;
+    intervalRef.current = setInterval(updateCursorLine, 50);
   }, [updateCursorLine]);
 
   const stopCursorTracking = useCallback(() => {
     setIsFocused(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   }, []);
 
   /* ── Error line (0-based index, or -1 if no error line) ──────── */
@@ -806,15 +814,23 @@ export default function SceneEditor({
                   return;
                 }
               }
+              if (e.key === "Escape") {
+                (e.target as HTMLTextAreaElement).dataset.tabTrapped = "false";
+                return;
+              }
               if (e.key === "Tab") {
+                const ta = e.target as HTMLTextAreaElement;
+                if (ta.dataset.tabTrapped === "false") {
+                  ta.dataset.tabTrapped = "true";
+                  return;
+                }
                 e.preventDefault();
-                const target = e.target as HTMLTextAreaElement;
-                const start = target.selectionStart;
-                const end = target.selectionEnd;
-                const val = target.value;
+                const start = ta.selectionStart;
+                const end = ta.selectionEnd;
+                const val = ta.value;
                 onChange(val.substring(0, start) + "  " + val.substring(end));
                 setTimeout(() => {
-                  target.selectionStart = target.selectionEnd = start + 2;
+                  ta.selectionStart = ta.selectionEnd = start + 2;
                   updateCursorLine();
                 }, 0);
               }

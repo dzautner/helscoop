@@ -27,6 +27,11 @@ function ResetPasswordForm() {
     e.preventDefault();
     setError("");
 
+    if (password.length < 8) {
+      setError(t("auth.passwordTooShort"));
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError(t("auth.resetPasswordMismatch"));
       return;
@@ -130,6 +135,31 @@ function ResetPasswordForm() {
             autoComplete="new-password"
             autoFocus
           />
+          {password.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                {[0, 1, 2].map((i) => {
+                  const strength = password.length >= 12 && /[A-Z]/.test(password) && /\d/.test(password) ? 3
+                    : password.length >= 8 && (/[A-Z]/.test(password) || /\d/.test(password)) ? 2
+                    : password.length >= 8 ? 1 : 0;
+                  return (
+                    <div key={i} style={{
+                      flex: 1,
+                      height: 3,
+                      borderRadius: 2,
+                      background: i < strength
+                        ? strength === 3 ? "var(--success, #4ade80)" : strength === 2 ? "var(--amber, #c4915c)" : "var(--danger, #ef4444)"
+                        : "var(--border, rgba(255,255,255,0.08))",
+                      transition: "background 0.2s",
+                    }} />
+                  );
+                })}
+              </div>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {password.length < 8 ? t("auth.passwordTooShort") : t("auth.passwordStrength")}
+              </span>
+            </div>
+          )}
         </div>
 
         <div>

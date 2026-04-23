@@ -462,9 +462,10 @@ export default function AddressSearch({
                 </div>
               </div>
 
-              <div className="building-info-grid" style={{
+              <dl className="building-info-grid" style={{
                 marginBottom: 16,
                 flex: 1,
+                margin: 0,
               }}>
                 {[
                   {
@@ -576,11 +577,11 @@ export default function AddressSearch({
                     borderRadius: "var(--radius-sm)",
                     border: "1px solid var(--border)",
                   }}>
-                    <div className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{item.value}</div>
+                    <dt className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</dt>
+                    <dd style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{item.value}</dd>
                   </div>
                 ))}
-              </div>
+              </dl>
 
               {result.data_sources && result.data_sources.length > 0 && (
                 <DataSourcesSection
