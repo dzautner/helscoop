@@ -36,6 +36,7 @@ import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
 import OnboardingTour from "@/components/OnboardingTour";
+import DaylightPanel from "@/components/DaylightPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ConfettiCelebration from "@/components/ConfettiCelebration";
 import { generateAraGrantPdf } from "@/lib/pdf";
@@ -297,6 +298,9 @@ export default function ProjectPage() {
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [showEnergyDashboard, setShowEnergyDashboard] = useState(false);
+  const [showDaylightPanel, setShowDaylightPanel] = useState(false);
+  const [sunDirection, setSunDirection] = useState<[number, number, number] | undefined>();
+  const [sunAltitude, setSunAltitude] = useState<number | undefined>();
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
@@ -2765,6 +2769,8 @@ export default function ProjectPage() {
                 selectedObjectId={showLayers ? selectedLayerId : null}
                 hiddenObjectIds={hiddenLayerIds}
                 lockedObjectIds={lockedLayerIds}
+                sunDirection={sunDirection}
+                sunAltitude={sunAltitude}
               />
             </ErrorBoundary>
           </div>
@@ -2854,6 +2860,18 @@ export default function ProjectPage() {
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
               {t('energy.toolbarLabel')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={showDaylightPanel}
+              onClick={() => setShowDaylightPanel((v) => !v)}
+              title={t('editor.daylightTitle')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+              </svg>
+              {t('editor.daylightTitle')}
             </button>
             <button
               className="viewport-toolbar-btn"
@@ -2983,6 +3001,16 @@ export default function ProjectPage() {
               materials={materials}
               bom={bom}
               onClose={() => setShowEnergyDashboard(false)}
+            />
+          )}
+
+          {/* Daylight analysis */}
+          {showDaylightPanel && (
+            <DaylightPanel
+              latitude={project?.permit_metadata?.latitude ?? 60.17}
+              longitude={project?.permit_metadata?.longitude ?? 24.94}
+              onLightDirection={(dir, alt) => { setSunDirection(dir); setSunAltitude(alt); }}
+              onClose={() => { setShowDaylightPanel(false); setSunDirection(undefined); setSunAltitude(undefined); }}
             />
           )}
 

@@ -61,6 +61,8 @@ interface Viewport3DProps {
   selectedObjectId?: string | null;
   hiddenObjectIds?: Set<string>;
   lockedObjectIds?: Set<string>;
+  sunDirection?: [number, number, number];
+  sunAltitude?: number;
 }
 
 export type LightingPresetId = "default" | "summer" | "winter" | "evening";
@@ -586,6 +588,8 @@ export default function Viewport3D({
   selectedObjectId = null,
   hiddenObjectIds,
   lockedObjectIds,
+  sunDirection,
+  sunAltitude,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -1544,6 +1548,15 @@ export default function Viewport3D({
     bgCanvas.height = 0;
     if (oldBg instanceof THREE.Texture) oldBg.dispose();
   }, [lightingPreset]);
+
+  useEffect(() => {
+    const dir = dirLightRef.current;
+    if (!dir || !sunDirection) return;
+    dir.position.set(sunDirection[0] * 15, sunDirection[1] * 15, sunDirection[2] * 15);
+    const warmth = Math.max(0, Math.min(1, (sunAltitude ?? 30) / 60));
+    dir.color.setRGB(1, 0.9 + warmth * 0.1, 0.7 + warmth * 0.3);
+    dir.intensity = Math.max(0.2, Math.min(2, (sunAltitude ?? 30) / 30));
+  }, [sunDirection, sunAltitude]);
 
   // Exploded view: shift mesh positions by category group
   useEffect(() => {

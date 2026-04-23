@@ -4113,6 +4113,114 @@ select:focus {
 }
 
 /* Energy dashboard */
+.daylight-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 25;
+  width: 260px;
+  background: rgba(17, 17, 19, 0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.daylight-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.daylight-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.daylight-panel-presets {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.daylight-preset-btn {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.daylight-preset-btn:hover {
+  background: var(--bg-elevated);
+}
+
+.daylight-preset-btn[data-active="true"] {
+  border-color: var(--amber, #e5a04b);
+  background: color-mix(in srgb, var(--amber, #e5a04b) 15%, var(--bg-tertiary));
+  color: var(--amber, #e5a04b);
+}
+
+.daylight-panel-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.daylight-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.daylight-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daylight-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--amber, #e5a04b);
+}
+
+.daylight-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+.daylight-panel-info {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.daylight-night {
+  color: var(--amber, #e5a04b);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .daylight-panel { display: none; }
+}
+
 .energy-dashboard {
   position: absolute;
   top: 10px;
