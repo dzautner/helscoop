@@ -126,7 +126,7 @@ describe("PDF Quote Generator", () => {
       locale: "en",
     });
     const textCalls = mockDoc.text.mock.calls.map((c: unknown[]) => c[0]);
-    const truncated = textCalls.find((t: string) => typeof t === "string" && t.endsWith("...") && t.length === 103);
+    const truncated = textCalls.find((t: unknown) => typeof t === "string" && t.endsWith("...") && t.length === 103);
     expect(truncated).toBeTruthy();
   });
 
@@ -171,7 +171,7 @@ describe("PDF Quote Generator", () => {
       locale: "en",
     });
     const textCalls = mockDoc.text.mock.calls.map((c: unknown[]) => c[0]);
-    const totalText = textCalls.find((t: string) => typeof t === "string" && t.includes("1,355") || t.includes("1 355"));
+    const totalText = textCalls.find((t: unknown) => typeof t === "string" && (t.includes("1,355") || t.includes("1 355")));
     expect(totalText).toBeTruthy();
   });
 
