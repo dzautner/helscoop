@@ -30,12 +30,22 @@ export interface Project {
   building_info?: BuildingInfo | null;
   permit_metadata?: RyhtiPermitMetadata | null;
   share_token?: string | null;
+  share_token_expires_at?: string | null;
   view_count?: number;
+  contractor_comment_count?: number;
   household_deduction_joint?: boolean;
   tags?: string[];
   status?: ProjectStatus;
   bom?: BomItem[];
+  comments?: SharedProjectComment[];
   param_presets?: ParamPreset[];
+}
+
+export interface SharedProjectComment {
+  id: string;
+  commenter_name: string;
+  message: string;
+  created_at: string;
 }
 
 export interface ParamPreset {
@@ -295,6 +305,7 @@ export interface BomItem {
   quantity: number;
   unit: string;
   unit_price?: number;
+  supplier_name?: string;
   total?: number;
   supplier?: string;
   link?: string | null;

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import type { FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getPresentationPreset } from "@/lib/presentation-export";
-import type { BomItem, Project } from "@/types";
+import type { BomItem, Project, SharedProjectComment } from "@/types";
 
 function escapeCsvField(value: string, sep: string): string {
   if (value.includes(sep) || value.includes('"') || value.includes('\n')) {
@@ -76,27 +77,58 @@ export default function SharedProjectContent({ token }: { token: string }) {
 
   const [project, setProject] = useState<Project | null>(null);
   const [bom, setBom] = useState<BomItem[]>([]);
+  const [comments, setComments] = useState<SharedProjectComment[]>([]);
+  const [commentName, setCommentName] = useState("");
+  const [commentMessage, setCommentMessage] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentStatus, setCommentStatus] = useState<"idle" | "sent" | "error">("idle");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     api.getSharedProject(token)
       .then((proj) => {
         setProject(proj);
         if (proj.bom) {
-          setBom(proj.bom.map((b: BomItem & { line_cost?: number }) => ({
+          setBom(proj.bom.map((b: BomItem & { line_cost?: number; supplier_name?: string }) => ({
             ...b,
+            supplier: b.supplier ?? b.supplier_name,
             total: b.total ?? b.line_cost ?? ((b.unit_price || 0) * b.quantity),
           })));
         }
+        setComments(proj.comments ?? []);
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 410) {
+          setExpired(true);
+        }
         setError(true);
       })
       .finally(() => {
         setLoading(false);
       });
   }, [token]);
+
+  const submitComment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!commentName.trim() || !commentMessage.trim()) return;
+    setCommentSubmitting(true);
+    setCommentStatus("idle");
+    try {
+      const created = await api.createSharedComment(token, {
+        name: commentName.trim(),
+        message: commentMessage.trim(),
+      }) as SharedProjectComment;
+      setComments((items) => [...items, created]);
+      setCommentMessage("");
+      setCommentStatus("sent");
+    } catch {
+      setCommentStatus("error");
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -132,10 +164,10 @@ export default function SharedProjectContent({ token }: { token: string }) {
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
         <h2 className="heading-display" style={{ fontSize: 20, margin: 0, color: "var(--text-primary)" }}>
-          {t('share.notFound')}
+          {expired ? t('share.expired') : t('share.notFound')}
         </h2>
         <p style={{ color: "var(--text-secondary)", fontSize: 14, maxWidth: 360 }}>
-          {t('share.notFoundDesc')}
+          {expired ? t('share.expiredDesc') : t('share.notFoundDesc')}
         </p>
         <a href="https://helscoop.fi" className="btn btn-primary" style={{ marginTop: 8, padding: "10px 24px", textDecoration: "none", fontSize: 13 }}>
           {t('share.signUpCta')}
@@ -236,111 +268,166 @@ export default function SharedProjectContent({ token }: { token: string }) {
           </ErrorBoundary>
         </div>
 
-        {/* BOM sidebar */}
-        {bom.length > 0 && (
-          <div className="shared-project-sidebar" style={{
-            width: 320,
-            flexShrink: 0,
-            borderLeft: "1px solid var(--border)",
-            background: "var(--bg-secondary)",
+        {/* Contractor sidebar */}
+        <div className="shared-project-sidebar" style={{
+          width: 360,
+          flexShrink: 0,
+          borderLeft: "1px solid var(--border)",
+          background: "var(--bg-secondary)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}>
+          <div style={{
+            padding: "14px 16px 10px",
+            borderBottom: "1px solid var(--border)",
             display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}>
-            <div style={{
-              padding: "14px 16px 10px",
-              borderBottom: "1px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+            <h2 style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-muted)",
+              margin: 0,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
             }}>
-              <h2 style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "var(--text-muted)",
-                margin: 0,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-              }}>
-                {t('share.materials')}
-              </h2>
-              <div style={{ display: "flex", gap: 4 }}>
-                <button
-                  type="button"
-                  className="shared-export-btn"
-                  onClick={() => exportBomCsv(bom, project.name, locale, t)}
-                  title={t('share.exportCsv')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  CSV
-                </button>
-                <button
-                  type="button"
-                  className="shared-export-btn"
-                  onClick={() => window.print()}
-                  title={t('share.print')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 6 2 18 2 18 9" />
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                    <rect x="6" y="14" width="12" height="8" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "8px 0",
-            }}>
-              {bom.map((item, i) => (
-                <div
-                  key={`${item.material_id}-${i}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "8px 16px",
-                    fontSize: 13,
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "var(--text-primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.material_name}
-                    </div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>
-                      {item.quantity} {item.unit}
-                      {item.supplier && ` \u00b7 ${item.supplier}`}
-                    </div>
-                  </div>
-                  <div style={{ color: "var(--text-secondary)", fontWeight: 500, flexShrink: 0, marginLeft: 12, fontVariantNumeric: "tabular-nums" }}>
-                    {(item.total || 0).toFixed(2)} EUR
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Total */}
-            <div style={{
-              padding: "12px 16px",
-              borderTop: "1px solid var(--border-strong)",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                {t('share.total')}
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
-                {grandTotal.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR
-              </span>
+              {t('share.materials')}
+            </h2>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                type="button"
+                className="shared-export-btn"
+                onClick={() => exportBomCsv(bom, project.name, locale, t)}
+                title={t('share.exportCsv')}
+                disabled={bom.length === 0}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                CSV
+              </button>
+              <button
+                type="button"
+                className="shared-export-btn"
+                onClick={() => window.print()}
+                title={t('share.exportPdfPrint')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" />
+                </svg>
+                PDF
+              </button>
             </div>
           </div>
-        )}
+          <div className="shared-bom-list" style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "8px 0",
+            minHeight: 120,
+          }}>
+            {bom.length === 0 ? (
+              <div style={{ padding: "12px 16px", color: "var(--text-muted)", fontSize: 12 }}>
+                {t('share.noMaterials')}
+              </div>
+            ) : bom.map((item, i) => (
+              <div
+                key={`${item.material_id}-${i}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 16px",
+                  fontSize: 13,
+                  borderBottom: "1px solid var(--border)",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "var(--text-primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.material_name}
+                  </div>
+                  <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>
+                    {item.quantity} {item.unit}
+                    {item.unit_price != null && ` \u00b7 ${item.unit_price.toFixed(2)} EUR/${item.unit}`}
+                    {item.supplier && ` \u00b7 ${item.supplier}`}
+                  </div>
+                </div>
+                <div style={{ color: "var(--text-secondary)", fontWeight: 500, flexShrink: 0, marginLeft: 12, fontVariantNumeric: "tabular-nums" }}>
+                  {(item.total || 0).toFixed(2)} EUR
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Total */}
+          <div style={{
+            padding: "12px 16px",
+            borderTop: "1px solid var(--border-strong)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              {t('share.total')}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>
+              {grandTotal.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR
+            </span>
+          </div>
+          <section className="shared-comments" aria-labelledby="shared-comments-title">
+            <div className="shared-comments-head">
+              <h2 id="shared-comments-title">{t('share.commentsTitle')}</h2>
+              <span>{comments.length}</span>
+            </div>
+            <div className="shared-comments-list">
+              {comments.length === 0 ? (
+                <p>{t('share.commentsEmpty')}</p>
+              ) : comments.map((comment) => (
+                <article key={comment.id} className="shared-comment">
+                  <div>
+                    <strong>{comment.commenter_name}</strong>
+                    <time dateTime={comment.created_at}>
+                      {new Date(comment.created_at).toLocaleDateString(locale === "fi" ? "fi-FI" : "en-GB")}
+                    </time>
+                  </div>
+                  <p>{comment.message}</p>
+                </article>
+              ))}
+            </div>
+            <form className="shared-comment-form" onSubmit={submitComment}>
+              <label>
+                {t('share.commentName')}
+                <input
+                  className="input"
+                  value={commentName}
+                  onChange={(event) => setCommentName(event.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label>
+                {t('share.commentMessage')}
+                <textarea
+                  className="input"
+                  value={commentMessage}
+                  onChange={(event) => setCommentMessage(event.target.value)}
+                  maxLength={2000}
+                  required
+                  rows={3}
+                />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={commentSubmitting || !commentName.trim() || !commentMessage.trim()}>
+                {commentSubmitting ? t('share.commentSending') : t('share.commentSend')}
+              </button>
+              {commentStatus === "sent" && <p role="status" aria-live="polite">{t('share.commentSent')}</p>}
+              {commentStatus === "error" && <p role="alert">{t('share.commentFailed')}</p>}
+            </form>
+          </section>
+        </div>
       </div>
 
       {/* Footer */}

@@ -37,7 +37,8 @@ import ryhtiRouter from "./routes/ryhti";
 import photoEstimateRouter from "./routes/photo-estimate";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
-import { logProjectView } from "./notifications";
+import { sendEmail } from "./email";
+import { hashViewerIp, logProjectView } from "./notifications";
 
 // ---------------------------------------------------------------------------
 // Sentry — initialize before anything else so it can instrument the app
@@ -745,9 +746,11 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   }
 
   const result = await query(
-    `SELECT id, name, description, scene_js, building_info, created_at, updated_at,
+    `SELECT id, name, description, scene_js, building_info, created_at, updated_at, share_token_expires_at,
       (SELECT COUNT(*)::int FROM project_views WHERE project_id = projects.id) AS view_count
-     FROM projects WHERE share_token = $1`,
+     FROM projects
+     WHERE share_token = $1
+       AND deleted_at IS NULL`,
     [token]
   );
   if (result.rows.length === 0) {
@@ -755,6 +758,9 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   }
 
   const project = result.rows[0];
+  if (project.share_token_expires_at && new Date(project.share_token_expires_at).getTime() <= Date.now()) {
+    return res.status(410).json({ error: "Shared project link has expired", code: "share_expired" });
+  }
   try {
     await logProjectView(project.id, req.ip, req.get("referer") || req.get("referrer") || null);
   } catch (err) {
@@ -776,7 +782,91 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
     [project.id]
   );
 
-  res.json({ ...project, bom: bom.rows });
+  const comments = await query(
+    `SELECT id, commenter_name, message, created_at
+     FROM project_share_comments
+     WHERE project_id = $1
+     ORDER BY created_at ASC`,
+    [project.id]
+  );
+
+  res.json({ ...project, bom: bom.rows, comments: comments.rows });
+});
+
+app.post("/shared/:token/comments", publicLimiter, async (req, res) => {
+  const { token } = req.params;
+  if (!token || typeof token !== "string" || token.length > 64) {
+    return res.status(400).json({ error: "Invalid share token" });
+  }
+
+  const commenterName = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 120) : "";
+  const message = typeof req.body?.message === "string" ? req.body.message.trim().slice(0, 2000) : "";
+  if (!commenterName || !message) {
+    return res.status(400).json({ error: "Name and message are required" });
+  }
+
+  const projectResult = await query(
+    `SELECT p.id, p.name, p.user_id, p.share_token_expires_at,
+            u.email AS owner_email, u.name AS owner_name, u.email_notifications
+     FROM projects p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.share_token = $1
+       AND p.deleted_at IS NULL`,
+    [token],
+  );
+  if (projectResult.rows.length === 0) {
+    return res.status(404).json({ error: "Shared project not found" });
+  }
+
+  const project = projectResult.rows[0];
+  if (project.share_token_expires_at && new Date(project.share_token_expires_at).getTime() <= Date.now()) {
+    return res.status(410).json({ error: "Shared project link has expired", code: "share_expired" });
+  }
+
+  const commentResult = await query(
+    `INSERT INTO project_share_comments (project_id, commenter_name, message, viewer_ip_hash)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, commenter_name, message, created_at`,
+    [project.id, commenterName, message, hashViewerIp(req.ip)],
+  );
+  const comment = commentResult.rows[0];
+  const title = "New contractor comment";
+  const body = `${commenterName} commented on ${project.name}`;
+
+  await query(
+    `INSERT INTO notifications (user_id, type, title, body, metadata_json)
+     VALUES ($1, $2, $3, $4, $5::jsonb)`,
+    [
+      project.user_id,
+      "contractor_comment",
+      title,
+      body,
+      JSON.stringify({
+        project_id: project.id,
+        project_name: project.name,
+        comment_id: comment.id,
+        commenter_name: commenterName,
+      }),
+    ],
+  );
+
+  if (project.email_notifications !== false && project.owner_email) {
+    const appUrl = (process.env.APP_URL || "https://helscoop.fi").replace(/\/$/, "");
+    const emailBody = [
+      `Hi ${project.owner_name || "there"},`,
+      "",
+      `${commenterName} left a contractor comment on "${project.name}":`,
+      "",
+      message,
+      "",
+      `Open project: ${appUrl}/project/${project.id}`,
+    ].join("\n");
+    sendEmail(project.owner_email, `Helscoop: contractor comment on ${project.name}`, emailBody).catch((err) => {
+      logger.warn({ err, projectId: project.id }, "Failed to send contractor comment email");
+    });
+  }
+
+  res.status(201).json(comment);
 });
 
 // Public endpoints get the stricter IP-based limiter

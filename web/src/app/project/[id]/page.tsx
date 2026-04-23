@@ -323,6 +323,7 @@ export default function ProjectPage() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showAraChecklist, setShowAraChecklist] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
@@ -438,7 +439,10 @@ export default function ProjectPage() {
         setHouseholdDeductionJoint(Boolean(proj.household_deduction_joint));
         setProjectStatus(proj.status || "planning");
         setProjectTags(proj.tags || []);
-        if (proj.share_token) setShareToken(proj.share_token);
+        if (proj.share_token) {
+          setShareToken(proj.share_token);
+          setShareExpiresAt(proj.share_token_expires_at ?? null);
+        }
         setParamPresets(proj.param_presets || []);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
@@ -1547,6 +1551,7 @@ export default function ProjectPage() {
             try {
               const res = await api.shareProject(projectId);
               setShareToken(res.share_token);
+              setShareExpiresAt(res.expires_at ?? null);
             } catch (err) {
               toast(err instanceof Error ? err.message : t("toast.shareFailed"), "error");
               setShareLoading(false);
@@ -2342,6 +2347,7 @@ export default function ProjectPage() {
                 try {
                   const res = await api.shareProject(projectId);
                   setShareToken(res.share_token);
+                  setShareExpiresAt(res.expires_at ?? null);
                 } catch (err) {
                   toast(err instanceof Error ? err.message : t('toast.shareFailed'), "error");
                   setShareLoading(false);
@@ -3688,6 +3694,13 @@ export default function ProjectPage() {
                 {t("share.viewCount", { count: Number(project?.view_count || 0) })}
               </div>
             )}
+            {shareExpiresAt && (
+              <div className="badge badge-muted" style={{ display: "inline-flex", marginBottom: 14, marginLeft: Number(project?.view_count || 0) > 0 ? 8 : 0 }}>
+                {t("share.expiresAt", {
+                  date: new Date(shareExpiresAt).toLocaleDateString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB"),
+                })}
+              </div>
+            )}
 
             {/* Share URL field */}
             <div style={{
@@ -3745,6 +3758,7 @@ export default function ProjectPage() {
                   try {
                     await api.unshareProject(projectId);
                     setShareToken(null);
+                    setShareExpiresAt(null);
                     setShowShareDialog(false);
                     toast(t('toast.projectUnshared'), "success");
                   } catch (err) {

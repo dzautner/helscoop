@@ -383,7 +383,8 @@ router.get("/", async (req, res) => {
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
        WHERE pb.project_id = projects.id) AS estimated_cost,
-      (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count
+      (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count,
+      (SELECT COUNT(*)::int FROM project_share_comments psc WHERE psc.project_id = projects.id) AS contractor_comment_count
      FROM projects WHERE user_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC`,
     [req.user!.id]
   );
@@ -954,7 +955,7 @@ router.delete("/:id/permanent", async (req, res) => {
 router.post("/:id/share", requirePermission("project:share"), async (req, res) => {
   // Check ownership
   const proj = await query(
-    "SELECT id, share_token FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT id, share_token, share_token_expires_at FROM projects WHERE id=$1 AND user_id=$2",
     [req.params.id, req.user!.id]
   );
   if (proj.rows.length === 0) {
@@ -962,23 +963,36 @@ router.post("/:id/share", requirePermission("project:share"), async (req, res) =
   }
 
   // If already shared, return existing token
-  if (proj.rows[0].share_token) {
-    return res.json({ share_token: proj.rows[0].share_token });
+  const existingExpiresAt = proj.rows[0].share_token_expires_at ? new Date(proj.rows[0].share_token_expires_at) : null;
+  if (proj.rows[0].share_token && existingExpiresAt && existingExpiresAt.getTime() > Date.now()) {
+    return res.json({ share_token: proj.rows[0].share_token, expires_at: proj.rows[0].share_token_expires_at });
   }
 
   // Generate a new share token (UUID v4)
   const shareToken = crypto.randomUUID();
-  await query(
-    "UPDATE projects SET share_token = $1, updated_at = now() WHERE id = $2",
+  const updated = await query(
+    `UPDATE projects
+     SET share_token = $1,
+         share_token_created_at = now(),
+         share_token_expires_at = now() + INTERVAL '30 days',
+         updated_at = now()
+     WHERE id = $2
+     RETURNING share_token_expires_at`,
     [shareToken, req.params.id]
   );
 
-  res.json({ share_token: shareToken });
+  res.json({ share_token: shareToken, expires_at: updated.rows[0]?.share_token_expires_at });
 });
 
 router.delete("/:id/share", async (req, res) => {
   const result = await query(
-    "UPDATE projects SET share_token = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING id",
+    `UPDATE projects
+     SET share_token = NULL,
+         share_token_created_at = NULL,
+         share_token_expires_at = NULL,
+         updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id`,
     [req.params.id, req.user!.id]
   );
   if (result.rows.length === 0) {
