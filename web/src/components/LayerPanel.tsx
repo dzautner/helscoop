@@ -110,12 +110,37 @@ export default function LayerPanel({
     );
   }, [orderedIds, onSetHiddenLayers, onSelectLayer, onFocusLayer, stopAutoplay]);
 
+  const [autoplayPaused, setAutoplayPaused] = useState(false);
+
+  const goToStep = useCallback((step: number) => {
+    if (step < 0 || step >= orderedIds.length) return;
+    if (autoplayTimerRef.current) {
+      clearTimeout(autoplayTimerRef.current);
+      autoplayTimerRef.current = null;
+    }
+    setAutoplayStep(step);
+    setAutoplayPaused(true);
+    const hiddenIds = new Set(orderedIds.slice(step + 1));
+    onSetHiddenLayers?.(hiddenIds);
+    onSelectLayer(orderedIds[step]);
+    onFocusLayer?.(orderedIds[step]);
+  }, [orderedIds, onSetHiddenLayers, onSelectLayer, onFocusLayer]);
+
+  const resumeAutoplay = useCallback(() => {
+    setAutoplayPaused(false);
+    autoplayTimerRef.current = setTimeout(
+      () => advanceAutoplay(autoplayStep + 1),
+      BASE_STEP_MS / speedRef.current,
+    );
+  }, [advanceAutoplay, autoplayStep]);
+
   const startAutoplay = useCallback(() => {
     if (orderedIds.length === 0 || !onSetHiddenLayers) return;
     savedHiddenRef.current = new Set(hiddenLayerIds);
     setAutoplayActive(true);
     setAutoplayStep(0);
     setAutoplaySpeed(1);
+    setAutoplayPaused(false);
     onSetHiddenLayers(new Set(orderedIds));
     setTimeout(() => advanceAutoplay(0), 500);
   }, [orderedIds, hiddenLayerIds, onSetHiddenLayers, advanceAutoplay]);
@@ -239,23 +264,78 @@ export default function LayerPanel({
             })}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              flex: 1,
-              height: 3,
-              background: "var(--border)",
-              borderRadius: 2,
-              overflow: "hidden",
-            }}>
+            <div
+              style={{
+                flex: 1,
+                height: 6,
+                background: "var(--border)",
+                borderRadius: 3,
+                overflow: "hidden",
+                cursor: "pointer",
+                position: "relative",
+              }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pct = (e.clientX - rect.left) / rect.width;
+                const step = Math.min(layers.length - 1, Math.max(0, Math.floor(pct * layers.length)));
+                goToStep(step);
+              }}
+              title={t("layers.scrubTimeline")}
+            >
               <div style={{
                 width: `${((autoplayStep + 1) / layers.length) * 100}%`,
                 height: "100%",
                 background: "var(--amber)",
-                transition: "width 0.4s ease-out",
+                transition: "width 0.3s ease-out",
               }} />
             </div>
             <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
               {autoplayStep + 1}/{layers.length}
             </span>
+          </div>
+          <div className="timelapse-transport-row">
+            <button
+              type="button"
+              className="timelapse-nav-btn"
+              disabled={autoplayStep === 0}
+              onClick={() => goToStep(autoplayStep - 1)}
+              aria-label={t("layers.prevStep")}
+              title={t("layers.prevStep")}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 4h2v16H6zM20 12L10 4v16z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="timelapse-nav-btn"
+              onClick={() => autoplayPaused ? resumeAutoplay() : goToStep(autoplayStep)}
+              aria-label={autoplayPaused ? t("layers.resumeAutoplay") : t("layers.pauseAutoplay")}
+              title={autoplayPaused ? t("layers.resumeAutoplay") : t("layers.pauseAutoplay")}
+            >
+              {autoplayPaused ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="6,4 20,12 6,20" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              className="timelapse-nav-btn"
+              disabled={autoplayStep >= layers.length - 1}
+              onClick={() => goToStep(autoplayStep + 1)}
+              aria-label={t("layers.nextStep")}
+              title={t("layers.nextStep")}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 12l10-8v16zM16 4h2v16h-2z" />
+              </svg>
+            </button>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
             <div className="timelapse-speed-row">
