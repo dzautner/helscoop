@@ -504,6 +504,21 @@ export const api = {
     const blob = await res.blob();
     downloadBlob(blob, `helscoop_permit_${projectName.replace(/\s+/g, '_')}.ifc`);
   },
+  exportPermitPack: async (projectId: string, projectName: string) => {
+    const t = getToken();
+    const res = await fetch(`${API_URL}/permit-pack/projects/${encodeURIComponent(projectId)}/export`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        ERROR_MESSAGES[res.status] || `Virhe ${res.status} / Error ${res.status}`,
+        res.status,
+        res.statusText
+      );
+    }
+    const blob = await res.blob();
+    downloadBlob(blob, `helscoop_permit_pack_${projectName.replace(/\s+/g, '_')}.zip`);
+  },
   exportPdf: async (projectId: string, projectName: string, lang: string) => {
     const t = getToken();
     const res = await fetch(`${API_URL}/projects/${projectId}/pdf?lang=${lang}`, {

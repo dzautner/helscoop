@@ -242,7 +242,7 @@ export default function ProjectPage() {
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
-  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "csv" | "json" | "ara" | "ifc" | "permit" | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showAraChecklist, setShowAraChecklist] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -965,7 +965,22 @@ export default function ProjectPage() {
     } finally {
       setExportingFormat(null);
     }
-  }, [projectId, projectName, t, toast, track]);
+  }, [playSound, projectId, projectName, t, toast, track]);
+
+  const exportPermitPack = useCallback(async () => {
+    setShowExportMenu(false);
+    setExportingFormat("permit");
+    try {
+      track("project_exported", { format: "permit_pack_zip" });
+      await api.exportPermitPack(projectId, projectName);
+      toast(t("permitPack.generated"), "success");
+      playSound("exportDone");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("permitPack.generateFailed"), "error");
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [playSound, projectId, projectName, t, toast, track]);
 
   type ViewportDomApi = HTMLDivElement & {
     resetCamera?: () => void;
@@ -1085,6 +1100,19 @@ export default function ProjectPage() {
           </svg>
         ),
         action: () => { void exportIfcPermitModel(); },
+      },
+      {
+        id: "export-permit-pack",
+        labelKey: "commandPalette.exportPermitPack",
+        labelSecondaryKey: "commandPalette.exportPermitPackEn",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" />
+            <path d="M1 3h22v5H1z" />
+            <path d="M10 12h4" />
+          </svg>
+        ),
+        action: () => { void exportPermitPack(); },
       },
       {
         id: "export-project",
@@ -1229,7 +1257,7 @@ export default function ProjectPage() {
         isActive: showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode]);
 
   const handleViewportReset = useCallback(() => {
     setSceneJs(DEFAULT_SCENE);
@@ -1898,6 +1926,26 @@ export default function ProjectPage() {
                     </svg>
                   )}
                   {t("ifcExport.exportMenu")}
+                </button>
+                <button
+                  role="menuitem"
+                  className="btn btn-ghost"
+                  disabled={exportingFormat !== null}
+                  onClick={() => { void exportPermitPack(); }}
+                  style={{ width: "100%", justifyContent: "flex-start", gap: 8, padding: "8px 12px", fontSize: 12, border: "none", opacity: exportingFormat && exportingFormat !== "permit" ? 0.4 : 1 }}
+                >
+                  {exportingFormat === "permit" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "toast-spin 1.2s linear infinite" }}>
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" />
+                      <path d="M1 3h22v5H1z" />
+                      <path d="M10 12h4" />
+                    </svg>
+                  )}
+                  {t("permitPack.exportMenu")}
                 </button>
                 <button
                   className="btn btn-ghost"

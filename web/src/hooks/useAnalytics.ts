@@ -71,7 +71,7 @@ export interface AnalyticsEventProps {
   presentation_render_downloaded: { preset: string; watermarked: boolean };
   quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
   bom_exported: { format: "pdf" | "csv" | "json" };
-  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" };
+  project_exported: { format: "helscoop" | "ara_grant_package" | "ifc4x3_permit" | "permit_pack_zip" };
   project_imported: { format: "helscoop" };
   chat_message_sent: { suggestion_used: boolean };
   chat_code_applied: Record<string, never>;
