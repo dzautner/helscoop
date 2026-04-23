@@ -4425,6 +4425,53 @@ select:focus {
   text-align: right;
 }
 
+.daylight-playback-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.daylight-play-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--amber, #e5a04b);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.daylight-play-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--amber, #e5a04b);
+}
+
+.daylight-speed-btn {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.daylight-speed-btn:hover {
+  background: var(--bg-elevated);
+}
+
+.daylight-speed-btn[data-active="true"] {
+  border-color: var(--amber, #e5a04b);
+  color: var(--amber, #e5a04b);
+  background: color-mix(in srgb, var(--amber, #e5a04b) 10%, var(--bg-tertiary));
+}
+
 .daylight-panel-sun-times {
   display: flex;
   align-items: center;
