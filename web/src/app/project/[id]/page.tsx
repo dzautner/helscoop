@@ -19,6 +19,12 @@ import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
+import {
+  analyzeSceneGeometry,
+  suggestGeometryBomUpdates,
+  type GeometryBomSuggestion,
+  type SceneGeometryMetrics,
+} from "@/lib/scene-geometry-bom";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
@@ -122,6 +128,14 @@ const MOBILE_EDITOR_QUERY = "(max-width: 768px)";
 type MobileEditorPanel = "viewport" | "chat" | "bom" | "code" | "params" | "docs";
 type MobilePanelSize = "normal" | "expanded" | "minimized";
 
+interface GeometryBomUpdateState {
+  sceneJs: string;
+  metrics: SceneGeometryMetrics;
+  previousMetrics: SceneGeometryMetrics | null;
+  suggestions: GeometryBomSuggestion[];
+  skippedManual: GeometryBomSuggestion[];
+}
+
 function getBomWidthBounds(): { min: number; max: number } {
   if (typeof window === "undefined") return { min: 260, max: 600 };
   const isTabletOrNarrow = window.innerWidth <= 1024;
@@ -200,6 +214,24 @@ function hydrateSnapshotBom(snapshot: ProjectVersionSnapshot, materials: Materia
   });
 }
 
+function formatGeometryNumber(value: number, unit: string, locale: string): string {
+  return `${value.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", {
+    maximumFractionDigits: value >= 10 ? 1 : 2,
+  })} ${unit}`;
+}
+
+function formatGeometryMetricChange(update: GeometryBomUpdateState, locale: string): string {
+  const previous = update.previousMetrics;
+  if (!previous) {
+    return locale === "fi"
+      ? `Seinäalaa ${formatGeometryNumber(update.metrics.wallAreaM2, "m²", locale)}, kattoa ${formatGeometryNumber(update.metrics.roofAreaM2, "m²", locale)}`
+      : `Wall area ${formatGeometryNumber(update.metrics.wallAreaM2, "m²", locale)}, roof ${formatGeometryNumber(update.metrics.roofAreaM2, "m²", locale)}`;
+  }
+  return locale === "fi"
+    ? `Seinäala ${formatGeometryNumber(previous.wallAreaM2, "m²", locale)} → ${formatGeometryNumber(update.metrics.wallAreaM2, "m²", locale)}, katto ${formatGeometryNumber(previous.roofAreaM2, "m²", locale)} → ${formatGeometryNumber(update.metrics.roofAreaM2, "m²", locale)}`
+    : `Wall area ${formatGeometryNumber(previous.wallAreaM2, "m²", locale)} → ${formatGeometryNumber(update.metrics.wallAreaM2, "m²", locale)}, roof ${formatGeometryNumber(previous.roofAreaM2, "m²", locale)} → ${formatGeometryNumber(update.metrics.roofAreaM2, "m²", locale)}`;
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -215,6 +247,8 @@ export default function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bom, setBom] = useState<BomItem[]>([]);
+  const [manualBomOverrideIds, setManualBomOverrideIds] = useState<Set<string>>(() => new Set());
+  const [geometryBomUpdate, setGeometryBomUpdate] = useState<GeometryBomUpdateState | null>(null);
   const [surfacePickerMaterialId, setSurfacePickerMaterialId] = useState<string | null>(null);
   const [sceneJs, setSceneJs] = useState("");
   const [savedScript, setSavedScript] = useState("");
@@ -278,6 +312,8 @@ export default function ProjectPage() {
   const presentationRef = useRef<ViewportPresentationApi | null>(null);
   const resizingRef = useRef(false);
   const activeVersionBranchRef = useRef<string | null>(null);
+  const geometryBaselineRef = useRef<{ sceneJs: string; metrics: SceneGeometryMetrics } | null>(null);
+  const dismissedGeometrySceneRef = useRef<string | null>(null);
 
   const pushHistory = useCallback((code: string) => {
     const history = historyRef.current;
@@ -332,6 +368,8 @@ export default function ProjectPage() {
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
         setSavedScript(initialScene);
+        geometryBaselineRef.current = { sceneJs: initialScene, metrics: analyzeSceneGeometry(initialScene) };
+        dismissedGeometrySceneRef.current = null;
         historyRef.current = [initialScene];
         historyIndexRef.current = 0;
         setMaterials(mats);
@@ -342,6 +380,8 @@ export default function ProjectPage() {
             }))
           : [];
         setBom(initialBom);
+        setManualBomOverrideIds(new Set());
+        setGeometryBomUpdate(null);
         // Set the auto-save baseline to match what the server has
         setSavedSnapshot({
           name: proj.name,
@@ -610,6 +650,42 @@ export default function ProjectPage() {
     () => estimateRenovationRoi(bom, materials, project?.building_info ?? null, { coupleMode: householdDeductionJoint }),
     [bom, householdDeductionJoint, materials, project?.building_info],
   );
+  const manualOverrideKey = useMemo(
+    () => Array.from(manualBomOverrideIds).sort().join("|"),
+    [manualBomOverrideIds],
+  );
+
+  useEffect(() => {
+    if (!initialLoadDone) return;
+    if (dismissedGeometrySceneRef.current === sceneJs) return;
+
+    const timer = window.setTimeout(() => {
+      const baseline = geometryBaselineRef.current;
+      if (!baseline || baseline.sceneJs === sceneJs) {
+        if (!baseline) {
+          geometryBaselineRef.current = { sceneJs, metrics: analyzeSceneGeometry(sceneJs) };
+        }
+        return;
+      }
+
+      const result = suggestGeometryBomUpdates(sceneJs, bom, materials, manualBomOverrideIds);
+      if (result.suggestions.length === 0 && result.skippedManual.length === 0) {
+        geometryBaselineRef.current = { sceneJs, metrics: result.metrics };
+        setGeometryBomUpdate(null);
+        return;
+      }
+
+      setGeometryBomUpdate({
+        sceneJs,
+        metrics: result.metrics,
+        previousMetrics: baseline.metrics,
+        suggestions: result.suggestions,
+        skippedManual: result.skippedManual,
+      });
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [bom, initialLoadDone, manualBomOverrideIds, manualOverrideKey, materials, sceneJs]);
 
   const handleParamChange = useCallback(
     (name: string, value: number) => {
@@ -756,6 +832,13 @@ export default function ProjectPage() {
       setSceneJs(snapshot.scene_js || DEFAULT_SCENE);
       setSavedScript(snapshot.scene_js || DEFAULT_SCENE);
       setBom(restoredBom);
+      geometryBaselineRef.current = {
+        sceneJs: snapshot.scene_js || DEFAULT_SCENE,
+        metrics: analyzeSceneGeometry(snapshot.scene_js || DEFAULT_SCENE),
+      };
+      dismissedGeometrySceneRef.current = null;
+      setManualBomOverrideIds(new Set());
+      setGeometryBomUpdate(null);
       setProject((prev) => prev ? {
         ...prev,
         name: snapshot.name,
@@ -1541,6 +1624,61 @@ export default function ProjectPage() {
     [bom, t, toast, track],
   );
 
+  const dismissGeometryBomUpdate = useCallback(() => {
+    if (geometryBomUpdate) {
+      geometryBaselineRef.current = {
+        sceneJs: geometryBomUpdate.sceneJs,
+        metrics: geometryBomUpdate.metrics,
+      };
+      dismissedGeometrySceneRef.current = geometryBomUpdate.sceneJs;
+    }
+    setGeometryBomUpdate(null);
+  }, [geometryBomUpdate]);
+
+  const applyGeometryBomUpdate = useCallback((includeManualOverrides: boolean) => {
+    if (!geometryBomUpdate) return;
+    const selected = includeManualOverrides
+      ? [...geometryBomUpdate.suggestions, ...geometryBomUpdate.skippedManual]
+      : geometryBomUpdate.suggestions;
+    if (selected.length === 0) return;
+
+    const selectedById = new Map(selected.map((suggestion) => [suggestion.materialId, suggestion]));
+    setBom((prev) =>
+      prev.map((item) => {
+        const suggestion = selectedById.get(item.material_id);
+        if (!suggestion) return item;
+        return {
+          ...item,
+          quantity: suggestion.suggestedQuantity,
+          total: (item.unit_price || 0) * suggestion.suggestedQuantity,
+          manual_override: includeManualOverrides ? false : item.manual_override,
+          geometry_driven: true,
+        };
+      }),
+    );
+
+    if (includeManualOverrides) {
+      setManualBomOverrideIds((prev) => {
+        const next = new Set(prev);
+        for (const suggestion of selected) next.delete(suggestion.materialId);
+        return next;
+      });
+    }
+
+    geometryBaselineRef.current = {
+      sceneJs: geometryBomUpdate.sceneJs,
+      metrics: geometryBomUpdate.metrics,
+    };
+    dismissedGeometrySceneRef.current = null;
+    setGeometryBomUpdate(null);
+    toast(
+      locale === "fi"
+        ? `Päivitettiin ${selected.length} materiaalimäärää geometriasta`
+        : `Updated ${selected.length} material quantities from geometry`,
+      "success",
+    );
+  }, [geometryBomUpdate, locale, toast]);
+
   const removeBomItem = useCallback((materialId: string) => {
     let removedItem: BomItem | undefined;
     setBom((prev) => {
@@ -1567,10 +1705,11 @@ export default function ProjectPage() {
   }, [track, toast, t, playSound]);
 
   const updateBomQty = useCallback((materialId: string, qty: number) => {
+    setManualBomOverrideIds((prev) => new Set(prev).add(materialId));
     setBom((prev) =>
       prev.map((b) =>
         b.material_id === materialId
-          ? { ...b, quantity: qty, total: (b.unit_price || 0) * qty }
+          ? { ...b, quantity: qty, total: (b.unit_price || 0) * qty, manual_override: true, geometry_driven: false }
           : b
       )
     );
@@ -2550,6 +2689,107 @@ export default function ProjectPage() {
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }}
           />
+          {geometryBomUpdate && (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                position: "absolute",
+                left: 18,
+                bottom: priceChangeSummary?.show ? 184 : 76,
+                zIndex: 12,
+                width: "min(520px, calc(100% - 36px))",
+                border: "1px solid var(--border-strong)",
+                borderRadius: 16,
+                padding: "14px 16px",
+                background: "color-mix(in srgb, var(--bg-elevated) 92%, transparent)",
+                color: "var(--text-primary)",
+                boxShadow: "0 22px 70px rgba(0,0,0,0.30)",
+                backdropFilter: "blur(16px)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                <div>
+                  <div className="label-mono" style={{ color: "var(--amber)", marginBottom: 5 }}>
+                    {locale === "fi" ? "Geometria muutti materiaalimääriä" : "Geometry changed BOM quantities"}
+                  </div>
+                  <strong style={{ fontSize: 15 }}>
+                    {locale === "fi"
+                      ? `${geometryBomUpdate.suggestions.length} päivitysehdotusta`
+                      : `${geometryBomUpdate.suggestions.length} update suggestion${geometryBomUpdate.suggestions.length === 1 ? "" : "s"}`}
+                  </strong>
+                  <div style={{ marginTop: 5, color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.45 }}>
+                    {formatGeometryMetricChange(geometryBomUpdate, locale)}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-ghost"
+                  onClick={dismissGeometryBomUpdate}
+                  aria-label={locale === "fi" ? "Sulje geometriapäivitys" : "Dismiss geometry update"}
+                  style={{ padding: "4px 7px", border: "none" }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
+                {[...geometryBomUpdate.suggestions, ...geometryBomUpdate.skippedManual].slice(0, 4).map((suggestion) => (
+                  <div
+                    key={suggestion.materialId}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 10,
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border)",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      <strong>{suggestion.materialName}</strong>
+                      {manualBomOverrideIds.has(suggestion.materialId) && (
+                        <span style={{ color: "var(--amber)", marginLeft: 8 }}>
+                          {locale === "fi" ? "manuaalinen" : "manual"}
+                        </span>
+                      )}
+                      <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{suggestion.reason}</div>
+                    </div>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      {formatGeometryNumber(suggestion.currentQuantity, suggestion.unit, locale)}
+                      {" -> "}
+                      <strong>{formatGeometryNumber(suggestion.suggestedQuantity, suggestion.unit, locale)}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {geometryBomUpdate.skippedManual.length > 0 && (
+                <div style={{ marginTop: 10, color: "var(--text-muted)", fontSize: 12 }}>
+                  {locale === "fi"
+                    ? `${geometryBomUpdate.skippedManual.length} manuaalisesti muokattua riviä jätetään ennalleen, ellet valitse uudelleenlaskentaa.`
+                    : `${geometryBomUpdate.skippedManual.length} manually edited row${geometryBomUpdate.skippedManual.length === 1 ? "" : "s"} will stay unchanged unless you recalculate all.`}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 14 }}>
+                <button className="btn btn-ghost" onClick={dismissGeometryBomUpdate} style={{ padding: "7px 11px", fontSize: 12 }}>
+                  {locale === "fi" ? "Pidä nykyiset" : "Keep current"}
+                </button>
+                {geometryBomUpdate.suggestions.length > 0 && (
+                  <button className="btn btn-primary" onClick={() => applyGeometryBomUpdate(false)} style={{ padding: "7px 11px", fontSize: 12 }}>
+                    {locale === "fi" ? "Päivitä ehdotetut" : "Update suggested"}
+                  </button>
+                )}
+                {geometryBomUpdate.skippedManual.length > 0 && (
+                  <button className="btn btn-secondary" onClick={() => applyGeometryBomUpdate(true)} style={{ padding: "7px 11px", fontSize: 12 }}>
+                    {locale === "fi" ? "Laske kaikki uudelleen" : "Recalculate all"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {priceChangeSummary?.show && (
             <div
               role="status"
