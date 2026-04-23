@@ -36,6 +36,7 @@ import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
 import OnboardingTour from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import ConfettiCelebration from "@/components/ConfettiCelebration";
 import { generateAraGrantPdf } from "@/lib/pdf";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
@@ -307,6 +308,7 @@ export default function ProjectPage() {
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
   const [priceChangeSummary, setPriceChangeSummary] = useState<ProjectPriceChangeSummary | null>(null);
   const [duplicating, setDuplicating] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("helscoop_bom_width");
@@ -1842,6 +1844,7 @@ export default function ProjectPage() {
       data-mobile-panel={isMobileEditor ? activeMobilePanel : undefined}
       data-mobile-panel-size={isMobileEditor ? mobilePanelSize : undefined}
     >
+      {showConfetti && <ConfettiCelebration onComplete={() => setShowConfetti(false)} />}
 
       {/* Header */}
       <div className="editor-header">
@@ -1883,6 +1886,10 @@ export default function ProjectPage() {
           onChange={(e) => {
             const newStatus = e.target.value as import("@/types").ProjectStatus;
             setProjectStatus(newStatus);
+            if (newStatus === "completed" && projectStatus !== "completed") {
+              setShowConfetti(true);
+              toast(t("project.completionCelebration"), "success");
+            }
             api.updateProject(projectId, { status: newStatus } as Record<string, unknown>).catch(() => {});
           }}
           aria-label={t('project.filterByStatus')}
