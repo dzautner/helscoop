@@ -116,4 +116,18 @@ describe("accessibility foundation", () => {
     expect(loginForm).toContain('htmlFor="login-email"');
     expect(loginForm).toContain('htmlFor="login-password"');
   });
+
+  it("labels high-traffic project, share, admin, and material search fields", () => {
+    const admin = readSource("../app/admin/page.tsx");
+    const projectEditor = readSource("../app/project/[id]/page.tsx");
+    const bomPanel = readSource("../components/BomPanel.tsx");
+
+    expect(admin).toContain("aria-label={t('admin.search')}");
+    expect(projectEditor).toContain("aria-label={t('project.nameField')}");
+    expect(projectEditor).toContain('aria-describedby={projectName.length > 80 ? "project-name-count" : undefined}');
+    expect(projectEditor).toContain('id="project-name-count"');
+    expect(projectEditor).toContain('aria-live="polite"');
+    expect(projectEditor).toContain("aria-label={t('share.linkLabel')}");
+    expect(bomPanel).toContain("aria-label={t('pricing.searchMaterials')}");
+  });
 });

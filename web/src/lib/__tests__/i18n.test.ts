@@ -401,7 +401,7 @@ describe("exhaustive i18n key parity", () => {
     "search.dataSources",
     // project
     "project.myProjects", "project.projectCount", "project.startFirst",
-    "project.loadingProjects", "project.newProjectPlaceholder", "project.create",
+    "project.loadingProjects", "project.newProjectPlaceholder", "project.nameField", "project.create",
     "project.open", "project.copy", "project.delete", "project.deleteConfirm",
     "project.noProjects", "project.noProjectsDesc", "project.emptyDescription",
     "project.descriptionPlaceholder", "project.orStartFromTemplate",
@@ -498,7 +498,7 @@ describe("exhaustive i18n key parity", () => {
     "editor.sceneMaterialsDetected", "editor.syncFromScene", "editor.materialConfiguratorHint",
     // share
     "share.title", "share.description", "share.generating", "share.copyLink",
-    "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
+    "share.linkLabel", "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
     "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
     "share.signUpCta", "share.materials", "share.total", "share.viewCount",
     // presentation
