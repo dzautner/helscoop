@@ -27,6 +27,21 @@ describe("accessibility foundation", () => {
     expect(css).toContain("clip: rect(0, 0, 0, 0)");
   });
 
+  it("disables global and view-transition motion for reduced-motion users", () => {
+    const css = readSource("../app/globals.css");
+
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).toContain("animation-delay: 0ms !important");
+    expect(css).toContain("animation-duration: 0.01ms !important");
+    expect(css).toContain("animation-iteration-count: 1 !important");
+    expect(css).toContain("transition-delay: 0ms !important");
+    expect(css).toContain("transition-duration: 0.01ms !important");
+    expect(css).toContain("scroll-behavior: auto !important");
+    expect(css).toContain("::view-transition-old(*)");
+    expect(css).toContain("::view-transition-new(*)");
+    expect(css).toContain("animation: none !important");
+  });
+
   it("makes the 3D viewport keyboard-operable and described for assistive tech", () => {
     const viewport = readSource("../components/Viewport3D.tsx");
 
