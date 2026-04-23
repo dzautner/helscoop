@@ -10,6 +10,7 @@ import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { buildSavingsRecommendations } from "@/lib/bom-savings";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
+import { interpretScene } from "@/lib/scene-interpreter";
 import type { ChatMessage, BomItem, Material } from "@/types";
 
 interface ChatContextBuildingInfo {
@@ -158,6 +159,12 @@ export default function ChatPanel({
   }, [input, autoResizeTextarea]);
 
   function handleApplyClick(code: string) {
+    const result = interpretScene(code);
+    if (result.error) {
+      toast(t("editor.aiValidationFailed"), "error");
+      track("chat_code_validation_failed", {} as Record<string, never>);
+      return;
+    }
     track("chat_code_applied", {} as Record<string, never>);
     if (skipConfirm) {
       onApplyCode(code);
