@@ -1,27 +1,38 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import {
   calculateSunPosition,
   sunPositionToLightDirection,
+  calculateSunriseSunset,
+  getSeasonalLightingPreset,
   SEASON_PRESETS,
 } from "@/lib/sun-position";
+import type { SeasonalLighting } from "@/lib/sun-position";
 
 interface DaylightPanelProps {
   latitude: number;
   longitude: number;
   onLightDirection: (dir: [number, number, number], altitude: number) => void;
+  onLightingPreset?: (preset: SeasonalLighting) => void;
   onClose: () => void;
+}
+
+function formatTime(hours: number): string {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 export default function DaylightPanel({
   latitude,
   longitude,
   onLightDirection,
+  onLightingPreset,
   onClose,
 }: DaylightPanelProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
   const [day, setDay] = useState(now.getDate());
@@ -33,12 +44,25 @@ export default function DaylightPanel({
     return calculateSunPosition(latitude, longitude, date);
   }, [latitude, longitude, month, day, hour, minute]);
 
+  const sunTimes = useMemo(
+    () => calculateSunriseSunset(latitude, longitude, month, day),
+    [latitude, longitude, month, day],
+  );
+
   const updateLight = useCallback(() => {
     if (sunPos.isAboveHorizon) {
       const dir = sunPositionToLightDirection(sunPos.azimuth, sunPos.altitude);
       onLightDirection(dir, sunPos.altitude);
     }
   }, [sunPos, onLightDirection]);
+
+  useEffect(() => {
+    onLightingPreset?.(getSeasonalLightingPreset(month, hour));
+  }, [month, hour, onLightingPreset]);
+
+  useMemo(() => {
+    updateLight();
+  }, [updateLight]);
 
   const applyPreset = useCallback(
     (preset: (typeof SEASON_PRESETS)[number]) => {
@@ -50,14 +74,11 @@ export default function DaylightPanel({
     [],
   );
 
-  useMemo(() => {
-    updateLight();
-  }, [updateLight]);
-
-  const monthNames = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
+  const monthLabel = useMemo(() => {
+    const loc = locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB";
+    const d = new Date(2026, month, 1);
+    return d.toLocaleString(loc, { month: "short" });
+  }, [month, locale]);
 
   return (
     <div className="daylight-panel">
@@ -79,7 +100,7 @@ export default function DaylightPanel({
             key={p.key}
             className="daylight-preset-btn"
             onClick={() => applyPreset(p)}
-            data-active={month === p.month && day === p.day}
+            data-active={month === p.month && day === p.day && hour === p.hour}
           >
             {t(`editor.${p.key}` as any)}
           </button>
@@ -98,7 +119,7 @@ export default function DaylightPanel({
               onChange={(e) => setMonth(Number(e.target.value))}
               className="daylight-slider"
             />
-            <span className="daylight-value">{monthNames[month]}</span>
+            <span className="daylight-value">{monthLabel}</span>
           </div>
         </label>
         <label className="daylight-label">
@@ -131,6 +152,18 @@ export default function DaylightPanel({
             </span>
           </div>
         </label>
+      </div>
+
+      <div className="daylight-panel-sun-times">
+        <div className="daylight-sun-row">
+          <span className="daylight-sun-icon">&#9728;</span>
+          <span>{formatTime(sunTimes.sunrise)}</span>
+          <span className="daylight-sun-separator">&mdash;</span>
+          <span>{formatTime(sunTimes.sunset)}</span>
+        </div>
+        <span className="daylight-hours">
+          {sunTimes.daylightHours.toFixed(1)}{t("editor.daylightHoursUnit")}
+        </span>
       </div>
 
       <div className="daylight-panel-info">

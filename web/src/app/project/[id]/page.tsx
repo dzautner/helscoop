@@ -3141,7 +3141,8 @@ export default function ProjectPage() {
               latitude={project?.permit_metadata?.latitude ?? 60.17}
               longitude={project?.permit_metadata?.longitude ?? 24.94}
               onLightDirection={(dir, alt) => { setSunDirection(dir); setSunAltitude(alt); }}
-              onClose={() => { setShowDaylightPanel(false); setSunDirection(undefined); setSunAltitude(undefined); }}
+              onLightingPreset={setLightingPreset}
+              onClose={() => { setShowDaylightPanel(false); setSunDirection(undefined); setSunAltitude(undefined); setLightingPreset("default"); }}
             />
           )}
 
