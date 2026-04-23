@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
@@ -33,6 +33,7 @@ import { countSceneAddCalls } from "@/lib/scene-a11y";
 import { calculateThermalLoss, heatFluxToColor, getComplianceSummary } from "@/lib/thermal-engine";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
+import { formatRenovationCompareCurrency, summarizeRenovationComparison } from "@/lib/renovation-compare";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
@@ -58,7 +59,7 @@ import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary } from "@/types";
 import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
-import type { ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
+import type { ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import PriceSummaryBar from "@/components/PriceSummaryBar";
@@ -184,6 +185,10 @@ function clampBomWidth(width: number): number {
   return Math.max(min, Math.min(max, width));
 }
 
+function clampCompareSplit(value: number): number {
+  return Math.max(22, Math.min(78, value));
+}
+
 function buildBomItemFromMaterial(material: Material, quantity = 1): BomItem {
   const pricing = material.pricing?.find((price) => price.is_primary) || material.pricing?.[0];
   const unitPrice = Number(pricing?.unit_price ?? 0);
@@ -284,6 +289,7 @@ export default function ProjectPage() {
   const [geometryBomUpdate, setGeometryBomUpdate] = useState<GeometryBomUpdateState | null>(null);
   const [surfacePickerMaterialId, setSurfacePickerMaterialId] = useState<string | null>(null);
   const [sceneJs, setSceneJs] = useState("");
+  const [originalSceneJs, setOriginalSceneJs] = useState("");
   const [sceneA11yAnnouncement, setSceneA11yAnnouncement] = useState("");
   const [savedScript, setSavedScript] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -331,6 +337,11 @@ export default function ProjectPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [wireframe, setWireframe] = useState(false);
+  const [renovationCompareMode, setRenovationCompareMode] = useState(false);
+  const [renovationCompareSplit, setRenovationCompareSplit] = useState(50);
+  const [renovationCompareCamera, setRenovationCompareCamera] = useState<ViewportCameraState | null>(null);
+  const renovationCompareRef = useRef<HTMLDivElement>(null);
+  const renovationCompareDragging = useRef(false);
   const [thermalView, setThermalView] = useState(false);
   const [lightingPreset, setLightingPreset] = useState<import("@/components/Viewport3D").LightingPresetId>("default");
   const [showLightingMenu, setShowLightingMenu] = useState(false);
@@ -383,6 +394,40 @@ export default function ProjectPage() {
   const photoOffsetY = photoOverlay?.offset_y ?? PHOTO_OVERLAY_DEFAULTS.offset_y;
   const photoScale = photoOverlay?.scale ?? PHOTO_OVERLAY_DEFAULTS.scale;
   const photoRotation = photoOverlay?.rotation ?? PHOTO_OVERLAY_DEFAULTS.rotation;
+  const renovationBaselineSceneJs = originalSceneJs || sceneJs || DEFAULT_SCENE;
+  const renovationCompareSummary = useMemo(() => summarizeRenovationComparison(bom, 0), [bom]);
+  const compareCurrentCostLabel = formatRenovationCompareCurrency(renovationCompareSummary.currentEstimatedValue, locale);
+  const compareRenovationCostLabel = formatRenovationCompareCurrency(renovationCompareSummary.renovationCost, locale);
+  const compareNewValueLabel = formatRenovationCompareCurrency(renovationCompareSummary.newTotalValue, locale);
+
+  const handleRenovationCompareCamera = useCallback((state: ViewportCameraState) => {
+    setRenovationCompareCamera((current) => {
+      if (
+        current
+        && current.position.every((value, index) => Math.abs(value - state.position[index]) < 0.001)
+        && current.target.every((value, index) => Math.abs(value - state.target[index]) < 0.001)
+      ) {
+        return current;
+      }
+      return state;
+    });
+  }, []);
+
+  const updateRenovationCompareSplit = useCallback((clientX: number, clientY: number) => {
+    const container = renovationCompareRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const vertical = rect.width < 720;
+    const raw = vertical
+      ? ((clientY - rect.top) / rect.height) * 100
+      : ((clientX - rect.left) / rect.width) * 100;
+    setRenovationCompareSplit(clampCompareSplit(raw));
+  }, []);
+
+  const toggleRenovationCompareMode = useCallback(() => {
+    setRenovationCompareCamera(null);
+    setRenovationCompareMode((current) => !current);
+  }, []);
 
   const updatePhotoOverlay = useCallback((patch: Partial<PhotoOverlayState>) => {
     setPhotoOverlay((current) => {
@@ -519,6 +564,7 @@ export default function ProjectPage() {
         setPhotoOverlay(initialPhotoOverlay);
         setParamPresets(proj.param_presets || []);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
+        setOriginalSceneJs(proj.original_scene_js || initialScene);
         setSceneJs(initialScene);
         setSavedScript(initialScene);
         geometryBaselineRef.current = { sceneJs: initialScene, metrics: analyzeSceneGeometry(initialScene) };
@@ -1469,7 +1515,10 @@ export default function ProjectPage() {
 
   const getViewportApi = useCallback(() => {
     const container = viewportRef.current;
-    return container?.querySelector("div") as ViewportDomApi | null;
+    return (
+      container?.querySelector(".renovation-compare-pane--planned [role='application']")
+      ?? container?.querySelector("[role='application']")
+    ) as ViewportDomApi | null;
   }, []);
 
   const resetViewportCamera = useCallback(() => {
@@ -1496,6 +1545,14 @@ export default function ProjectPage() {
         icon: icon("M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"),
         action: () => setWireframe((v) => !v),
         isActive: wireframe,
+      },
+      {
+        id: "toggle-renovation-compare",
+        labelKey: "commandPalette.toggleCompare",
+        labelSecondaryKey: "commandPalette.toggleCompareEn",
+        icon: icon("M12 3v18M4 6h16M4 18h16"),
+        action: toggleRenovationCompareMode,
+        isActive: renovationCompareMode,
       },
       {
         id: "reset-camera",
@@ -1625,6 +1682,7 @@ export default function ProjectPage() {
               name: projectName,
               description: projectDesc,
               scene_js: sceneJs,
+              original_scene_js: renovationBaselineSceneJs,
               bom: bom.map((b) => ({
                 material_id: b.material_id,
                 material_name: b.material_name,
@@ -1750,7 +1808,7 @@ export default function ProjectPage() {
         isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -2719,6 +2777,7 @@ export default function ProjectPage() {
                         name: projectName,
                         description: projectDesc,
                         scene_js: sceneJs,
+                        original_scene_js: renovationBaselineSceneJs,
                         bom: bom.map((b) => ({
                           material_id: b.material_id,
                           material_name: b.material_name,
@@ -3037,36 +3096,154 @@ export default function ProjectPage() {
                 </div>
               )}
             >
-              <Viewport3D
-                sceneJs={sceneJs}
-                wireframe={wireframe}
-                explodedView={explodedView}
-                materialCategoryMap={materialCategoryMap}
-                onObjectCount={setObjectCount}
-                onError={setSceneError}
-                onErrorLine={setSceneErrorLine}
-                onWarnings={setSceneWarnings}
-                captureRef={captureThumbRef}
-                presentationRef={presentationRef}
-                onToggleWireframe={() => setWireframe(!wireframe)}
-                onMaterialSurfaceSelect={showLayers ? undefined : handleViewportMaterialSurfaceSelect}
-                onObjectSurfaceSelect={showLayers ? handleViewportObjectSelect : undefined}
-                onRenderedLayersChange={setRenderedLayers}
-                onMeasurementModeChange={setViewportMeasurementMode}
-                projectName={projectName}
-                thermalView={thermalView}
-                thermalColorMap={thermalColorMap}
-                lightingPreset={lightingPreset}
-                selectedObjectId={showLayers ? selectedLayerId : null}
-                hiddenObjectIds={hiddenLayerIds}
-                lockedObjectIds={lockedLayerIds}
-                sunDirection={sunDirection}
-                sunAltitude={sunAltitude}
-                focusObjectRef={focusObjectRef}
-              />
+              {renovationCompareMode ? (
+                <div
+                  ref={renovationCompareRef}
+                  className="renovation-compare-shell"
+                  style={{ "--compare-split": `${renovationCompareSplit}%` } as CSSProperties}
+                  data-testid="renovation-compare-shell"
+                >
+                  <div className="renovation-compare-pane renovation-compare-pane--current">
+                    <Viewport3D
+                      sceneJs={renovationBaselineSceneJs}
+                      wireframe={wireframe}
+                      explodedView={false}
+                      materialCategoryMap={materialCategoryMap}
+                      projectName={projectName}
+                      thermalView={thermalView}
+                      thermalColorMap={thermalColorMap}
+                      lightingPreset={lightingPreset}
+                      cameraSyncState={renovationCompareCamera}
+                      onCameraSyncChange={handleRenovationCompareCamera}
+                      sunDirection={sunDirection}
+                      sunAltitude={sunAltitude}
+                    />
+                    <span className="renovation-compare-label">{t("editor.compareCurrent")}</span>
+                  </div>
+                  <div className="renovation-compare-pane renovation-compare-pane--planned">
+                    <Viewport3D
+                      sceneJs={sceneJs}
+                      wireframe={wireframe}
+                      explodedView={explodedView}
+                      materialCategoryMap={materialCategoryMap}
+                      onObjectCount={setObjectCount}
+                      onError={setSceneError}
+                      onErrorLine={setSceneErrorLine}
+                      onWarnings={setSceneWarnings}
+                      captureRef={captureThumbRef}
+                      presentationRef={presentationRef}
+                      onToggleWireframe={() => setWireframe(!wireframe)}
+                      onMaterialSurfaceSelect={showLayers ? undefined : handleViewportMaterialSurfaceSelect}
+                      onObjectSurfaceSelect={showLayers ? handleViewportObjectSelect : undefined}
+                      onRenderedLayersChange={setRenderedLayers}
+                      onMeasurementModeChange={setViewportMeasurementMode}
+                      projectName={projectName}
+                      thermalView={thermalView}
+                      thermalColorMap={thermalColorMap}
+                      lightingPreset={lightingPreset}
+                      selectedObjectId={showLayers ? selectedLayerId : null}
+                      hiddenObjectIds={hiddenLayerIds}
+                      lockedObjectIds={lockedLayerIds}
+                      cameraSyncState={renovationCompareCamera}
+                      onCameraSyncChange={handleRenovationCompareCamera}
+                      sunDirection={sunDirection}
+                      sunAltitude={sunAltitude}
+                      focusObjectRef={focusObjectRef}
+                    />
+                    <span className="renovation-compare-label renovation-compare-label--planned">{t("editor.comparePlanned")}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="renovation-compare-divider"
+                    aria-label={t("editor.compareDividerLabel")}
+                    aria-valuemin={22}
+                    aria-valuemax={78}
+                    aria-valuenow={Math.round(renovationCompareSplit)}
+                    role="separator"
+                    onPointerDown={(event) => {
+                      renovationCompareDragging.current = true;
+                      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+                      updateRenovationCompareSplit(event.clientX, event.clientY);
+                    }}
+                    onPointerMove={(event) => {
+                      if (!renovationCompareDragging.current) return;
+                      updateRenovationCompareSplit(event.clientX, event.clientY);
+                    }}
+                    onPointerUp={() => { renovationCompareDragging.current = false; }}
+                    onPointerCancel={() => { renovationCompareDragging.current = false; }}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setRenovationCompareSplit((value) => clampCompareSplit(value - 5));
+                      } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setRenovationCompareSplit((value) => clampCompareSplit(value + 5));
+                      } else if (event.key === "Home") {
+                        event.preventDefault();
+                        setRenovationCompareSplit(22);
+                      } else if (event.key === "End") {
+                        event.preventDefault();
+                        setRenovationCompareSplit(78);
+                      }
+                    }}
+                  >
+                    <span className="renovation-compare-divider-line" />
+                    <span className="renovation-compare-divider-thumb">
+                      <svg width="12" height="18" viewBox="0 0 12 18" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 3L1 6l3 3M8 3l3 3-3 3M4 9l-3 3 3 3M8 9l3 3-3 3" />
+                      </svg>
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <Viewport3D
+                  sceneJs={sceneJs}
+                  wireframe={wireframe}
+                  explodedView={explodedView}
+                  materialCategoryMap={materialCategoryMap}
+                  onObjectCount={setObjectCount}
+                  onError={setSceneError}
+                  onErrorLine={setSceneErrorLine}
+                  onWarnings={setSceneWarnings}
+                  captureRef={captureThumbRef}
+                  presentationRef={presentationRef}
+                  onToggleWireframe={() => setWireframe(!wireframe)}
+                  onMaterialSurfaceSelect={showLayers ? undefined : handleViewportMaterialSurfaceSelect}
+                  onObjectSurfaceSelect={showLayers ? handleViewportObjectSelect : undefined}
+                  onRenderedLayersChange={setRenderedLayers}
+                  onMeasurementModeChange={setViewportMeasurementMode}
+                  projectName={projectName}
+                  thermalView={thermalView}
+                  thermalColorMap={thermalColorMap}
+                  lightingPreset={lightingPreset}
+                  selectedObjectId={showLayers ? selectedLayerId : null}
+                  hiddenObjectIds={hiddenLayerIds}
+                  lockedObjectIds={lockedLayerIds}
+                  sunDirection={sunDirection}
+                  sunAltitude={sunAltitude}
+                  focusObjectRef={focusObjectRef}
+                />
+              )}
             </ErrorBoundary>
 
-            {photoOverlayUrl && (
+            {renovationCompareMode && (
+              <div className="renovation-cost-compare" data-testid="renovation-cost-compare">
+                <div>
+                  <span>{t("editor.compareCurrentValue")}</span>
+                  <strong>{compareCurrentCostLabel}</strong>
+                </div>
+                <div>
+                  <span>{t("editor.compareRenovationCost")}</span>
+                  <strong>{compareRenovationCostLabel}</strong>
+                </div>
+                <div>
+                  <span>{t("editor.compareNewValue")}</span>
+                  <strong>{compareNewValueLabel}</strong>
+                </div>
+              </div>
+            )}
+
+            {!renovationCompareMode && photoOverlayUrl && (
               <div
                 className="photo-overlay"
                 style={{
@@ -3092,7 +3269,7 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {photoOverlayUrl && photoCompareMode && (
+            {!renovationCompareMode && photoOverlayUrl && photoCompareMode && (
               <div
                 className="photo-compare-handle"
                 style={{ left: `calc(${photoComparePos}% + 8px - 1px)` }}
@@ -3119,7 +3296,7 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {photoOverlayUrl && (
+            {!renovationCompareMode && photoOverlayUrl && (
               <div className="photo-overlay-controls">
                 <label className="photo-overlay-label">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3235,6 +3412,20 @@ export default function ProjectPage() {
                 <path d="M2 12l10 5 10-5" />
               </svg>
               {t('editor.wireframe')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={renovationCompareMode}
+              onClick={toggleRenovationCompareMode}
+              aria-pressed={renovationCompareMode}
+              title={t("editor.compare")}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v18" />
+                <path d="M4 6h16" />
+                <path d="M4 18h16" />
+              </svg>
+              {t("editor.compare")}
             </button>
             <button
               className="viewport-toolbar-btn"

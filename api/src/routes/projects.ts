@@ -527,23 +527,33 @@ router.post("/bulk", async (req, res) => {
 });
 
 router.post("/", requirePermission("project:create"), async (req, res) => {
-  const { name, description, scene_js, building_info, tags, status } = req.body;
+  const { name, description, scene_js, original_scene_js, building_info, tags, status } = req.body;
   if (!name || typeof name !== "string") {
     return res.status(400).json({ error: "Project name is required" });
   }
   if (name.length > 200) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
-  if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
+  if (scene_js !== undefined && scene_js !== null && typeof scene_js !== "string") {
+    return res.status(400).json({ error: "scene_js must be a string" });
+  }
+  if (typeof scene_js === "string" && scene_js.length > 512 * 1024) {
     return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
+  }
+  if (original_scene_js !== undefined && original_scene_js !== null && typeof original_scene_js !== "string") {
+    return res.status(400).json({ error: "original_scene_js must be a string" });
+  }
+  if (typeof original_scene_js === "string" && original_scene_js.length > 512 * 1024) {
+    return res.status(400).json({ error: "Original scene script exceeds maximum size of 512 KB" });
   }
   const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
   const safeStatus = status && VALID_STATUSES.includes(status) ? status : "planning";
   const safeTags = Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : [];
+  const baselineSceneJs = original_scene_js !== undefined ? original_scene_js : scene_js;
   const result = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js, building_info, tags, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [req.user!.id, name.trim(), description, scene_js, building_info ? JSON.stringify(building_info) : null, safeTags, safeStatus]
+    `INSERT INTO projects (user_id, name, description, scene_js, original_scene_js, building_info, tags, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    [req.user!.id, name.trim(), description, scene_js, baselineSceneJs ?? null, building_info ? JSON.stringify(building_info) : null, safeTags, safeStatus]
   );
   res.status(201).json(result.rows[0]);
 });
@@ -1253,9 +1263,9 @@ router.post("/:id/duplicate", requirePermission("project:create"), async (req, r
   const suffix = acceptLang.toLowerCase().startsWith("fi") ? "(kopio)" : "(copy)";
 
   const dup = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.user!.id, `${p.name} ${suffix}`, p.description, p.scene_js]
+    `INSERT INTO projects (user_id, name, description, scene_js, original_scene_js)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.user!.id, `${p.name} ${suffix}`, p.description, p.scene_js, p.original_scene_js ?? p.scene_js]
   );
   const newId = dup.rows[0].id;
 

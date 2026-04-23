@@ -25,6 +25,7 @@ export interface Project {
   updated_at: string;
   deleted_at?: string | null;
   scene_js?: string | null;
+  original_scene_js?: string | null;
   display_scale?: number;
   thumbnail_url?: string | null;
   building_info?: BuildingInfo | null;

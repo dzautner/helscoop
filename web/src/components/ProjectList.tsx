@@ -214,6 +214,7 @@ export default function ProjectList({
         name: data.name,
         description: data.description || undefined,
         scene_js: data.scene_js,
+        original_scene_js: typeof data.original_scene_js === "string" ? data.original_scene_js : data.scene_js,
       });
 
       if (Array.isArray(data.bom) && data.bom.length > 0) {
