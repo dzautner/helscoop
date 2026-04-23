@@ -3,6 +3,10 @@
 import { useEffect, useRef, useCallback, useId, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { evaluateSceneWorker, initWorker } from "@/lib/manifold-worker-client";
 import type { TessellatedObject, EvaluateOptions } from "@/lib/manifold-engine";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -48,7 +52,69 @@ interface Viewport3DProps {
   projectName?: string;
   thermalView?: boolean;
   thermalColorMap?: Map<string, [number, number, number]>;
+  lightingPreset?: LightingPresetId;
 }
+
+export type LightingPresetId = "default" | "summer" | "winter" | "evening";
+
+interface LightingConfig {
+  ambient: { color: number; intensity: number };
+  hemisphere: { sky: number; ground: number; intensity: number };
+  directional: { color: number; intensity: number; position: [number, number, number] };
+  fill: { color: number; intensity: number };
+  envGradient: string[];
+  groundColor: number;
+  fogColor: number;
+  toneMappingExposure: number;
+  bloomStrength: number;
+}
+
+const LIGHTING_PRESETS: Record<LightingPresetId, LightingConfig> = {
+  default: {
+    ambient: { color: 0xe8e4df, intensity: 0.35 },
+    hemisphere: { sky: 0x7799cc, ground: 0x3d3528, intensity: 0.45 },
+    directional: { color: 0xfff0dd, intensity: 1.3, position: [5, 8, 4] },
+    fill: { color: 0xc4d4e8, intensity: 0.3 },
+    envGradient: ["#1a2030", "#2a3545", "#3a3428", "#2a2520", "#0a0a08"],
+    groundColor: 0x1f1e1c,
+    fogColor: 0x1a1d22,
+    toneMappingExposure: 0.9,
+    bloomStrength: 0.12,
+  },
+  summer: {
+    ambient: { color: 0xfff5e0, intensity: 0.45 },
+    hemisphere: { sky: 0x88bbee, ground: 0x556633, intensity: 0.55 },
+    directional: { color: 0xffe8c0, intensity: 1.6, position: [4, 10, 3] },
+    fill: { color: 0xaaccee, intensity: 0.35 },
+    envGradient: ["#2a3a55", "#4a6588", "#887750", "#665530", "#1a1808"],
+    groundColor: 0x2a2820,
+    fogColor: 0x222830,
+    toneMappingExposure: 1.05,
+    bloomStrength: 0.15,
+  },
+  winter: {
+    ambient: { color: 0xc8d4e8, intensity: 0.25 },
+    hemisphere: { sky: 0x6680aa, ground: 0x282830, intensity: 0.35 },
+    directional: { color: 0xdde4f0, intensity: 1.0, position: [8, 3, 4] },
+    fill: { color: 0x8899bb, intensity: 0.25 },
+    envGradient: ["#141828", "#1e2a40", "#282838", "#1e1e28", "#080810"],
+    groundColor: 0x22222a,
+    fogColor: 0x141820,
+    toneMappingExposure: 0.75,
+    bloomStrength: 0.08,
+  },
+  evening: {
+    ambient: { color: 0xffd0a0, intensity: 0.3 },
+    hemisphere: { sky: 0x554488, ground: 0x442210, intensity: 0.4 },
+    directional: { color: 0xffaa55, intensity: 1.4, position: [10, 2, 3] },
+    fill: { color: 0x665588, intensity: 0.2 },
+    envGradient: ["#1a1030", "#2a1838", "#553318", "#442210", "#0a0508"],
+    groundColor: 0x201a14,
+    fogColor: 0x18141e,
+    toneMappingExposure: 0.85,
+    bloomStrength: 0.2,
+  },
+};
 
 interface CameraPreset {
   position: [number, number, number];
@@ -491,6 +557,7 @@ export default function Viewport3D({
   projectName,
   thermalView = false,
   thermalColorMap,
+  lightingPreset = "default",
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -521,6 +588,13 @@ export default function Viewport3D({
   const [sectionMode, setSectionMode] = useState(false);
   const [sectionAxis, setSectionAxis] = useState<"x" | "y" | "z">("z");
   const [sectionPos, setSectionPos] = useState(0);
+  const composerRef = useRef<EffectComposer | null>(null);
+  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
+  const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
+  const hemisphereLightRef = useRef<THREE.HemisphereLight | null>(null);
+  const dirLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const fillLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const groundMeshRef = useRef<THREE.Mesh | null>(null);
   const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));
   const updateIdRef = useRef(0);
   const hasAppliedInitialPresentationPresetRef = useRef(false);
@@ -880,9 +954,11 @@ export default function Viewport3D({
 
     const ambientLight = new THREE.AmbientLight(0xe8e4df, 0.35);
     scene.add(ambientLight);
+    ambientLightRef.current = ambientLight;
 
     const hemisphereLight = new THREE.HemisphereLight(0x7799cc, 0x3d3528, 0.45);
     scene.add(hemisphereLight);
+    hemisphereLightRef.current = hemisphereLight;
 
     const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.3);
     dirLight.position.set(5, 8, 4);
@@ -897,10 +973,12 @@ export default function Viewport3D({
     dirLight.shadow.camera.bottom = -30;
     dirLight.shadow.bias = -0.001;
     scene.add(dirLight);
+    dirLightRef.current = dirLight;
 
     const fillLight = new THREE.DirectionalLight(0xc4d4e8, 0.3);
     fillLight.position.set(-4, 3, -2);
     scene.add(fillLight);
+    fillLightRef.current = fillLight;
 
     const gridMinor = new THREE.GridHelper(40, 40, 0x2a2a2a, 0x2a2a2a);
     (gridMinor.material as THREE.Material).opacity = 0.12;
@@ -949,6 +1027,25 @@ export default function Viewport3D({
     ground.position.y = -0.01;
     ground.receiveShadow = true;
     scene.add(ground);
+    groundMeshRef.current = ground;
+
+    // Post-processing: subtle bloom for photographic quality
+    const lowPower = typeof navigator !== "undefined" && navigator.hardwareConcurrency < 4;
+    let composer: EffectComposer | null = null;
+    if (!lowPower) {
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(container.clientWidth, container.clientHeight),
+        0.12,
+        0.8,
+        0.88,
+      );
+      composer.addPass(bloomPass);
+      composer.addPass(new OutputPass());
+      composerRef.current = composer;
+      bloomPassRef.current = bloomPass;
+    }
 
     // Object group — rotated to convert Z-up (Manifold/C++ viewer) to Y-up (Three.js)
     const objectGroup = new THREE.Group();
@@ -963,7 +1060,11 @@ export default function Viewport3D({
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
       controls.update();
-      renderer.render(scene, camera);
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
       updateMeasurementLabelPositions();
     }
     animate();
@@ -976,6 +1077,7 @@ export default function Viewport3D({
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
+      if (composer) composer.setSize(w, h);
     });
     resizeObserver.observe(container);
 
@@ -1034,6 +1136,17 @@ export default function Viewport3D({
         groundAlphaCanvas = null;
       }
       groundMat.dispose();
+
+      if (composer) {
+        composer.dispose();
+        composerRef.current = null;
+        bloomPassRef.current = null;
+      }
+      ambientLightRef.current = null;
+      hemisphereLightRef.current = null;
+      dirLightRef.current = null;
+      fillLightRef.current = null;
+      groundMeshRef.current = null;
 
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
@@ -1210,6 +1323,90 @@ export default function Viewport3D({
       originalColorsRef.current.clear();
     }
   }, [thermalView, thermalColorMap]);
+
+  // Lighting preset: update lights, fog, ground, bloom, and env map
+  useEffect(() => {
+    const config = LIGHTING_PRESETS[lightingPreset];
+    const scene = sceneRef.current;
+    const renderer = rendererRef.current;
+    if (!config || !scene || !renderer) return;
+
+    const ambient = ambientLightRef.current;
+    const hemi = hemisphereLightRef.current;
+    const dir = dirLightRef.current;
+    const fill = fillLightRef.current;
+    const ground = groundMeshRef.current;
+    const bloom = bloomPassRef.current;
+
+    if (ambient) {
+      ambient.color.setHex(config.ambient.color);
+      ambient.intensity = config.ambient.intensity;
+    }
+    if (hemi) {
+      hemi.color.setHex(config.hemisphere.sky);
+      hemi.groundColor.setHex(config.hemisphere.ground);
+      hemi.intensity = config.hemisphere.intensity;
+    }
+    if (dir) {
+      dir.color.setHex(config.directional.color);
+      dir.intensity = config.directional.intensity;
+      dir.position.set(...config.directional.position);
+    }
+    if (fill) {
+      fill.color.setHex(config.fill.color);
+      fill.intensity = config.fill.intensity;
+    }
+    if (ground) {
+      (ground.material as THREE.MeshStandardMaterial).color.setHex(config.groundColor);
+    }
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.color.setHex(config.fogColor);
+    }
+    if (bloom) {
+      bloom.strength = config.bloomStrength;
+    }
+    renderer.toneMappingExposure = config.toneMappingExposure;
+
+    // Regenerate environment map for the preset
+    const envCanvas = document.createElement("canvas");
+    envCanvas.width = 256;
+    envCanvas.height = 128;
+    const ctx = envCanvas.getContext("2d")!;
+    const grad = ctx.createLinearGradient(0, 0, 0, 128);
+    const stops = config.envGradient;
+    for (let i = 0; i < stops.length; i++) {
+      grad.addColorStop(i / (stops.length - 1), stops[i]);
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 128);
+    const envTexture = new THREE.CanvasTexture(envCanvas);
+    envTexture.mapping = THREE.EquirectangularReflectionMapping;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const oldEnv = scene.environment;
+    scene.environment = pmrem.fromEquirectangular(envTexture).texture;
+    envTexture.dispose();
+    pmrem.dispose();
+    envCanvas.width = 0;
+    envCanvas.height = 0;
+    if (oldEnv) oldEnv.dispose();
+
+    // Update background gradient to match
+    const bgCanvas = document.createElement("canvas");
+    bgCanvas.width = 2;
+    bgCanvas.height = 256;
+    const bgCtx = bgCanvas.getContext("2d")!;
+    const bgGrad = bgCtx.createLinearGradient(0, 0, 0, 256);
+    bgGrad.addColorStop(0, stops[0]);
+    bgGrad.addColorStop(0.5, stops[Math.floor(stops.length / 2)]);
+    bgGrad.addColorStop(1, stops[stops.length - 1]);
+    bgCtx.fillStyle = bgGrad;
+    bgCtx.fillRect(0, 0, 2, 256);
+    const oldBg = scene.background;
+    scene.background = new THREE.CanvasTexture(bgCanvas);
+    bgCanvas.width = 0;
+    bgCanvas.height = 0;
+    if (oldBg instanceof THREE.Texture) oldBg.dispose();
+  }, [lightingPreset]);
 
   useEffect(() => {
     const container = containerRef.current;
