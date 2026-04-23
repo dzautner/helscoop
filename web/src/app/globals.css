@@ -4425,6 +4425,41 @@ select:focus {
   text-align: right;
 }
 
+.daylight-panel-sun-times {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(229, 160, 75, 0.08);
+  border: 1px solid rgba(229, 160, 75, 0.12);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.daylight-sun-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.daylight-sun-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.daylight-sun-separator {
+  color: var(--text-muted);
+  margin: 0 1px;
+}
+
+.daylight-hours {
+  font-size: 10px;
+  color: var(--amber, #e5a04b);
+  font-weight: 600;
+}
+
 .daylight-panel-info {
   display: flex;
   gap: 12px;
