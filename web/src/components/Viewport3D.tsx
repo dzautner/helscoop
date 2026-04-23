@@ -64,6 +64,7 @@ interface Viewport3DProps {
   sunDirection?: [number, number, number];
   sunAltitude?: number;
   focusObjectRef?: React.MutableRefObject<((objectId: string) => void) | null>;
+  onRevealComplete?: () => void;
 }
 
 export type LightingPresetId = "default" | "summer" | "winter" | "evening";
@@ -592,6 +593,7 @@ export default function Viewport3D({
   sunDirection,
   sunAltitude,
   focusObjectRef,
+  onRevealComplete,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -1333,29 +1335,51 @@ export default function Viewport3D({
           }
         }
 
-        // Cinematic reveal on first load
+        // 3-phase cinematic reveal: wireframe → surface fill → lighting settle
         if (!hasRevealedRef.current && result.meshes.length > 0 && !prefersReducedMotion()) {
           hasRevealedRef.current = true;
           cancelAnimationFrame(revealAnimRef.current);
 
           const meshes: THREE.Mesh[] = [];
-          const origTransparency: boolean[] = [];
-          const origOpacity: number[] = [];
+          const origMaterials: THREE.Material[] = [];
+          const wireframeMeshes: THREE.Mesh[] = [];
           stagingGroup.traverse((child) => {
             if (child instanceof THREE.Mesh) {
-              const mat = child.material as THREE.MeshStandardMaterial;
-              origTransparency.push(mat.transparent);
-              origOpacity.push(mat.opacity);
-              mat.transparent = true;
-              mat.opacity = 0;
-              mat.needsUpdate = true;
               meshes.push(child);
+              origMaterials.push(child.material);
+              const surfaceMat = child.material as THREE.MeshStandardMaterial;
+              surfaceMat.transparent = true;
+              surfaceMat.opacity = 0;
+              surfaceMat.needsUpdate = true;
+
+              const wireMat = new THREE.MeshBasicMaterial({
+                wireframe: true,
+                color: 0xe5a04b,
+                transparent: true,
+                opacity: 0,
+              });
+              const wireClone = new THREE.Mesh(child.geometry, wireMat);
+              wireClone.position.copy(child.position);
+              wireClone.rotation.copy(child.rotation);
+              wireClone.scale.copy(child.scale);
+              wireClone.matrixAutoUpdate = true;
+              child.parent?.add(wireClone);
+              wireframeMeshes.push(wireClone);
             }
           });
 
-          // Shift meshes slightly upward for drop-in effect
-          const dropOffset = maxDim * 0.08;
-          stagingGroup.position.y += dropOffset;
+          const rimLight = new THREE.PointLight(0xe5a04b, 0, 20);
+          const box = new THREE.Box3().setFromObject(stagingGroup);
+          const edgePos = new THREE.Vector3();
+          box.getCenter(edgePos);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          rimLight.position.set(
+            edgePos.x + size.x * 0.6,
+            edgePos.y + size.y * 0.3,
+            edgePos.z + size.z * 0.4,
+          );
+          stagingGroup.add(rimLight);
 
           const camera = cameraRef.current;
           const controls = controlsRef.current;
@@ -1364,51 +1388,91 @@ export default function Viewport3D({
             camera.position.z - (controls?.target.z ?? 0),
           ) : 0;
           const cameraRadius = camera ? camera.position.distanceTo(controls?.target ?? new THREE.Vector3()) : 10;
-          const cameraY = camera ? camera.position.y : 4;
+          const startCameraY = camera ? camera.position.y : 4;
+          const dollyStart = cameraRadius * 1.15;
 
-          const DURATION = 1500;
+          const DURATION = 1800;
+          const P1_END = 600;
+          const P2_END = 1200;
           const startTime = performance.now();
+          let revealCompleteFired = false;
+
+          const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
+          const spring = (x: number) => {
+            const c4 = (2 * Math.PI) / 3;
+            return x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
+          };
 
           const revealStep = () => {
             const elapsed = performance.now() - startTime;
             const raw = Math.min(elapsed / DURATION, 1);
-            // Ease-out cubic
-            const t = 1 - Math.pow(1 - raw, 3);
 
-            // Fade meshes in (0-800ms range)
-            const fadeT = Math.min(1, elapsed / 800);
-            const fadeEased = 1 - Math.pow(1 - fadeT, 2);
-            for (let i = 0; i < meshes.length; i++) {
-              const mat = meshes[i].material as THREE.MeshStandardMaterial;
-              mat.opacity = fadeEased * origOpacity[i];
-              mat.needsUpdate = true;
+            if (elapsed <= P1_END) {
+              // Phase 1: Wireframe emerge
+              const p = Math.min(elapsed / P1_END, 1);
+              const eased = spring(p);
+              for (const wm of wireframeMeshes) {
+                (wm.material as THREE.MeshBasicMaterial).opacity = eased * 0.6;
+                (wm.material as THREE.MeshBasicMaterial).needsUpdate = true;
+              }
+            } else if (elapsed <= P2_END) {
+              // Phase 2: Surface fill, wireframe fade
+              const p = Math.min((elapsed - P1_END) / (P2_END - P1_END), 1);
+              const eased = easeOutCubic(p);
+              for (let i = 0; i < meshes.length; i++) {
+                const mat = meshes[i].material as THREE.MeshStandardMaterial;
+                mat.opacity = eased;
+                mat.needsUpdate = true;
+              }
+              for (const wm of wireframeMeshes) {
+                (wm.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - eased);
+                (wm.material as THREE.MeshBasicMaterial).needsUpdate = true;
+              }
+              rimLight.intensity = eased * 0.3;
+
+              if (!revealCompleteFired && p > 0.5) {
+                revealCompleteFired = true;
+                onRevealComplete?.();
+              }
+            } else {
+              // Phase 3: Lighting settle + orbit
+              const p = Math.min((elapsed - P2_END) / (DURATION - P2_END), 1);
+              const eased = easeOutCubic(p);
+              rimLight.intensity = 0.3 * (1 - eased);
             }
 
-            // Drop-in: Y offset
-            stagingGroup.position.y = dropOffset * (1 - t);
-
-            // Subtle camera orbit (5 degrees over full duration)
+            // Camera dolly-in + orbit over full duration
             if (camera && controls) {
+              const t = easeOutCubic(raw);
               const orbitAngle = startAngle + t * (5 * Math.PI / 180);
-              camera.position.x = controls.target.x + Math.sin(orbitAngle) * cameraRadius;
-              camera.position.z = controls.target.z + Math.cos(orbitAngle) * cameraRadius;
-              camera.position.y = cameraY;
+              const currentRadius = dollyStart + (cameraRadius - dollyStart) * t;
+              camera.position.x = controls.target.x + Math.sin(orbitAngle) * currentRadius;
+              camera.position.z = controls.target.z + Math.cos(orbitAngle) * currentRadius;
+              camera.position.y = startCameraY;
               controls.update();
             }
 
             if (raw < 1) {
               revealAnimRef.current = requestAnimationFrame(revealStep);
             } else {
-              // Restore original material settings
+              // Cleanup: remove wireframe meshes and rim light
+              for (const wm of wireframeMeshes) {
+                wm.parent?.remove(wm);
+                (wm.material as THREE.MeshBasicMaterial).dispose();
+              }
+              stagingGroup.remove(rimLight);
+              rimLight.dispose();
               for (let i = 0; i < meshes.length; i++) {
                 const mat = meshes[i].material as THREE.MeshStandardMaterial;
-                mat.transparent = origTransparency[i];
-                mat.opacity = origOpacity[i];
+                mat.transparent = false;
+                mat.opacity = 1;
                 mat.needsUpdate = true;
               }
-              stagingGroup.position.y = 0;
+              if (!revealCompleteFired) {
+                onRevealComplete?.();
+              }
             }
-          }
+          };
           revealAnimRef.current = requestAnimationFrame(revealStep);
         }
       }
