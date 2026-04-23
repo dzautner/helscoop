@@ -3811,6 +3811,49 @@ select:focus {
   color: var(--danger);
 }
 
+.viewport-thermal-legend {
+  position: absolute;
+  bottom: 65px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-float) 90%, transparent);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-md);
+  min-width: 140px;
+}
+
+.viewport-thermal-legend-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.viewport-thermal-legend-bar {
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #0d004d, #4d0099, #cc1100, #ff6600, #ffcc00, #ffffff);
+}
+
+.viewport-thermal-legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .viewport-thermal-legend { display: none; }
+}
+
 /* Dashboard layout */
 .dash-empty {
   padding: 48px 28px;

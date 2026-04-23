@@ -46,6 +46,8 @@ interface Viewport3DProps {
   onMaterialSurfaceSelect?: (selection: ViewportMaterialSelection) => void;
   onMeasurementModeChange?: (active: boolean) => void;
   projectName?: string;
+  thermalView?: boolean;
+  thermalColorMap?: Map<string, [number, number, number]>;
 }
 
 interface CameraPreset {
@@ -487,6 +489,8 @@ export default function Viewport3D({
   onMaterialSurfaceSelect,
   onMeasurementModeChange,
   projectName,
+  thermalView = false,
+  thermalColorMap,
 }: Viewport3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -1172,6 +1176,40 @@ export default function Viewport3D({
     }, 100);
     return () => clearTimeout(timer);
   }, [sceneJs, wireframe, updateScene]);
+
+  // Thermal view: override mesh colors when active, restore originals when off
+  const originalColorsRef = useRef<Map<THREE.Mesh, THREE.Color>>(new Map());
+
+  useEffect(() => {
+    const group = objectGroupRef.current;
+    if (!group) return;
+
+    if (thermalView && thermalColorMap) {
+      group.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const mid = child.userData.materialId as string | undefined;
+        if (!mid) return;
+        const mat = child.material as THREE.MeshStandardMaterial;
+        if (!originalColorsRef.current.has(child)) {
+          originalColorsRef.current.set(child, mat.color.clone());
+        }
+        const rgb = thermalColorMap.get(mid);
+        if (rgb) {
+          mat.color.setRGB(rgb[0], rgb[1], rgb[2]);
+          mat.emissive.setRGB(rgb[0] * 0.15, rgb[1] * 0.15, rgb[2] * 0.15);
+          mat.needsUpdate = true;
+        }
+      });
+    } else {
+      originalColorsRef.current.forEach((color, mesh) => {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        mat.color.copy(color);
+        mat.emissive.setRGB(0, 0, 0);
+        mat.needsUpdate = true;
+      });
+      originalColorsRef.current.clear();
+    }
+  }, [thermalView, thermalColorMap]);
 
   useEffect(() => {
     const container = containerRef.current;
