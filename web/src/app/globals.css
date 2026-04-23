@@ -606,13 +606,152 @@ body::before {
 }
 
 .scene-params-count {
-  margin-left: auto;
   font-size: 10px;
   color: var(--text-muted);
   background: var(--bg-hover);
   padding: 1px 6px;
   border-radius: 99px;
   font-variant-numeric: tabular-nums;
+}
+
+.scene-params-preset-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scene-params-preset-btn:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.scene-params-preset-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  margin-top: 4px;
+  padding: 4px;
+  background: var(--surface-float);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.scene-params-preset-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.scene-params-preset-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.scene-params-preset-item[data-active="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.scene-params-preset-item-row {
+  display: flex;
+  align-items: center;
+}
+
+.scene-params-preset-item-row .scene-params-preset-item {
+  flex: 1;
+}
+
+.scene-params-preset-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.scene-params-preset-item-row:hover .scene-params-preset-delete {
+  opacity: 1;
+}
+
+.scene-params-preset-delete:hover {
+  color: var(--danger);
+  background: var(--bg-hover);
+}
+
+.scene-params-preset-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-subtle);
+}
+
+.scene-params-preset-add {
+  color: var(--accent);
+}
+
+.scene-params-preset-save-form {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.scene-params-preset-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.scene-params-preset-input:focus {
+  border-color: var(--accent);
+}
+
+.scene-params-preset-save-confirm {
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scene-params-preset-save-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .scene-params-body {

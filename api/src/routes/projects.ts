@@ -881,7 +881,7 @@ router.post("/:id/quote-request", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, description, scene_js, household_deduction_joint, tags, status } = req.body;
+  const { name, description, scene_js, household_deduction_joint, tags, status, param_presets } = req.body;
   if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
@@ -895,9 +895,13 @@ router.put("/:id", async (req, res) => {
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(", ")}` });
   }
+  if (param_presets !== undefined && (!Array.isArray(param_presets) || param_presets.length > 20)) {
+    return res.status(400).json({ error: "param_presets must be an array of at most 20 presets" });
+  }
   const safeTags = tags !== undefined
     ? (Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : null)
     : null;
+  const safePresets = param_presets !== undefined ? JSON.stringify(param_presets) : null;
   const result = await query(
     `UPDATE projects SET
        name=COALESCE($1, name),
@@ -906,9 +910,10 @@ router.put("/:id", async (req, res) => {
        household_deduction_joint=COALESCE($4, household_deduction_joint),
        tags=COALESCE($5, tags),
        status=COALESCE($6, status),
+       param_presets=COALESCE($7::jsonb, param_presets),
        updated_at=now()
-     WHERE id=$7 AND user_id=$8 RETURNING *`,
-    [name?.trim(), description, scene_js, household_deduction_joint ?? null, safeTags, status ?? null, req.params.id, req.user!.id]
+     WHERE id=$8 AND user_id=$9 RETURNING *`,
+    [name?.trim(), description, scene_js, household_deduction_joint ?? null, safeTags, status ?? null, safePresets, req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
