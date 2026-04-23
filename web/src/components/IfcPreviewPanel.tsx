@@ -29,13 +29,13 @@ const COPY = {
   },
   fi: {
     title: "IFC 4.3 -lupamallin esikatselu",
-    subtitle: "Luo Lupapiste-vienti, tarkista objektipuu ja poimi estavat IFC-virheet ennen latausta.",
+    subtitle: "Luo Lupapiste-vienti, tarkista objektipuu ja poimi estävät IFC-virheet ennen latausta.",
     generate: "Luo esikatselu",
-    refresh: "Paivita esikatselu",
+    refresh: "Päivitä esikatselu",
     generating: "Luodaan...",
     download: "Lataa IFC",
     downloading: "Ladataan...",
-    empty: "IFC-esikatselua ei ole viela. Luo se nykyisesta tallennetusta projektista.",
+    empty: "IFC-esikatselua ei ole vielä. Luo se nykyisestä tallennetusta projektista.",
     ready: "Valmis Lupapisteeseen",
     blocked: "Korjattavaa",
     warning: "Varoituksia",
@@ -45,7 +45,28 @@ const COPY = {
     objects: "Objektipuu",
     checklist: "Tarkistuslista",
     failed: "IFC-esikatselua ei voitu luoda.",
-    noObjects: "Esikatseltavia rakennusobjekteja ei loytynyt.",
+    noObjects: "Esikatseltavia rakennusobjekteja ei löytynyt.",
+    meters: "m",
+  },
+  sv: {
+    title: "IFC 4.3 tillståndsmodell förhandsgranskning",
+    subtitle: "Generera Lupapiste-exporten, inspektera objektträdet och fånga blockerande IFC-problem innan nedladdning.",
+    generate: "Generera förhandsgranskning",
+    refresh: "Uppdatera förhandsgranskning",
+    generating: "Genererar...",
+    download: "Ladda ner IFC",
+    downloading: "Laddar ner...",
+    empty: "Ingen IFC-förhandsgranskning ännu. Generera en från det aktuella sparade projektet.",
+    ready: "Redo för Lupapiste",
+    blocked: "Behöver åtgärdas",
+    warning: "Varningar",
+    schema: "Schema",
+    largestSpan: "Största spann",
+    boxes: "Begränsningsrutor",
+    objects: "Objektträd",
+    checklist: "Valideringschecklista",
+    failed: "Kunde inte generera IFC-förhandsgranskning.",
+    noObjects: "Inga förhandsgranskningsbara byggobjekt hittades.",
     meters: "m",
   },
 } as const;
@@ -68,7 +89,7 @@ export default function IfcPreviewPanel({
   projectName?: string;
 }) {
   const { locale } = useTranslation();
-  const copy = locale === "fi" ? COPY.fi : COPY.en;
+  const copy = locale === "fi" ? COPY.fi : locale === "sv" ? COPY.sv : COPY.en;
   const [analysis, setAnalysis] = useState<IfcPreviewAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
