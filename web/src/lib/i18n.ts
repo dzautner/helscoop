@@ -917,6 +917,8 @@ const translations = {
       costApprox: 'Arvioitu kustannus',
       noCost: 'Ei hintaa',
       viewportHint: 'Klikkaa objektia valitaksesi sen tason',
+      startAutoplay: 'Toista rakennusjärjestys',
+      stopAutoplay: 'Pysäytä toisto',
     },
     commandPalette: {
       title: 'Komentovalikko',
@@ -2557,6 +2559,8 @@ const translations = {
       costApprox: 'Approximate cost',
       noCost: 'No cost',
       viewportHint: 'Click a mesh to select its layer',
+      startAutoplay: 'Play build sequence',
+      stopAutoplay: 'Stop playback',
     },
     commandPalette: {
       title: 'Command palette',
@@ -4112,6 +4116,8 @@ const translations = {
       costApprox: 'Ungefärlig kostnad',
       noCost: 'Ingen kostnad',
       viewportHint: 'Klicka på en mesh för att välja dess lager',
+      startAutoplay: 'Spela byggsekvens',
+      stopAutoplay: 'Stoppa uppspelning',
     },
     commandPalette: {
       title: 'Kommandopalett',

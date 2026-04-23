@@ -3427,6 +3427,7 @@ export default function ProjectPage() {
             onToggleLayerLock={handleToggleLayerLock}
             onOpenLayerMaterial={handleOpenLayerMaterial}
             onFocusLayer={(layerId) => focusObjectRef.current?.(layerId)}
+            onSetHiddenLayers={setHiddenLayerIds}
           />
         )}
 
