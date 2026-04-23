@@ -13,12 +13,14 @@ interface RenovationRoiPanelProps {
 }
 
 function formatEur(value: number, locale: string): string {
-  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} €`;
+  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} €`;
 }
 
 function formatYears(value: number | null, locale: string): string {
-  if (value == null) return locale === "fi" ? "Ei energiasäästöarviota" : "No energy payback";
-  return locale === "fi" ? `${value.toLocaleString("fi-FI")} vuotta` : `${value.toLocaleString("en-GB")} years`;
+  if (value == null) return locale === "fi" ? "Ei energiasäästöarviota" : locale === "sv" ? "Ingen energibesparingsuppskattning" : "No energy payback";
+  const tag = locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB";
+  const unit = locale === "fi" ? "vuotta" : locale === "sv" ? "år" : "years";
+  return `${value.toLocaleString(tag)} ${unit}`;
 }
 
 export default function RenovationRoiPanel({

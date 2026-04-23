@@ -84,22 +84,22 @@ const COPY = {
   },
   sv: {
     title: "Guidad renoveringsguide",
-    subtitle: "Valj 3-5 saker i taget. Helscoop skapar modell, BOM och kostnadsvag.",
-    total: "Lopande uppskattning",
-    preview: "Live 3D-forhandsvisning",
+    subtitle: "Välj 3–5 saker i taget. Helscoop skapar modell, BOM och kostnadsväg.",
+    total: "Löpande uppskattning",
+    preview: "Live 3D-förhandsvisning",
     showMore: "Visa fler alternativ",
-    showLess: "Dolj extra alternativ",
+    showLess: "Dölj extra alternativ",
     customize: "Anpassa mer",
     back: "Tillbaka",
-    next: "Nasta",
-    close: "Stang",
+    next: "Nästa",
+    close: "Stäng",
     apply: "Skapa plan",
-    applyAdvanced: "Skapa och oppna avancerat lage",
+    applyAdvanced: "Skapa och öppna avancerat läge",
     bom: "BOM-rader",
     scene: "Scene script",
     cost: "Uppskattad totalbudget",
-    energy: "Energitillagg",
-    noEnergy: "Inget tillagg",
+    energy: "Energitillägg",
+    noEnergy: "Inget tillägg",
   },
 } as const;
 
@@ -109,7 +109,7 @@ function localeKey(locale: string): keyof typeof COPY {
 }
 
 function formatEuro(value: number, locale: string): string {
-  return `${value.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { maximumFractionDigits: 0 })} EUR`;
+  return `${value.toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB", { maximumFractionDigits: 0 })} EUR`;
 }
 
 function OptionGrid<T extends string>({
