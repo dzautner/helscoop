@@ -1807,6 +1807,15 @@ export default function ProjectPage() {
     );
   }, []);
 
+  const reorderBom = useCallback((fromIndex: number, toIndex: number) => {
+    setBom((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   const updateHouseholdDeductionMode = useCallback(async (joint: boolean) => {
     const previous = householdDeductionJoint;
     setHouseholdDeductionJoint(joint);
@@ -3043,6 +3052,7 @@ export default function ProjectPage() {
               onRemove={removeBomItem}
               onUpdateQty={updateBomQty}
               onUpdateNote={updateBomNote}
+              onReorder={reorderBom}
               style={isMobileEditor ? undefined : { width: bomWidth }}
               sceneJs={sceneJs}
               projectName={projectName}
