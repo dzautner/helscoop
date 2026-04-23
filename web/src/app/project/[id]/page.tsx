@@ -281,6 +281,9 @@ export default function ProjectPage() {
   const [projectStatus, setProjectStatus] = useState<import("@/types").ProjectStatus>("planning");
   const [projectTags, setProjectTags] = useState<string[]>([]);
   const [householdDeductionJoint, setHouseholdDeductionJoint] = useState(false);
+  const [paramPresets, setParamPresets] = useState<import("@/types").ParamPreset[]>([]);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+  const defaultParamsRef = useRef<Record<string, number>>({});
   const [showCode, setShowCode] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
@@ -408,6 +411,7 @@ export default function ProjectPage() {
         setProjectStatus(proj.status || "planning");
         setProjectTags(proj.tags || []);
         if (proj.share_token) setShareToken(proj.share_token);
+        setParamPresets(proj.param_presets || []);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setSceneJs(initialScene);
         setSavedScript(initialScene);
@@ -761,6 +765,7 @@ export default function ProjectPage() {
   const handleParamChange = useCallback(
     (name: string, value: number) => {
       queueSceneAnnouncement("editor.sceneParameterChanged");
+      setActivePreset(null);
       setSceneJs((prev) => {
         const updated = applyParamToScript(prev, name, value);
         pushHistory(updated);
@@ -769,6 +774,64 @@ export default function ProjectPage() {
     },
     [pushHistory, queueSceneAnnouncement]
   );
+
+  // Capture default param values on first parse
+  useMemo(() => {
+    if (sceneParams.length > 0 && Object.keys(defaultParamsRef.current).length === 0) {
+      const defaults: Record<string, number> = {};
+      for (const p of sceneParams) defaults[p.name] = p.value;
+      defaultParamsRef.current = defaults;
+    }
+  }, [sceneParams]);
+
+  const handleSavePreset = useCallback(
+    (name: string, values: Record<string, number>) => {
+      const updated = [...paramPresets.filter((p) => p.name !== name), { name, values }];
+      setParamPresets(updated);
+      setActivePreset(name);
+      api.updateProject(projectId, { param_presets: updated });
+    },
+    [paramPresets, projectId],
+  );
+
+  const handleLoadPreset = useCallback(
+    (preset: import("@/types").ParamPreset) => {
+      setActivePreset(preset.name);
+      setSceneJs((prev) => {
+        let script = prev;
+        for (const [paramName, value] of Object.entries(preset.values)) {
+          script = applyParamToScript(script, paramName, value);
+        }
+        pushHistory(script);
+        return script;
+      });
+    },
+    [pushHistory],
+  );
+
+  const handleDeletePreset = useCallback(
+    (name: string) => {
+      const updated = paramPresets.filter((p) => p.name !== name);
+      setParamPresets(updated);
+      if (activePreset === name) setActivePreset(null);
+      api.updateProject(projectId, { param_presets: updated });
+    },
+    [paramPresets, activePreset, projectId],
+  );
+
+  const handleResetDefaults = useCallback(() => {
+    setActivePreset(null);
+    const defaults = defaultParamsRef.current;
+    if (Object.keys(defaults).length === 0) return;
+    setSceneJs((prev) => {
+      let script = prev;
+      for (const [paramName, value] of Object.entries(defaults)) {
+        script = applyParamToScript(script, paramName, value);
+      }
+      pushHistory(script);
+      return script;
+    });
+  }, [pushHistory]);
 
   const handleSceneChange = useCallback(
     (code: string) => {
@@ -3032,6 +3095,12 @@ export default function ProjectPage() {
           <SceneParamsPanel
             params={sceneParams}
             onParamChange={handleParamChange}
+            presets={paramPresets}
+            activePreset={activePreset}
+            onSavePreset={handleSavePreset}
+            onLoadPreset={handleLoadPreset}
+            onDeletePreset={handleDeletePreset}
+            onResetDefaults={handleResetDefaults}
           />
         )}
 

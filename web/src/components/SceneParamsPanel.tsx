@@ -2,22 +2,39 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import type { SceneParam } from "@/lib/scene-interpreter";
+import type { ParamPreset } from "@/types";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useCursorGlow } from "@/hooks/useCursorGlow";
 
 interface SceneParamsPanelProps {
   params: SceneParam[];
   onParamChange: (name: string, value: number) => void;
+  presets?: ParamPreset[];
+  activePreset?: string | null;
+  onSavePreset?: (name: string, values: Record<string, number>) => void;
+  onLoadPreset?: (preset: ParamPreset) => void;
+  onDeletePreset?: (name: string) => void;
+  onResetDefaults?: () => void;
 }
 
 export default function SceneParamsPanel({
   params,
   onParamChange,
+  presets = [],
+  activePreset,
+  onSavePreset,
+  onLoadPreset,
+  onDeletePreset,
+  onResetDefaults,
 }: SceneParamsPanelProps) {
   const { t } = useTranslation();
   const glow = useCursorGlow();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const presetMenuRef = useRef<HTMLDivElement>(null);
 
   const sections = useMemo(() => {
     const map = new Map<string, SceneParam[]>();
@@ -38,6 +55,19 @@ export default function SceneParamsPanel({
     },
     [onParamChange],
   );
+
+  const handleSavePreset = useCallback(() => {
+    const name = presetName.trim();
+    if (!name || !onSavePreset) return;
+    const values: Record<string, number> = {};
+    for (const p of params) {
+      values[p.name] = p.value;
+    }
+    onSavePreset(name, values);
+    setPresetName("");
+    setSavingPreset(false);
+    setShowPresetMenu(false);
+  }, [presetName, params, onSavePreset]);
 
   if (params.length === 0) return null;
 
@@ -66,6 +96,103 @@ export default function SceneParamsPanel({
         </svg>
         <span>{t("editor.parameters")}</span>
         <span className="scene-params-count">{params.length}</span>
+        {onSavePreset && (
+          <div style={{ position: "relative", marginLeft: "auto" }}>
+            <button
+              className="scene-params-preset-btn"
+              onClick={() => setShowPresetMenu((v) => !v)}
+              title={t("editor.presets")}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              {activePreset || t("editor.presets")}
+            </button>
+            {showPresetMenu && (
+              <div className="scene-params-preset-menu" ref={presetMenuRef}>
+                {onResetDefaults && (
+                  <button
+                    className="scene-params-preset-item"
+                    data-active={!activePreset}
+                    onClick={() => {
+                      onResetDefaults();
+                      setShowPresetMenu(false);
+                    }}
+                  >
+                    <span>{t("editor.presetDefault")}</span>
+                  </button>
+                )}
+                {presets.map((preset) => (
+                  <div key={preset.name} className="scene-params-preset-item-row">
+                    <button
+                      className="scene-params-preset-item"
+                      data-active={activePreset === preset.name}
+                      onClick={() => {
+                        onLoadPreset?.(preset);
+                        setShowPresetMenu(false);
+                      }}
+                    >
+                      <span>{preset.name}</span>
+                    </button>
+                    {onDeletePreset && (
+                      <button
+                        className="scene-params-preset-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeletePreset(preset.name);
+                        }}
+                        title={t("editor.presetDelete")}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="scene-params-preset-divider" />
+                {savingPreset ? (
+                  <div className="scene-params-preset-save-form">
+                    <input
+                      type="text"
+                      className="scene-params-preset-input"
+                      value={presetName}
+                      onChange={(e) => setPresetName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSavePreset();
+                        if (e.key === "Escape") setSavingPreset(false);
+                      }}
+                      placeholder={t("editor.presetNamePlaceholder")}
+                      maxLength={40}
+                      autoFocus
+                    />
+                    <button
+                      className="scene-params-preset-save-confirm"
+                      onClick={handleSavePreset}
+                      disabled={!presetName.trim()}
+                    >
+                      {t("editor.presetSave")}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="scene-params-preset-item scene-params-preset-add"
+                    onClick={() => setSavingPreset(true)}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span>{t("editor.presetSaveCurrent")}</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="scene-params-body">
         {Array.from(sections.entries()).map(([section, sectionParams]) => {

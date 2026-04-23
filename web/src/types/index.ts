@@ -35,6 +35,12 @@ export interface Project {
   tags?: string[];
   status?: ProjectStatus;
   bom?: BomItem[];
+  param_presets?: ParamPreset[];
+}
+
+export interface ParamPreset {
+  name: string;
+  values: Record<string, number>;
 }
 
 export type ProjectStatus = "planning" | "in_progress" | "completed" | "archived";
