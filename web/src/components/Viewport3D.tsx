@@ -1084,6 +1084,7 @@ export default function Viewport3D({
     return () => {
       resizeObserver.disconnect();
       cancelAnimationFrame(animFrameRef.current);
+      cancelAnimationFrame(revealAnimRef.current);
       controls.dispose();
 
       // Dispose all meshes in the object group (user scene objects)
@@ -1162,6 +1163,8 @@ export default function Viewport3D({
   }, []);
 
   const hasAutoFitRef = useRef(false);
+  const hasRevealedRef = useRef(false);
+  const revealAnimRef = useRef<number>(0);
 
   const updateScene = useCallback(
     async (script: string, wf: boolean) => {
@@ -1276,6 +1279,85 @@ export default function Viewport3D({
             const newTarget: [number, number, number] = [center.x, center.y, center.z];
             animateCamera(camera, controls, newPos, newTarget, 600);
           }
+        }
+
+        // Cinematic reveal on first load
+        if (!hasRevealedRef.current && result.meshes.length > 0 && !prefersReducedMotion()) {
+          hasRevealedRef.current = true;
+          cancelAnimationFrame(revealAnimRef.current);
+
+          const meshes: THREE.Mesh[] = [];
+          const origTransparency: boolean[] = [];
+          const origOpacity: number[] = [];
+          stagingGroup.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              const mat = child.material as THREE.MeshStandardMaterial;
+              origTransparency.push(mat.transparent);
+              origOpacity.push(mat.opacity);
+              mat.transparent = true;
+              mat.opacity = 0;
+              mat.needsUpdate = true;
+              meshes.push(child);
+            }
+          });
+
+          // Shift meshes slightly upward for drop-in effect
+          const dropOffset = maxDim * 0.08;
+          stagingGroup.position.y += dropOffset;
+
+          const camera = cameraRef.current;
+          const controls = controlsRef.current;
+          const startAngle = camera ? Math.atan2(
+            camera.position.x - (controls?.target.x ?? 0),
+            camera.position.z - (controls?.target.z ?? 0),
+          ) : 0;
+          const cameraRadius = camera ? camera.position.distanceTo(controls?.target ?? new THREE.Vector3()) : 10;
+          const cameraY = camera ? camera.position.y : 4;
+
+          const DURATION = 1500;
+          const startTime = performance.now();
+
+          const revealStep = () => {
+            const elapsed = performance.now() - startTime;
+            const raw = Math.min(elapsed / DURATION, 1);
+            // Ease-out cubic
+            const t = 1 - Math.pow(1 - raw, 3);
+
+            // Fade meshes in (0-800ms range)
+            const fadeT = Math.min(1, elapsed / 800);
+            const fadeEased = 1 - Math.pow(1 - fadeT, 2);
+            for (let i = 0; i < meshes.length; i++) {
+              const mat = meshes[i].material as THREE.MeshStandardMaterial;
+              mat.opacity = fadeEased * origOpacity[i];
+              mat.needsUpdate = true;
+            }
+
+            // Drop-in: Y offset
+            stagingGroup.position.y = dropOffset * (1 - t);
+
+            // Subtle camera orbit (5 degrees over full duration)
+            if (camera && controls) {
+              const orbitAngle = startAngle + t * (5 * Math.PI / 180);
+              camera.position.x = controls.target.x + Math.sin(orbitAngle) * cameraRadius;
+              camera.position.z = controls.target.z + Math.cos(orbitAngle) * cameraRadius;
+              camera.position.y = cameraY;
+              controls.update();
+            }
+
+            if (raw < 1) {
+              revealAnimRef.current = requestAnimationFrame(revealStep);
+            } else {
+              // Restore original material settings
+              for (let i = 0; i < meshes.length; i++) {
+                const mat = meshes[i].material as THREE.MeshStandardMaterial;
+                mat.transparent = origTransparency[i];
+                mat.opacity = origOpacity[i];
+                mat.needsUpdate = true;
+              }
+              stagingGroup.position.y = 0;
+            }
+          }
+          revealAnimRef.current = requestAnimationFrame(revealStep);
         }
       }
     },
