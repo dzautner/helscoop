@@ -26,6 +26,7 @@ import {
   type SceneGeometryMetrics,
 } from "@/lib/scene-geometry-bom";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
+import { countSceneAddCalls } from "@/lib/scene-a11y";
 import { calculateThermalLoss, heatFluxToColor } from "@/lib/thermal-engine";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
@@ -136,6 +137,18 @@ interface GeometryBomUpdateState {
   suggestions: GeometryBomSuggestion[];
   skippedManual: GeometryBomSuggestion[];
 }
+
+type SceneAnnouncementKey =
+  | "editor.sceneAppliedFromChat"
+  | "editor.sceneUpdatedFromEditor"
+  | "editor.sceneParameterChanged"
+  | "editor.sceneDraftRestored"
+  | "editor.sceneResetAnnounced"
+  | "editor.sceneMaterialChanged"
+  | "editor.sceneUndoAnnounced"
+  | "editor.sceneRedoAnnounced"
+  | "editor.sceneVersionRestored"
+  | "editor.sceneSnippetInserted";
 
 function getBomWidthBounds(): { min: number; max: number } {
   if (typeof window === "undefined") return { min: 260, max: 600 };
@@ -252,6 +265,7 @@ export default function ProjectPage() {
   const [geometryBomUpdate, setGeometryBomUpdate] = useState<GeometryBomUpdateState | null>(null);
   const [surfacePickerMaterialId, setSurfacePickerMaterialId] = useState<string | null>(null);
   const [sceneJs, setSceneJs] = useState("");
+  const [sceneA11yAnnouncement, setSceneA11yAnnouncement] = useState("");
   const [savedScript, setSavedScript] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -307,6 +321,7 @@ export default function ProjectPage() {
 
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
+  const pendingSceneAnnouncementRef = useRef<SceneAnnouncementKey | null>(null);
 
   const initialLoadDoneRef = useRef(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -316,6 +331,23 @@ export default function ProjectPage() {
   const activeVersionBranchRef = useRef<string | null>(null);
   const geometryBaselineRef = useRef<{ sceneJs: string; metrics: SceneGeometryMetrics } | null>(null);
   const dismissedGeometrySceneRef = useRef<string | null>(null);
+
+  const queueSceneAnnouncement = useCallback((actionKey: SceneAnnouncementKey) => {
+    pendingSceneAnnouncementRef.current = actionKey;
+  }, []);
+
+  useEffect(() => {
+    const actionKey = pendingSceneAnnouncementRef.current;
+    if (!actionKey) return;
+
+    pendingSceneAnnouncementRef.current = null;
+    const count = countSceneAddCalls(sceneJs);
+    setSceneA11yAnnouncement(t("editor.sceneChangeAnnouncement", {
+      action: t(actionKey),
+      count,
+      objects: count === 1 ? t("editor.objectSingular") : t("editor.objectPlural"),
+    }));
+  }, [sceneJs, t]);
 
   const pushHistory = useCallback((code: string) => {
     const history = historyRef.current;
@@ -339,18 +371,20 @@ export default function ProjectPage() {
   const undo = useCallback(() => {
     if (historyIndexRef.current > 0) {
       historyIndexRef.current -= 1;
+      queueSceneAnnouncement("editor.sceneUndoAnnounced");
       setSceneJs(historyRef.current[historyIndexRef.current]);
       toast(t("shortcuts.undone"), "info");
     }
-  }, [toast, t]);
+  }, [queueSceneAnnouncement, toast, t]);
 
   const redo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
       historyIndexRef.current += 1;
+      queueSceneAnnouncement("editor.sceneRedoAnnounced");
       setSceneJs(historyRef.current[historyIndexRef.current]);
       toast(t("shortcuts.redone"), "info");
     }
-  }, [toast, t]);
+  }, [queueSceneAnnouncement, toast, t]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -702,29 +736,32 @@ export default function ProjectPage() {
 
   const handleParamChange = useCallback(
     (name: string, value: number) => {
+      queueSceneAnnouncement("editor.sceneParameterChanged");
       setSceneJs((prev) => {
         const updated = applyParamToScript(prev, name, value);
         pushHistory(updated);
         return updated;
       });
     },
-    [pushHistory]
+    [pushHistory, queueSceneAnnouncement]
   );
 
   const handleSceneChange = useCallback(
     (code: string) => {
+      queueSceneAnnouncement("editor.sceneUpdatedFromEditor");
       setSceneJs(code);
       pushHistory(code);
     },
-    [pushHistory]
+    [pushHistory, queueSceneAnnouncement]
   );
 
   const handleRestoreDraft = useCallback(
     (draft: string) => {
+      queueSceneAnnouncement("editor.sceneDraftRestored");
       setSceneJs(draft);
       pushHistory(draft);
     },
-    [pushHistory]
+    [pushHistory, queueSceneAnnouncement]
   );
 
   const { hasDraft, restore: restoreDraft, discard: discardDraft, clearDraft } = useDraftRecovery(
@@ -744,10 +781,11 @@ export default function ProjectPage() {
   const handleApplyCode = useCallback(
     (code: string) => {
       markChat();
+      queueSceneAnnouncement("editor.sceneAppliedFromChat");
       setSceneJs(code);
       pushHistory(code);
     },
-    [pushHistory, markChat]
+    [pushHistory, markChat, queueSceneAnnouncement]
   );
 
   const handleMobilePanelChange = useCallback(
@@ -839,6 +877,7 @@ export default function ProjectPage() {
   const handleVersionRestored = useCallback(
     ({ snapshot }: { snapshot: ProjectVersionSnapshot; project?: unknown }) => {
       const restoredBom = hydrateSnapshotBom(snapshot, materials);
+      queueSceneAnnouncement("editor.sceneVersionRestored");
       setProjectName(snapshot.name);
       previousNameRef.current = snapshot.name;
       setProjectDesc(snapshot.description || "");
@@ -869,7 +908,7 @@ export default function ProjectPage() {
       setViewportKey((key) => key + 1);
       toast(t("versions.restoreSuccess"), "success");
     },
-    [materials, pushHistory, setSavedSnapshot, t, toast],
+    [materials, pushHistory, queueSceneAnnouncement, setSavedSnapshot, t, toast],
   );
 
   useEffect(() => {
@@ -1363,12 +1402,13 @@ export default function ProjectPage() {
   }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, showBom, showDocs, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportQuotePdf, resetViewportCamera, toggleViewportMeasurementMode, viewportMeasurementMode]);
 
   const handleViewportReset = useCallback(() => {
+    queueSceneAnnouncement("editor.sceneResetAnnounced");
     setSceneJs(DEFAULT_SCENE);
     pushHistory(DEFAULT_SCENE);
     setSceneError(null);
     setSceneErrorLine(null);
     setViewportKey((k) => k + 1);
-  }, [pushHistory]);
+  }, [pushHistory, queueSceneAnnouncement]);
 
   const addBomItem = useCallback(
     (materialId: string, quantity: number) => {
@@ -1471,6 +1511,7 @@ export default function ProjectPage() {
       setSceneJs((prev) => {
         const result = replaceSceneMaterialReferences(prev, fromMaterialId, toMaterialId);
         if (result.replacements > 0) {
+          queueSceneAnnouncement("editor.sceneMaterialChanged");
           pushHistory(result.code);
         }
         return result.code;
@@ -1514,6 +1555,7 @@ export default function ProjectPage() {
               setSceneJs((prev) => {
                 const result = replaceSceneMaterialReferences(prev, toMaterialId, fromMaterialId);
                 if (result.replacements > 0) {
+                  queueSceneAnnouncement("editor.sceneUndoAnnounced");
                   pushHistory(result.code);
                 }
                 return result.code;
@@ -1523,7 +1565,7 @@ export default function ProjectPage() {
         });
       }
     },
-    [bom, materials, pushHistory, t, toast, track],
+    [bom, materials, pushHistory, queueSceneAnnouncement, t, toast, track],
   );
 
   const surfacePickerContext = useMemo(() => {
@@ -2386,6 +2428,15 @@ export default function ProjectPage() {
 
       {/* Main content */}
       <main id="main-content" className="editor-main" tabIndex={-1}>
+        <div
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="scene-a11y-announcer"
+        >
+          {sceneA11yAnnouncement}
+        </div>
         {/* Left: Viewport + Code */}
         <div className="editor-viewport-area">
           {/* 3D Viewport */}
@@ -2926,8 +2977,10 @@ export default function ProjectPage() {
           <div className="scene-docs-panel" style={{ width: 320, flexShrink: 0, height: "100%", overflow: "hidden" }}>
             <SceneApiReference
               onInsertCode={(code) => {
-                setSceneJs((prev) => prev + "\n" + code);
-                pushHistory(sceneJs + "\n" + code);
+                const updated = sceneJs + "\n" + code;
+                queueSceneAnnouncement("editor.sceneSnippetInserted");
+                setSceneJs(updated);
+                pushHistory(updated);
                 setShowCode(true);
                 if (isMobileEditor) setActiveMobilePanel("code");
               }}
