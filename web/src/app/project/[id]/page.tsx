@@ -310,7 +310,10 @@ export default function ProjectPage() {
   const [showDaylightPanel, setShowDaylightPanel] = useState(false);
   const [photoOverlayUrl, setPhotoOverlayUrl] = useState<string | null>(null);
   const [photoOverlayOpacity, setPhotoOverlayOpacity] = useState(0.4);
+  const [photoCompareMode, setPhotoCompareMode] = useState(false);
+  const [photoComparePos, setPhotoComparePos] = useState(50);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const compareDragging = useRef(false);
   const [sunDirection, setSunDirection] = useState<[number, number, number] | undefined>();
   const [sunAltitude, setSunAltitude] = useState<number | undefined>();
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
@@ -2914,11 +2917,38 @@ export default function ProjectPage() {
                   backgroundImage: `url(${photoOverlayUrl})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
-                  opacity: photoOverlayOpacity,
+                  opacity: photoCompareMode ? 1 : photoOverlayOpacity,
                   pointerEvents: "none",
                   zIndex: 5,
+                  clipPath: photoCompareMode ? `inset(0 ${100 - photoComparePos}% 0 0)` : undefined,
                 }}
               />
+            )}
+
+            {photoOverlayUrl && photoCompareMode && (
+              <div
+                className="photo-compare-handle"
+                style={{ left: `calc(${photoComparePos}% + 8px - 1px)` }}
+                onPointerDown={(e) => {
+                  compareDragging.current = true;
+                  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (!compareDragging.current) return;
+                  const container = (e.target as HTMLElement).parentElement;
+                  if (!container) return;
+                  const rect = container.getBoundingClientRect();
+                  const x = Math.max(0, Math.min(1, (e.clientX - rect.left - 8) / (rect.width - 16)));
+                  setPhotoComparePos(Math.round(x * 100));
+                }}
+                onPointerUp={() => { compareDragging.current = false; }}
+              >
+                <div className="photo-compare-thumb">
+                  <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+                    <path d="M3 0L0 3v10l3 3V0zM7 0l3 3v10l-3 3V0z" />
+                  </svg>
+                </div>
+              </div>
             )}
 
             {photoOverlayUrl && (
@@ -2935,13 +2965,27 @@ export default function ProjectPage() {
                     value={Math.round(photoOverlayOpacity * 100)}
                     onChange={(e) => setPhotoOverlayOpacity(Number(e.target.value) / 100)}
                     className="daylight-slider"
+                    disabled={photoCompareMode}
+                    style={photoCompareMode ? { opacity: 0.4 } : undefined}
                   />
                   <span className="photo-overlay-value">{Math.round(photoOverlayOpacity * 100)}%</span>
                 </label>
                 <button
                   type="button"
+                  className={`photo-compare-toggle${photoCompareMode ? " active" : ""}`}
+                  onClick={() => setPhotoCompareMode(!photoCompareMode)}
+                  title={t("editor.photoCompare")}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="2" x2="12" y2="22" />
+                    <polyline points="8 6 4 12 8 18" />
+                    <polyline points="16 6 20 12 16 18" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
                   className="photo-overlay-clear"
-                  onClick={() => setPhotoOverlayUrl(null)}
+                  onClick={() => { setPhotoOverlayUrl(null); setPhotoCompareMode(false); }}
                   aria-label={t("editor.photoOverlayClear")}
                 >
                   &times;

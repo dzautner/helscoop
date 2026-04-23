@@ -4640,6 +4640,59 @@ select:focus {
   color: var(--text-primary);
 }
 
+.photo-compare-toggle {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.photo-compare-toggle:hover {
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.3);
+}
+
+.photo-compare-toggle.active {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: rgba(229, 160, 75, 0.1);
+}
+
+.photo-compare-handle {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--amber);
+  z-index: 10;
+  cursor: ew-resize;
+  touch-action: none;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.photo-compare-thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amber);
+  border-radius: 6px;
+  color: var(--bg-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 .energy-dashboard {
   position: absolute;
   top: 10px;
