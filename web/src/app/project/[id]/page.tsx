@@ -308,6 +308,9 @@ export default function ProjectPage() {
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [showEnergyDashboard, setShowEnergyDashboard] = useState(false);
   const [showDaylightPanel, setShowDaylightPanel] = useState(false);
+  const [photoOverlayUrl, setPhotoOverlayUrl] = useState<string | null>(null);
+  const [photoOverlayOpacity, setPhotoOverlayOpacity] = useState(0.4);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [sunDirection, setSunDirection] = useState<[number, number, number] | undefined>();
   const [sunAltitude, setSunAltitude] = useState<number | undefined>();
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
@@ -2900,6 +2903,51 @@ export default function ProjectPage() {
                 focusObjectRef={focusObjectRef}
               />
             </ErrorBoundary>
+
+            {photoOverlayUrl && (
+              <div
+                className="photo-overlay"
+                style={{
+                  position: "absolute",
+                  inset: 8,
+                  borderRadius: "var(--radius-md)",
+                  backgroundImage: `url(${photoOverlayUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  opacity: photoOverlayOpacity,
+                  pointerEvents: "none",
+                  zIndex: 5,
+                }}
+              />
+            )}
+
+            {photoOverlayUrl && (
+              <div className="photo-overlay-controls">
+                <label className="photo-overlay-label">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(photoOverlayOpacity * 100)}
+                    onChange={(e) => setPhotoOverlayOpacity(Number(e.target.value) / 100)}
+                    className="daylight-slider"
+                  />
+                  <span className="photo-overlay-value">{Math.round(photoOverlayOpacity * 100)}%</span>
+                </label>
+                <button
+                  type="button"
+                  className="photo-overlay-clear"
+                  onClick={() => setPhotoOverlayUrl(null)}
+                  aria-label={t("editor.photoOverlayClear")}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Floating viewport toolbar */}
@@ -3000,6 +3048,39 @@ export default function ProjectPage() {
               </svg>
               {t('editor.daylightTitle')}
             </button>
+            <button
+              className="viewport-toolbar-btn"
+              data-active={!!photoOverlayUrl}
+              onClick={() => {
+                if (photoOverlayUrl) {
+                  setPhotoOverlayUrl(null);
+                } else {
+                  photoInputRef.current?.click();
+                }
+              }}
+              title={photoOverlayUrl ? t('editor.photoOverlayClear') : t('editor.photoOverlay')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="m21 15-5-5L5 21" />
+              </svg>
+              {t('editor.photoOverlay')}
+            </button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setPhotoOverlayUrl(reader.result as string);
+                reader.readAsDataURL(file);
+                e.target.value = "";
+              }}
+            />
             <button
               className="viewport-toolbar-btn"
               data-active={viewportMeasurementMode}
