@@ -21,6 +21,7 @@ import KrautaProPartnerPanel from "@/components/KrautaProPartnerPanel";
 import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
 import IfcPreviewPanel from "@/components/IfcPreviewPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
+import BlueprintToScenePanel from "@/components/BlueprintToScenePanel";
 import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
 import PermitCheckerPanel from "@/components/PermitCheckerPanel";
 import ShoppingListModal from "@/components/ShoppingListModal";
@@ -1892,6 +1893,7 @@ export default function BomPanel({
   projectId,
   householdDeductionJoint = false,
   onHouseholdDeductionJointChange,
+  onApplyScene,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -1919,6 +1921,8 @@ export default function BomPanel({
   householdDeductionJoint?: boolean;
   /** Persist household deduction claimant mode on the project */
   onHouseholdDeductionJointChange?: (joint: boolean) => void;
+  /** Apply generated scene code from blueprint/floor-plan tooling */
+  onApplyScene?: (sceneJs: string) => void;
 }) {
   const glow = useCursorGlow();
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
@@ -2515,6 +2519,13 @@ export default function BomPanel({
             projectName={projectName}
             buildingInfo={buildingInfo}
             onImportBom={onImportBom}
+          />
+        )}
+        {onApplyScene && (
+          <BlueprintToScenePanel
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            onApplyScene={onApplyScene}
           />
         )}
         <PermitCheckerPanel buildingInfo={buildingInfo} />

@@ -28,6 +28,8 @@ export type AnalyticsEvent =
   | "bom_aggregated"
   | "photo_estimate_generated"
   | "photo_estimate_imported"
+  | "blueprint_scene_generated"
+  | "blueprint_scene_applied"
   | "project_photo_overlay_uploaded"
   | "bom_package_material_replaced"
   | "bom_optimization_applied"
@@ -73,6 +75,8 @@ export interface AnalyticsEventProps {
   bom_aggregated: { project_count: number; item_count: number };
   photo_estimate_generated: { project_id: string; photo_count: number; scope_count: number; estimate_mid: number };
   photo_estimate_imported: { project_id: string; item_count: number; estimate_mid: number };
+  blueprint_scene_generated: { file_type: string; room_count: number; confidence: number };
+  blueprint_scene_applied: { room_count: number; confidence: number };
   project_photo_overlay_uploaded: { file_type: string };
   bom_package_material_replaced: { from_material_id: string; to_material_id: string; category?: string; source?: string };
   bom_optimization_applied: { type: string; material_id: string; savings_amount: number };
