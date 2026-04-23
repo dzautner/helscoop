@@ -28,7 +28,7 @@ const COPY = {
     compare: "Vertaa remonttilainoja",
     external: "Avaa kumppanin palvelun uudessa ikkunassa.",
     terms: "Nopeat laina-aikavertailut",
-    details: "Arviot ennen luottopaatosta",
+    details: "Arviot ennen luottopäätöstä",
     assumptions: "Oletukset",
     notCreditOffer: "Ei luottotarjous",
     products: {
@@ -37,19 +37,19 @@ const COPY = {
       materials_bnpl: "Materiaalien osamaksu",
     },
     productBodies: {
-      unsecured_remonttilaina: "Nopea vertailu, mutta korkohaitari on levea ja henkilokohtainen.",
+      unsecured_remonttilaina: "Nopea vertailu, mutta korkohaitari on leveä ja henkilökohtainen.",
       secured_bank_loan: "Usein halvempi isoille remonteille, vaatii pankin ja vakuuden.",
-      materials_bnpl: "Sopii materiaaliosuuden jakamiseen, ei kata urakoitsijatyota.",
+      materials_bnpl: "Sopii materiaaliosuuden jakamiseen, ei kata urakoitsijätyötä.",
     },
     notices: {
       household_deduction: (amount: string, max: string) =>
-        `Kotitalousvahennys voi pienentaa kassatarvetta noin ${amount}. Mallin katto on ${max}; tarkista Vero ja urakoitsijan ennakkoperintarekisteri.`,
+        `Kotitalousvähennys voi pienentää kassatarvetta noin ${amount}. Mallin katto on ${max}; tarkista Vero ja urakoitsijan ennakkoperintärekisteri.`,
       energy_grant: (amount: string) =>
-        `Energiaremontin tukisignaali havaittu. Varaa rahoitukseen puskuri: alustava tukilippu enintaan ${amount}, mutta viranomainen ratkaisee.`,
+        `Energiaremontin tukisignaali havaittu. Varaa rahoitukseen puskuri: alustava tukilippu enintään ${amount}, mutta viranomainen ratkaisee.`,
       unsecured_limit: (_amount: string, max: string) =>
-        `Summa ylittaa tyypillisen vakuudettoman remonttilainan ylarajan (${max}). Ohjaa kayttaja pankkiin tai jaa rahoitus osiin.`,
+        `Summa ylittää tyypillisen vakuudettoman remonttilainan ylärajan (${max}). Ohjaa käyttäjä pankkiin tai jaa rahoitus osiin.`,
       credit_disclaimer:
-        "Helscoop ei ole luotonantaja. Namat ovat suunnitteluarvioita; lopullinen korko, kulut ja hyvaksynta tulevat kumppanilta.",
+        "Helscoop ei ole luotonantaja. Nämä ovat suunnitteluarvioita; lopullinen korko, kulut ja hyväksyntä tulevat kumppanilta.",
     },
   },
   en: {
@@ -86,10 +86,44 @@ const COPY = {
         "Helscoop is not a lender. These are planning estimates; final APR, fees, and approval come from the partner.",
     },
   },
+  sv: {
+    eyebrow: "Finansiering",
+    title: "Finansiera renoveringen",
+    subtitle: "Omvandla materialförteckningen till renoveringslån- och delbetalningsestimat inför partneransökan.",
+    amount: "Lånebelopp",
+    term: "Lånetid",
+    years: "år",
+    compare: "Jämför renoveringslån",
+    external: "Öppnar partnertjänsten i ett nytt fönster.",
+    terms: "Snabb ränteperiodsjämförelse",
+    details: "Uppskattningar före kreditbeslut",
+    assumptions: "Antaganden",
+    notCreditOffer: "Ej krediterbjudande",
+    products: {
+      unsecured_remonttilaina: "Blancolån för renovering",
+      secured_bank_loan: "Banklån med säkerhet",
+      materials_bnpl: "Materialdelbetalning",
+    },
+    productBodies: {
+      unsecured_remonttilaina: "Snabb jämförelse, men räntespannet är brett och personligt.",
+      secured_bank_loan: "Ofta billigare för större renoveringar, men kräver bankgranskning och säkerhet.",
+      materials_bnpl: "Användbart enbart för materialköp; finansierar inte entreprenörsarbete.",
+    },
+    notices: {
+      household_deduction: (amount: string, max: string) =>
+        `Hushållsavdrag kan minska kontantbehovet med ungefär ${amount}. Modelltak är ${max}; kontrollera skatteregler och entreprenörsregistrering.`,
+      energy_grant: (amount: string) =>
+        `Signal om energirenoveringsbidrag upptäckt. Behåll finansieringsbuffert: planläggningsflagga upp till ${amount}, men myndighetens granskning avgör.`,
+      unsecured_limit: (_amount: string, max: string) =>
+        `Beloppet överstiger det typiska blancolånetaket (${max}). Hänvisa till bankgranskning eller dela finansieringen.`,
+      credit_disclaimer:
+        "Helscoop är inte en långivare. Detta är planeringsestimat; slutlig ränta, avgifter och godkännande kommer från partnern.",
+    },
+  },
 } as const;
 
 function formatEur(value: number, locale: string): string {
-  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} EUR`;
+  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} EUR`;
 }
 
 function formatMonthlyRange(offer: Pick<FinancingOffer, "monthlyMin" | "monthlyMax">, locale: string): string {
@@ -97,7 +131,7 @@ function formatMonthlyRange(offer: Pick<FinancingOffer, "monthlyMin" | "monthlyM
   return `${formatEur(offer.monthlyMin, locale)}-${formatEur(offer.monthlyMax, locale)}/mo`;
 }
 
-function noticeText(notice: FinancingNotice, locale: "fi" | "en"): string {
+function noticeText(notice: FinancingNotice, locale: "fi" | "en" | "sv"): string {
   const copy = COPY[locale].notices;
   const amount = formatEur(notice.amount ?? 0, locale);
   const maxAmount = formatEur(notice.maxAmount ?? 0, locale);
@@ -124,7 +158,7 @@ export default function RenovationFinancingPanel({
   buildingInfo,
 }: RenovationFinancingPanelProps) {
   const { locale } = useTranslation();
-  const financingLocale: "fi" | "en" = locale === "fi" ? "fi" : "en";
+  const financingLocale: "fi" | "en" | "sv" = locale === "fi" ? "fi" : locale === "sv" ? "sv" : "en";
   const copy = COPY[financingLocale];
   const { track } = useAnalytics();
   const [loanAmount, setLoanAmount] = useState("");
