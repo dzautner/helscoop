@@ -130,4 +130,17 @@ describe("accessibility foundation", () => {
     expect(projectEditor).toContain("aria-label={t('share.linkLabel')}");
     expect(bomPanel).toContain("aria-label={t('pricing.searchMaterials')}");
   });
+
+  it("announces async loading and error states to assistive tech", () => {
+    const addressSearch = readSource("../components/AddressSearch.tsx");
+    const projectEditor = readSource("../app/project/[id]/page.tsx");
+    const sharedProject = readSource("../app/shared/[token]/SharedProjectContent.tsx");
+
+    expect(addressSearch.match(/className="inline-error-banner" role="alert"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(projectEditor).toContain('className="anim-up" role="alert"');
+    expect(sharedProject.match(/role="status"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(sharedProject.match(/aria-live="polite"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(sharedProject.match(/aria-busy="true"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(sharedProject).toContain('role="alert"');
+  });
 });
