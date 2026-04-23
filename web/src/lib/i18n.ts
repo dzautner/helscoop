@@ -1099,6 +1099,15 @@ const translations = {
       packageLock: 'Lukitse {{name}} pakettivaihdoilta',
       packageUnlock: 'Poista {{name}} pakettivaihdon lukitus',
     },
+    shoppingList: {
+      title: 'Ostoslista',
+      copy: 'Kopioi',
+      print: 'Tulosta',
+      close: 'Sulje',
+      subtotal: 'Välisumma',
+      grandTotal: 'Yhteensä',
+      otherSupplier: 'Muu toimittaja',
+    },
     bomTrends: {
       eyebrow: 'HINTATRENDI',
       title: 'Ostoajankohta',
@@ -2603,6 +2612,15 @@ const translations = {
       packageLock: 'Lock {{name}} from package switches',
       packageUnlock: 'Unlock {{name}} for package switches',
     },
+    shoppingList: {
+      title: 'Shopping list',
+      copy: 'Copy',
+      print: 'Print',
+      close: 'Close',
+      subtotal: 'Subtotal',
+      grandTotal: 'Grand total',
+      otherSupplier: 'Other supplier',
+    },
     bomTrends: {
       eyebrow: 'PRICE TREND',
       title: 'Purchase timing',
@@ -4015,6 +4033,15 @@ const translations = {
       packageLocked: '{{count}} låsta',
       packageLock: 'Lås {{name}} från paketbyten',
       packageUnlock: 'Lås upp {{name}} för paketbyten',
+    },
+    shoppingList: {
+      title: 'Inköpslista',
+      copy: 'Kopiera',
+      print: 'Skriv ut',
+      close: 'Stäng',
+      subtotal: 'Delsumma',
+      grandTotal: 'Totalt',
+      otherSupplier: 'Annan leverantör',
     },
     bomTrends: {
       eyebrow: 'PRISTREND',
