@@ -33,7 +33,7 @@ export default function PriceSummaryBar({ bom, onViewBom }: PriceSummaryBarProps
 
   if (bom.length === 0) return null;
 
-  const fmtLocale = locale === "fi" ? "fi-FI" : "en-GB";
+  const fmtLocale = locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB";
 
   return (
     <div className="price-summary-bar">
@@ -63,7 +63,7 @@ export default function PriceSummaryBar({ bom, onViewBom }: PriceSummaryBarProps
           color: "var(--text-muted)",
           fontFamily: "var(--font-mono)",
         }}>
-          {bom.length} {locale === "fi" ? "kpl" : "items"}
+          {bom.length} {locale === "fi" ? "kpl" : locale === "sv" ? "st" : "items"}
         </span>
       </div>
       {onViewBom && (

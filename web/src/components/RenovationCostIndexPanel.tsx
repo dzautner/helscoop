@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import type { RenovationCostIndexResponse, RenovationCostUnit } from "@/types";
 
 function formatEur(value: number, locale: string): string {
-  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : "en-GB")} €`;
+  return `${Math.round(value).toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} €`;
 }
 
 function formatPeriod(period: string): string {
@@ -18,8 +18,8 @@ function formatPeriod(period: string): string {
 function localizeUnit(unit: RenovationCostUnit, locale: string): string {
   if (unit === "m2") return "m²";
   if (unit === "m") return locale === "fi" ? "jm" : "m";
-  if (unit === "unit") return locale === "fi" ? "kpl" : "unit";
-  return locale === "fi" ? "projekti" : "project";
+  if (unit === "unit") return locale === "fi" ? "kpl" : locale === "sv" ? "st" : "unit";
+  return locale === "fi" ? "projekti" : locale === "sv" ? "projekt" : "project";
 }
 
 export default function RenovationCostIndexPanel() {
