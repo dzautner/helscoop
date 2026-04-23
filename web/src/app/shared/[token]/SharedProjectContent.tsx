@@ -12,7 +12,7 @@ import type { BomItem, Project } from "@/types";
 function Viewport3DLoading() {
   const { t } = useTranslation();
   return (
-    <div style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+    <div role="status" aria-live="polite" aria-busy="true" style={{ width: "100%", height: "100%", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
       {t('editor.loading3D')}
     </div>
   );
@@ -61,7 +61,7 @@ export default function SharedProjectContent({ token }: { token: string }) {
         background: "var(--bg-primary)",
         color: "var(--text-muted)",
         fontSize: 14,
-      }}>
+      }} role="status" aria-live="polite" aria-busy="true">
         {t('editor.loadingProject')}
       </div>
     );
@@ -79,7 +79,7 @@ export default function SharedProjectContent({ token }: { token: string }) {
         gap: 12,
         padding: 40,
         textAlign: "center",
-      }}>
+      }} role="alert">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />

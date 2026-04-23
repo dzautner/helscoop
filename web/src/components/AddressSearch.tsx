@@ -305,7 +305,7 @@ export default function AddressSearch({
                 </div>
               </div>
               {createError && (
-                <div className="inline-error-banner">
+                <div className="inline-error-banner" role="alert">
                   {t('search.createError')}
                 </div>
               )}
@@ -596,13 +596,13 @@ export default function AddressSearch({
               )}
 
               {editError && (
-                <div className="inline-error-banner">
+                <div className="inline-error-banner" role="alert">
                   {t('search.updateError')}
                 </div>
               )}
 
               {createError && (
-                <div className="inline-error-banner">
+                <div className="inline-error-banner" role="alert">
                   {t('search.createError')}
                 </div>
               )}

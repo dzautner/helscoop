@@ -1917,7 +1917,7 @@ export default function ProjectPage() {
 
   if (loadError) {
     return (
-      <div className="anim-up" style={{ padding: 60, textAlign: "center" }}>
+      <div className="anim-up" role="alert" style={{ padding: 60, textAlign: "center" }}>
         <h2 className="heading-display" style={{ marginBottom: 8 }}>{t('editor.error')}</h2>
         <p style={{ color: "var(--danger)", marginBottom: 16 }}>{t('editor.errorLoadProject')}</p>
         <button className="btn btn-primary" onClick={() => router.push("/")}>
