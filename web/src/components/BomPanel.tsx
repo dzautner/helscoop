@@ -1940,6 +1940,15 @@ export default function BomPanel({
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const animatedTotal = useAnimatedNumber(total);
+  const bomTotalAnnouncement = t("editor.bomTotalAnnouncement", {
+    count: bom.length,
+    items: bom.length === 1 ? t("editor.bomItemSingular") : t("editor.bomItemPlural"),
+    total: total.toLocaleString(locale, {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 0,
+    }),
+  });
   const heatingGrantOpportunity = useMemo(() => detectHeatingGrantOpportunity({
     sceneJs,
     bom,
@@ -2346,6 +2355,15 @@ export default function BomPanel({
         void handleBomImportFile(file);
       }}
     >
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="bom-total-a11y-announcer"
+      >
+        {bomTotalAnnouncement}
+      </div>
       {importDragging && (
         <div
           style={{
