@@ -7788,11 +7788,139 @@ select:focus {
   color: var(--accent);
   border-color: var(--accent);
 }
+.shared-export-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.shared-comments {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 16px;
+  background: color-mix(in srgb, var(--bg-tertiary) 54%, transparent);
+}
+
+.shared-comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shared-comments-head h2 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.shared-comments-head span {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+}
+
+.shared-comments-list {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.shared-comments-list > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.shared-comment {
+  padding: 8px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.shared-comment div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.shared-comment strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.shared-comment time {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.shared-comment p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.shared-comment-form {
+  display: grid;
+  gap: 8px;
+}
+
+.shared-comment-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shared-comment-form input,
+.shared-comment-form textarea {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.shared-comment-form textarea {
+  resize: vertical;
+  min-height: 74px;
+}
+
+.shared-comment-form button {
+  justify-content: center;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.shared-comment-form p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
 
 /* Print styles for shared project view */
 @media print {
   body { background: white !important; color: black !important; }
   .shared-export-btn,
+  .shared-comment-form,
   .shared-presentation-badge,
   .shared-presentation-card { display: none !important; }
   canvas { display: none !important; }
@@ -7804,5 +7932,14 @@ select:focus {
     max-height: none !important;
     overflow: visible !important;
     background: white !important;
+  }
+  .shared-comments,
+  .shared-comment {
+    background: white !important;
+    color: black !important;
+  }
+  .shared-comments-list {
+    max-height: none !important;
+    overflow: visible !important;
   }
 }

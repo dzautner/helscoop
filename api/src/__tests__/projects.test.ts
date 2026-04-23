@@ -737,7 +737,7 @@ describe("POST /projects/:id/share", () => {
 
   it("returns existing share token if already shared (idempotent)", async () => {
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", share_token: "existing-token-123" }],
+      rows: [{ id: "proj-1", share_token: "existing-token-123", share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
       command: "SELECT",
       rowCount: 1,
       oid: 0,
@@ -749,12 +749,13 @@ describe("POST /projects/:id/share", () => {
     });
     expect(res.status).toBe(200);
     expect((res.body as { share_token: string }).share_token).toBe("existing-token-123");
+    expect((res.body as { expires_at: string }).expires_at).toBe("2999-01-01T00:00:00.000Z");
   });
 
   it("generates a new share token when not already shared", async () => {
     // Project lookup — no existing token
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", share_token: null }],
+      rows: [{ id: "proj-1", share_token: null, share_token_expires_at: null }],
       command: "SELECT",
       rowCount: 1,
       oid: 0,
@@ -762,7 +763,7 @@ describe("POST /projects/:id/share", () => {
     });
     // UPDATE to set token
     mockQuery.mockResolvedValueOnce({
-      rows: [],
+      rows: [{ share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
       command: "UPDATE",
       rowCount: 1,
       oid: 0,
@@ -774,6 +775,31 @@ describe("POST /projects/:id/share", () => {
     });
     expect(res.status).toBe(200);
     expect((res.body as { share_token: string }).share_token).toBeTruthy();
+    expect((res.body as { expires_at: string }).expires_at).toBe("2999-01-01T00:00:00.000Z");
+  });
+
+  it("regenerates an expired existing share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: "old-token", share_token_expires_at: "2000-01-01T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/projects/proj-1/share", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { share_token: string }).share_token).not.toBe("old-token");
   });
 });
 
@@ -889,7 +915,7 @@ describe("GET /shared/:token", () => {
   it("returns project data without auth for valid token", async () => {
     // Project by share token
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", name: "Shared House", scene_js: "box(1,1,1);", view_count: 2 }],
+      rows: [{ id: "proj-1", name: "Shared House", scene_js: "box(1,1,1);", view_count: 2, share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
       command: "SELECT",
       rowCount: 1,
       oid: 0,
@@ -911,15 +937,112 @@ describe("GET /shared/:token", () => {
       oid: 0,
       fields: [],
     });
+    // Comments for shared project
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "comment-1", commenter_name: "Builder", message: "Can quote", created_at: "2026-04-23T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
 
     const res = await makeRequest("GET", "/shared/valid-share-token-123", {
       headers: { referer: "https://contractor.example/link" },
     });
     expect(res.status).toBe(200);
     expect((res.body as { name: string }).name).toBe("Shared House");
+    expect((res.body as { comments: unknown[] }).comments).toHaveLength(1);
     expect(mockQuery.mock.calls[1][0]).toContain("INSERT INTO project_views");
     expect(mockQuery.mock.calls[1][0]).toContain("NOT EXISTS");
     expect(mockQuery.mock.calls[1][1]).toEqual(expect.arrayContaining(["proj-1", "https://contractor.example/link"]));
+  });
+
+  it("returns 410 for expired shared links", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Shared House", share_token_expires_at: "2000-01-01T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/shared/expired-token");
+
+    expect(res.status).toBe(410);
+    expect((res.body as { code: string }).code).toBe("share_expired");
+  });
+});
+
+describe("POST /shared/:token/comments", () => {
+  it("creates a contractor comment, notification, and owner email", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        name: "Shared House",
+        user_id: "user-1",
+        owner_email: "owner@example.com",
+        owner_name: "Owner",
+        email_notifications: true,
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "comment-1", commenter_name: "Builder", message: "Available in June", created_at: "2026-04-23T00:00:00.000Z" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/shared/valid-share-token-123/comments", {
+      body: { name: "Builder", message: "Available in June" },
+    });
+
+    expect(res.status).toBe(201);
+    expect((res.body as { id: string }).id).toBe("comment-1");
+    expect(mockQuery.mock.calls[1][0]).toContain("INSERT INTO project_share_comments");
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO notifications");
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      "owner@example.com",
+      "Helscoop: contractor comment on Shared House",
+      expect.stringContaining("Available in June"),
+    );
+  });
+
+  it("rejects empty contractor comments", async () => {
+    const res = await makeRequest("POST", "/shared/valid-share-token-123/comments", {
+      body: { name: "", message: "" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns 410 when commenting through an expired link", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Shared House", share_token_expires_at: "2000-01-01T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/shared/expired-token/comments", {
+      body: { name: "Builder", message: "Available in June" },
+    });
+
+    expect(res.status).toBe(410);
   });
 });
 

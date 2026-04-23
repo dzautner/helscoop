@@ -162,6 +162,11 @@ export default function ProjectCard({
                 {t("project.viewCount", { count: Number(project.view_count || 0) })}
               </span>
             )}
+            {Number(project.contractor_comment_count || 0) > 0 && (
+              <span className="badge" style={{ borderColor: "rgba(37,99,235,0.28)", color: "var(--info, #2563eb)" }}>
+                {t("share.contractorComments", { count: Number(project.contractor_comment_count || 0) })}
+              </span>
+            )}
             {project.status && project.status !== "planning" && (
               <span style={{
                 display: "inline-flex",

@@ -97,6 +97,19 @@ describe("ProjectCard", () => {
     expect(screen.getByText(/project\.viewCount/)).toBeInTheDocument();
   });
 
+  it("renders contractor comment count badge", () => {
+    render(
+      <ProjectCard
+        project={{ ...mockProject, contractor_comment_count: 2 }}
+        index={0}
+        onDuplicate={mockOnDuplicate}
+        onDelete={mockOnDelete}
+      />,
+    );
+
+    expect(screen.getByText(/share\.contractorComments/)).toBeInTheDocument();
+  });
+
   it("hides view count badge when 0", () => {
     const noViews = { ...mockProject, view_count: 0 };
     render(<ProjectCard project={noViews} index={0} onDuplicate={mockOnDuplicate} onDelete={mockOnDelete} />);

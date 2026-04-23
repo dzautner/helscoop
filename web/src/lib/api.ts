@@ -583,6 +583,11 @@ export const api = {
     apiFetch(`/projects/${projectId}/share`, { method: "DELETE" }),
   getSharedProject: (token: string) =>
     apiFetch(`/shared/${token}`),
+  createSharedComment: (token: string, data: { name: string; message: string }) =>
+    apiFetch(`/shared/${encodeURIComponent(token)}/comments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   chat: (
     messages: { role: string; content: string }[],
