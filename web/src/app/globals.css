@@ -444,6 +444,367 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.assembly-guide-panel {
+  width: 340px;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.assembly-guide-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--glass-mid-border);
+  flex-shrink: 0;
+}
+
+.assembly-guide-eyebrow {
+  margin-bottom: 6px;
+  color: var(--amber);
+}
+
+.assembly-guide-title {
+  font-size: 19px;
+}
+
+.assembly-guide-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+}
+
+.assembly-guide-empty {
+  padding: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.assembly-guide-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.assembly-guide-summary > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.assembly-guide-summary span,
+.assembly-guide-summary strong {
+  display: block;
+}
+
+.assembly-guide-summary strong {
+  margin-top: 5px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.assembly-guide-progress {
+  height: 7px;
+  margin: 0 14px 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.assembly-guide-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--amber), #ffd08a);
+  transition: width 0.25s ease;
+}
+
+.assembly-guide-transport,
+.assembly-guide-speed-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px 8px;
+}
+
+.assembly-guide-nav,
+.assembly-guide-play,
+.assembly-guide-speed {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.assembly-guide-nav {
+  padding: 0 10px;
+}
+
+.assembly-guide-play {
+  flex: 1;
+  color: var(--amber);
+  border-color: rgba(229, 160, 75, 0.35);
+  background: rgba(229, 160, 75, 0.1);
+}
+
+.assembly-guide-speed {
+  min-width: 32px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+}
+
+.assembly-guide-nav:hover:not(:disabled),
+.assembly-guide-play:hover,
+.assembly-guide-speed:hover,
+.assembly-guide-speed.active {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: rgba(229, 160, 75, 0.1);
+}
+
+.assembly-guide-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.assembly-guide-timeline {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 14px 12px;
+  border-bottom: 1px solid var(--glass-mid-border);
+}
+
+.assembly-guide-thumb {
+  position: relative;
+  width: 52px;
+  height: 42px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  color: var(--text-muted);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.assembly-guide-thumb:hover,
+.assembly-guide-thumb[data-active="true"] {
+  transform: translateY(-1px);
+  border-color: var(--amber);
+  background: rgba(229, 160, 75, 0.1);
+}
+
+.assembly-guide-thumb[data-complete="true"] {
+  color: var(--success);
+}
+
+.assembly-guide-thumb-preview {
+  position: absolute;
+  left: 11px;
+  top: 15px;
+  width: 26px;
+  height: 16px;
+}
+
+.assembly-guide-thumb-preview span {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.22);
+}
+
+.assembly-guide-thumb-index {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.assembly-guide-step-card,
+.assembly-guide-section {
+  margin: 12px 14px 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(229, 160, 75, 0.12), transparent 38%),
+    rgba(255,255,255,0.035);
+}
+
+.assembly-guide-step-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.assembly-guide-step-card h3 {
+  margin: 0 0 7px;
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.assembly-guide-step-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assembly-guide-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.assembly-guide-actions .btn:first-child {
+  grid-column: span 2;
+}
+
+.assembly-guide-actions .btn {
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.assembly-guide-section-title {
+  margin-bottom: 9px;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assembly-guide-parts {
+  display: grid;
+  gap: 8px;
+}
+
+.assembly-guide-part {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.assembly-guide-part strong,
+.assembly-guide-part span {
+  display: block;
+}
+
+.assembly-guide-part strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.assembly-guide-part span {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.assembly-guide-swatch {
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.22);
+}
+
+.assembly-guide-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assembly-guide-tools span {
+  padding: 5px 8px;
+  border: 1px solid rgba(229, 160, 75, 0.22);
+  border-radius: 999px;
+  background: rgba(229, 160, 75, 0.08);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.assembly-guide-substeps {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assembly-guide-substeps li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.assembly-guide-substeps li > span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(229, 160, 75, 0.12);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.assembly-guide-substeps strong,
+.assembly-guide-substeps small {
+  display: block;
+}
+
+.assembly-guide-substeps strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.assembly-guide-substeps small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.assembly-guide-shortcuts {
+  margin: 12px 14px 14px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(229, 160, 75, 0.28);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 [data-theme="light"] .chat-messages-area {
   background: rgba(250, 250, 250, 0.7);
   backdrop-filter: blur(14px) saturate(1.2);
