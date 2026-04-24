@@ -24,6 +24,7 @@ import IfcPreviewPanel from "@/components/IfcPreviewPanel";
 import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
 import BlueprintToScenePanel from "@/components/BlueprintToScenePanel";
 import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
+import QuantityTakeoffPanel from "@/components/QuantityTakeoffPanel";
 import PermitCheckerPanel from "@/components/PermitCheckerPanel";
 import ShoppingListModal from "@/components/ShoppingListModal";
 import { api } from "@/lib/api";
@@ -2559,6 +2560,14 @@ export default function BomPanel({
         )}
         {projectId && onImportBom && (
           <PhotoEstimatePanel
+            projectId={projectId}
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            onImportBom={onImportBom}
+          />
+        )}
+        {projectId && onImportBom && (
+          <QuantityTakeoffPanel
             projectId={projectId}
             projectName={projectName}
             buildingInfo={buildingInfo}

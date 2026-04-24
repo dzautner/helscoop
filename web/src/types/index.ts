@@ -237,6 +237,94 @@ export interface PhotoEstimateResponse {
   credits?: { cost: number; balance: number };
 }
 
+export interface QuantityTakeoffDrawing {
+  name: string;
+  mime_type: string;
+  size?: number;
+  data_url?: string;
+}
+
+export interface QuantityTakeoffOptions {
+  drawing_type?: "floor_plan" | "elevation" | "mixed";
+  floor_label?: string;
+  notes?: string;
+  scale_text?: string;
+  width_m?: number | null;
+  depth_m?: number | null;
+  area_m2?: number | null;
+}
+
+export interface QuantityTakeoffBomSuggestion {
+  material_id: string;
+  material_name: string;
+  category_name: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+  supplier: string | null;
+  link: string | null;
+  confidence: number;
+  note: string;
+}
+
+export interface QuantityTakeoffRoom {
+  id: string;
+  name: string;
+  type: "entry" | "living" | "kitchen" | "bedroom" | "bath" | "sauna" | "utility";
+  x: number;
+  z: number;
+  width_m: number;
+  depth_m: number;
+  area_m2: number;
+  confidence: number;
+}
+
+export interface QuantityTakeoffResponse {
+  project_id: string;
+  project_name: string;
+  analysis_mode: "catalog_heuristic" | "catalog_heuristic_ai_ready";
+  drawings_analyzed: number;
+  source_files: { name: string; mime_type: string; size: number | null }[];
+  drawing_context: {
+    drawing_type: "floor_plan" | "elevation" | "mixed";
+    floor_label: string;
+    scale_text: string | null;
+    scale_source: "user_dimensions" | "user_area" | "building_area" | "scale_hint" | "fallback";
+    width_m: number;
+    depth_m: number;
+    floor_area_m2: number;
+    room_count: number;
+    door_count: number;
+    window_count: number;
+  };
+  detected_quantities: {
+    width_m: number;
+    depth_m: number;
+    floor_area_m2: number;
+    exterior_wall_lm: number;
+    partition_wall_lm: number;
+    exterior_wall_area_m2: number;
+    interior_wall_board_m2: number;
+    ceiling_area_m2: number;
+    wet_room_area_m2: number;
+    door_count: number;
+    window_count: number;
+  };
+  rooms: QuantityTakeoffRoom[];
+  estimate: {
+    materials_total: number;
+    non_catalog_allowance: number;
+    low: number;
+    mid: number;
+    high: number;
+  };
+  bom_suggestions: QuantityTakeoffBomSuggestion[];
+  assumptions: string[];
+  disclaimer: string;
+  credits?: { cost: number; balance: number };
+}
+
 export interface BuildingResult {
   address: string;
   coordinates: { lat: number; lon: number };
