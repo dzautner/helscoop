@@ -16,7 +16,7 @@ import TemplateGrid from "@/components/TemplateGrid";
 import AddressSearch from "@/components/AddressSearch";
 import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
 import Link from "next/link";
-import type { BomAggregateResponse, Project, ProjectStatus, Template, BuildingResult, Material } from "@/types";
+import type { BomAggregateResponse, Project, ProjectStatus, ProjectType, Template, BuildingResult, Material } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 
 type SortKey = "modified" | "created" | "name" | "cost";
@@ -35,6 +35,7 @@ export default function ProjectList({
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [newName, setNewName] = useState("");
+  const [newProjectType, setNewProjectType] = useState<ProjectType>("omakotitalo");
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -85,10 +86,11 @@ export default function ProjectList({
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      track("project_created", { source: "blank" });
-      const p = await api.createProject({ name: newName });
+      track("project_created", { source: "blank", project_type: newProjectType });
+      const p = await api.createProject({ name: newName, project_type: newProjectType });
       setProjects([p, ...projects]);
       setNewName("");
+      setNewProjectType("omakotitalo");
       toast(t('toast.projectCreated'), "success");
     } catch (err) {
       toast(err instanceof Error ? err.message : t('toast.createProjectFailed'), "error");
@@ -604,7 +606,29 @@ export default function ProjectList({
                 : t('project.startFirst')}
           </p>
 
-          <div style={{ display: "flex", gap: 8, maxWidth: 560 }}>
+          <div style={{ display: "flex", gap: 8, maxWidth: 760, alignItems: "stretch", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "inline-flex",
+                padding: 3,
+                borderRadius: 999,
+                border: "1px solid var(--border)",
+                background: "var(--bg-elevated)",
+              }}
+              aria-label={t("taloyhtio.projectTypeLabel")}
+            >
+              {(["omakotitalo", "taloyhtio"] as ProjectType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={newProjectType === type ? "btn btn-primary" : "btn btn-ghost"}
+                  onClick={() => setNewProjectType(type)}
+                  style={{ padding: "7px 11px", fontSize: 11, borderRadius: 999 }}
+                >
+                  {t(`taloyhtio.projectType.${type}`)}
+                </button>
+              ))}
+            </div>
             <input
               className="input"
               placeholder={t('project.newProjectPlaceholder')}

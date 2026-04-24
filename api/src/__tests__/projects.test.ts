@@ -183,6 +183,13 @@ describe("POST /projects", () => {
       null,
       [],
       "planning",
+      "omakotitalo",
+      null,
+      null,
+      null,
+      null,
+      null,
+      "[]",
     ]);
   });
 
@@ -224,6 +231,58 @@ describe("POST /projects", () => {
       body: { name: 12345 },
     });
     expect(res.status).toBe(400);
+  });
+
+  it("creates a taloyhtio project with cooperative metadata", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", project_type: "taloyhtio", unit_count: 24 }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: {
+        name: "Pipe renovation",
+        project_type: "taloyhtio",
+        unit_count: 24,
+        business_id: "1234567-8",
+        property_manager_email: "manager@example.com",
+        shareholder_shares: [{ apartment: "A1", share_pct: 2.5 }],
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      "user-1",
+      "Pipe renovation",
+      undefined,
+      undefined,
+      null,
+      null,
+      [],
+      "planning",
+      "taloyhtio",
+      24,
+      "1234567-8",
+      null,
+      "manager@example.com",
+      null,
+      JSON.stringify([{ apartment: "A1", owner_name: null, share_pct: 2.5 }]),
+    ]);
+  });
+
+  it("rejects invalid taloyhtio metadata", async () => {
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { name: "Bad co-op", project_type: "taloyhtio", unit_count: 0 },
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("unit_count");
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -568,7 +627,34 @@ describe("PUT /projects/:id", () => {
     expect(res.status).toBe(200);
     expect((res.body as { household_deduction_joint: boolean }).household_deduction_joint).toBe(true);
     expect(mockQuery.mock.calls[0][0]).toContain("household_deduction_joint=COALESCE");
-    expect(mockQuery.mock.calls[0][1]).toEqual([undefined, undefined, undefined, true, null, null, null, false, null, "proj-1", "user-1"]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      true,
+      null,
+      null,
+      null,
+      false,
+      null,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      "proj-1",
+      "user-1",
+    ]);
   });
 
   it("persists scene parameter presets", async () => {
@@ -602,6 +688,78 @@ describe("PUT /projects/:id", () => {
       JSON.stringify(param_presets),
       false,
       null,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      "proj-1",
+      "user-1",
+    ]);
+  });
+
+  it("persists taloyhtio metadata and shareholder shares", async () => {
+    const shareholder_shares = [{ apartment: "A1", share_pct: 4.25, owner_name: "Owner" }];
+    const building_info = { address: "Testikatu 1", year_built: 1975, units: 18 };
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", project_type: "taloyhtio", unit_count: 18, shareholder_shares }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: {
+        project_type: "taloyhtio",
+        unit_count: 18,
+        business_id: "1234567-8",
+        property_manager_name: "Manager",
+        property_manager_email: "manager@example.com",
+        property_manager_phone: "+358 40 123",
+        shareholder_shares,
+        building_info,
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][0]).toContain("project_type=COALESCE");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      false,
+      null,
+      "taloyhtio",
+      true,
+      18,
+      true,
+      "1234567-8",
+      true,
+      "Manager",
+      true,
+      "manager@example.com",
+      true,
+      "+358 40 123",
+      true,
+      JSON.stringify([{ apartment: "A1", owner_name: "Owner", share_pct: 4.25 }]),
+      true,
+      JSON.stringify(building_info),
       "proj-1",
       "user-1",
     ]);

@@ -15,6 +15,7 @@ import type {
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
+  ProjectType,
   PriceAlertEmailFrequency,
   PriceWatch,
   ProjectPriceChangeSummary,
@@ -330,7 +331,16 @@ export const api = {
 
   getProjects: () => apiFetch("/projects"),
   getProject: (id: string) => apiFetch(`/projects/${id}`),
-  createProject: (data: { name: string; description?: string; scene_js?: string; original_scene_js?: string; building_info?: Record<string, unknown> }) =>
+  createProject: (data: {
+    name: string;
+    description?: string;
+    scene_js?: string;
+    original_scene_js?: string;
+    building_info?: Record<string, unknown>;
+    project_type?: ProjectType;
+    unit_count?: number | null;
+    business_id?: string | null;
+  }) =>
     apiFetch("/projects", { method: "POST", body: JSON.stringify(data) }),
   updateProject: (id: string, data: Record<string, unknown>) =>
     apiFetch(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),

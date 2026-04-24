@@ -264,7 +264,7 @@ describe("ProjectList", () => {
     fireEvent.click(screen.getByText("project.create"));
 
     await waitFor(() => {
-      expect(mockCreateProject).toHaveBeenCalledWith({ name: "New Project" });
+      expect(mockCreateProject).toHaveBeenCalledWith({ name: "New Project", project_type: "omakotitalo" });
     });
   });
 
@@ -279,7 +279,22 @@ describe("ProjectList", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
-      expect(mockCreateProject).toHaveBeenCalledWith({ name: "Enter Project" });
+      expect(mockCreateProject).toHaveBeenCalledWith({ name: "Enter Project", project_type: "omakotitalo" });
+    });
+  });
+
+  it("creates a housing-cooperative project from the project type toggle", async () => {
+    const newProject = { ...mockProjects[0], id: "p3", name: "Pipe Reno", project_type: "taloyhtio" };
+    mockCreateProject.mockResolvedValue(newProject);
+    render(<ProjectList />);
+    await waitFor(() => { expect(screen.getByText("Sauna Reno")).toBeInTheDocument(); });
+
+    fireEvent.click(screen.getByText("taloyhtio.projectType.taloyhtio"));
+    fireEvent.change(screen.getByLabelText("project.newProjectPlaceholder"), { target: { value: "Pipe Reno" } });
+    fireEvent.click(screen.getByText("project.create"));
+
+    await waitFor(() => {
+      expect(mockCreateProject).toHaveBeenCalledWith({ name: "Pipe Reno", project_type: "taloyhtio" });
     });
   });
 
@@ -419,7 +434,7 @@ describe("ProjectList", () => {
     fireEvent.click(screen.getByText("project.create"));
 
     await waitFor(() => {
-      expect(mockTrack).toHaveBeenCalledWith("project_created", { source: "blank" });
+      expect(mockTrack).toHaveBeenCalledWith("project_created", { source: "blank", project_type: "omakotitalo" });
     });
   });
 });

@@ -34,9 +34,21 @@ interface ProjectVersionSnapshot {
 }
 
 type ProjectVersionEvent = "auto" | "named" | "restore" | "branch";
+type ProjectType = "omakotitalo" | "taloyhtio";
+
+interface ShareholderShare {
+  apartment: string;
+  owner_name: string | null;
+  share_pct: number;
+}
 
 const MAX_AUTO_VERSIONS = 100;
 const VERSION_EVENTS = new Set<ProjectVersionEvent>(["auto", "named", "restore", "branch"]);
+const PROJECT_TYPES = new Set<ProjectType>(["omakotitalo", "taloyhtio"]);
+
+function hasOwn(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
+}
 
 function requiredText(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -55,6 +67,86 @@ function optionalText(value: unknown, maxLength: number): string | null {
   const cleaned = value.trim();
   if (!cleaned) return null;
   return cleaned.slice(0, maxLength);
+}
+
+function optionalTextStrict(value: unknown, field: string, maxLength: number): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new Error(`${field} must be a string`);
+  }
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  if (cleaned.length > maxLength) {
+    throw new Error(`${field} must be ${maxLength} characters or fewer`);
+  }
+  return cleaned;
+}
+
+function normalizeProjectType(value: unknown): ProjectType {
+  if (value == null || value === "") return "omakotitalo";
+  if (typeof value === "string" && PROJECT_TYPES.has(value as ProjectType)) {
+    return value as ProjectType;
+  }
+  throw new Error("project_type must be omakotitalo or taloyhtio");
+}
+
+function normalizeProjectTypePatch(value: unknown): ProjectType | null {
+  if (value === undefined) return null;
+  return normalizeProjectType(value);
+}
+
+function normalizePositiveInteger(value: unknown, field: string, max: number): number | null {
+  if (value == null || value === "") return null;
+  const next = Number(value);
+  if (!Number.isInteger(next) || next <= 0 || next > max) {
+    throw new Error(`${field} must be an integer between 1 and ${max}`);
+  }
+  return next;
+}
+
+function normalizeBuildingInfo(value: unknown): Record<string, unknown> | null {
+  if (value == null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("building_info must be an object or null");
+  }
+  const json = JSON.stringify(value);
+  if (json.length > 64 * 1024) {
+    throw new Error("building_info is too large");
+  }
+  return value as Record<string, unknown>;
+}
+
+function jsonbParam(value: unknown): string | null {
+  if (value == null) return null;
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function normalizeShareholderShares(value: unknown): ShareholderShare[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error("shareholder_shares must be an array");
+  }
+  if (value.length > 500) {
+    throw new Error("shareholder_shares must contain at most 500 rows");
+  }
+
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("shareholder_shares rows must be objects");
+    }
+    const raw = item as Record<string, unknown>;
+    const apartment = optionalTextStrict(raw.apartment ?? raw.unit ?? raw.label ?? `Unit ${index + 1}`, "shareholder_shares.apartment", 120);
+    const ownerName = optionalTextStrict(raw.owner_name ?? raw.ownerName ?? null, "shareholder_shares.owner_name", 160);
+    const sharePct = Number(raw.share_pct ?? raw.sharePercent ?? raw.share_percent);
+    if (!Number.isFinite(sharePct) || sharePct < 0 || sharePct > 100) {
+      throw new Error("shareholder_shares.share_pct must be between 0 and 100");
+    }
+    return {
+      apartment: apartment ?? `Unit ${index + 1}`,
+      owner_name: ownerName,
+      share_pct: Math.round(sharePct * 10000) / 10000,
+    };
+  });
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -414,11 +506,15 @@ router.use(requireAuth);
 router.get("/", async (req, res) => {
   const result = await query(
     `SELECT id, name, description, is_public, created_at, updated_at, thumbnail_url, tags, status,
-      (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
+      project_type, unit_count, business_id, property_manager_name, property_manager_email,
+      property_manager_phone, shareholder_shares,
+      ((SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
-       WHERE pb.project_id = projects.id) AS estimated_cost,
+       WHERE pb.project_id = projects.id)
+       * CASE WHEN projects.project_type = 'taloyhtio' THEN GREATEST(COALESCE(projects.unit_count, 1), 1) ELSE 1 END
+      ) AS estimated_cost,
       (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count,
       (SELECT COUNT(*)::int FROM project_share_comments psc WHERE psc.project_id = projects.id) AS contractor_comment_count
      FROM projects WHERE user_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC`,
@@ -430,11 +526,14 @@ router.get("/", async (req, res) => {
 router.get("/trash", async (req, res) => {
   const result = await query(
     `SELECT id, name, description, is_public, created_at, updated_at, deleted_at, thumbnail_url,
-      (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
+      project_type, unit_count, business_id,
+      ((SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
-       WHERE pb.project_id = projects.id) AS estimated_cost
+       WHERE pb.project_id = projects.id)
+       * CASE WHEN projects.project_type = 'taloyhtio' THEN GREATEST(COALESCE(projects.unit_count, 1), 1) ELSE 1 END
+      ) AS estimated_cost
      FROM projects WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC`,
     [req.user!.id]
   );
@@ -527,7 +626,22 @@ router.post("/bulk", async (req, res) => {
 });
 
 router.post("/", requirePermission("project:create"), async (req, res) => {
-  const { name, description, scene_js, original_scene_js, building_info, tags, status } = req.body;
+  const {
+    name,
+    description,
+    scene_js,
+    original_scene_js,
+    building_info,
+    tags,
+    status,
+    project_type,
+    unit_count,
+    business_id,
+    property_manager_name,
+    property_manager_email,
+    property_manager_phone,
+    shareholder_shares,
+  } = req.body;
   if (!name || typeof name !== "string") {
     return res.status(400).json({ error: "Project name is required" });
   }
@@ -550,10 +664,57 @@ router.post("/", requirePermission("project:create"), async (req, res) => {
   const safeStatus = status && VALID_STATUSES.includes(status) ? status : "planning";
   const safeTags = Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : [];
   const baselineSceneJs = original_scene_js !== undefined ? original_scene_js : scene_js;
+  let safeBuildingInfo: Record<string, unknown> | null;
+  let safeProjectType: ProjectType;
+  let safeUnitCount: number | null;
+  let safeBusinessId: string | null;
+  let safePropertyManagerName: string | null;
+  let safePropertyManagerEmail: string | null;
+  let safePropertyManagerPhone: string | null;
+  let safeShareholderShares: ShareholderShare[];
+  try {
+    safeBuildingInfo = normalizeBuildingInfo(building_info);
+    safeProjectType = normalizeProjectType(project_type);
+    const buildingUnitCount = safeBuildingInfo ? normalizePositiveInteger(safeBuildingInfo.units, "building_info.units", 10000) : null;
+    safeUnitCount = normalizePositiveInteger(unit_count ?? buildingUnitCount, "unit_count", 10000);
+    if (safeProjectType === "taloyhtio" && safeUnitCount == null) {
+      safeUnitCount = 1;
+    }
+    safeBusinessId = optionalTextStrict(business_id, "business_id", 32);
+    safePropertyManagerName = optionalTextStrict(property_manager_name, "property_manager_name", 160);
+    safePropertyManagerEmail = optionalTextStrict(property_manager_email, "property_manager_email", 254);
+    if (safePropertyManagerEmail && !EMAIL_RE.test(safePropertyManagerEmail)) {
+      throw new Error("property_manager_email must be a valid email address");
+    }
+    safePropertyManagerPhone = optionalTextStrict(property_manager_phone, "property_manager_phone", 80);
+    safeShareholderShares = normalizeShareholderShares(shareholder_shares);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid project metadata" });
+  }
   const result = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js, original_scene_js, building_info, tags, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [req.user!.id, name.trim(), description, scene_js, baselineSceneJs ?? null, building_info ? JSON.stringify(building_info) : null, safeTags, safeStatus]
+    `INSERT INTO projects (
+       user_id, name, description, scene_js, original_scene_js, building_info, tags, status,
+       project_type, unit_count, business_id, property_manager_name, property_manager_email,
+       property_manager_phone, shareholder_shares
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+    [
+      req.user!.id,
+      name.trim(),
+      typeof description === "string" ? description : undefined,
+      typeof scene_js === "string" ? scene_js : undefined,
+      baselineSceneJs ?? null,
+      safeBuildingInfo ? JSON.stringify(safeBuildingInfo) : null,
+      safeTags,
+      safeStatus,
+      safeProjectType,
+      safeUnitCount,
+      safeBusinessId,
+      safePropertyManagerName,
+      safePropertyManagerEmail,
+      safePropertyManagerPhone,
+      JSON.stringify(safeShareholderShares),
+    ]
   );
   res.status(201).json(result.rows[0]);
 });
@@ -928,9 +1089,32 @@ router.post("/:id/quote-request", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, description, scene_js, household_deduction_joint, tags, status, param_presets } = req.body;
+  const body = req.body as Record<string, unknown>;
+  const {
+    name,
+    description,
+    scene_js,
+    household_deduction_joint,
+    tags,
+    status,
+    param_presets,
+    building_info,
+    project_type,
+    unit_count,
+    business_id,
+    property_manager_name,
+    property_manager_email,
+    property_manager_phone,
+    shareholder_shares,
+  } = body;
   if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
+  }
+  if (description !== undefined && description !== null && typeof description !== "string") {
+    return res.status(400).json({ error: "description must be a string" });
+  }
+  if (scene_js !== undefined && typeof scene_js !== "string") {
+    return res.status(400).json({ error: "scene_js must be a string" });
   }
   if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
     return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
@@ -939,7 +1123,7 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({ error: "household_deduction_joint must be a boolean" });
   }
   const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
-  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+  if (status !== undefined && (typeof status !== "string" || !VALID_STATUSES.includes(status))) {
     return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(", ")}` });
   }
   if (param_presets !== undefined && (!Array.isArray(param_presets) || param_presets.length > 20)) {
@@ -949,14 +1133,44 @@ router.put("/:id", async (req, res) => {
     ? (Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : null)
     : null;
   const safePresets = param_presets !== undefined ? JSON.stringify(param_presets) : null;
-  const photoOverlayProvided = Object.prototype.hasOwnProperty.call(req.body, "photo_overlay");
+  const photoOverlayProvided = hasOwn(body, "photo_overlay");
   let safePhotoOverlay: Record<string, unknown> | null = null;
   if (photoOverlayProvided) {
     try {
-      safePhotoOverlay = normalizePhotoOverlay(req.body.photo_overlay);
+      safePhotoOverlay = normalizePhotoOverlay(body.photo_overlay);
     } catch (err) {
       return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid photo_overlay" });
     }
+  }
+  const unitCountProvided = hasOwn(body, "unit_count");
+  const businessIdProvided = hasOwn(body, "business_id");
+  const propertyManagerNameProvided = hasOwn(body, "property_manager_name");
+  const propertyManagerEmailProvided = hasOwn(body, "property_manager_email");
+  const propertyManagerPhoneProvided = hasOwn(body, "property_manager_phone");
+  const shareholderSharesProvided = hasOwn(body, "shareholder_shares");
+  const buildingInfoProvided = hasOwn(body, "building_info");
+  let safeProjectType: ProjectType | null;
+  let safeUnitCount: number | null;
+  let safeBusinessId: string | null;
+  let safePropertyManagerName: string | null;
+  let safePropertyManagerEmail: string | null;
+  let safePropertyManagerPhone: string | null;
+  let safeShareholderShares: ShareholderShare[] | null;
+  let safeBuildingInfo: Record<string, unknown> | null;
+  try {
+    safeProjectType = normalizeProjectTypePatch(project_type);
+    safeUnitCount = normalizePositiveInteger(unit_count, "unit_count", 10000);
+    safeBusinessId = optionalTextStrict(business_id, "business_id", 32);
+    safePropertyManagerName = optionalTextStrict(property_manager_name, "property_manager_name", 160);
+    safePropertyManagerEmail = optionalTextStrict(property_manager_email, "property_manager_email", 254);
+    if (safePropertyManagerEmail && !EMAIL_RE.test(safePropertyManagerEmail)) {
+      throw new Error("property_manager_email must be a valid email address");
+    }
+    safePropertyManagerPhone = optionalTextStrict(property_manager_phone, "property_manager_phone", 80);
+    safeShareholderShares = shareholderSharesProvided ? normalizeShareholderShares(shareholder_shares) : null;
+    safeBuildingInfo = buildingInfoProvided ? normalizeBuildingInfo(building_info) : null;
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid project metadata" });
   }
   const result = await query(
     `UPDATE projects SET
@@ -968,18 +1182,41 @@ router.put("/:id", async (req, res) => {
        status=COALESCE($6, status),
        param_presets=COALESCE($7::jsonb, param_presets),
        photo_overlay=CASE WHEN $8::boolean THEN $9::jsonb ELSE photo_overlay END,
+       project_type=COALESCE($10, project_type),
+       unit_count=CASE WHEN $11::boolean THEN $12::integer ELSE unit_count END,
+       business_id=CASE WHEN $13::boolean THEN $14 ELSE business_id END,
+       property_manager_name=CASE WHEN $15::boolean THEN $16 ELSE property_manager_name END,
+       property_manager_email=CASE WHEN $17::boolean THEN $18 ELSE property_manager_email END,
+       property_manager_phone=CASE WHEN $19::boolean THEN $20 ELSE property_manager_phone END,
+       shareholder_shares=CASE WHEN $21::boolean THEN COALESCE($22::jsonb, '[]'::jsonb) ELSE shareholder_shares END,
+       building_info=CASE WHEN $23::boolean THEN $24::jsonb ELSE building_info END,
        updated_at=now()
-     WHERE id=$10 AND user_id=$11 RETURNING *`,
+     WHERE id=$25 AND user_id=$26 RETURNING *`,
     [
-      name?.trim(),
+      typeof name === "string" ? name.trim() : undefined,
       description,
       scene_js,
       household_deduction_joint ?? null,
       safeTags,
-      status ?? null,
+      typeof status === "string" ? status : null,
       safePresets,
       photoOverlayProvided,
       safePhotoOverlay === null ? null : JSON.stringify(safePhotoOverlay),
+      safeProjectType,
+      unitCountProvided,
+      safeUnitCount,
+      businessIdProvided,
+      safeBusinessId,
+      propertyManagerNameProvided,
+      safePropertyManagerName,
+      propertyManagerEmailProvided,
+      safePropertyManagerEmail,
+      propertyManagerPhoneProvided,
+      safePropertyManagerPhone,
+      shareholderSharesProvided,
+      safeShareholderShares === null ? null : JSON.stringify(safeShareholderShares),
+      buildingInfoProvided,
+      safeBuildingInfo === null ? null : JSON.stringify(safeBuildingInfo),
       req.params.id,
       req.user!.id,
     ]
@@ -1263,9 +1500,27 @@ router.post("/:id/duplicate", requirePermission("project:create"), async (req, r
   const suffix = acceptLang.toLowerCase().startsWith("fi") ? "(kopio)" : "(copy)";
 
   const dup = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js, original_scene_js)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [req.user!.id, `${p.name} ${suffix}`, p.description, p.scene_js, p.original_scene_js ?? p.scene_js]
+    `INSERT INTO projects (
+       user_id, name, description, scene_js, original_scene_js, building_info,
+       project_type, unit_count, business_id, property_manager_name,
+       property_manager_email, property_manager_phone, shareholder_shares
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [
+      req.user!.id,
+      `${p.name} ${suffix}`,
+      p.description,
+      p.scene_js,
+      p.original_scene_js ?? p.scene_js,
+      jsonbParam(p.building_info),
+      p.project_type ?? "omakotitalo",
+      p.unit_count ?? null,
+      p.business_id ?? null,
+      p.property_manager_name ?? null,
+      p.property_manager_email ?? null,
+      p.property_manager_phone ?? null,
+      jsonbParam(p.shareholder_shares ?? []),
+    ]
   );
   const newId = dup.rows[0].id;
 
