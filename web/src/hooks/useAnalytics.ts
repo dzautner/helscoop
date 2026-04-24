@@ -30,6 +30,9 @@ export type AnalyticsEvent =
   | "photo_estimate_imported"
   | "quantity_takeoff_generated"
   | "quantity_takeoff_imported"
+  | "room_scan_imported"
+  | "room_scan_applied"
+  | "room_scan_bom_imported"
   | "blueprint_scene_generated"
   | "blueprint_scene_applied"
   | "project_photo_overlay_uploaded"
@@ -81,6 +84,9 @@ export interface AnalyticsEventProps {
   photo_estimate_imported: { project_id: string; item_count: number; estimate_mid: number };
   quantity_takeoff_generated: { project_id: string; drawing_count: number; room_count: number; estimate_mid: number; confidence: number };
   quantity_takeoff_imported: { project_id: string; item_count: number; estimate_mid: number };
+  room_scan_imported: { project_id: string; source_format: string; room_count: number; wall_count: number; opening_count: number; coverage_percent: number; parser: string };
+  room_scan_applied: { project_id: string; room_count: number; wall_count: number; merge_mode: "append" | "replace" };
+  room_scan_bom_imported: { project_id: string; item_count: number; estimate_mid: number };
   blueprint_scene_generated: { file_type: string; room_count: number; confidence: number };
   blueprint_scene_applied: { room_count: number; confidence: number };
   project_photo_overlay_uploaded: { file_type: string };

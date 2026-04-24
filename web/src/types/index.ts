@@ -325,6 +325,109 @@ export interface QuantityTakeoffResponse {
   credits?: { cost: number; balance: number };
 }
 
+export interface RoomScanUpload {
+  name: string;
+  mime_type: string;
+  size?: number;
+  data_url?: string;
+}
+
+export interface RoomScanOptions {
+  floor_label?: string;
+  notes?: string;
+  width_m?: number | null;
+  depth_m?: number | null;
+  area_m2?: number | null;
+}
+
+export interface RoomScanRoom {
+  id: string;
+  name: string;
+  type: "entry" | "living" | "kitchen" | "bedroom" | "bath" | "sauna" | "utility" | "unknown";
+  x: number;
+  z: number;
+  width_m: number;
+  depth_m: number;
+  area_m2: number;
+  confidence: number;
+}
+
+export interface RoomScanWall {
+  id: string;
+  start: [number, number];
+  end: [number, number];
+  length_m: number;
+  height_m: number;
+  thickness_m: number;
+  confidence: number;
+}
+
+export interface RoomScanOpening {
+  id: string;
+  type: "door" | "window";
+  wall_id: string | null;
+  x: number;
+  z: number;
+  width_m: number;
+  height_m: number;
+  confidence: number;
+}
+
+export interface RoomScanBomSuggestion {
+  material_id: string;
+  material_name: string;
+  category_name: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+  supplier: string | null;
+  link: string | null;
+  confidence: number;
+  note: string;
+}
+
+export interface RoomScanResponse {
+  project_id: string;
+  project_name: string;
+  analysis_mode: "roomplan_import" | "roomplan_import_ai_ready";
+  source_format: "usdz" | "usd" | "usda" | "usdc" | "json" | "unknown";
+  source_detail: string;
+  source_files: { name: string; mime_type: string; size: number | null }[];
+  floor_label: string;
+  width_m: number;
+  depth_m: number;
+  floor_area_m2: number;
+  rooms: RoomScanRoom[];
+  walls: RoomScanWall[];
+  openings: RoomScanOpening[];
+  surfaces: {
+    floor_area_m2: number;
+    ceiling_area_m2: number;
+    wall_area_m2: number;
+    wet_room_area_m2: number;
+    opening_count: number;
+  };
+  quality: {
+    coverage_percent: number;
+    detected_feature_count: number;
+    parser: "roomplan_text" | "json" | "fallback";
+    warnings: string[];
+  };
+  scene_js: string;
+  estimate: {
+    materials_total: number;
+    non_catalog_allowance: number;
+    low: number;
+    mid: number;
+    high: number;
+  };
+  bom_suggestions: RoomScanBomSuggestion[];
+  assumptions: string[];
+  disclaimer: string;
+  credits?: { cost: number; balance: number };
+}
+
 export interface BuildingResult {
   address: string;
   coordinates: { lat: number; lon: number };
