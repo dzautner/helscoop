@@ -18,6 +18,7 @@ import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
+import ScenarioRenderPanel from "@/components/ScenarioRenderPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
 import AssemblyGuidePanel from "@/components/AssemblyGuidePanel";
@@ -363,6 +364,8 @@ export default function ProjectPage() {
   const [thermalView, setThermalView] = useState(false);
   const [lightingPreset, setLightingPreset] = useState<import("@/components/Viewport3D").LightingPresetId>("default");
   const [showLightingMenu, setShowLightingMenu] = useState(false);
+  const [showScenarioRenderPanel, setShowScenarioRenderPanel] = useState(false);
+  const [scenarioRenderToken, setScenarioRenderToken] = useState(0);
   const lightingMenuRef = useRef<HTMLDivElement>(null);
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -445,6 +448,11 @@ export default function ProjectPage() {
   const toggleRenovationCompareMode = useCallback(() => {
     setRenovationCompareCamera(null);
     setRenovationCompareMode((current) => !current);
+  }, []);
+
+  const triggerScenarioRender = useCallback(() => {
+    setShowScenarioRenderPanel(true);
+    setScenarioRenderToken((token) => token + 1);
   }, []);
 
   const updatePhotoOverlay = useCallback((patch: Partial<PhotoOverlayState>) => {
@@ -1733,6 +1741,14 @@ export default function ProjectPage() {
         isActive: renovationCompareMode,
       },
       {
+        id: "render-scenario",
+        labelKey: "editor.renderScenario",
+        labelSecondaryKey: "editor.renderScenario",
+        icon: icon("M4 4h16v10H4zM8 18h8M10 14l-2 4M14 14l2 4"),
+        action: triggerScenarioRender,
+        isActive: showScenarioRenderPanel,
+      },
+      {
         id: "toggle-assembly-guide",
         labelKey: "commandPalette.toggleAssemblyGuide",
         labelSecondaryKey: "commandPalette.toggleAssemblyGuideEn",
@@ -1995,7 +2011,7 @@ export default function ProjectPage() {
         isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs, showScenarioRenderPanel, triggerScenarioRender]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -3641,6 +3657,21 @@ export default function ProjectPage() {
             </button>
             <button
               className="viewport-toolbar-btn"
+              data-active={showScenarioRenderPanel}
+              onClick={triggerScenarioRender}
+              aria-pressed={showScenarioRenderPanel}
+              title={t("editor.renderScenario")}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="11" rx="2" />
+                <path d="M8 19h8" />
+                <path d="M10 15l-2 4" />
+                <path d="M14 15l2 4" />
+              </svg>
+              {t("editor.renderScenario")}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
               data-active={thermalView}
               onClick={() => setThermalView(!thermalView)}
               title={`${t('editor.thermal')} (T)`}
@@ -3913,6 +3944,19 @@ export default function ProjectPage() {
               onLightingPreset={setLightingPreset}
               onShadowStudyChange={setDaylightShadowStudy}
               onClose={() => { setShowDaylightPanel(false); setSunDirection(undefined); setSunAltitude(undefined); setDaylightShadowStudy(null); setLightingPreset("default"); }}
+            />
+          )}
+
+          {showScenarioRenderPanel && (
+            <ScenarioRenderPanel
+              projectId={projectId}
+              projectName={projectName}
+              beforeImage={photoOverlayUrl}
+              captureApiRef={presentationRef}
+              lightingPreset={lightingPreset}
+              onLightingPresetChange={setLightingPreset}
+              autoGenerateToken={scenarioRenderToken}
+              onClose={() => setShowScenarioRenderPanel(false)}
             />
           )}
 
