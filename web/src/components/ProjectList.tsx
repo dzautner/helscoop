@@ -548,6 +548,9 @@ export default function ProjectList({
           </div>
           <div className="nav-links">
             <CreditBalancePill />
+            <Link href="/gallery" className="btn btn-ghost" style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {t('nav.gallery')}
+            </Link>
             <ThemeToggle />
             <LanguageSwitcher />
             <Link href="/settings" className="btn btn-ghost" style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -577,6 +580,9 @@ export default function ProjectList({
         </div>
         <div className={`nav-mobile-menu ${mobileMenuOpen ? "open" : ""}`}>
           <CreditBalancePill />
+          <Link href="/gallery" className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start", textDecoration: "none" }}>
+            {t('nav.gallery')}
+          </Link>
           <ThemeToggle />
             <LanguageSwitcher />
           <Link href="/settings" className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>

@@ -4,6 +4,8 @@ import type {
   BuildingResult,
   BomAggregateResponse,
   EnergySubsidyRequest,
+  GalleryCostRange,
+  GalleryProject,
   BomSubstitutionResponse,
   KeskoProduct,
   MarketplaceCheckoutResponse,
@@ -15,6 +17,7 @@ import type {
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
+  Project,
   ProjectType,
   ProjectImage,
   ProjectImagesResponse,
@@ -136,6 +139,15 @@ export interface CreditState {
   lowCreditThreshold: number;
   costs: Record<string, number>;
   packs: CreditPack[];
+}
+
+export interface GalleryProjectFilters {
+  q?: string;
+  project_type?: ProjectType | "";
+  region?: string;
+  material?: string;
+  cost_range?: GalleryCostRange | "";
+  limit?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +360,21 @@ export const api = {
 
   getProjects: () => apiFetch("/projects"),
   getProject: (id: string) => apiFetch(`/projects/${id}`),
+  getGalleryProjects: (filters: GalleryProjectFilters = {}): Promise<{ projects: GalleryProject[] }> => {
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.project_type) params.set("project_type", filters.project_type);
+    if (filters.region) params.set("region", filters.region);
+    if (filters.material) params.set("material", filters.material);
+    if (filters.cost_range) params.set("cost_range", filters.cost_range);
+    if (filters.limit) params.set("limit", String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch(`/gallery/projects${suffix}`);
+  },
+  getGalleryProject: (id: string): Promise<GalleryProject & Project> =>
+    apiFetch(`/gallery/projects/${encodeURIComponent(id)}`),
+  cloneGalleryProject: (id: string): Promise<Project & { cloned_from_project_id?: string }> =>
+    apiFetch(`/gallery/projects/${encodeURIComponent(id)}/clone`, { method: "POST" }),
   createProject: (data: {
     name: string;
     description?: string;
@@ -361,6 +388,15 @@ export const api = {
     apiFetch("/projects", { method: "POST", body: JSON.stringify(data) }),
   updateProject: (id: string, data: Record<string, unknown>) =>
     apiFetch(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  publishProject: (id: string, isPublic: boolean): Promise<{
+    id: string;
+    is_public: boolean;
+    published_at: string | null;
+    gallery_status: "pending" | "approved" | "rejected";
+    share_token: string | null;
+    share_token_expires_at: string | null;
+  }> =>
+    apiFetch(`/projects/${id}/publish`, { method: "PUT", body: JSON.stringify({ is_public: isPublic }) }),
   deleteProject: (id: string) =>
     apiFetch(`/projects/${id}`, { method: "DELETE" }),
   bulkProjectAction: (ids: string[], action: string, extra?: { status?: string; tags?: string[] }) =>

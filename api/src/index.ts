@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, verifyGoogleToken, googleLogin, verifyAppleToken, appleLogin, AuthUser } from "./auth";
+import { requirePermission } from "./permissions";
 import { query, pool } from "./db";
 import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
@@ -287,6 +288,49 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Strip HTML tags from user input to prevent XSS
 function sanitize(input: string): string {
   return input.replace(/<[^>]*>/g, "").trim();
+}
+
+const galleryCostExpression = `(
+  (SELECT COALESCE(SUM(pb.quantity * COALESCE(pr.unit_price, 0) * COALESCE(m.waste_factor, 1)), 0)
+   FROM project_bom pb
+   JOIN materials m ON pb.material_id = m.id
+   LEFT JOIN pricing pr ON pb.material_id = pr.material_id AND pr.is_primary = true
+   WHERE pb.project_id = p.id)
+  * CASE WHEN p.project_type = 'taloyhtio' THEN GREATEST(COALESCE(p.unit_count, 1), 1) ELSE 1 END
+)`;
+
+const gallerySelectFields = `
+  p.id, p.name, p.description, p.thumbnail_url, p.share_token,
+  p.is_public, p.published_at, p.created_at, p.updated_at, p.project_type,
+  COALESCE(p.gallery_like_count, 0)::int AS heart_count,
+  COALESCE(p.gallery_clone_count, 0)::int AS clone_count,
+  u.name AS owner_name,
+  COALESCE(p.building_info->>'municipality', p.building_info->>'city', p.building_info->>'region', 'Finland') AS region,
+  ${galleryCostExpression} AS estimated_cost,
+  (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = p.id) AS view_count,
+  ARRAY(
+    SELECT DISTINCT m.name
+    FROM project_bom pb
+    JOIN materials m ON pb.material_id = m.id
+    WHERE pb.project_id = p.id
+    ORDER BY m.name
+    LIMIT 4
+  ) AS material_highlights
+`;
+
+function costBandExpression(): string {
+  return `CASE
+    WHEN ${galleryCostExpression} < 5000 THEN 'under-5k'
+    WHEN ${galleryCostExpression} < 15000 THEN '5k-15k'
+    WHEN ${galleryCostExpression} < 50000 THEN '15k-50k'
+    ELSE '50k-plus'
+  END`;
+}
+
+function normalizeGalleryLimit(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return 24;
+  return Math.min(parsed, 60);
 }
 
 app.post("/auth/login", authLimiter, async (req, res) => {
@@ -751,6 +795,188 @@ app.use("/api/terrain", buildingLimiter, terrainRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
+// Public inspiration gallery — browse opt-in published projects without auth.
+app.get("/gallery/projects", publicLimiter, async (req, res) => {
+  const where = [
+    "p.is_public = true",
+    "p.deleted_at IS NULL",
+    "COALESCE(p.gallery_status, 'approved') = 'approved'",
+    "p.share_token IS NOT NULL",
+  ];
+  const params: unknown[] = [];
+  const addParam = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (q) {
+    const needle = addParam(`%${q.slice(0, 120)}%`);
+    where.push(`(
+      p.name ILIKE ${needle}
+      OR COALESCE(p.description, '') ILIKE ${needle}
+      OR COALESCE(p.building_info->>'address', '') ILIKE ${needle}
+      OR EXISTS (
+        SELECT 1
+        FROM project_bom pbq
+        JOIN materials mq ON pbq.material_id = mq.id
+        JOIN categories cq ON mq.category_id = cq.id
+        WHERE pbq.project_id = p.id
+          AND (mq.name ILIKE ${needle} OR mq.id ILIKE ${needle} OR cq.display_name ILIKE ${needle})
+      )
+    )`);
+  }
+
+  const projectType = typeof req.query.project_type === "string" ? req.query.project_type : "";
+  if (projectType === "omakotitalo" || projectType === "taloyhtio") {
+    where.push(`p.project_type = ${addParam(projectType)}`);
+  }
+
+  const region = typeof req.query.region === "string" ? req.query.region.trim() : "";
+  if (region) {
+    const needle = addParam(`%${region.slice(0, 80)}%`);
+    where.push(`(
+      COALESCE(p.building_info->>'municipality', '') ILIKE ${needle}
+      OR COALESCE(p.building_info->>'city', '') ILIKE ${needle}
+      OR COALESCE(p.building_info->>'region', '') ILIKE ${needle}
+      OR COALESCE(p.building_info->>'address', '') ILIKE ${needle}
+    )`);
+  }
+
+  const material = typeof req.query.material === "string" ? req.query.material.trim() : "";
+  if (material) {
+    const needle = addParam(`%${material.slice(0, 80)}%`);
+    const tag = addParam(material.slice(0, 80));
+    where.push(`EXISTS (
+      SELECT 1
+      FROM project_bom pbm
+      JOIN materials mm ON pbm.material_id = mm.id
+      JOIN categories cm ON mm.category_id = cm.id
+      WHERE pbm.project_id = p.id
+        AND (mm.name ILIKE ${needle} OR mm.id ILIKE ${needle} OR cm.display_name ILIKE ${needle} OR ${tag} = ANY(COALESCE(mm.tags, ARRAY[]::text[])))
+    )`);
+  }
+
+  const costRange = typeof req.query.cost_range === "string"
+    ? req.query.cost_range
+    : typeof req.query.costRange === "string"
+      ? req.query.costRange
+      : "";
+  if (costRange === "under-5k") {
+    where.push(`${galleryCostExpression} < 5000`);
+  } else if (costRange === "5k-15k") {
+    where.push(`${galleryCostExpression} >= 5000 AND ${galleryCostExpression} < 15000`);
+  } else if (costRange === "15k-50k") {
+    where.push(`${galleryCostExpression} >= 15000 AND ${galleryCostExpression} < 50000`);
+  } else if (costRange === "50k-plus") {
+    where.push(`${galleryCostExpression} >= 50000`);
+  }
+
+  const limit = addParam(normalizeGalleryLimit(req.query.limit));
+  const result = await query(
+    `SELECT ${gallerySelectFields}, ${costBandExpression()} AS cost_band
+     FROM projects p
+     JOIN users u ON u.id = p.user_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY COALESCE(p.published_at, p.updated_at) DESC, p.updated_at DESC
+     LIMIT ${limit}`,
+    params,
+  );
+
+  res.json({ projects: result.rows });
+});
+
+app.get("/gallery/projects/:id", publicLimiter, async (req, res) => {
+  const result = await query(
+    `SELECT ${gallerySelectFields}, p.scene_js, p.building_info, ${costBandExpression()} AS cost_band
+     FROM projects p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.id = $1
+       AND p.is_public = true
+       AND p.deleted_at IS NULL
+       AND COALESCE(p.gallery_status, 'approved') = 'approved'
+       AND p.share_token IS NOT NULL`,
+    [req.params.id],
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Gallery project not found" });
+  }
+
+  const project = result.rows[0];
+  const bom = await query(
+    `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
+      pr.unit_price, pr.link, s.name AS supplier_name,
+      pr.in_stock, pr.stock_level, pr.store_location, pr.last_checked_at AS stock_last_checked_at,
+      (pb.quantity * pr.unit_price * m.waste_factor) AS total
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     JOIN categories c ON m.category_id = c.id
+     LEFT JOIN pricing pr ON m.id = pr.material_id AND pr.is_primary = true
+     LEFT JOIN suppliers s ON pr.supplier_id = s.id
+     WHERE pb.project_id = $1
+     ORDER BY c.sort_order`,
+    [project.id],
+  );
+
+  res.json({ ...project, bom: bom.rows, comments: [] });
+});
+
+app.post("/gallery/projects/:id/clone", authenticatedLimiter, requireAuth, requirePermission("project:create"), async (req, res) => {
+  const sourceResult = await query(
+    `SELECT id, name, description, project_type, unit_count, tags
+     FROM projects p
+     WHERE id = $1
+       AND is_public = true
+       AND deleted_at IS NULL
+       AND COALESCE(gallery_status, 'approved') = 'approved'`,
+    [req.params.id],
+  );
+  if (sourceResult.rows.length === 0) {
+    return res.status(404).json({ error: "Gallery project not found" });
+  }
+
+  const source = sourceResult.rows[0];
+  const sceneJs = [
+    `// Inspired by public gallery project: ${String(source.name || "Helscoop project").slice(0, 120)}`,
+    "// Geometry intentionally starts blank. The material list was copied for planning.",
+    "",
+  ].join("\n");
+  const cloneResult = await query(
+    `INSERT INTO projects (
+       user_id, name, description, scene_js, original_scene_js,
+       project_type, unit_count, tags, status
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'planning')
+     RETURNING *`,
+    [
+      req.user!.id,
+      `Inspired by ${String(source.name || "gallery project").slice(0, 120)}`.slice(0, 200),
+      `Started from the public gallery project "${source.name}". Materials were copied; geometry starts blank.`,
+      sceneJs,
+      sceneJs,
+      source.project_type ?? "omakotitalo",
+      source.unit_count ?? null,
+      Array.isArray(source.tags) ? source.tags : [],
+    ],
+  );
+  const clone = cloneResult.rows[0];
+
+  await query(
+    `INSERT INTO project_bom (project_id, material_id, quantity, unit)
+     SELECT $1, material_id, quantity, unit
+     FROM project_bom
+     WHERE project_id = $2`,
+    [clone.id, source.id],
+  );
+  await query(
+    "UPDATE projects SET gallery_clone_count = COALESCE(gallery_clone_count, 0) + 1 WHERE id = $1",
+    [source.id],
+  );
+  logAuditEvent(req.user!.id, "gallery.clone", { targetId: source.id, clonedProjectId: clone.id, ip: req.ip });
+
+  res.status(201).json({ ...clone, cloned_from_project_id: source.id });
+});
+
 // Public shared project endpoint — no auth required
 app.get("/shared/:token", publicLimiter, async (req, res) => {
   const { token } = req.params;
@@ -759,11 +985,16 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   }
 
   const result = await query(
-    `SELECT id, name, description, scene_js, building_info, created_at, updated_at, share_token_expires_at,
-      (SELECT COUNT(*)::int FROM project_views WHERE project_id = projects.id) AS view_count
-     FROM projects
-     WHERE share_token = $1
-       AND deleted_at IS NULL`,
+    `SELECT p.id, p.name, p.description, p.scene_js, p.building_info, p.thumbnail_url,
+      p.is_public, p.published_at, p.project_type, p.created_at, p.updated_at, p.share_token_expires_at,
+      COALESCE(p.gallery_like_count, 0)::int AS heart_count,
+      COALESCE(p.gallery_clone_count, 0)::int AS clone_count,
+      u.name AS owner_name,
+      (SELECT COUNT(*)::int FROM project_views WHERE project_id = p.id) AS view_count
+     FROM projects p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.share_token = $1
+       AND p.deleted_at IS NULL`,
     [token]
   );
   if (result.rows.length === 0) {

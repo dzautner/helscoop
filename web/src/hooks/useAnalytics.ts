@@ -48,6 +48,9 @@ export type AnalyticsEvent =
   | "presentation_render_downloaded"
   | "scenario_render_generated"
   | "scenario_render_downloaded"
+  | "gallery_viewed"
+  | "gallery_project_opened"
+  | "gallery_project_cloned"
   | "construction_timelapse_started"
   | "construction_timelapse_exported"
   | "quote_request_submitted"
@@ -105,6 +108,9 @@ export interface AnalyticsEventProps {
   presentation_render_downloaded: { preset: string; watermarked: boolean };
   scenario_render_generated: { project_id: string; view_count: number; lighting_preset: string; has_before_image: boolean; source: "manual" | "toolbar" };
   scenario_render_downloaded: { project_id: string; artifact: "single" | "contact_sheet"; view_count: number; lighting_preset: string };
+  gallery_viewed: { result_count: number; has_query: boolean; project_type?: string; cost_range?: string };
+  gallery_project_opened: { project_id: string; source: "card" | "viewer" };
+  gallery_project_cloned: { project_id: string; source: "gallery" | "shared_viewer" };
   construction_timelapse_started: { project_name: string; step_count: number; camera_mode: string; speed: number };
   construction_timelapse_exported: { project_name: string; format: "json" | "svg"; step_count: number; camera_mode: string };
   quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
