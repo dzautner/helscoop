@@ -43,6 +43,13 @@ export interface ViewportCameraState {
   target: [number, number, number];
 }
 
+export interface ViewportAssemblyGuideState {
+  stepKey: string;
+  completedObjectIds: string[];
+  currentObjectIds: string[];
+  ghostObjectIds: string[];
+}
+
 interface Viewport3DProps {
   sceneJs: string;
   wireframe?: boolean;
@@ -72,6 +79,7 @@ interface Viewport3DProps {
   sunDirection?: [number, number, number];
   sunAltitude?: number;
   shadowStudySamples?: ShadowStudySample[] | null;
+  assemblyGuideState?: ViewportAssemblyGuideState | null;
   focusObjectRef?: React.MutableRefObject<((objectId: string) => void) | null>;
   onRevealComplete?: () => void;
 }
@@ -659,6 +667,7 @@ export default function Viewport3D({
   sunDirection,
   sunAltitude,
   shadowStudySamples,
+  assemblyGuideState = null,
   focusObjectRef,
   onRevealComplete,
 }: Viewport3DProps) {
@@ -705,6 +714,8 @@ export default function Viewport3D({
   const hasAppliedInitialPresentationPresetRef = useRef(false);
   const [explodeFactor, setExplodeFactor] = useState(0.5);
   const originalPositionsRef = useRef<Map<THREE.Object3D, THREE.Vector3>>(new Map());
+  const assemblyAnimFrameRef = useRef<number>(0);
+  const assemblyBasePositionsRef = useRef<Map<THREE.Mesh, THREE.Vector3>>(new Map());
   const onCameraSyncChangeRef = useRef(onCameraSyncChange);
   const applyingCameraSyncRef = useRef(false);
   const lastCameraSyncSignatureRef = useRef("");
@@ -1226,6 +1237,8 @@ export default function Viewport3D({
       resizeObserver.disconnect();
       cancelAnimationFrame(animFrameRef.current);
       cancelAnimationFrame(revealAnimRef.current);
+      cancelAnimationFrame(assemblyAnimFrameRef.current);
+      assemblyBasePositionsRef.current.clear();
       controls.removeEventListener("change", emitCameraSyncChange);
       controls.dispose();
 
@@ -1610,6 +1623,11 @@ export default function Viewport3D({
     const group = objectGroupRef.current;
     if (!group) return;
 
+    const assemblyCurrent = new Set(assemblyGuideState?.currentObjectIds ?? []);
+    const assemblyCompleted = new Set(assemblyGuideState?.completedObjectIds ?? []);
+    const assemblyGhost = new Set(assemblyGuideState?.ghostObjectIds ?? []);
+    const assemblyActive = Boolean(assemblyGuideState);
+
     group.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
 
@@ -1623,18 +1641,42 @@ export default function Viewport3D({
       const baseTransparent = Boolean(child.userData.baseTransparent);
       const thermalRgb = thermalView && materialId ? thermalColorMap?.get(materialId) : undefined;
       const displayColor = thermalRgb ?? baseColor;
+      const isAssemblyCurrent = Boolean(objectId && assemblyCurrent.has(objectId));
+      const isAssemblyCompleted = Boolean(objectId && assemblyCompleted.has(objectId));
+      const isAssemblyGhost = Boolean(objectId && assemblyGhost.has(objectId));
       const isSelected = Boolean(objectId && selectedObjectId === objectId);
-      const isHidden = Boolean(objectId && hiddenObjectIds?.has(objectId));
+      const isHidden = Boolean(objectId && hiddenObjectIds?.has(objectId) && !isAssemblyGhost);
 
       child.visible = !isHidden;
-      mat.transparent = baseTransparent;
-      mat.opacity = baseOpacity;
-      mat.color.setRGB(displayColor[0], displayColor[1], displayColor[2]);
+      mat.wireframe = isAssemblyGhost ? true : wireframe;
+
+      let opacity = baseOpacity;
+      let transparent = baseTransparent;
+      let color: [number, number, number] = displayColor;
+
+      if (assemblyActive) {
+        if (isAssemblyGhost) {
+          opacity = 0.14;
+          transparent = true;
+          color = [1, 0.78, 0.38];
+        } else if (isAssemblyCompleted) {
+          opacity = Math.min(baseOpacity, 0.42);
+          transparent = true;
+          color = [displayColor[0] * 0.75, displayColor[1] * 0.75, displayColor[2] * 0.75];
+        } else if (isAssemblyCurrent) {
+          opacity = baseOpacity;
+          transparent = true;
+        }
+      }
+
+      mat.transparent = transparent;
+      mat.opacity = opacity;
+      mat.color.setRGB(color[0], color[1], color[2]);
 
       const emissiveBase: [number, number, number] = thermalRgb
         ? [thermalRgb[0] * 0.15, thermalRgb[1] * 0.15, thermalRgb[2] * 0.15]
         : [0, 0, 0];
-      if (isSelected) {
+      if (isSelected || isAssemblyCurrent) {
         mat.emissive.setRGB(
           Math.min(1, emissiveBase[0] + 0.45),
           Math.min(1, emissiveBase[1] + 0.24),
@@ -1645,11 +1687,89 @@ export default function Viewport3D({
       }
       mat.needsUpdate = true;
     });
-  }, [hiddenObjectIds, selectedObjectId, thermalColorMap, thermalView]);
+  }, [assemblyGuideState, hiddenObjectIds, selectedObjectId, thermalColorMap, thermalView, wireframe]);
 
   useEffect(() => {
     refreshMeshAppearance();
   }, [refreshMeshAppearance, sceneRenderTick]);
+
+  useEffect(() => {
+    cancelAnimationFrame(assemblyAnimFrameRef.current);
+    assemblyBasePositionsRef.current.forEach((position, mesh) => {
+      mesh.position.copy(position);
+    });
+    assemblyBasePositionsRef.current.clear();
+
+    const group = objectGroupRef.current;
+    if (!group || !assemblyGuideState || assemblyGuideState.currentObjectIds.length === 0) {
+      refreshMeshAppearance();
+      return;
+    }
+
+    const currentIds = new Set(assemblyGuideState.currentObjectIds);
+    const meshes: THREE.Mesh[] = [];
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh && currentIds.has(child.userData.objectId as string)) {
+        meshes.push(child);
+      }
+    });
+
+    if (meshes.length === 0 || prefersReducedMotion()) {
+      refreshMeshAppearance();
+      return;
+    }
+
+    const bounds = new THREE.Box3().setFromObject(group);
+    const size = bounds.getSize(new THREE.Vector3()).length();
+    const dropOffset = Math.max(0.25, Math.min(1.2, size * 0.045));
+    const duration = 520;
+    const start = performance.now();
+    meshes.forEach((mesh) => {
+      const base = mesh.position.clone();
+      assemblyBasePositionsRef.current.set(mesh, base);
+      mesh.position.z = base.z + dropOffset;
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      material.transparent = true;
+      material.opacity = 0.08;
+      material.needsUpdate = true;
+    });
+
+    const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
+    const animate = () => {
+      const raw = Math.min((performance.now() - start) / duration, 1);
+      const eased = easeOutCubic(raw);
+
+      for (const mesh of meshes) {
+        const base = assemblyBasePositionsRef.current.get(mesh);
+        if (!base) continue;
+        mesh.position.z = base.z + dropOffset * (1 - eased);
+        const material = mesh.material as THREE.MeshStandardMaterial;
+        const baseOpacity = typeof mesh.userData.baseOpacity === "number" ? mesh.userData.baseOpacity : 1;
+        material.opacity = Math.min(baseOpacity, 0.08 + eased * 0.92);
+        material.transparent = true;
+        material.needsUpdate = true;
+      }
+
+      if (raw < 1) {
+        assemblyAnimFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        assemblyBasePositionsRef.current.forEach((position, mesh) => {
+          mesh.position.copy(position);
+        });
+        assemblyBasePositionsRef.current.clear();
+        refreshMeshAppearance();
+      }
+    };
+
+    assemblyAnimFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      cancelAnimationFrame(assemblyAnimFrameRef.current);
+      assemblyBasePositionsRef.current.forEach((position, mesh) => {
+        mesh.position.copy(position);
+      });
+      assemblyBasePositionsRef.current.clear();
+    };
+  }, [assemblyGuideState, refreshMeshAppearance, sceneRenderTick]);
 
   useEffect(() => {
     if (!focusObjectRef) return;

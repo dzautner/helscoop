@@ -20,6 +20,7 @@ import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
+import AssemblyGuidePanel from "@/components/AssemblyGuidePanel";
 import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import {
@@ -59,12 +60,13 @@ import type { SaveStatus } from "@/components/SaveStatusIndicator";
 import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary } from "@/types";
 import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
-import type { ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
+import type { ViewportAssemblyGuideState, ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import PriceSummaryBar from "@/components/PriceSummaryBar";
 import type { DataProvenance } from "@/lib/confidence";
 import { buildSceneLayers, type LayerSeed } from "@/lib/scene-layers";
+import { buildAssemblyGuide, getAssemblyViewportState, type AssemblyGuideSpeed } from "@/lib/assembly-guide";
 import {
   PHOTO_OVERLAY_DEFAULTS,
   composePhotoOverlayExport,
@@ -104,6 +106,14 @@ function formatWarning(raw: string, t: (key: string, params?: Record<string, str
     return t(key, { count: rest });
   }
   return t(key);
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT" ||
+    target.isContentEditable;
 }
 
 function Viewport3DLoading() {
@@ -315,6 +325,12 @@ export default function ProjectPage() {
   const [showDocs, setShowDocs] = useState(false);
   const [showParams, setShowParams] = useState(true);
   const [showLayers, setShowLayers] = useState(false);
+  const [showAssemblyGuide, setShowAssemblyGuide] = useState(false);
+  const [assemblyStepIndex, setAssemblyStepIndex] = useState(0);
+  const [assemblyCompletedStepIds, setAssemblyCompletedStepIds] = useState<Set<string>>(() => new Set());
+  const [assemblyPlaying, setAssemblyPlaying] = useState(false);
+  const [assemblySpeed, setAssemblySpeed] = useState<AssemblyGuideSpeed>(1);
+  const [assemblyProgressLoaded, setAssemblyProgressLoaded] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
@@ -883,6 +899,30 @@ export default function ProjectPage() {
     return { colorMap, compliance };
   }, [thermalView, materials]);
   const sceneLayers = useMemo(() => buildSceneLayers(renderedLayers, bom), [bom, renderedLayers]);
+  const assemblyGuide = useMemo(() => buildAssemblyGuide(sceneLayers, bom, materials), [bom, materials, sceneLayers]);
+  const assemblyStepSignature = useMemo(
+    () => assemblyGuide.steps.map((step) => step.id).join("|"),
+    [assemblyGuide.steps],
+  );
+  const assemblyViewportState = useMemo(
+    () => showAssemblyGuide ? getAssemblyViewportState(assemblyGuide.steps, assemblyStepIndex) : null,
+    [assemblyGuide.steps, assemblyStepIndex, showAssemblyGuide],
+  );
+  const assemblyViewportHiddenObjectIds = useMemo(
+    () => assemblyViewportState ? new Set(assemblyViewportState.hiddenObjectIds) : hiddenLayerIds,
+    [assemblyViewportState, hiddenLayerIds],
+  );
+  const viewportAssemblyGuideState = useMemo<ViewportAssemblyGuideState | null>(
+    () => assemblyViewportState
+      ? {
+        stepKey: assemblyViewportState.stepKey,
+        completedObjectIds: assemblyViewportState.completedObjectIds,
+        currentObjectIds: assemblyViewportState.currentObjectIds,
+        ghostObjectIds: assemblyViewportState.ghostObjectIds,
+      }
+      : null,
+    [assemblyViewportState],
+  );
   const isAdvancedMode = editorMode === "advanced";
 
   const thermalColorMap = thermalData?.colorMap;
@@ -914,6 +954,32 @@ export default function ProjectPage() {
   useEffect(() => {
     if (!showLayers) setSelectedLayerId(null);
   }, [showLayers]);
+
+  useEffect(() => {
+    setAssemblyProgressLoaded(false);
+    if (typeof window === "undefined") return;
+    const validIds = new Set(assemblyGuide.steps.map((step) => step.id));
+    const storageKey = `helscoop_assembly_progress_${projectId}`;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as string[];
+      setAssemblyCompletedStepIds(new Set(saved.filter((id) => validIds.has(id))));
+    } catch {
+      setAssemblyCompletedStepIds(new Set());
+    } finally {
+      setAssemblyProgressLoaded(true);
+    }
+  }, [assemblyStepSignature, assemblyGuide.steps, projectId]);
+
+  useEffect(() => {
+    if (!assemblyProgressLoaded || typeof window === "undefined") return;
+    const storageKey = `helscoop_assembly_progress_${projectId}`;
+    window.localStorage.setItem(storageKey, JSON.stringify(Array.from(assemblyCompletedStepIds)));
+  }, [assemblyCompletedStepIds, assemblyProgressLoaded, projectId]);
+
+  useEffect(() => {
+    if (assemblyStepIndex < assemblyGuide.steps.length) return;
+    setAssemblyStepIndex(Math.max(0, assemblyGuide.steps.length - 1));
+  }, [assemblyGuide.steps.length, assemblyStepIndex]);
 
   useEffect(() => {
     if (showLayers) setSurfacePickerMaterialId(null);
@@ -1212,8 +1278,97 @@ export default function ProjectPage() {
 
   const toggleLayersPanel = useCallback(() => {
     if (isMobileEditor) return;
-    setShowLayers((visible) => !visible);
+    setShowLayers((visible) => {
+      const next = !visible;
+      if (next) setShowAssemblyGuide(false);
+      return next;
+    });
   }, [isMobileEditor]);
+
+  const focusAssemblyStep = useCallback((index: number) => {
+    const step = assemblyGuide.steps[index];
+    const layerId = step?.layerIds[0];
+    if (!layerId) return;
+    setSelectedLayerId(layerId);
+    window.setTimeout(() => focusObjectRef.current?.(layerId), 0);
+  }, [assemblyGuide.steps]);
+
+  const selectAssemblyStep = useCallback((index: number) => {
+    if (assemblyGuide.steps.length === 0) return;
+    const nextIndex = Math.min(Math.max(index, 0), assemblyGuide.steps.length - 1);
+    setAssemblyStepIndex(nextIndex);
+    focusAssemblyStep(nextIndex);
+  }, [assemblyGuide.steps.length, focusAssemblyStep]);
+
+  const toggleAssemblyGuide = useCallback(() => {
+    if (isMobileEditor) return;
+    setEditorMode("advanced");
+    setShowAssemblyGuide((visible) => {
+      const next = !visible;
+      if (next) {
+        setShowLayers(false);
+        setAssemblyPlaying(false);
+        window.setTimeout(() => focusAssemblyStep(assemblyStepIndex), 0);
+      }
+      return next;
+    });
+  }, [assemblyStepIndex, focusAssemblyStep, isMobileEditor]);
+
+  const toggleAssemblyStepComplete = useCallback((stepId: string) => {
+    setAssemblyCompletedStepIds((current) => {
+      const next = new Set(current);
+      if (next.has(stepId)) next.delete(stepId);
+      else next.add(stepId);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showAssemblyGuide || !assemblyPlaying || assemblyGuide.steps.length === 0) return;
+    if (assemblyStepIndex >= assemblyGuide.steps.length - 1) {
+      setAssemblyPlaying(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      selectAssemblyStep(assemblyStepIndex + 1);
+    }, 3600 / assemblySpeed);
+    return () => window.clearTimeout(timer);
+  }, [assemblyGuide.steps.length, assemblyPlaying, assemblySpeed, assemblyStepIndex, selectAssemblyStep, showAssemblyGuide]);
+
+  useEffect(() => {
+    if (!showAssemblyGuide) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableKeyboardTarget(event.target)) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        selectAssemblyStep(assemblyStepIndex - 1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        selectAssemblyStep(assemblyStepIndex + 1);
+      } else if (event.key === " ") {
+        event.preventDefault();
+        setAssemblyPlaying((playing) => !playing);
+      } else if (event.key.toLowerCase() === "c") {
+        const step = assemblyGuide.steps[assemblyStepIndex];
+        if (step) {
+          event.preventDefault();
+          toggleAssemblyStepComplete(step.id);
+        }
+      } else if (event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        focusAssemblyStep(assemblyStepIndex);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        selectAssemblyStep(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        selectAssemblyStep(assemblyGuide.steps.length - 1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [assemblyGuide.steps, assemblyStepIndex, focusAssemblyStep, selectAssemblyStep, showAssemblyGuide, toggleAssemblyStepComplete]);
 
   const duplicateProject = useCallback(async () => {
     setShowHeaderMenu(false);
@@ -1288,6 +1443,8 @@ export default function ProjectPage() {
     setShowHeaderMenu(false);
     setShowDocs(false);
     setShowLayers(false);
+    setShowAssemblyGuide(false);
+    setAssemblyPlaying(false);
     if (isMobileEditor) setActiveMobilePanel("viewport");
   }, [isMobileEditor]);
 
@@ -1373,6 +1530,13 @@ export default function ProjectPage() {
       descriptionKey: "shortcuts.explode",
     },
     {
+      key: "A",
+      mod: false,
+      code: "a",
+      action: toggleAssemblyGuide,
+      descriptionKey: "shortcuts.assemblyGuide",
+    },
+    {
       key: "E",
       mod: false,
       code: "e",
@@ -1386,7 +1550,7 @@ export default function ProjectPage() {
       action: () => setShowDocs((v) => !v),
       descriptionKey: "shortcuts.toggleDocs",
     },
-  ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo]);
+  ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo, toggleAssemblyGuide]);
 
   useKeyboardShortcuts(shortcuts);
 
@@ -1566,6 +1730,15 @@ export default function ProjectPage() {
         icon: icon("M12 3v18M4 6h16M4 18h16"),
         action: toggleRenovationCompareMode,
         isActive: renovationCompareMode,
+      },
+      {
+        id: "toggle-assembly-guide",
+        labelKey: "commandPalette.toggleAssemblyGuide",
+        labelSecondaryKey: "commandPalette.toggleAssemblyGuideEn",
+        shortcut: "A",
+        icon: icon("M4 19V7l8-4 8 4v12l-8 4-8-4zM4 7l8 4 8-4M12 11v12"),
+        action: toggleAssemblyGuide,
+        isActive: showAssemblyGuide,
       },
       {
         id: "reset-camera",
@@ -1821,7 +1994,7 @@ export default function ProjectPage() {
         isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -2051,6 +2224,12 @@ export default function ProjectPage() {
 
     setSurfacePickerMaterialId(layer.materialId);
   }, [bom, materials, sceneLayers, t, toast]);
+
+  const openAssemblyStepMaterial = useCallback((index: number) => {
+    const layerId = assemblyGuide.steps[index]?.layerIds[0];
+    if (!layerId) return;
+    handleOpenLayerMaterial(layerId);
+  }, [assemblyGuide.steps, handleOpenLayerMaterial]);
 
   const handleViewportMaterialSurfaceSelect = useCallback((selection: ViewportMaterialSelection) => {
     const hasBomMaterial = bom.some((item) => item.material_id === selection.materialId);
@@ -3155,14 +3334,15 @@ export default function ProjectPage() {
                       thermalView={thermalView}
                       thermalColorMap={thermalColorMap}
                       lightingPreset={lightingPreset}
-                      selectedObjectId={showLayers ? selectedLayerId : null}
-                      hiddenObjectIds={hiddenLayerIds}
+                      selectedObjectId={showAssemblyGuide ? assemblyViewportState?.currentObjectIds[0] ?? null : showLayers ? selectedLayerId : null}
+                      hiddenObjectIds={showAssemblyGuide ? assemblyViewportHiddenObjectIds : hiddenLayerIds}
                       lockedObjectIds={lockedLayerIds}
                       cameraSyncState={renovationCompareCamera}
                       onCameraSyncChange={handleRenovationCompareCamera}
                       sunDirection={sunDirection}
                       sunAltitude={sunAltitude}
                       shadowStudySamples={daylightShadowStudy?.samples ?? null}
+                      assemblyGuideState={viewportAssemblyGuideState}
                       focusObjectRef={focusObjectRef}
                     />
                     <span className="renovation-compare-label renovation-compare-label--planned">{t("editor.comparePlanned")}</span>
@@ -3231,12 +3411,13 @@ export default function ProjectPage() {
                   thermalView={thermalView}
                   thermalColorMap={thermalColorMap}
                   lightingPreset={lightingPreset}
-                  selectedObjectId={showLayers ? selectedLayerId : null}
-                  hiddenObjectIds={hiddenLayerIds}
+                  selectedObjectId={showAssemblyGuide ? assemblyViewportState?.currentObjectIds[0] ?? null : showLayers ? selectedLayerId : null}
+                  hiddenObjectIds={showAssemblyGuide ? assemblyViewportHiddenObjectIds : hiddenLayerIds}
                   lockedObjectIds={lockedLayerIds}
                   sunDirection={sunDirection}
                   sunAltitude={sunAltitude}
                   shadowStudySamples={daylightShadowStudy?.samples ?? null}
+                  assemblyGuideState={viewportAssemblyGuideState}
                   focusObjectRef={focusObjectRef}
                 />
               )}
@@ -3527,6 +3708,21 @@ export default function ProjectPage() {
               </svg>
               {t('editor.daylightTitle')}
             </button>
+            {!isMobileEditor && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showAssemblyGuide}
+                onClick={toggleAssemblyGuide}
+                title={t("assemblyGuide.title")}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 7l8-4 8 4-8 4-8-4z" />
+                  <path d="M4 7v10l8 4 8-4V7" />
+                  <path d="M12 11v10" />
+                </svg>
+                {t("assemblyGuide.shortTitle")}
+              </button>
+            )}
             <button
               className="viewport-toolbar-btn"
               data-active={!!photoOverlayUrl}
@@ -3988,6 +4184,23 @@ export default function ProjectPage() {
             onOpenLayerMaterial={handleOpenLayerMaterial}
             onFocusLayer={(layerId) => focusObjectRef.current?.(layerId)}
             onSetHiddenLayers={setHiddenLayerIds}
+          />
+        )}
+
+        {isAdvancedMode && showAssemblyGuide && !isMobileEditor && (
+          <AssemblyGuidePanel
+            guide={assemblyGuide}
+            activeStepIndex={assemblyStepIndex}
+            completedStepIds={assemblyCompletedStepIds}
+            playing={assemblyPlaying}
+            speed={assemblySpeed}
+            onStepChange={selectAssemblyStep}
+            onToggleComplete={toggleAssemblyStepComplete}
+            onPlayingChange={setAssemblyPlaying}
+            onSpeedChange={setAssemblySpeed}
+            onFocusStep={focusAssemblyStep}
+            onOpenStepMaterial={openAssemblyStepMaterial}
+            onClose={() => { setShowAssemblyGuide(false); setAssemblyPlaying(false); }}
           />
         )}
 
