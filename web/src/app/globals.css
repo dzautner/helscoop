@@ -1828,6 +1828,17 @@ body::before {
   font-size: 12px;
 }
 
+.bom-item-regular-price {
+  color: var(--text-muted);
+  opacity: 0.68;
+}
+
+.bom-item-sale-price {
+  color: var(--success);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 .bom-item-total {
   margin-left: auto;
   font-weight: 600;
@@ -1852,6 +1863,38 @@ body::before {
 .bom-item-cost-badge:focus-visible {
   border-color: rgba(74, 124, 89, 0.38);
   background: rgba(74, 124, 89, 0.14);
+}
+
+.bom-campaign-callout,
+.bom-campaign-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(74, 124, 89, 0.22);
+  background: linear-gradient(135deg, rgba(74, 124, 89, 0.13), rgba(228, 182, 92, 0.08));
+  color: var(--success);
+}
+
+.bom-campaign-callout {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.bom-campaign-callout strong,
+.bom-campaign-summary strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bom-campaign-summary {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
 }
 
 .bom-item-cost-badge:active {

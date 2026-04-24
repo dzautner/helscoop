@@ -101,4 +101,48 @@ describe("price alerts", () => {
       url: "/project/project-1",
     }));
   });
+
+  it("includes campaign metadata in sale notifications", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "watch-1",
+          user_id: "user-1",
+          project_id: "project-1",
+          material_id: "decking",
+          target_price: null,
+          watch_any_decrease: true,
+          notify_email: false,
+          notify_push: false,
+          email: "owner@example.com",
+          name: "Owner",
+          email_notifications: true,
+          price_alert_email_frequency: "daily",
+          push_notifications: false,
+          project_name: "Deck",
+          material_name: "Decking",
+          supplier_name: "K-Rauta",
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "notification-1" }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    await expect(notifyPriceWatchers({
+      materialId: "decking",
+      supplierId: "k-rauta",
+      previousUnitPrice: 10,
+      unitPrice: 8,
+      regularUnitPrice: 10,
+      campaignLabel: "Terassikampanja -20%",
+      campaignEndsAt: "2026-05-15T00:00:00.000Z",
+      source: "kesko-api",
+    })).resolves.toBe(1);
+
+    const insertParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(insertParams[1]).toContain("campaign");
+    expect(JSON.parse(insertParams[3] as string)).toMatchObject({
+      campaign_label: "Terassikampanja -20%",
+      regular_unit_price: 10,
+    });
+  });
 });

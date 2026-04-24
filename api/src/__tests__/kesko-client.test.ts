@@ -50,6 +50,26 @@ describe("Kesko client normalization", () => {
     expect(normalizeKeskoProduct({ id: "sku-2" }, "branch", "now")).toBeNull();
   });
 
+  it("detects campaign prices with regular price and expiry", () => {
+    const product = normalizeKeskoProduct(
+      {
+        id: "sku-campaign",
+        name: "Terassilauta kampanja",
+        campaignPrice: "7,90",
+        regularPrice: "9,90",
+        campaignName: "Terassikampanja -20%",
+        campaignEndDate: "2026-05-15",
+      },
+      "branch",
+      "2026-04-24T09:00:00.000Z",
+    );
+
+    expect(product?.unitPrice).toBe(7.9);
+    expect(product?.regularUnitPrice).toBe(9.9);
+    expect(product?.campaignLabel).toBe("Terassikampanja -20%");
+    expect(product?.campaignEndsAt).toContain("2026-05-15");
+  });
+
   it("maps common K-Rauta product categories to Helscoop categories", () => {
     expect(mapKeskoCategory("Sahatavara", "Runkopuu C24")).toBe("lumber");
     expect(mapKeskoCategory("Rakennuslevyt", "OSB levy")).toBe("sheathing");

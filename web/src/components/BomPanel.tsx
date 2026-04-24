@@ -177,6 +177,41 @@ function getLineCost(item: BomItem, material: Material | null | undefined): numb
   return unitPrice * Number(item.quantity || 0);
 }
 
+function getCampaignUnitPrice(item: BomItem): number | null {
+  const regular = Number(item.regular_unit_price ?? 0);
+  const current = Number(item.unit_price ?? 0);
+  return regular > current && current > 0 ? regular : null;
+}
+
+function getCampaignSavings(item: BomItem): number {
+  const explicit = Number(item.campaign_savings ?? 0);
+  if (explicit > 0) return explicit;
+  const regular = getCampaignUnitPrice(item);
+  const current = Number(item.unit_price ?? 0);
+  return regular ? Math.max(0, (regular - current) * Number(item.quantity || 0)) : 0;
+}
+
+function formatCampaignExpiry(
+  endsAt: string | null | undefined,
+  locale: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string | null {
+  if (!endsAt) return null;
+  const end = new Date(endsAt);
+  if (Number.isNaN(end.getTime())) return null;
+  const ms = end.getTime() - Date.now();
+  if (ms <= 0) return t("pricing.campaignEndsToday");
+  const days = Math.ceil(ms / 86_400_000);
+  if (days <= 1) return t("pricing.campaignEndsToday");
+  if (days <= 14) return t("pricing.campaignEndsDays", { count: days });
+  return t("pricing.campaignEndsDate", {
+    date: end.toLocaleDateString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB", {
+      day: "numeric",
+      month: "short",
+    }),
+  });
+}
+
 function getReplacementCandidates(
   item: BomItem,
   currentMaterial: Material | null,
@@ -1012,6 +1047,8 @@ function PriceComparisonPopup({
               {priceData.prices.map((price, idx) => {
                 const isCheapest = idx === 0;
                 const unitPrice = parseFloat(price.unit_price);
+                const regularUnitPrice = Number(price.regular_unit_price ?? 0);
+                const hasCampaignPrice = regularUnitPrice > unitPrice;
                 const spark = sparklineData.get(price.supplier_id);
                 const trend = computeTrend(priceHistory, price.supplier_id, 30);
                 const priceStockLevel = normalizeStockLevel(price.stock_level);
@@ -1058,6 +1095,11 @@ function PriceComparisonPopup({
                             {t('pricing.primary')}
                           </span>
                         )}
+                        {hasCampaignPrice && (
+                          <span className="badge badge-forest" style={{ fontSize: 10, padding: "2px 8px" }}>
+                            {price.campaign_label || t("pricing.campaignActive")}
+                          </span>
+                        )}
                         {/* Trend badge */}
                         {trend.direction !== "stable" && (
                           <span
@@ -1092,13 +1134,20 @@ function PriceComparisonPopup({
                             <Sparkline data={spark} width={60} height={20} />
                           </div>
                         )}
-                        <span style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: isCheapest ? "var(--success)" : "var(--text-primary)",
-                        }}>
-                          {unitPrice.toFixed(2)} &euro;
+                        <span style={{ display: "grid", justifyItems: "end", lineHeight: 1.1 }}>
+                          {hasCampaignPrice && (
+                            <s style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)" }}>
+                              {regularUnitPrice.toFixed(2)} &euro;
+                            </s>
+                          )}
+                          <span style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: isCheapest || hasCampaignPrice ? "var(--success)" : "var(--text-primary)",
+                          }}>
+                            {unitPrice.toFixed(2)} &euro;
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -1540,6 +1589,10 @@ function BomItemCard({
   const stockLevel = normalizeStockLevel(item.stock_level);
   const stock = stockMeta(stockLevel, t);
   const stockTooltipText = stockTooltip(item, t, locale);
+  const regularCampaignPrice = getCampaignUnitPrice(item);
+  const currentUnitPrice = Number(item.unit_price || 0);
+  const campaignSavings = getCampaignSavings(item);
+  const campaignExpiry = formatCampaignExpiry(item.campaign_ends_at, locale, t);
 
   return (
     <div
@@ -1668,7 +1721,15 @@ function BomItemCard({
           aria-label={t('editor.quantityFor', { name: materialName })}
         />
         <span className="bom-item-unit">
-          {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
+          {localizeUnit(item.unit, t)} x{" "}
+          {regularCampaignPrice ? (
+            <>
+              <s className="bom-item-regular-price">{regularCampaignPrice.toFixed(2)}</s>{" "}
+              <strong className="bom-item-sale-price">{currentUnitPrice.toFixed(2)}</strong>
+            </>
+          ) : (
+            currentUnitPrice.toFixed(2)
+          )}
         </span>
         <span
           title={stockTooltipText}
@@ -1695,6 +1756,17 @@ function BomItemCard({
           {Number(item.total || 0).toFixed(2)}
         </button>
       </div>
+      {regularCampaignPrice && campaignSavings > 0 && (
+        <div className="bom-campaign-callout">
+          <span>
+            {t("pricing.campaignSaveNow", { amount: campaignSavings.toFixed(2) })}
+          </span>
+          <strong>
+            {item.campaign_label || t("pricing.campaignActive")}
+            {campaignExpiry ? ` · ${campaignExpiry}` : ""}
+          </strong>
+        </div>
+      )}
       {/* Purchasable quantity hint — shown when conversion differs from design */}
       {(() => {
         const mat = materials.find((m) => m.id === item.material_id);
@@ -1994,6 +2066,8 @@ export default function BomPanel({
   }, [bom.length]);
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const campaignSavingsTotal = bom.reduce((sum, item) => sum + getCampaignSavings(item), 0);
+  const activeCampaignCount = bom.filter((item) => getCampaignUnitPrice(item) && getCampaignSavings(item) > 0).length;
   const taloyhtioUnitCount = projectType === "taloyhtio"
     ? Math.max(1, Math.floor(Number(unitCount ?? buildingInfo?.units ?? 1) || 1))
     : 1;
@@ -2728,6 +2802,12 @@ export default function BomPanel({
             {t("bom.stockWarning", { count: stockSummary.outOfStock })}
           </div>
         )}
+        {campaignSavingsTotal > 0 && (
+          <div className="bom-campaign-summary" title={t("pricing.campaignSummaryTooltip")}>
+            <span>{t("pricing.campaignSummary", { count: activeCampaignCount })}</span>
+            <strong>-{campaignSavingsTotal.toFixed(2)} &euro;</strong>
+          </div>
+        )}
         {totalSavings > 0 && (
           <div
             title={t('pricing.savingsTooltip')}
@@ -3383,6 +3463,11 @@ export default function BomPanel({
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                        {product.regularUnitPrice != null && product.unitPrice != null && product.regularUnitPrice > product.unitPrice && (
+                          <s style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)" }}>
+                            {product.regularUnitPrice.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                          </s>
+                        )}
                         <span style={{
                           fontFamily: "var(--font-mono)",
                           fontSize: 12,
@@ -3392,6 +3477,11 @@ export default function BomPanel({
                         }}>
                           {product.unitPrice != null ? `${product.unitPrice.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : "--"}
                         </span>
+                        {product.campaignLabel && (
+                          <span className="badge badge-forest" style={{ fontSize: 9, padding: "1px 6px" }}>
+                            {product.campaignLabel}
+                          </span>
+                        )}
                         <span style={{ fontSize: 9, color: "var(--text-muted)" }}>
                           {localizeUnit(product.unit, t)} · {t("pricing.vatNote")}
                         </span>

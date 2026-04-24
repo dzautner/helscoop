@@ -732,8 +732,20 @@ router.get("/:id", async (req, res) => {
   const bom = await query(
     `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
       p.unit_price, p.link, s.name AS supplier_name,
+      p.regular_unit_price, p.campaign_label, p.campaign_ends_at,
+      p.campaign_detected_at,
       p.in_stock, p.stock_level, p.store_location, p.last_checked_at AS stock_last_checked_at,
-      (pb.quantity * p.unit_price * m.waste_factor) AS total
+      (pb.quantity * p.unit_price * m.waste_factor) AS total,
+      CASE
+        WHEN p.regular_unit_price IS NOT NULL AND p.regular_unit_price > p.unit_price
+        THEN (pb.quantity * p.regular_unit_price * m.waste_factor)
+        ELSE NULL
+      END AS regular_total,
+      CASE
+        WHEN p.regular_unit_price IS NOT NULL AND p.regular_unit_price > p.unit_price
+        THEN (pb.quantity * (p.regular_unit_price - p.unit_price) * m.waste_factor)
+        ELSE 0
+      END AS campaign_savings
      FROM project_bom pb
      JOIN materials m ON pb.material_id = m.id
      JOIN categories c ON m.category_id = c.id
@@ -1002,8 +1014,13 @@ router.post("/:id/quote-request", async (req, res) => {
 
   const bomResult = await query(
     `SELECT pb.*, m.name AS material_name, m.waste_factor,
-      p.unit_price, p.unit,
+      p.unit_price, p.unit, p.regular_unit_price, p.campaign_label, p.campaign_ends_at,
       (pb.quantity * p.unit_price * m.waste_factor) AS line_cost,
+      CASE
+        WHEN p.regular_unit_price IS NOT NULL AND p.regular_unit_price > p.unit_price
+        THEN (pb.quantity * (p.regular_unit_price - p.unit_price) * m.waste_factor)
+        ELSE 0
+      END AS campaign_savings,
       s.name AS supplier_name
      FROM project_bom pb
      JOIN materials m ON pb.material_id = m.id

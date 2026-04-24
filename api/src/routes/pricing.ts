@@ -19,6 +19,18 @@ function isStockLevel(value: unknown): value is StockLevel {
   return typeof value === "string" && STOCK_LEVELS.includes(value as StockLevel);
 }
 
+function toOptionalPositiveNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : null;
+}
+
+function toOptionalTimestamp(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 // GET /pricing/compare/:materialId — price comparison (anyone with pricing:read)
 router.get("/compare/:materialId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
   const result = await query(
@@ -204,6 +216,9 @@ router.put(
       stock_level,
       store_location,
       last_checked_at,
+      regular_unit_price,
+      campaign_label,
+      campaign_ends_at,
     } = req.body;
     const { materialId, supplierId } = req.params;
     const normalizedStockLevel = stock_level === undefined ? undefined : stock_level;
@@ -231,13 +246,24 @@ router.put(
       store_location !== undefined ||
       last_checked_at !== undefined;
     const checkedAt = stockWasProvided ? (last_checked_at ?? new Date().toISOString()) : null;
+    const currentUnitPrice = Number(unit_price);
+    const regularUnitPrice = toOptionalPositiveNumber(regular_unit_price);
+    const hasCampaignPrice = regularUnitPrice !== null && Number.isFinite(currentUnitPrice) && regularUnitPrice > currentUnitPrice;
+    const normalizedCampaignLabel = hasCampaignPrice
+      ? (typeof campaign_label === "string" && campaign_label.trim() ? campaign_label.trim().slice(0, 160) : "Campaign price")
+      : null;
+    const normalizedCampaignEndsAt = hasCampaignPrice ? toOptionalTimestamp(campaign_ends_at) : null;
 
     const result = await query(
       `INSERT INTO pricing (
          material_id, supplier_id, unit, unit_price, sku, ean, link, is_primary,
-         stock_level, in_stock, store_location, last_checked_at, last_verified_at
+         stock_level, in_stock, store_location, last_checked_at,
+         regular_unit_price, campaign_label, campaign_ends_at, campaign_detected_at,
+         last_verified_at
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, 'unknown'),$10,$11,$12,now())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, 'unknown'),$10,$11,$12,$13,$14,$15,
+         CASE WHEN $14::text IS NULL THEN NULL ELSE now() END,
+         now())
        ON CONFLICT (material_id, supplier_id) DO UPDATE SET
          unit=$3,
          previous_unit_price=CASE
@@ -250,6 +276,19 @@ router.put(
          in_stock=COALESCE($10, pricing.in_stock),
          store_location=COALESCE($11, pricing.store_location),
          last_checked_at=COALESCE($12, pricing.last_checked_at),
+         regular_unit_price=$13,
+         campaign_label=$14,
+         campaign_ends_at=$15,
+         campaign_detected_at=CASE
+           WHEN $14::text IS NOT NULL
+            AND (
+              pricing.campaign_label IS DISTINCT FROM $14
+              OR pricing.regular_unit_price IS DISTINCT FROM $13
+              OR pricing.campaign_ends_at IS DISTINCT FROM $15
+            )
+           THEN now()
+           ELSE pricing.campaign_detected_at
+         END,
          last_verified_at=now(), updated_at=now()
        RETURNING *`,
       [
@@ -265,6 +304,9 @@ router.put(
         in_stock,
         store_location,
         checkedAt,
+        hasCampaignPrice ? regularUnitPrice : null,
+        normalizedCampaignLabel,
+        normalizedCampaignEndsAt,
       ]
     );
 
@@ -279,6 +321,9 @@ router.put(
       supplierId,
       previousUnitPrice: result.rows[0].previous_unit_price,
       unitPrice: result.rows[0].unit_price,
+      regularUnitPrice: result.rows[0].regular_unit_price,
+      campaignLabel: result.rows[0].campaign_label,
+      campaignEndsAt: result.rows[0].campaign_ends_at,
       source: "manual",
     });
 
