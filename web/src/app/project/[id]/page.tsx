@@ -22,6 +22,7 @@ import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
 import AssemblyGuidePanel from "@/components/AssemblyGuidePanel";
 import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
+import TaloyhtioPanel from "@/components/TaloyhtioPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import {
   analyzeSceneGeometry,
@@ -2452,6 +2453,12 @@ export default function ProjectPage() {
     }
   }, [householdDeductionJoint, projectId, t, toast]);
 
+  const saveTaloyhtioMetadata = useCallback(async (patch: Record<string, unknown>) => {
+    const updated = await api.updateProject(projectId, patch) as Project;
+    setProject((prev) => prev ? { ...prev, ...updated } : updated);
+    toast(t("taloyhtio.saved"), "success");
+  }, [projectId, t, toast]);
+
   if (loadError) {
     return (
       <div className="anim-up" role="alert" style={{ padding: 60, textAlign: "center" }}>
@@ -3162,6 +3169,14 @@ export default function ProjectPage() {
           </div>
         );
       })()}
+
+      {project && (
+        <TaloyhtioPanel
+          project={project}
+          bom={bom}
+          onSave={saveTaloyhtioMetadata}
+        />
+      )}
 
       {/* Main content */}
       <main id="main-content" className="editor-main" tabIndex={-1}>
@@ -4235,6 +4250,8 @@ export default function ProjectPage() {
               projectDescription={projectDesc}
               buildingInfo={project?.building_info ?? null}
               projectId={projectId}
+              projectType={project?.project_type}
+              unitCount={project?.unit_count}
               householdDeductionJoint={householdDeductionJoint}
               onHouseholdDeductionJointChange={updateHouseholdDeductionMode}
               onApplyScene={handleBlueprintSceneApply}

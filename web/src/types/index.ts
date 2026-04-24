@@ -19,6 +19,14 @@ export interface BuildingInfo {
   terrain_accuracy_m?: number;
 }
 
+export type ProjectType = "omakotitalo" | "taloyhtio";
+
+export interface ShareholderShare {
+  apartment: string;
+  owner_name?: string | null;
+  share_pct: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -39,6 +47,13 @@ export interface Project {
   view_count?: number;
   contractor_comment_count?: number;
   household_deduction_joint?: boolean;
+  project_type?: ProjectType;
+  unit_count?: number | null;
+  business_id?: string | null;
+  property_manager_name?: string | null;
+  property_manager_email?: string | null;
+  property_manager_phone?: string | null;
+  shareholder_shares?: ShareholderShare[];
   tags?: string[];
   status?: ProjectStatus;
   bom?: BomItem[];

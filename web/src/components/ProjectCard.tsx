@@ -147,6 +147,11 @@ export default function ProjectCard({
                 {Number(project.estimated_cost).toFixed(0)} &euro;
               </span>
             )}
+            {project.project_type === "taloyhtio" && (
+              <span className="badge" style={{ borderColor: "rgba(229,160,75,0.35)", color: "var(--amber)" }}>
+                {t("taloyhtio.cardBadge", { count: Number(project.unit_count || project.building_info?.units || 1) })}
+              </span>
+            )}
             {fundingSignal.show && (
               <span className="badge" style={{ borderColor: "rgba(74,124,89,0.36)", color: "var(--forest)" }}>
                 {t("project.fundingBadge")} {fundingSignal.amount.toLocaleString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB")} &euro;

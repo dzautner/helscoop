@@ -54,6 +54,7 @@ import type {
   KeskoSearchResponse,
   KeskoImportResponse,
   PriceWatch,
+  ProjectType,
 } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
@@ -1892,6 +1893,8 @@ export default function BomPanel({
   projectDescription,
   buildingInfo,
   projectId,
+  projectType,
+  unitCount,
   householdDeductionJoint = false,
   onHouseholdDeductionJointChange,
   onApplyScene,
@@ -1918,6 +1921,10 @@ export default function BomPanel({
   buildingInfo?: BuildingInfo | null;
   /** Project ID used by API-backed cost add-ons such as waste estimates */
   projectId?: string;
+  /** Project mode used for housing-cooperative BOM totals */
+  projectType?: ProjectType;
+  /** Housing-cooperative unit count for building-wide totals */
+  unitCount?: number | null;
   /** Whether the household deduction calculator should use two claimants */
   householdDeductionJoint?: boolean;
   /** Persist household deduction claimant mode on the project */
@@ -1982,6 +1989,10 @@ export default function BomPanel({
   }, [bom.length]);
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const taloyhtioUnitCount = projectType === "taloyhtio"
+    ? Math.max(1, Math.floor(Number(unitCount ?? buildingInfo?.units ?? 1) || 1))
+    : 1;
+  const taloyhtioBuildingTotal = total * taloyhtioUnitCount;
   const animatedTotal = useAnimatedNumber(total);
   const bomTotalAnnouncement = t("editor.bomTotalAnnouncement", {
     count: bom.length,
@@ -2498,6 +2509,38 @@ export default function BomPanel({
             )}
           </div>
         </div>
+        {projectType === "taloyhtio" && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "12px 14px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid rgba(229,160,75,0.28)",
+              background: "rgba(229,160,75,0.08)",
+              display: "grid",
+              gap: 6,
+              fontSize: 12,
+            }}
+          >
+            <div className="label-mono" style={{ fontSize: 10, color: "var(--amber)" }}>
+              {t("taloyhtio.bomMultiplier")}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              <div>
+                <div style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("taloyhtio.perUnit")}</div>
+                <strong>{Math.round(total).toLocaleString(locale)} &euro;</strong>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("taloyhtio.unitCount")}</div>
+                <strong>{taloyhtioUnitCount}</strong>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("taloyhtio.buildingTotal")}</div>
+                <strong>{Math.round(taloyhtioBuildingTotal).toLocaleString(locale)} &euro;</strong>
+              </div>
+            </div>
+          </div>
+        )}
         {importError && (
           <div
             role="alert"
