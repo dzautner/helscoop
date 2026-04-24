@@ -4937,15 +4937,17 @@ select:focus {
   z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-float) 90%, transparent);
   border: 1px solid var(--border-subtle);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--shadow-md);
-  min-width: 140px;
+  width: min(340px, calc(100% - 20px));
+  max-height: calc(100% - 86px);
+  overflow: auto;
 }
 
 .viewport-thermal-legend-title {
@@ -4986,6 +4988,7 @@ select:focus {
 
 .thermal-compliance-badges {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -5009,6 +5012,97 @@ select:focus {
 .thermal-badge-fail {
   background: color-mix(in srgb, #ef4444 20%, transparent);
   color: #dc2626;
+}
+
+.thermal-controls {
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.thermal-controls label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.thermal-controls select,
+.thermal-controls input {
+  width: 100%;
+}
+
+.thermal-controls select {
+  min-height: 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+  color: var(--text-primary);
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.thermal-controls input {
+  accent-color: #ff8a2a;
+}
+
+.thermal-inspector {
+  display: grid;
+  gap: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.thermal-inspector p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.thermal-inspector-title {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.thermal-inspector-name {
+  display: grid;
+  gap: 2px;
+}
+
+.thermal-inspector-name strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.thermal-inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.thermal-inspector-grid span {
+  min-width: 0;
+  padding: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 72%, transparent);
+  line-height: 1.35;
+}
+
+.thermal-inspector-grid strong {
+  display: block;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.thermal-inspector-foot {
+  display: grid;
+  gap: 3px;
+  line-height: 1.4;
 }
 
 .viewport-airflow-panel {

@@ -34,7 +34,17 @@ import {
 } from "@/lib/scene-geometry-bom";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
-import { calculateThermalLoss, heatFluxToColor, getComplianceSummary } from "@/lib/thermal-engine";
+import {
+  calculateSurfaceAnnualHeatLossKwh,
+  calculateThermalLoss,
+  checkCodeCompliance,
+  CLIMATE_LOCATIONS,
+  estimateBomAreaM2,
+  getComplianceSummary,
+  getHeatLossRating,
+  heatFluxToColor,
+  type SurfaceThermalData,
+} from "@/lib/thermal-engine";
 import { analyzeAirflow } from "@/lib/airflow-engine";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
@@ -370,6 +380,15 @@ export default function ProjectPage() {
   const renovationCompareRef = useRef<HTMLDivElement>(null);
   const renovationCompareDragging = useRef(false);
   const [thermalView, setThermalView] = useState(false);
+  const [thermalLocationIndex, setThermalLocationIndex] = useState(0);
+  const [thermalInsideTemp, setThermalInsideTemp] = useState(21);
+  const [thermalOutsideTemp, setThermalOutsideTemp] = useState(CLIMATE_LOCATIONS[0]?.designTemp ?? -26);
+  const [thermalInspection, setThermalInspection] = useState<{
+    materialId: string;
+    objectId?: string;
+    clientX?: number;
+    clientY?: number;
+  } | null>(null);
   const [airflowView, setAirflowView] = useState(false);
   const [airflowParticleDensity, setAirflowParticleDensity] = useState(500);
   const [airflowSpeed, setAirflowSpeed] = useState(1);
@@ -911,16 +930,27 @@ export default function ProjectPage() {
 
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
 
+  const thermalBomAreaItems = useMemo(
+    () => bom.map((item) => ({ material_id: item.material_id, quantity: item.quantity, unit: item.unit })),
+    [bom],
+  );
+
   const thermalData = useMemo(() => {
     if (!thermalView || materials.length === 0) return undefined;
-    const result = calculateThermalLoss(materials);
+    const location = CLIMATE_LOCATIONS[thermalLocationIndex] ?? CLIMATE_LOCATIONS[0];
+    const result = calculateThermalLoss(materials, {
+      insideTemp: thermalInsideTemp,
+      outsideTemp: thermalOutsideTemp,
+      surfaceRInside: 0.13,
+      surfaceROutside: 0.04,
+    });
     const colorMap = new Map<string, [number, number, number]>();
     result.surfaces.forEach((data) => {
       colorMap.set(data.materialId, heatFluxToColor(data.heatFluxDensity, result.minHeatFlux, result.maxHeatFlux));
     });
     const compliance = getComplianceSummary(result.surfaces);
-    return { colorMap, compliance };
-  }, [thermalView, materials]);
+    return { colorMap, compliance, location, result };
+  }, [materials, thermalInsideTemp, thermalLocationIndex, thermalOutsideTemp, thermalView]);
   const sceneLayers = useMemo(() => buildSceneLayers(renderedLayers, bom), [bom, renderedLayers]);
   const assemblyGuide = useMemo(() => buildAssemblyGuide(sceneLayers, bom, materials), [bom, materials, sceneLayers]);
   const constructionTimelapsePlan = useMemo(() => buildConstructionTimelapse(assemblyGuide), [assemblyGuide]);
@@ -971,6 +1001,54 @@ export default function ProjectPage() {
   const isAdvancedMode = editorMode === "advanced";
 
   const thermalColorMap = thermalData?.colorMap;
+  const thermalInspectionDetails = useMemo(() => {
+    if (!thermalView) return null;
+
+    const layer = thermalInspection?.objectId
+      ? sceneLayers.find((entry) => entry.id === thermalInspection.objectId)
+      : selectedLayerId
+        ? sceneLayers.find((entry) => entry.id === selectedLayerId)
+        : null;
+    const sceneMaterialId = thermalInspection?.materialId ?? layer?.materialId ?? null;
+    if (!sceneMaterialId) return null;
+
+    const matchedMaterial = materials.find((material) => material.id === sceneMaterialId)
+      ?? matchSceneMaterial(sceneMaterialId, materials);
+    const resolvedMaterialId = matchedMaterial?.id ?? sceneMaterialId;
+    const data: SurfaceThermalData | undefined = thermalData?.result.surfaces.get(sceneMaterialId)
+      ?? thermalData?.result.surfaces.get(resolvedMaterialId);
+    const materialName = matchedMaterial
+      ? locale === "fi"
+        ? matchedMaterial.name_fi || matchedMaterial.name || matchedMaterial.id
+        : matchedMaterial.name_en || matchedMaterial.name || matchedMaterial.id
+      : sceneMaterialId;
+    const areaM2 = data ? estimateBomAreaM2(data.materialId, thermalBomAreaItems) : 0;
+    const annualHeatLossKwh = data && thermalData
+      ? calculateSurfaceAnnualHeatLossKwh(data, areaM2, thermalData.location, thermalInsideTemp)
+      : 0;
+    const compliance = data ? checkCodeCompliance(data.category, data.uValue, data.materialId) : null;
+
+    return {
+      areaM2,
+      annualHeatLossKwh,
+      compliance,
+      data,
+      layerName: layer?.name ?? thermalInspection?.objectId ?? null,
+      materialName,
+      sceneMaterialId,
+      rating: data ? getHeatLossRating(data.heatFluxDensity) : null,
+    };
+  }, [
+    locale,
+    materials,
+    sceneLayers,
+    selectedLayerId,
+    thermalBomAreaItems,
+    thermalData,
+    thermalInspection,
+    thermalInsideTemp,
+    thermalView,
+  ]);
 
   const renovationRoi = useMemo(
     () => estimateRenovationRoi(bom, materials, project?.building_info ?? null, { coupleMode: householdDeductionJoint }),
@@ -999,6 +1077,10 @@ export default function ProjectPage() {
   useEffect(() => {
     if (!showLayers) setSelectedLayerId(null);
   }, [showLayers]);
+
+  useEffect(() => {
+    if (!thermalView) setThermalInspection(null);
+  }, [thermalView]);
 
   useEffect(() => {
     setAssemblyProgressLoaded(false);
@@ -2377,7 +2459,13 @@ export default function ProjectPage() {
 
   const handleViewportObjectSelect = useCallback((objectId: string) => {
     setSelectedLayerId(objectId);
-  }, []);
+    if (thermalView) {
+      const layer = sceneLayers.find((entry) => entry.id === objectId);
+      if (layer) {
+        setThermalInspection({ materialId: layer.materialId, objectId });
+      }
+    }
+  }, [sceneLayers, thermalView]);
 
   const surfacePickerContext = useMemo(() => {
     if (!surfacePickerMaterialId) return null;
@@ -2418,6 +2506,21 @@ export default function ProjectPage() {
   }, [assemblyGuide.steps, handleOpenLayerMaterial]);
 
   const handleViewportMaterialSurfaceSelect = useCallback((selection: ViewportMaterialSelection) => {
+    if (thermalView) {
+      setThermalInspection({
+        materialId: selection.materialId,
+        objectId: selection.objectId,
+        clientX: selection.clientX,
+        clientY: selection.clientY,
+      });
+      if (selection.objectId) setSelectedLayerId(selection.objectId);
+      track("thermal_surface_inspected", {
+        material_id: selection.materialId,
+        object_id: selection.objectId ?? "",
+      });
+      return;
+    }
+
     const hasBomMaterial = bom.some((item) => item.material_id === selection.materialId);
     const matchedMaterial = matchSceneMaterial(selection.materialId, materials);
     if (!hasBomMaterial && !matchedMaterial) {
@@ -2430,7 +2533,7 @@ export default function ProjectPage() {
       object_id: selection.objectId ?? "",
     });
     setSurfacePickerMaterialId(selection.materialId);
-  }, [bom, materials, t, toast, track]);
+  }, [bom, materials, t, thermalView, toast, track]);
 
   const handleSurfacePickerSelect = useCallback((toMaterialId: string) => {
     if (!surfacePickerContext) return;
@@ -4157,12 +4260,51 @@ export default function ProjectPage() {
 
           {/* Thermal legend */}
           {thermalView && (
-            <div className="viewport-thermal-legend">
+            <div className="viewport-thermal-legend" data-testid="thermal-panel">
               <div className="viewport-thermal-legend-title">{t('editor.thermalLegend')}</div>
               <div className="viewport-thermal-legend-bar" />
               <div className="viewport-thermal-legend-labels">
                 <span>{t('editor.thermalLow')}</span>
                 <span>{t('editor.thermalHigh')}</span>
+              </div>
+              <div className="thermal-controls">
+                <label>
+                  <span>{t("editor.thermalLocation")}</span>
+                  <select
+                    value={thermalLocationIndex}
+                    onChange={(event) => {
+                      const nextIndex = Number(event.currentTarget.value);
+                      setThermalLocationIndex(nextIndex);
+                      setThermalOutsideTemp(CLIMATE_LOCATIONS[nextIndex]?.designTemp ?? thermalOutsideTemp);
+                    }}
+                  >
+                    {CLIMATE_LOCATIONS.map((location, index) => (
+                      <option key={location.code} value={index}>{location.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("editor.thermalOutdoor")}: {thermalOutsideTemp} °C</span>
+                  <input
+                    type="range"
+                    min={-40}
+                    max={30}
+                    step={1}
+                    value={thermalOutsideTemp}
+                    onChange={(event) => setThermalOutsideTemp(Number(event.currentTarget.value))}
+                  />
+                </label>
+                <label>
+                  <span>{t("editor.thermalIndoor")}: {thermalInsideTemp} °C</span>
+                  <input
+                    type="range"
+                    min={5}
+                    max={25}
+                    step={1}
+                    value={thermalInsideTemp}
+                    onChange={(event) => setThermalInsideTemp(Number(event.currentTarget.value))}
+                  />
+                </label>
               </div>
               {thermalData?.compliance && (thermalData.compliance.pass + thermalData.compliance.warn + thermalData.compliance.fail) > 0 && (
                 <div className="thermal-compliance-row">
@@ -4180,6 +4322,43 @@ export default function ProjectPage() {
                   </div>
                 </div>
               )}
+              <div className="thermal-inspector">
+                <div className="thermal-inspector-title">{t("editor.thermalInspect")}</div>
+                {thermalInspectionDetails ? (
+                  <>
+                    <div className="thermal-inspector-name">
+                      <strong>{thermalInspectionDetails.materialName}</strong>
+                      {thermalInspectionDetails.layerName && (
+                        <span>{t("editor.thermalLayer")}: {thermalInspectionDetails.layerName}</span>
+                      )}
+                    </div>
+                    {thermalInspectionDetails.data ? (
+                      <>
+                        <div className="thermal-inspector-grid">
+                          <span>{t("editor.thermalUValue")} <strong>{thermalInspectionDetails.data.uValue.toFixed(2)} W/m²K</strong></span>
+                          <span>{t("editor.thermalRValue")} <strong>{thermalInspectionDetails.data.rValue.toFixed(2)} m²K/W</strong></span>
+                          <span>{t("editor.thermalFlux")} <strong>{thermalInspectionDetails.data.heatFluxDensity.toFixed(1)} W/m²</strong></span>
+                          <span>{t("editor.thermalInsideSurface")} <strong>{thermalInspectionDetails.data.insideSurfaceTempC.toFixed(1)} °C</strong></span>
+                          <span>{t("editor.thermalOutsideSurface")} <strong>{thermalInspectionDetails.data.outsideSurfaceTempC.toFixed(1)} °C</strong></span>
+                          <span>{t("editor.thermalAnnualLoss")} <strong>{thermalInspectionDetails.areaM2 > 0 ? `${thermalInspectionDetails.annualHeatLossKwh.toFixed(0)} kWh/y` : t("editor.thermalAreaUnknown")}</strong></span>
+                        </div>
+                        <div className="thermal-inspector-foot">
+                          <span>{t("editor.thermalRating")}: {t((`editor.thermalRating_${thermalInspectionDetails.rating}`) as any)}</span>
+                          {thermalInspectionDetails.compliance && (
+                            <span>
+                              {t("editor.thermalComplianceReference")}: {t((`editor.thermalReference_${thermalInspectionDetails.compliance.referenceCategory}`) as any)} ≤ {thermalInspectionDetails.compliance.referenceU.toFixed(2)} W/m²K
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p>{t("editor.thermalNoData")}</p>
+                    )}
+                  </>
+                ) : (
+                  <p>{t("editor.thermalClickHint")}</p>
+                )}
+              </div>
             </div>
           )}
 
