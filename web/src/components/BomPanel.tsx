@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
 import { useCursorGlow } from "@/hooks/useCursorGlow";
 import { useTranslation } from "@/components/LocaleProvider";
 import { SkeletonPriceComparison } from "@/components/Skeleton";
@@ -1900,6 +1900,7 @@ export default function BomPanel({
   householdDeductionJoint = false,
   onHouseholdDeductionJointChange,
   onApplyScene,
+  referencePhotosSlot,
 }: {
   bom: BomItem[];
   materials: Material[];
@@ -1933,6 +1934,8 @@ export default function BomPanel({
   onHouseholdDeductionJointChange?: (joint: boolean) => void;
   /** Apply generated scene code from blueprint/floor-plan tooling */
   onApplyScene?: (sceneJs: string) => void;
+  /** Optional project-level house photo gallery shown above BOM tools */
+  referencePhotosSlot?: ReactNode;
 }) {
   const glow = useCursorGlow();
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
@@ -2441,6 +2444,7 @@ export default function BomPanel({
           {t("bom.importDrop")}
         </div>
       )}
+      {referencePhotosSlot}
       <div style={{
         padding: "16px 20px",
         borderBottom: "1px solid var(--border)",

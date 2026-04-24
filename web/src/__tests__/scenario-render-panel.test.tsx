@@ -94,10 +94,12 @@ describe("ScenarioRenderPanel", () => {
     await waitFor(() => {
       expect(captureFrame).toHaveBeenCalledTimes(4);
     });
-    expect(mockTrack).toHaveBeenCalledWith("scenario_render_generated", expect.objectContaining({
-      source: "toolbar",
-      lighting_preset: "winter",
-    }));
+    await waitFor(() => {
+      expect(mockTrack).toHaveBeenCalledWith("scenario_render_generated", expect.objectContaining({
+        source: "toolbar",
+        lighting_preset: "winter",
+      }));
+    });
     expect(screen.getByText(/Add a photo overlay/)).toBeInTheDocument();
   });
 });

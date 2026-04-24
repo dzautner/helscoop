@@ -669,6 +669,26 @@ export interface QuoteRequestResponse {
   matched_contractor_count: number;
 }
 
+export interface ProjectImage {
+  id: string;
+  project_id: string;
+  original_filename: string;
+  content_type: string;
+  byte_size: number;
+  width: number | null;
+  height: number | null;
+  uploaded_at: string;
+  urls: {
+    original: string;
+    thumb_200: string;
+    thumb_800: string;
+  };
+}
+
+export interface ProjectImagesResponse {
+  images: ProjectImage[];
+}
+
 export type ProLeadStatus = "submitted" | "forwarded" | "closed";
 
 export interface ProLead {

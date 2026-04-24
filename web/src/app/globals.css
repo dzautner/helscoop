@@ -4232,6 +4232,20 @@ select:focus {
   color: var(--text-muted);
 }
 
+.chat-reference-photo-context {
+  align-self: center;
+  max-width: 142px;
+  padding: 3px 6px;
+  border: 1px solid rgba(74, 124, 89, 0.32);
+  border-radius: 999px;
+  color: var(--forest);
+  background: rgba(74, 124, 89, 0.12);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .chat-send-btn {
   background: none;
   border: none;
@@ -4256,6 +4270,163 @@ select:focus {
 .chat-input:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+/* Project reference photos */
+.reference-photos-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(74,124,89,0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent);
+}
+
+.reference-photos-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.reference-photos-eyebrow {
+  color: var(--forest);
+  font-size: 9px;
+  margin-bottom: 4px;
+}
+
+.reference-photos-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.reference-photos-header p,
+.reference-photo-empty {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.reference-photo-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px dashed rgba(74,124,89,0.55);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: rgba(74,124,89,0.08);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.reference-photo-dropzone[data-dragging="true"],
+.reference-photo-dropzone:hover:not(:disabled) {
+  border-color: var(--forest);
+  color: var(--forest);
+  background: rgba(74,124,89,0.15);
+}
+
+.reference-photo-dropzone:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reference-photo-dropzone span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reference-photo-dropzone small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.reference-photo-progress {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.reference-photo-progress > div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.reference-photo-progress progress {
+  width: 100%;
+  height: 7px;
+  accent-color: var(--forest);
+}
+
+.reference-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reference-photo-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.reference-photo-card img,
+.reference-photo-skeleton {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.2;
+  object-fit: cover;
+  background: var(--bg-secondary);
+}
+
+.reference-photo-skeleton {
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.reference-photo-card div {
+  display: grid;
+  gap: 2px;
+  padding: 7px;
+}
+
+.reference-photo-card strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-photo-card span {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.reference-photo-delete {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(0,0,0,0.25);
+  border-radius: 999px;
+  color: white;
+  background: rgba(0,0,0,0.58);
+  cursor: pointer;
 }
 .chat-suggestion-chip:disabled {
   opacity: 0.4;
