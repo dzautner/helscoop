@@ -12,6 +12,12 @@ vi.mock("next/dynamic", () => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+const mockTrack = vi.fn();
+vi.mock("@/hooks/useAnalytics", () => ({
+  useAnalytics: () => ({ track: mockTrack }),
 }));
 
 vi.mock("@/components/LocaleProvider", () => ({
@@ -32,6 +38,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       getSharedProject: vi.fn(),
       createSharedComment: vi.fn(),
+      cloneGalleryProject: vi.fn(),
     },
   };
 });
@@ -45,6 +52,7 @@ const sharedProject = {
   created_at: "2026-04-20T00:00:00.000Z",
   updated_at: "2026-04-23T00:00:00.000Z",
   share_token_expires_at: "2026-05-23T00:00:00.000Z",
+  is_public: true,
   bom: [
     {
       material_id: "tile",
@@ -75,6 +83,14 @@ describe("SharedProjectContent contractor view", () => {
       commenter_name: "New Builder",
       message: "Available next month.",
       created_at: "2026-04-24T00:00:00.000Z",
+    });
+    vi.mocked(api.cloneGalleryProject).mockResolvedValue({
+      id: "clone-1",
+      name: "Inspired by Sauna contractor pack",
+      description: "",
+      estimated_cost: 0,
+      created_at: "2026-04-24T00:00:00.000Z",
+      updated_at: "2026-04-24T00:00:00.000Z",
     });
   });
 
@@ -112,5 +128,18 @@ describe("SharedProjectContent contractor view", () => {
 
     expect(await screen.findByText("share.expired")).toBeInTheDocument();
     expect(screen.getByText("share.expiredDesc")).toBeInTheDocument();
+  });
+
+  it("offers cloning for public inspiration projects", async () => {
+    render(<SharedProjectContent token="share-token" />);
+
+    await screen.findByText("Sauna contractor pack");
+    fireEvent.click(screen.getAllByRole("button", { name: "share.inspireOwn" })[0]);
+
+    await waitFor(() => expect(api.cloneGalleryProject).toHaveBeenCalledWith("project-1"));
+    expect(mockTrack).toHaveBeenCalledWith("gallery_project_cloned", {
+      project_id: "project-1",
+      source: "shared_viewer",
+    });
   });
 });

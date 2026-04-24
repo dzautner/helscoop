@@ -505,7 +505,8 @@ router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   const result = await query(
-    `SELECT id, name, description, is_public, created_at, updated_at, thumbnail_url, tags, status,
+    `SELECT id, name, description, is_public, published_at, gallery_status,
+      gallery_like_count, gallery_clone_count, created_at, updated_at, thumbnail_url, tags, status,
       project_type, unit_count, business_id, property_manager_name, property_manager_email,
       property_manager_phone, shareholder_shares,
       ((SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
@@ -525,7 +526,8 @@ router.get("/", async (req, res) => {
 
 router.get("/trash", async (req, res) => {
   const result = await query(
-    `SELECT id, name, description, is_public, created_at, updated_at, deleted_at, thumbnail_url,
+    `SELECT id, name, description, is_public, published_at, gallery_status,
+      gallery_like_count, gallery_clone_count, created_at, updated_at, deleted_at, thumbnail_url,
       project_type, unit_count, business_id,
       ((SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
@@ -1286,7 +1288,7 @@ router.post("/:id/share", requirePermission("project:share"), async (req, res) =
 
   // If already shared, return existing token
   const existingExpiresAt = proj.rows[0].share_token_expires_at ? new Date(proj.rows[0].share_token_expires_at) : null;
-  if (proj.rows[0].share_token && existingExpiresAt && existingExpiresAt.getTime() > Date.now()) {
+  if (proj.rows[0].share_token && (!existingExpiresAt || existingExpiresAt.getTime() > Date.now())) {
     return res.json({ share_token: proj.rows[0].share_token, expires_at: proj.rows[0].share_token_expires_at });
   }
 
@@ -1312,6 +1314,8 @@ router.delete("/:id/share", async (req, res) => {
      SET share_token = NULL,
          share_token_created_at = NULL,
          share_token_expires_at = NULL,
+         is_public = false,
+         published_at = NULL,
          updated_at = now()
      WHERE id = $1 AND user_id = $2
      RETURNING id`,
@@ -1321,6 +1325,56 @@ router.delete("/:id/share", async (req, res) => {
     return res.status(404).json({ error: "Project not found" });
   }
   res.json({ ok: true });
+});
+
+router.put("/:id/publish", requirePermission("project:share"), async (req, res) => {
+  if (typeof req.body?.is_public !== "boolean") {
+    return res.status(400).json({ error: "is_public must be a boolean" });
+  }
+
+  const project = await query(
+    "SELECT id, share_token, share_token_expires_at FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  if (req.body.is_public) {
+    const shareToken = project.rows[0].share_token || crypto.randomUUID();
+    const result = await query(
+      `UPDATE projects
+       SET is_public = true,
+           gallery_status = 'approved',
+           published_at = COALESCE(published_at, now()),
+           share_token = $1,
+           share_token_created_at = COALESCE(share_token_created_at, now()),
+           share_token_expires_at = NULL,
+           updated_at = now()
+       WHERE id = $2 AND user_id = $3
+       RETURNING id, is_public, published_at, gallery_status, share_token, share_token_expires_at`,
+      [shareToken, req.params.id, req.user!.id],
+    );
+    logAuditEvent(req.user!.id, "project.publish", { targetId: req.params.id, ip: req.ip });
+    return res.json(result.rows[0]);
+  }
+
+  const result = await query(
+    `UPDATE projects
+     SET is_public = false,
+         published_at = NULL,
+         gallery_status = 'approved',
+         share_token_expires_at = CASE
+           WHEN share_token IS NOT NULL AND share_token_expires_at IS NULL THEN now() + INTERVAL '30 days'
+           ELSE share_token_expires_at
+         END,
+         updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id, is_public, published_at, gallery_status, share_token, share_token_expires_at`,
+    [req.params.id, req.user!.id],
+  );
+  logAuditEvent(req.user!.id, "project.unpublish", { targetId: req.params.id, ip: req.ip });
+  res.json(result.rows[0]);
 });
 
 router.post("/:id/bom/substitute", async (req, res) => {

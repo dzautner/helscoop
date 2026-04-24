@@ -1132,6 +1132,115 @@ describe("DELETE /projects/:id/share", () => {
 });
 
 // --------------------------------------------------------------------------
+// Public inspiration gallery
+// --------------------------------------------------------------------------
+
+describe("PUT /projects/:id/publish", () => {
+  it("publishes an owned project with a permanent gallery share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: null, share_token_expires_at: null }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        is_public: true,
+        published_at: "2026-04-24T00:00:00.000Z",
+        gallery_status: "approved",
+        share_token: "public-token",
+        share_token_expires_at: null,
+      }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/publish", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { is_public: true },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { is_public: boolean }).is_public).toBe(true);
+    expect(mockQuery.mock.calls[1][0]).toContain("share_token_expires_at = NULL");
+  });
+
+  it("rejects invalid publish payloads", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1/publish", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { is_public: "yes" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /gallery/projects", () => {
+  it("returns public gallery cards without authentication", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        name: "Sauna inspiration",
+        share_token: "public-token",
+        is_public: true,
+        estimated_cost: "8500",
+        material_highlights: ["Lumber", "Insulation"],
+        view_count: 3,
+        heart_count: 0,
+        clone_count: 1,
+      }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/gallery/projects?q=sauna&cost_range=5k-15k");
+
+    expect(res.status).toBe(200);
+    expect((res.body as { projects: Array<{ name: string }> }).projects[0].name).toBe("Sauna inspiration");
+    expect(mockQuery.mock.calls[0][0]).toContain("p.is_public = true");
+    expect(mockQuery.mock.calls[0][1]).toContain("%sauna%");
+  });
+});
+
+describe("POST /gallery/projects/:id/clone", () => {
+  it("clones a public project's material list into a blank owned project", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "source-1", name: "Published Sauna", project_type: "omakotitalo", unit_count: null, tags: ["sauna"] }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "clone-1", name: "Inspired by Published Sauna", user_id: "user-1" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], command: "INSERT", rowCount: 2, oid: 0, fields: [] });
+    mockQuery.mockResolvedValueOnce({ rows: [], command: "UPDATE", rowCount: 1, oid: 0, fields: [] });
+
+    const res = await makeRequest("POST", "/gallery/projects/source-1/clone", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(201);
+    expect((res.body as { id: string; cloned_from_project_id: string }).id).toBe("clone-1");
+    expect((res.body as { cloned_from_project_id: string }).cloned_from_project_id).toBe("source-1");
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO project_bom");
+    expect(mockQuery.mock.calls[2][0]).toContain("SELECT $1, material_id, quantity, unit");
+  });
+});
+
+// --------------------------------------------------------------------------
 // PUT /projects/:id/thumbnail — thumbnail upload
 // --------------------------------------------------------------------------
 

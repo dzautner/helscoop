@@ -39,6 +39,17 @@ export interface Project {
   original_scene_js?: string | null;
   display_scale?: number;
   thumbnail_url?: string | null;
+  is_public?: boolean;
+  published_at?: string | null;
+  gallery_status?: "pending" | "approved" | "rejected";
+  gallery_like_count?: number;
+  gallery_clone_count?: number;
+  heart_count?: number;
+  clone_count?: number;
+  owner_name?: string | null;
+  region?: string | null;
+  cost_band?: GalleryCostRange;
+  material_highlights?: string[];
   building_info?: BuildingInfo | null;
   permit_metadata?: RyhtiPermitMetadata | null;
   photo_overlay?: PhotoOverlayState | null;
@@ -59,6 +70,29 @@ export interface Project {
   bom?: BomItem[];
   comments?: SharedProjectComment[];
   param_presets?: ParamPreset[];
+}
+
+export type GalleryCostRange = "under-5k" | "5k-15k" | "15k-50k" | "50k-plus";
+
+export interface GalleryProject {
+  id: string;
+  name: string;
+  description?: string | null;
+  thumbnail_url?: string | null;
+  share_token?: string | null;
+  is_public: boolean;
+  published_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  project_type?: ProjectType;
+  owner_name?: string | null;
+  region?: string | null;
+  estimated_cost: number;
+  cost_band?: GalleryCostRange;
+  material_highlights: string[];
+  view_count: number;
+  heart_count: number;
+  clone_count: number;
 }
 
 export interface PhotoOverlayState {

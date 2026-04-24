@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getPresentationPreset } from "@/lib/presentation-export";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import type { BomItem, Project, SharedProjectComment } from "@/types";
 
 function escapeCsvField(value: string, sep: string): string {
@@ -73,7 +74,9 @@ const Viewport3D = dynamic(() => import("@/components/Viewport3D"), {
 
 export default function SharedProjectContent({ token }: { token: string }) {
   const { t, locale } = useTranslation();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { track } = useAnalytics();
 
   const [project, setProject] = useState<Project | null>(null);
   const [bom, setBom] = useState<BomItem[]>([]);
@@ -82,6 +85,8 @@ export default function SharedProjectContent({ token }: { token: string }) {
   const [commentMessage, setCommentMessage] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentStatus, setCommentStatus] = useState<"idle" | "sent" | "error">("idle");
+  const [cloneSubmitting, setCloneSubmitting] = useState(false);
+  const [cloneStatus, setCloneStatus] = useState<"idle" | "error">("idle");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expired, setExpired] = useState(false);
@@ -127,6 +132,21 @@ export default function SharedProjectContent({ token }: { token: string }) {
       setCommentStatus("error");
     } finally {
       setCommentSubmitting(false);
+    }
+  };
+
+  const clonePublicProject = async () => {
+    if (!project?.id || cloneSubmitting) return;
+    setCloneSubmitting(true);
+    setCloneStatus("idle");
+    try {
+      const clone = await api.cloneGalleryProject(project.id);
+      track("gallery_project_cloned", { project_id: project.id, source: "shared_viewer" });
+      router.push(`/project/${clone.id}`);
+    } catch {
+      setCloneStatus("error");
+    } finally {
+      setCloneSubmitting(false);
     }
   };
 
@@ -179,6 +199,9 @@ export default function SharedProjectContent({ token }: { token: string }) {
   const grandTotal = bom.reduce((sum, b) => sum + (b.total || 0), 0);
   const presentationMode = searchParams.get("presentation") === "1";
   const presentationPreset = getPresentationPreset(searchParams.get("camera")).id;
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const encodedShareUrl = encodeURIComponent(shareUrl);
+  const encodedShareText = encodeURIComponent(`${project.name} - ${shareUrl}`);
 
   return (
     <div style={{
@@ -224,6 +247,17 @@ export default function SharedProjectContent({ token }: { token: string }) {
           <span className="shared-presentation-badge">
             {t("presentation.viewerBadge")}
           </span>
+        )}
+        {project.is_public && (
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={cloneSubmitting}
+            onClick={clonePublicProject}
+            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 700, flexShrink: 0 }}
+          >
+            {cloneSubmitting ? t("share.cloningProject") : t("share.inspireOwn")}
+          </button>
         )}
       </div>
 
@@ -378,6 +412,29 @@ export default function SharedProjectContent({ token }: { token: string }) {
               {grandTotal.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR
             </span>
           </div>
+          {project.is_public && (
+            <section className="shared-gallery-actions" aria-label={t("share.publicGalleryActions")}>
+              <div>
+                <h2>{t("share.publicGalleryActions")}</h2>
+                <p>{t("share.publicGalleryDesc")}</p>
+              </div>
+              <button className="btn btn-primary" type="button" disabled={cloneSubmitting} onClick={clonePublicProject}>
+                {cloneSubmitting ? t("share.cloningProject") : t("share.inspireOwn")}
+              </button>
+              {cloneStatus === "error" && <p role="alert">{t("share.cloneFailed")}</p>}
+              <div className="shared-social-links">
+                <a href={`https://wa.me/?text=${encodedShareText}`} target="_blank" rel="noreferrer">
+                  WhatsApp
+                </a>
+                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}`} target="_blank" rel="noreferrer">
+                  Facebook
+                </a>
+                <a href={`mailto:?subject=${encodeURIComponent(project.name)}&body=${encodedShareText}`}>
+                  Email
+                </a>
+              </div>
+            </section>
+          )}
           <section className="shared-comments" aria-labelledby="shared-comments-title">
             <div className="shared-comments-head">
               <h2 id="shared-comments-title">{t('share.commentsTitle')}</h2>

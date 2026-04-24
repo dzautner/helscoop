@@ -374,6 +374,8 @@ export default function ProjectPage() {
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [isPublicGalleryProject, setIsPublicGalleryProject] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
   const [wireframe, setWireframe] = useState(false);
   const [renovationCompareMode, setRenovationCompareMode] = useState(false);
   const [renovationCompareSplit, setRenovationCompareSplit] = useState(50);
@@ -617,6 +619,7 @@ export default function ProjectPage() {
         setHouseholdDeductionJoint(Boolean(proj.household_deduction_joint));
         setProjectStatus(proj.status || "planning");
         setProjectTags(proj.tags || []);
+        setIsPublicGalleryProject(Boolean(proj.is_public));
         if (proj.share_token) {
           setShareToken(proj.share_token);
           setShareExpiresAt(proj.share_token_expires_at ?? null);
@@ -1624,6 +1627,29 @@ export default function ProjectPage() {
       setDuplicating(false);
     }
   }, [projectId, router, t, toast]);
+
+  const togglePublicGalleryProject = useCallback(async (nextPublic: boolean) => {
+    setPublishLoading(true);
+    try {
+      const result = await api.publishProject(projectId, nextPublic);
+      setIsPublicGalleryProject(result.is_public);
+      setShareToken(result.share_token);
+      setShareExpiresAt(result.share_token_expires_at);
+      setProject((current) => current ? {
+        ...current,
+        is_public: result.is_public,
+        published_at: result.published_at,
+        gallery_status: result.gallery_status,
+        share_token: result.share_token,
+        share_token_expires_at: result.share_token_expires_at,
+      } : current);
+      toast(nextPublic ? t("toast.projectPublished") : t("toast.projectUnpublished"), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("toast.publishFailed"), "error");
+    } finally {
+      setPublishLoading(false);
+    }
+  }, [projectId, t, toast]);
 
   const handleVersionRestored = useCallback(
     ({ snapshot }: { snapshot: ProjectVersionSnapshot; project?: unknown }) => {
@@ -4962,6 +4988,29 @@ export default function ProjectPage() {
                 })}
               </div>
             )}
+            {isPublicGalleryProject && (
+              <div className="badge badge-muted" style={{ display: "inline-flex", marginBottom: 14, marginLeft: 8 }}>
+                {t("share.publicGalleryBadge")}
+              </div>
+            )}
+
+            <div className="share-publish-panel">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isPublicGalleryProject}
+                  disabled={publishLoading}
+                  onChange={(event) => togglePublicGalleryProject(event.currentTarget.checked)}
+                />
+                <span>{t("share.publishToGallery")}</span>
+              </label>
+              <p>{t("share.publishToGalleryDesc")}</p>
+              {isPublicGalleryProject && (
+                <Link href="/gallery" target="_blank" rel="noreferrer">
+                  {t("share.viewInGallery")}
+                </Link>
+              )}
+            </div>
 
             {/* Share URL field */}
             <div style={{
