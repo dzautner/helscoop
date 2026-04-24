@@ -60,7 +60,7 @@ describe("ScenarioRenderPanel", () => {
       expect(captureFrame).toHaveBeenCalledTimes(4);
     });
 
-    expect(screen.getByText("Front")).toBeInTheDocument();
+    expect(await screen.findByText("Front")).toBeInTheDocument();
     expect(screen.getByText("Side")).toBeInTheDocument();
     expect(screen.getByText("Aerial")).toBeInTheDocument();
     expect(screen.getByText("Iso")).toBeInTheDocument();

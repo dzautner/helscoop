@@ -19,6 +19,7 @@ import ViewCube from "@/components/ViewCube";
 import Minimap from "@/components/Minimap";
 import { groupLayerSeeds, type LayerSeed } from "@/lib/scene-layers";
 import type { ShadowStudySample } from "@/lib/sun-position";
+import type { AirflowAnalysis } from "@/lib/airflow-engine";
 
 export interface ViewportPresentationApi {
   captureFrame: (options?: {
@@ -80,6 +81,8 @@ interface Viewport3DProps {
   sunAltitude?: number;
   shadowStudySamples?: ShadowStudySample[] | null;
   assemblyGuideState?: ViewportAssemblyGuideState | null;
+  airflowView?: boolean;
+  airflowAnalysis?: AirflowAnalysis | null;
   focusObjectRef?: React.MutableRefObject<((objectId: string) => void) | null>;
   onRevealComplete?: () => void;
 }
@@ -167,15 +170,259 @@ interface DimensionOverlay {
   depth: number;
 }
 
+type AirflowParticleSource = "warm" | "cold" | "mixed";
+
+interface AirflowParticle {
+  position: THREE.Vector3;
+  age: number;
+  maxAge: number;
+  warmth: number;
+  phase: number;
+  source: AirflowParticleSource;
+}
+
+interface AirflowRuntime {
+  points: THREE.Points;
+  arrowGroup: THREE.Group;
+  geometry: THREE.BufferGeometry;
+  positions: Float32Array;
+  colors: Float32Array;
+  particles: AirflowParticle[];
+  bounds: THREE.Box3;
+  analysis: AirflowAnalysis;
+  lastTime: number;
+}
+
 const MEASUREMENT_UNITS: MeasurementUnit[] = ["mm", "cm", "m"];
 const VIEWPORT_KEY_ROTATION_STEP = Math.PI / 18;
 const VIEWPORT_KEY_ZOOM_IN = 0.88;
 const VIEWPORT_KEY_ZOOM_OUT = 1.12;
+const AIRFLOW_COLD = new THREE.Color(0x58c7ff);
+const AIRFLOW_MIXED = new THREE.Color(0xddefff);
+const AIRFLOW_WARM = new THREE.Color(0xffa64d);
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function randomBetween(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function disposeAirflowObject(obj: THREE.Object3D) {
+  while (obj.children.length > 0) {
+    const child = obj.children[0];
+    disposeAirflowObject(child);
+    obj.remove(child);
+  }
+  if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.LineSegments || obj instanceof THREE.Points) {
+    obj.geometry.dispose();
+    if (Array.isArray(obj.material)) {
+      obj.material.forEach((material) => material.dispose());
+    } else if (obj.material) {
+      (obj.material as THREE.Material).dispose();
+    }
+  }
+}
+
+function spawnAirflowParticle(bounds: THREE.Box3, analysis: AirflowAnalysis, source?: AirflowParticleSource): AirflowParticle {
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const selectedSource = source ?? (Math.random() < 0.38 ? "warm" : Math.random() < 0.68 ? "cold" : "mixed");
+  const marginX = Math.max(0.1, size.x * 0.08);
+  const marginZ = Math.max(0.1, size.z * 0.08);
+  const lowY = bounds.min.y + size.y * randomBetween(0.08, 0.24);
+  const highY = bounds.min.y + size.y * randomBetween(0.62, 0.9);
+
+  let position: THREE.Vector3;
+  if (selectedSource === "warm") {
+    position = new THREE.Vector3(
+      center.x + randomBetween(-size.x * 0.18, size.x * 0.18),
+      bounds.min.y + size.y * randomBetween(0.06, 0.18),
+      center.z + randomBetween(-size.z * 0.18, size.z * 0.18),
+    );
+  } else if (selectedSource === "cold") {
+    const side = Math.floor(Math.random() * 4);
+    position = new THREE.Vector3(
+      side === 0 ? bounds.min.x + marginX : side === 1 ? bounds.max.x - marginX : randomBetween(bounds.min.x + marginX, bounds.max.x - marginX),
+      Math.random() < 0.55 ? lowY : highY,
+      side === 2 ? bounds.min.z + marginZ : side === 3 ? bounds.max.z - marginZ : randomBetween(bounds.min.z + marginZ, bounds.max.z - marginZ),
+    );
+  } else {
+    position = new THREE.Vector3(
+      randomBetween(bounds.min.x + marginX, bounds.max.x - marginX),
+      randomBetween(bounds.min.y + size.y * 0.16, bounds.max.y - size.y * 0.12),
+      randomBetween(bounds.min.z + marginZ, bounds.max.z - marginZ),
+    );
+  }
+
+  return {
+    position,
+    age: randomBetween(0, 2),
+    maxAge: randomBetween(3.2, 6.2),
+    warmth: selectedSource === "warm" ? randomBetween(0.74, 1) : selectedSource === "cold" ? randomBetween(0, 0.28) : randomBetween(0.35, 0.68),
+    phase: randomBetween(0, Math.PI * 2),
+    source: selectedSource,
+  };
+}
+
+function setAirflowParticleColor(runtime: AirflowRuntime, index: number, particle: AirflowParticle) {
+  const height = Math.max(0.001, runtime.bounds.max.y - runtime.bounds.min.y);
+  const normalizedY = clamp01((particle.position.y - runtime.bounds.min.y) / height);
+  const warmth = clamp01(particle.warmth * 0.72 + normalizedY * 0.28);
+  const color = warmth < 0.5
+    ? AIRFLOW_COLD.clone().lerp(AIRFLOW_MIXED, warmth / 0.5)
+    : AIRFLOW_MIXED.clone().lerp(AIRFLOW_WARM, (warmth - 0.5) / 0.5);
+  const fade = Math.sin(clamp01(particle.age / particle.maxAge) * Math.PI);
+  runtime.colors[index * 3] = color.r * (0.35 + fade * 0.65);
+  runtime.colors[index * 3 + 1] = color.g * (0.35 + fade * 0.65);
+  runtime.colors[index * 3 + 2] = color.b * (0.35 + fade * 0.65);
+}
+
+function createAirflowArrowGroup(bounds: THREE.Box3, analysis: AirflowAnalysis): THREE.Group {
+  const group = new THREE.Group();
+  if (!analysis.showArrows) return group;
+
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const windAngle = (analysis.windDirectionDeg * Math.PI) / 180;
+  const wind = new THREE.Vector3(Math.cos(windAngle), 0, Math.sin(windAngle));
+  const count = Math.max(2, Math.min(6, analysis.openingCount + 1));
+  const length = Math.max(0.35, Math.min(1.4, Math.max(size.x, size.z) * 0.12));
+
+  for (let i = 0; i < count; i++) {
+    const side = i % 4;
+    const low = i % 2 === 0;
+    const origin = new THREE.Vector3(
+      side === 0 ? bounds.min.x + size.x * 0.08 : side === 1 ? bounds.max.x - size.x * 0.08 : center.x + randomBetween(-size.x * 0.32, size.x * 0.32),
+      bounds.min.y + size.y * (low ? 0.22 : 0.74),
+      side === 2 ? bounds.min.z + size.z * 0.08 : side === 3 ? bounds.max.z - size.z * 0.08 : center.z + randomBetween(-size.z * 0.32, size.z * 0.32),
+    );
+    const horizontal = low ? wind.clone().multiplyScalar(0.55) : wind.clone().multiplyScalar(-0.35);
+    const direction = horizontal.add(new THREE.Vector3(0, low ? 0.18 : 0.82, 0)).normalize();
+    const arrow = new THREE.ArrowHelper(direction, origin, length * (low ? 0.8 : 1), low ? 0x58c7ff : 0xffa64d, length * 0.25, length * 0.12);
+    arrow.renderOrder = 8;
+    arrow.userData.airflowArrowIndex = i;
+    group.add(arrow);
+  }
+
+  return group;
+}
+
+function createAirflowRuntime(bounds: THREE.Box3, analysis: AirflowAnalysis): AirflowRuntime {
+  const particleCount = analysis.particleCount;
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  const particles = Array.from({ length: particleCount }, (_, index) => {
+    const source = index % 5 === 0 ? "warm" : index % 5 === 1 ? "cold" : undefined;
+    return spawnAirflowParticle(bounds, analysis, source);
+  });
+  const geometry = new THREE.BufferGeometry();
+  const size = bounds.getSize(new THREE.Vector3());
+  const pointSize = Math.max(0.035, Math.min(0.14, size.length() / 180));
+
+  particles.forEach((particle, index) => {
+    positions[index * 3] = particle.position.x;
+    positions[index * 3 + 1] = particle.position.y;
+    positions[index * 3 + 2] = particle.position.z;
+  });
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.PointsMaterial({
+    size: pointSize,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.82,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const points = new THREE.Points(geometry, material);
+  points.renderOrder = 7;
+  const runtime: AirflowRuntime = {
+    points,
+    arrowGroup: createAirflowArrowGroup(bounds, analysis),
+    geometry,
+    positions,
+    colors,
+    particles,
+    bounds: bounds.clone(),
+    analysis,
+    lastTime: performance.now(),
+  };
+  particles.forEach((particle, index) => setAirflowParticleColor(runtime, index, particle));
+  geometry.attributes.color.needsUpdate = true;
+  return runtime;
+}
+
+function updateAirflowRuntime(runtime: AirflowRuntime, now: number) {
+  const dt = Math.min(0.05, Math.max(0.001, (now - runtime.lastTime) / 1000));
+  runtime.lastTime = now;
+  const { bounds, analysis } = runtime;
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const height = Math.max(0.001, size.y);
+  const windAngle = (analysis.windDirectionDeg * Math.PI) / 180;
+  const wind = new THREE.Vector3(Math.cos(windAngle), 0, Math.sin(windAngle)).multiplyScalar(analysis.windSpeedMps * 0.028);
+  const stack = Math.max(0.04, analysis.stackVelocityMps * 0.22 + analysis.heatWatts / 9000);
+  const speed = analysis.speedMultiplier;
+
+  runtime.particles.forEach((particle, index) => {
+    particle.age += dt * speed;
+    const normalizedY = clamp01((particle.position.y - bounds.min.y) / height);
+    const relX = size.x > 0 ? (particle.position.x - center.x) / Math.max(size.x * 0.5, 0.001) : 0;
+    const relZ = size.z > 0 ? (particle.position.z - center.z) / Math.max(size.z * 0.5, 0.001) : 0;
+    const swirl = new THREE.Vector3(-relZ, 0, relX).multiplyScalar(0.045 + analysis.openingCount * 0.006);
+    const plume = particle.source === "warm"
+      ? stack * (1.25 - normalizedY * 0.55)
+      : particle.source === "cold" && normalizedY > 0.45
+        ? -stack * 0.46
+        : stack * 0.22;
+    const breathing = Math.sin(now * 0.0015 + particle.phase) * 0.018;
+    const velocity = swirl
+      .add(wind)
+      .add(new THREE.Vector3(0, plume + breathing, 0))
+      .multiplyScalar(speed);
+
+    particle.position.addScaledVector(velocity, dt);
+    particle.warmth = clamp01(particle.warmth + (particle.source === "warm" ? 0.08 : -0.035) * dt + normalizedY * 0.012 * dt);
+
+    const margin = Math.max(0.18, Math.max(size.x, size.y, size.z) * 0.08);
+    const expired = particle.age >= particle.maxAge ||
+      particle.position.y > bounds.max.y + margin ||
+      particle.position.y < bounds.min.y - margin ||
+      particle.position.x < bounds.min.x - margin ||
+      particle.position.x > bounds.max.x + margin ||
+      particle.position.z < bounds.min.z - margin ||
+      particle.position.z > bounds.max.z + margin;
+    if (expired) {
+      const next = spawnAirflowParticle(bounds, analysis);
+      particle.position.copy(next.position);
+      particle.age = 0;
+      particle.maxAge = next.maxAge;
+      particle.warmth = next.warmth;
+      particle.phase = next.phase;
+      particle.source = next.source;
+    }
+
+    runtime.positions[index * 3] = particle.position.x;
+    runtime.positions[index * 3 + 1] = particle.position.y;
+    runtime.positions[index * 3 + 2] = particle.position.z;
+    setAirflowParticleColor(runtime, index, particle);
+  });
+
+  runtime.geometry.attributes.position.needsUpdate = true;
+  runtime.geometry.attributes.color.needsUpdate = true;
+  runtime.arrowGroup.children.forEach((child, index) => {
+    const pulse = 0.92 + Math.sin(now * 0.004 + index) * 0.08;
+    child.scale.setScalar(pulse);
+  });
 }
 
 function formatMeasurementDistance(distanceMeters: number, unit: MeasurementUnit, locale: string): string {
@@ -668,6 +915,8 @@ export default function Viewport3D({
   sunAltitude,
   shadowStudySamples,
   assemblyGuideState = null,
+  airflowView = false,
+  airflowAnalysis = null,
   focusObjectRef,
   onRevealComplete,
 }: Viewport3DProps) {
@@ -709,6 +958,8 @@ export default function Viewport3D({
   const fillLightRef = useRef<THREE.DirectionalLight | null>(null);
   const groundMeshRef = useRef<THREE.Mesh | null>(null);
   const shadowStudyGroupRef = useRef<THREE.Group | null>(null);
+  const airflowGroupRef = useRef<THREE.Group | null>(null);
+  const airflowRuntimeRef = useRef<AirflowRuntime | null>(null);
   const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));
   const updateIdRef = useRef(0);
   const hasAppliedInitialPresentationPresetRef = useRef(false);
@@ -1181,6 +1432,11 @@ export default function Viewport3D({
     scene.add(shadowStudyGroup);
     shadowStudyGroupRef.current = shadowStudyGroup;
 
+    const airflowGroup = new THREE.Group();
+    airflowGroup.visible = false;
+    scene.add(airflowGroup);
+    airflowGroupRef.current = airflowGroup;
+
     // Post-processing: subtle bloom for photographic quality
     const lowPower = typeof navigator !== "undefined" && navigator.hardwareConcurrency < 4;
     let composer: EffectComposer | null = null;
@@ -1212,6 +1468,9 @@ export default function Viewport3D({
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
       controls.update();
+      if (airflowRuntimeRef.current) {
+        updateAirflowRuntime(airflowRuntimeRef.current, performance.now());
+      }
       if (composer) {
         composer.render();
       } else {
@@ -1257,6 +1516,12 @@ export default function Viewport3D({
         scene.remove(shadowStudyGroupRef.current);
         shadowStudyGroupRef.current = null;
       }
+      if (airflowGroupRef.current) {
+        disposeAirflowObject(airflowGroupRef.current);
+        scene.remove(airflowGroupRef.current);
+        airflowGroupRef.current = null;
+      }
+      airflowRuntimeRef.current = null;
 
       // Dispose grid helpers, axes, lights, and their materials
       scene.traverse((child) => {
@@ -1921,6 +2186,45 @@ export default function Viewport3D({
     });
     carpet.visible = true;
   }, [sceneRenderTick, shadowStudySamples]);
+
+  useEffect(() => {
+    const airflowGroup = airflowGroupRef.current;
+    if (!airflowGroup) return;
+
+    if (airflowRuntimeRef.current) {
+      airflowGroup.remove(airflowRuntimeRef.current.points);
+      airflowGroup.remove(airflowRuntimeRef.current.arrowGroup);
+      disposeAirflowObject(airflowRuntimeRef.current.points);
+      disposeAirflowObject(airflowRuntimeRef.current.arrowGroup);
+      airflowRuntimeRef.current = null;
+    }
+
+    const objectGroup = objectGroupRef.current;
+    if (!airflowView || !airflowAnalysis || !objectGroup) {
+      airflowGroup.visible = false;
+      return;
+    }
+
+    const bounds = new THREE.Box3().setFromObject(objectGroup);
+    if (bounds.isEmpty()) {
+      airflowGroup.visible = false;
+      return;
+    }
+
+    const runtime = createAirflowRuntime(bounds, airflowAnalysis);
+    airflowGroup.add(runtime.points);
+    airflowGroup.add(runtime.arrowGroup);
+    airflowGroup.visible = true;
+    airflowRuntimeRef.current = runtime;
+
+    return () => {
+      airflowGroup.remove(runtime.points);
+      airflowGroup.remove(runtime.arrowGroup);
+      disposeAirflowObject(runtime.points);
+      disposeAirflowObject(runtime.arrowGroup);
+      if (airflowRuntimeRef.current === runtime) airflowRuntimeRef.current = null;
+    };
+  }, [airflowAnalysis, airflowView, sceneRenderTick]);
 
   // Exploded view: shift mesh positions by category group
   useEffect(() => {
