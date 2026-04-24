@@ -7,7 +7,11 @@ export interface KeskoProduct {
   ean: string | null;
   sku: string | null;
   unitPrice: number | null;
+  regularUnitPrice: number | null;
   priceText: string | null;
+  regularPriceText: string | null;
+  campaignLabel: string | null;
+  campaignEndsAt: string | null;
   currency: string;
   unit: string;
   imageUrl: string | null;
@@ -250,15 +254,34 @@ export function normalizeKeskoProduct(
 
   const priceText = pickMoneyString(raw, [
     "unitPrice",
-    "price",
     "salesPrice",
     "currentPrice",
     "campaignPrice",
+    "campaign.price",
+    "promotion.price",
+    "price",
     "pricing.price",
     "price.value",
     "price.amount",
   ]);
   const unitPrice = priceText === null ? null : parseMoney(priceText);
+  const regularPriceText = pickMoneyString(raw, [
+    "regularPrice",
+    "normalPrice",
+    "listPrice",
+    "originalPrice",
+    "wasPrice",
+    "comparisonPrice",
+    "pricing.regularPrice",
+    "price.regularPrice",
+    "price.normalPrice",
+    "campaign.regularPrice",
+    "promotion.regularPrice",
+  ]);
+  const rawRegularUnitPrice = regularPriceText === null ? null : parseMoney(regularPriceText);
+  const regularUnitPrice = rawRegularUnitPrice !== null && unitPrice !== null && rawRegularUnitPrice > unitPrice
+    ? rawRegularUnitPrice
+    : null;
   const categoryName = pickString(raw, ["categoryName", "category", "categoryPath", "department"]);
 
   const product: KeskoProduct = {
@@ -268,7 +291,26 @@ export function normalizeKeskoProduct(
     ean,
     sku,
     unitPrice,
+    regularUnitPrice,
     priceText,
+    regularPriceText,
+    campaignLabel: regularUnitPrice ? pickString(raw, [
+      "campaignLabel",
+      "campaignName",
+      "promotionName",
+      "offerText",
+      "campaign.title",
+      "promotion.title",
+    ]) || "Campaign price" : null,
+    campaignEndsAt: regularUnitPrice ? pickDateString(raw, [
+      "campaignEndsAt",
+      "campaignEndDate",
+      "campaignValidTo",
+      "validTo",
+      "offerEndDate",
+      "campaign.endDate",
+      "promotion.endDate",
+    ]) : null,
     currency: pickString(raw, ["currency", "price.currency", "pricing.currency"]) || "EUR",
     unit: normalizeUnit(pickString(raw, ["unit", "priceUnit", "salesUnit", "unitOfMeasure", "measurementUnit"])),
     imageUrl: pickUrl(raw, ["imageUrl", "image", "productImage", "mainImage", "images.0.url", "images.0"]),
@@ -344,6 +386,18 @@ function pickNumber(raw: Record<string, unknown>, paths: string[]): number | nul
     if (typeof value === "string") {
       const parsed = Number.parseFloat(value.replace(",", ".").replace(/[^0-9.-]/g, ""));
       if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function pickDateString(raw: Record<string, unknown>, paths: string[]): string | null {
+  for (const path of paths) {
+    const value = getPath(raw, path);
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+    if (typeof value === "string" && value.trim()) {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) return date.toISOString();
     }
   }
   return null;

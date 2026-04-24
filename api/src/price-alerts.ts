@@ -7,6 +7,9 @@ export interface PriceAlertInput {
   supplierId?: string | null;
   previousUnitPrice: string | number | null | undefined;
   unitPrice: string | number | null | undefined;
+  regularUnitPrice?: string | number | null | undefined;
+  campaignLabel?: string | null | undefined;
+  campaignEndsAt?: string | Date | null | undefined;
   source?: string;
 }
 
@@ -60,11 +63,17 @@ function formatCurrency(value: number): string {
   return `${value.toLocaleString("fi-FI", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
 }
 
-function buildAlertCopy(row: WatchRow, previous: number, current: number, supplierId: string | null | undefined, source: string | undefined) {
+function buildAlertCopy(row: WatchRow, previous: number, current: number, input: PriceAlertInput) {
   const pct = Math.round(priceDropPercent(previous, current) * 100);
   const supplier = row.supplier_name ? ` (${row.supplier_name})` : "";
-  const title = `${row.material_name} dropped ${pct}%`;
-  const body = `${row.project_name}: ${formatCurrency(previous)} -> ${formatCurrency(current)}${supplier}.`;
+  const campaignEndsAt = input.campaignEndsAt ? new Date(input.campaignEndsAt) : null;
+  const campaignSuffix = input.campaignLabel
+    ? ` ${input.campaignLabel}${campaignEndsAt && !Number.isNaN(campaignEndsAt.getTime()) ? ` until ${campaignEndsAt.toISOString().slice(0, 10)}` : ""}.`
+    : "";
+  const title = input.campaignLabel
+    ? `${row.material_name} is on campaign (${pct}% off)`
+    : `${row.material_name} dropped ${pct}%`;
+  const body = `${row.project_name}: ${formatCurrency(previous)} -> ${formatCurrency(current)}${supplier}.${campaignSuffix}`;
   return {
     title,
     body,
@@ -74,9 +83,12 @@ function buildAlertCopy(row: WatchRow, previous: number, current: number, suppli
       price_watch_id: row.id,
       previous_unit_price: previous,
       unit_price: current,
+      regular_unit_price: input.regularUnitPrice == null ? null : Number(input.regularUnitPrice),
+      campaign_label: input.campaignLabel ?? null,
+      campaign_ends_at: input.campaignEndsAt ?? null,
       drop_percent: pct,
-      supplier_id: supplierId ?? null,
-      source: source ?? null,
+      supplier_id: input.supplierId ?? null,
+      source: input.source ?? null,
       target_price: row.target_price == null ? null : Number(row.target_price),
     },
   };
@@ -120,7 +132,7 @@ export async function notifyPriceWatchers(input: PriceAlertInput): Promise<numbe
       continue;
     }
 
-    const copy = buildAlertCopy(row, previous, current, input.supplierId, input.source);
+    const copy = buildAlertCopy(row, previous, current, input);
     const notification = await query(
       `INSERT INTO notifications (user_id, type, title, body, metadata_json)
        VALUES ($1, 'price_drop', $2, $3, $4::jsonb)

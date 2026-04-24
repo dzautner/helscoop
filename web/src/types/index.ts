@@ -522,6 +522,10 @@ export interface Material {
   pricing: {
     supplier_id?: string;
     unit_price: number;
+    regular_unit_price?: number | null;
+    campaign_label?: string | null;
+    campaign_ends_at?: string | null;
+    campaign_detected_at?: string | null;
     unit: string;
     supplier_name: string;
     link?: string | null;
@@ -570,6 +574,12 @@ export interface BomItem {
   quantity: number;
   unit: string;
   unit_price?: number;
+  regular_unit_price?: number | null;
+  regular_total?: number | null;
+  campaign_savings?: number | null;
+  campaign_label?: string | null;
+  campaign_ends_at?: string | null;
+  campaign_detected_at?: string | null;
   supplier_id?: string | null;
   supplier_name?: string;
   total?: number;
@@ -741,6 +751,10 @@ export interface PriceRow {
   supplier_id: string;
   unit: string;
   unit_price: string;
+  regular_unit_price?: string | null;
+  campaign_label?: string | null;
+  campaign_ends_at?: string | null;
+  campaign_detected_at?: string | null;
   currency: string;
   sku: string | null;
   ean: string | null;
@@ -864,7 +878,11 @@ export interface KeskoProduct {
   ean: string | null;
   sku: string | null;
   unitPrice: number | null;
+  regularUnitPrice: number | null;
   priceText: string | null;
+  regularPriceText: string | null;
+  campaignLabel: string | null;
+  campaignEndsAt: string | null;
   currency: string;
   unit: string;
   imageUrl: string | null;

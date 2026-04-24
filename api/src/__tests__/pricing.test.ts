@@ -238,6 +238,42 @@ describe("PUT /pricing/:materialId/:supplierId", () => {
     expect(body.store_location).toBe("K-Rauta Vantaa");
   });
 
+  it("stores campaign sale metadata with admin credentials", async () => {
+    const pricingRow = {
+      id: "pricing-1",
+      material_id: "mat1",
+      supplier_id: "sup1",
+      unit: "jm",
+      unit_price: 7.90,
+      regular_unit_price: 9.90,
+      campaign_label: "Terassikampanja -20%",
+      campaign_ends_at: "2026-05-15T00:00:00.000Z",
+    };
+    mockQuery.mockResolvedValueOnce({ rows: [pricingRow] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("PUT", "/pricing/mat1/sup1", {
+      headers: { Authorization: `Bearer ${adminToken()}` },
+      body: {
+        unit_price: 7.90,
+        regular_unit_price: 9.90,
+        campaign_label: "Terassikampanja -20%",
+        campaign_ends_at: "2026-05-15",
+        unit: "jm",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as typeof pricingRow;
+    expect(body.regular_unit_price).toBe(9.90);
+    expect(body.campaign_label).toBe("Terassikampanja -20%");
+
+    const upsertCall = mockQuery.mock.calls.find(
+      (call) => typeof call[0] === "string" && call[0].includes("campaign_detected_at"),
+    );
+    expect(upsertCall?.[1]).toEqual(expect.arrayContaining([9.90, "Terassikampanja -20%"]));
+  });
+
   it("rejects invalid stock metadata", async () => {
     const res = await makeRequest("PUT", "/pricing/mat1/sup1", {
       headers: { Authorization: `Bearer ${adminToken()}` },
