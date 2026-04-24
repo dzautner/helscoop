@@ -6,6 +6,10 @@ import type {
   EnergySubsidyRequest,
   BomSubstitutionResponse,
   KeskoProduct,
+  MarketplaceCheckoutResponse,
+  MarketplaceOpenOrderResponse,
+  MarketplaceOrder,
+  MarketplaceSupplierCheckoutInput,
   MaterialSubstitutionResponse,
   AppNotification,
   ProjectVersionCompareResponse,
@@ -386,6 +390,28 @@ export const api = {
   }) =>
     apiFetch("/affiliates/click", {
       method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getMarketplaceOrders: (projectId: string): Promise<MarketplaceOrder[]> =>
+    apiFetch(`/marketplace/project/${encodeURIComponent(projectId)}/orders`),
+  createMarketplaceCheckout: (
+    projectId: string,
+    data: { supplier_carts: MarketplaceSupplierCheckoutInput[] },
+  ): Promise<MarketplaceCheckoutResponse> =>
+    apiFetch(`/marketplace/project/${encodeURIComponent(projectId)}/checkout`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  openMarketplaceOrder: (orderId: string): Promise<MarketplaceOpenOrderResponse> =>
+    apiFetch(`/marketplace/orders/${encodeURIComponent(orderId)}/open`, {
+      method: "POST",
+    }),
+  updateMarketplaceOrder: (
+    orderId: string,
+    data: { status: MarketplaceOrder["status"]; external_order_ref?: string | null },
+  ): Promise<MarketplaceOrder> =>
+    apiFetch(`/marketplace/orders/${encodeURIComponent(orderId)}`, {
+      method: "PATCH",
       body: JSON.stringify(data),
     }),
 
