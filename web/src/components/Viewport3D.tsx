@@ -18,6 +18,7 @@ import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ViewCube from "@/components/ViewCube";
 import Minimap from "@/components/Minimap";
 import { groupLayerSeeds, type LayerSeed } from "@/lib/scene-layers";
+import type { ShadowStudySample } from "@/lib/sun-position";
 
 export interface ViewportPresentationApi {
   captureFrame: (options?: {
@@ -70,6 +71,7 @@ interface Viewport3DProps {
   onCameraSyncChange?: (state: ViewportCameraState) => void;
   sunDirection?: [number, number, number];
   sunAltitude?: number;
+  shadowStudySamples?: ShadowStudySample[] | null;
   focusObjectRef?: React.MutableRefObject<((objectId: string) => void) | null>;
   onRevealComplete?: () => void;
 }
@@ -306,6 +308,50 @@ function buildRenderedLayerSeeds(meshes: TessellatedObject[]): LayerSeed[] {
       color: mesh.color,
     })),
   );
+}
+
+function createShadowCarpetMesh(
+  sample: ShadowStudySample,
+  bounds: THREE.Box3,
+  index: number,
+): THREE.Mesh {
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const footprintWidth = Math.max(1, Math.min(12, Math.max(size.x, size.z) * 0.82));
+  const nearWidth = footprintWidth;
+  const farWidth = footprintWidth * 0.55;
+  const length = Math.max(0.5, Math.min(55, sample.shadowLength));
+  const [vx, vz] = sample.shadowVector;
+  const px = -vz;
+  const pz = vx;
+  const y = Math.max(0.012, bounds.min.y + 0.018 + index * 0.001);
+  const baseX = center.x + vx * 0.2;
+  const baseZ = center.z + vz * 0.2;
+  const farX = center.x + vx * length;
+  const farZ = center.z + vz * length;
+
+  const positions = new Float32Array([
+    baseX + px * nearWidth / 2, y, baseZ + pz * nearWidth / 2,
+    baseX - px * nearWidth / 2, y, baseZ - pz * nearWidth / 2,
+    farX - px * farWidth / 2, y, farZ - pz * farWidth / 2,
+    farX + px * farWidth / 2, y, farZ + pz * farWidth / 2,
+  ]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setIndex([0, 1, 2, 0, 2, 3]);
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(sample.color),
+    transparent: true,
+    opacity: Math.min(0.24, 0.08 + index * 0.012),
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = 4;
+  mesh.userData.daylightShadowSample = sample.label;
+  return mesh;
 }
 
 function animateCamera(
@@ -612,6 +658,7 @@ export default function Viewport3D({
   onCameraSyncChange,
   sunDirection,
   sunAltitude,
+  shadowStudySamples,
   focusObjectRef,
   onRevealComplete,
 }: Viewport3DProps) {
@@ -652,6 +699,7 @@ export default function Viewport3D({
   const dirLightRef = useRef<THREE.DirectionalLight | null>(null);
   const fillLightRef = useRef<THREE.DirectionalLight | null>(null);
   const groundMeshRef = useRef<THREE.Mesh | null>(null);
+  const shadowStudyGroupRef = useRef<THREE.Group | null>(null);
   const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));
   const updateIdRef = useRef(0);
   const hasAppliedInitialPresentationPresetRef = useRef(false);
@@ -1117,6 +1165,11 @@ export default function Viewport3D({
     scene.add(ground);
     groundMeshRef.current = ground;
 
+    const shadowStudyGroup = new THREE.Group();
+    shadowStudyGroup.visible = false;
+    scene.add(shadowStudyGroup);
+    shadowStudyGroupRef.current = shadowStudyGroup;
+
     // Post-processing: subtle bloom for photographic quality
     const lowPower = typeof navigator !== "undefined" && navigator.hardwareConcurrency < 4;
     let composer: EffectComposer | null = null;
@@ -1185,6 +1238,11 @@ export default function Viewport3D({
         disposeMeasurementGroup(measurementGroupRef.current);
         scene.remove(measurementGroupRef.current);
         measurementGroupRef.current = null;
+      }
+      if (shadowStudyGroupRef.current) {
+        disposeMeasurementGroup(shadowStudyGroupRef.current);
+        scene.remove(shadowStudyGroupRef.current);
+        shadowStudyGroupRef.current = null;
       }
 
       // Dispose grid helpers, axes, lights, and their materials
@@ -1714,10 +1772,35 @@ export default function Viewport3D({
     const dir = dirLightRef.current;
     if (!dir || !sunDirection) return;
     dir.position.set(sunDirection[0] * 15, sunDirection[1] * 15, sunDirection[2] * 15);
-    const warmth = Math.max(0, Math.min(1, (sunAltitude ?? 30) / 60));
-    dir.color.setRGB(1, 0.9 + warmth * 0.1, 0.7 + warmth * 0.3);
-    dir.intensity = Math.max(0.2, Math.min(2, (sunAltitude ?? 30) / 30));
+    const altitude = sunAltitude ?? 30;
+    const warmth = Math.max(0, Math.min(1, altitude / 60));
+    dir.color.setRGB(0.82 + warmth * 0.18, 0.86 + warmth * 0.14, 0.96 - warmth * 0.26);
+    dir.intensity = altitude <= 0 ? 0.08 : Math.max(0.2, Math.min(2, altitude / 30));
   }, [sunDirection, sunAltitude]);
+
+  useEffect(() => {
+    const carpet = shadowStudyGroupRef.current;
+    if (!carpet) return;
+    disposeMeasurementGroup(carpet);
+
+    const samples = shadowStudySamples ?? [];
+    const group = objectGroupRef.current;
+    if (samples.length === 0 || !group) {
+      carpet.visible = false;
+      return;
+    }
+
+    const bounds = new THREE.Box3().setFromObject(group);
+    if (bounds.isEmpty()) {
+      carpet.visible = false;
+      return;
+    }
+
+    samples.slice(0, 24).forEach((sample, index) => {
+      carpet.add(createShadowCarpetMesh(sample, bounds, index));
+    });
+    carpet.visible = true;
+  }, [sceneRenderTick, shadowStudySamples]);
 
   // Exploded view: shift mesh positions by category group
   useEffect(() => {

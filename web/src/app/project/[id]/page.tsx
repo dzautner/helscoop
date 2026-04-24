@@ -38,7 +38,7 @@ import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import type { Command } from "@/components/CommandPalette";
 import OnboardingTour from "@/components/OnboardingTour";
-import DaylightPanel from "@/components/DaylightPanel";
+import DaylightPanel, { type DaylightViewportShadowStudy } from "@/components/DaylightPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ConfettiCelebration from "@/components/ConfettiCelebration";
 import { generateAraGrantPdf, generateProposalPdf } from "@/lib/pdf";
@@ -326,6 +326,7 @@ export default function ProjectPage() {
   const compareDragging = useRef(false);
   const [sunDirection, setSunDirection] = useState<[number, number, number] | undefined>();
   const [sunAltitude, setSunAltitude] = useState<number | undefined>();
+  const [daylightShadowStudy, setDaylightShadowStudy] = useState<DaylightViewportShadowStudy | null>(null);
   const [activeVersionBranchId, setActiveVersionBranchId] = useState<string | null>(null);
   const [activeMobilePanel, setActiveMobilePanel] = useState<MobileEditorPanel>("viewport");
   const [mobilePanelSize, setMobilePanelSize] = useState<MobilePanelSize>("normal");
@@ -3129,6 +3130,7 @@ export default function ProjectPage() {
                       onCameraSyncChange={handleRenovationCompareCamera}
                       sunDirection={sunDirection}
                       sunAltitude={sunAltitude}
+                      shadowStudySamples={daylightShadowStudy?.samples ?? null}
                     />
                     <span className="renovation-compare-label">{t("editor.compareCurrent")}</span>
                   </div>
@@ -3160,6 +3162,7 @@ export default function ProjectPage() {
                       onCameraSyncChange={handleRenovationCompareCamera}
                       sunDirection={sunDirection}
                       sunAltitude={sunAltitude}
+                      shadowStudySamples={daylightShadowStudy?.samples ?? null}
                       focusObjectRef={focusObjectRef}
                     />
                     <span className="renovation-compare-label renovation-compare-label--planned">{t("editor.comparePlanned")}</span>
@@ -3233,6 +3236,7 @@ export default function ProjectPage() {
                   lockedObjectIds={lockedLayerIds}
                   sunDirection={sunDirection}
                   sunAltitude={sunAltitude}
+                  shadowStudySamples={daylightShadowStudy?.samples ?? null}
                   focusObjectRef={focusObjectRef}
                 />
               )}
@@ -3693,9 +3697,11 @@ export default function ProjectPage() {
             <DaylightPanel
               latitude={project?.permit_metadata?.latitude ?? 60.17}
               longitude={project?.permit_metadata?.longitude ?? 24.94}
+              projectName={projectName}
               onLightDirection={(dir, alt) => { setSunDirection(dir); setSunAltitude(alt); }}
               onLightingPreset={setLightingPreset}
-              onClose={() => { setShowDaylightPanel(false); setSunDirection(undefined); setSunAltitude(undefined); setLightingPreset("default"); }}
+              onShadowStudyChange={setDaylightShadowStudy}
+              onClose={() => { setShowDaylightPanel(false); setSunDirection(undefined); setSunAltitude(undefined); setDaylightShadowStudy(null); setLightingPreset("default"); }}
             />
           )}
 
