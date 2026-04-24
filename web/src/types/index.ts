@@ -669,6 +669,52 @@ export interface QuoteRequestResponse {
   matched_contractor_count: number;
 }
 
+export type ProLeadStatus = "submitted" | "forwarded" | "closed";
+
+export interface ProLead {
+  id: string;
+  project_id: string;
+  project_name: string;
+  project_description: string | null;
+  project_type: ProjectType | string | null;
+  unit_count: number | null;
+  building_info: BuildingInfo | null;
+  homeowner_name: string | null;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string | null;
+  postcode: string;
+  work_scope: string;
+  bom_line_count: number;
+  estimated_cost: number;
+  partner_channel: string;
+  matched_contractor_count: number;
+  status: ProLeadStatus;
+  created_at: string;
+}
+
+export interface ProLeadSummary {
+  lead_count: number;
+  open_count: number;
+  forwarded_count: number;
+  closed_count: number;
+  total_estimated_cost: number;
+  average_estimated_cost: number;
+}
+
+export interface ProTier {
+  id: "free" | "pro" | "growth";
+  name: string;
+  monthly_price_eur: number;
+  lead_limit: number;
+}
+
+export interface ProLeadResponse {
+  leads: ProLead[];
+  summary: ProLeadSummary;
+  tiers: ProTier[];
+}
+
 export interface PriceRow {
   id: string;
   material_id: string;
