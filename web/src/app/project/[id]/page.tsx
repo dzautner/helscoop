@@ -22,6 +22,7 @@ import ScenarioRenderPanel from "@/components/ScenarioRenderPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
 import AssemblyGuidePanel from "@/components/AssemblyGuidePanel";
+import ConstructionTimelapsePanel from "@/components/ConstructionTimelapsePanel";
 import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
 import TaloyhtioPanel from "@/components/TaloyhtioPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
@@ -63,12 +64,14 @@ import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceCh
 import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 import type { ViewportAssemblyGuideState, ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
+import type { PresentationPresetId } from "@/lib/presentation-export";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import PriceSummaryBar from "@/components/PriceSummaryBar";
 import type { DataProvenance } from "@/lib/confidence";
 import { buildSceneLayers, type LayerSeed } from "@/lib/scene-layers";
 import { buildAssemblyGuide, getAssemblyViewportState, type AssemblyGuideSpeed } from "@/lib/assembly-guide";
+import { buildConstructionTimelapse, type TimelapseCameraMode, type TimelapseSpeed } from "@/lib/construction-timelapse";
 import {
   PHOTO_OVERLAY_DEFAULTS,
   composePhotoOverlayExport,
@@ -333,6 +336,10 @@ export default function ProjectPage() {
   const [assemblyPlaying, setAssemblyPlaying] = useState(false);
   const [assemblySpeed, setAssemblySpeed] = useState<AssemblyGuideSpeed>(1);
   const [assemblyProgressLoaded, setAssemblyProgressLoaded] = useState(false);
+  const [showConstructionTimelapse, setShowConstructionTimelapse] = useState(false);
+  const [timelapsePlaying, setTimelapsePlaying] = useState(false);
+  const [timelapseSpeed, setTimelapseSpeed] = useState<TimelapseSpeed>(1);
+  const [timelapseCameraMode, setTimelapseCameraMode] = useState<TimelapseCameraMode>("orbit");
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
@@ -909,18 +916,21 @@ export default function ProjectPage() {
   }, [thermalView, materials]);
   const sceneLayers = useMemo(() => buildSceneLayers(renderedLayers, bom), [bom, renderedLayers]);
   const assemblyGuide = useMemo(() => buildAssemblyGuide(sceneLayers, bom, materials), [bom, materials, sceneLayers]);
+  const constructionTimelapsePlan = useMemo(() => buildConstructionTimelapse(assemblyGuide), [assemblyGuide]);
+  const constructionSequenceActive = showAssemblyGuide || showConstructionTimelapse;
   const assemblyStepSignature = useMemo(
     () => assemblyGuide.steps.map((step) => step.id).join("|"),
     [assemblyGuide.steps],
   );
   const assemblyViewportState = useMemo(
-    () => showAssemblyGuide ? getAssemblyViewportState(assemblyGuide.steps, assemblyStepIndex) : null,
-    [assemblyGuide.steps, assemblyStepIndex, showAssemblyGuide],
+    () => constructionSequenceActive ? getAssemblyViewportState(assemblyGuide.steps, assemblyStepIndex) : null,
+    [assemblyGuide.steps, assemblyStepIndex, constructionSequenceActive],
   );
   const assemblyViewportHiddenObjectIds = useMemo(
     () => assemblyViewportState ? new Set(assemblyViewportState.hiddenObjectIds) : hiddenLayerIds,
     [assemblyViewportState, hiddenLayerIds],
   );
+  const activeTimelapseStep = constructionTimelapsePlan.steps[assemblyStepIndex] ?? constructionTimelapsePlan.steps[0] ?? null;
   const viewportAssemblyGuideState = useMemo<ViewportAssemblyGuideState | null>(
     () => assemblyViewportState
       ? {
@@ -1289,7 +1299,11 @@ export default function ProjectPage() {
     if (isMobileEditor) return;
     setShowLayers((visible) => {
       const next = !visible;
-      if (next) setShowAssemblyGuide(false);
+      if (next) {
+        setShowAssemblyGuide(false);
+        setShowConstructionTimelapse(false);
+        setTimelapsePlaying(false);
+      }
       return next;
     });
   }, [isMobileEditor]);
@@ -1316,12 +1330,55 @@ export default function ProjectPage() {
       const next = !visible;
       if (next) {
         setShowLayers(false);
+        setShowConstructionTimelapse(false);
+        setTimelapsePlaying(false);
         setAssemblyPlaying(false);
         window.setTimeout(() => focusAssemblyStep(assemblyStepIndex), 0);
       }
       return next;
     });
   }, [assemblyStepIndex, focusAssemblyStep, isMobileEditor]);
+
+  const focusTimelapseStep = useCallback((index: number) => {
+    const step = assemblyGuide.steps[index];
+    const layerId = step?.layerIds[0];
+    if (layerId) setSelectedLayerId(layerId);
+
+    if (timelapseCameraMode === "follow") {
+      focusAssemblyStep(index);
+      return;
+    }
+
+    const orbitPresets: PresentationPresetId[] = ["front", "side", "iso", "aerial"];
+    const cinematicPresets: PresentationPresetId[] = ["front", "iso", "side", "aerial", "iso"];
+    const presets = timelapseCameraMode === "cinematic" ? cinematicPresets : orbitPresets;
+    presentationRef.current?.focusPreset(presets[index % presets.length]);
+  }, [assemblyGuide.steps, focusAssemblyStep, timelapseCameraMode]);
+
+  const selectTimelapseStep = useCallback((index: number) => {
+    if (assemblyGuide.steps.length === 0) return;
+    const nextIndex = Math.min(Math.max(index, 0), assemblyGuide.steps.length - 1);
+    setAssemblyStepIndex(nextIndex);
+    focusTimelapseStep(nextIndex);
+  }, [assemblyGuide.steps.length, focusTimelapseStep]);
+
+  const toggleConstructionTimelapse = useCallback((playImmediately = false) => {
+    if (isMobileEditor) return;
+    setEditorMode("advanced");
+    setShowConstructionTimelapse((visible) => {
+      const next = !visible || playImmediately;
+      if (next) {
+        setShowLayers(false);
+        setShowAssemblyGuide(false);
+        setAssemblyPlaying(false);
+        if (playImmediately) setTimelapsePlaying(true);
+        window.setTimeout(() => focusTimelapseStep(assemblyStepIndex), 0);
+      } else {
+        setTimelapsePlaying(false);
+      }
+      return next;
+    });
+  }, [assemblyStepIndex, focusTimelapseStep, isMobileEditor]);
 
   const toggleAssemblyStepComplete = useCallback((stepId: string) => {
     setAssemblyCompletedStepIds((current) => {
@@ -1343,6 +1400,27 @@ export default function ProjectPage() {
     }, 3600 / assemblySpeed);
     return () => window.clearTimeout(timer);
   }, [assemblyGuide.steps.length, assemblyPlaying, assemblySpeed, assemblyStepIndex, selectAssemblyStep, showAssemblyGuide]);
+
+  useEffect(() => {
+    if (!showConstructionTimelapse || !timelapsePlaying || constructionTimelapsePlan.steps.length === 0) return;
+    if (assemblyStepIndex >= constructionTimelapsePlan.steps.length - 1) {
+      setTimelapsePlaying(false);
+      return;
+    }
+    const current = constructionTimelapsePlan.steps[assemblyStepIndex];
+    const delay = Math.max(350, ((current?.durationSeconds ?? 3) * 1000) / timelapseSpeed);
+    const timer = window.setTimeout(() => {
+      selectTimelapseStep(assemblyStepIndex + 1);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [
+    assemblyStepIndex,
+    constructionTimelapsePlan.steps,
+    selectTimelapseStep,
+    showConstructionTimelapse,
+    timelapsePlaying,
+    timelapseSpeed,
+  ]);
 
   useEffect(() => {
     if (!showAssemblyGuide) return;
@@ -1378,6 +1456,35 @@ export default function ProjectPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [assemblyGuide.steps, assemblyStepIndex, focusAssemblyStep, selectAssemblyStep, showAssemblyGuide, toggleAssemblyStepComplete]);
+
+  useEffect(() => {
+    if (!showConstructionTimelapse) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableKeyboardTarget(event.target)) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        selectTimelapseStep(assemblyStepIndex - 1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        selectTimelapseStep(assemblyStepIndex + 1);
+      } else if (event.key === " ") {
+        event.preventDefault();
+        setTimelapsePlaying((playing) => !playing);
+      } else if (event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setTimelapsePlaying((playing) => !playing);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        selectTimelapseStep(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        selectTimelapseStep(constructionTimelapsePlan.steps.length - 1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [assemblyStepIndex, constructionTimelapsePlan.steps.length, selectTimelapseStep, showConstructionTimelapse]);
 
   const duplicateProject = useCallback(async () => {
     setShowHeaderMenu(false);
@@ -1454,6 +1561,8 @@ export default function ProjectPage() {
     setShowLayers(false);
     setShowAssemblyGuide(false);
     setAssemblyPlaying(false);
+    setShowConstructionTimelapse(false);
+    setTimelapsePlaying(false);
     if (isMobileEditor) setActiveMobilePanel("viewport");
   }, [isMobileEditor]);
 
@@ -1546,6 +1655,15 @@ export default function ProjectPage() {
       descriptionKey: "shortcuts.assemblyGuide",
     },
     {
+      key: "P",
+      mod: false,
+      code: "p",
+      action: () => {
+        if (!showConstructionTimelapse) toggleConstructionTimelapse(true);
+      },
+      descriptionKey: "shortcuts.constructionTimelapse",
+    },
+    {
       key: "E",
       mod: false,
       code: "e",
@@ -1559,7 +1677,7 @@ export default function ProjectPage() {
       action: () => setShowDocs((v) => !v),
       descriptionKey: "shortcuts.toggleDocs",
     },
-  ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo, toggleAssemblyGuide]);
+  ], [save, handleApplyCode, sceneJs, closeAllPanels, undo, redo, toggleAssemblyGuide, showConstructionTimelapse, toggleConstructionTimelapse]);
 
   useKeyboardShortcuts(shortcuts);
 
@@ -1756,6 +1874,15 @@ export default function ProjectPage() {
         icon: icon("M4 19V7l8-4 8 4v12l-8 4-8-4zM4 7l8 4 8-4M12 11v12"),
         action: toggleAssemblyGuide,
         isActive: showAssemblyGuide,
+      },
+      {
+        id: "toggle-construction-timelapse",
+        labelKey: "commandPalette.toggleTimelapse",
+        labelSecondaryKey: "commandPalette.toggleTimelapseEn",
+        shortcut: "P",
+        icon: icon("M4 5h16M4 19h16M7 5v14M17 5v14M9 9l5 3-5 3V9z"),
+        action: () => toggleConstructionTimelapse(false),
+        isActive: showConstructionTimelapse,
       },
       {
         id: "reset-camera",
@@ -2011,7 +2138,7 @@ export default function ProjectPage() {
         isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs, showScenarioRenderPanel, triggerScenarioRender]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showConstructionTimelapse, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleConstructionTimelapse, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs, showScenarioRenderPanel, triggerScenarioRender]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -3365,8 +3492,8 @@ export default function ProjectPage() {
                       thermalView={thermalView}
                       thermalColorMap={thermalColorMap}
                       lightingPreset={lightingPreset}
-                      selectedObjectId={showAssemblyGuide ? assemblyViewportState?.currentObjectIds[0] ?? null : showLayers ? selectedLayerId : null}
-                      hiddenObjectIds={showAssemblyGuide ? assemblyViewportHiddenObjectIds : hiddenLayerIds}
+                      selectedObjectId={constructionSequenceActive ? assemblyViewportState?.currentObjectIds[0] ?? null : showLayers ? selectedLayerId : null}
+                      hiddenObjectIds={constructionSequenceActive ? assemblyViewportHiddenObjectIds : hiddenLayerIds}
                       lockedObjectIds={lockedLayerIds}
                       cameraSyncState={renovationCompareCamera}
                       onCameraSyncChange={handleRenovationCompareCamera}
@@ -3442,8 +3569,8 @@ export default function ProjectPage() {
                   thermalView={thermalView}
                   thermalColorMap={thermalColorMap}
                   lightingPreset={lightingPreset}
-                  selectedObjectId={showAssemblyGuide ? assemblyViewportState?.currentObjectIds[0] ?? null : showLayers ? selectedLayerId : null}
-                  hiddenObjectIds={showAssemblyGuide ? assemblyViewportHiddenObjectIds : hiddenLayerIds}
+                  selectedObjectId={constructionSequenceActive ? assemblyViewportState?.currentObjectIds[0] ?? null : showLayers ? selectedLayerId : null}
+                  hiddenObjectIds={constructionSequenceActive ? assemblyViewportHiddenObjectIds : hiddenLayerIds}
                   lockedObjectIds={lockedLayerIds}
                   sunDirection={sunDirection}
                   sunAltitude={sunAltitude}
@@ -3453,6 +3580,61 @@ export default function ProjectPage() {
                 />
               )}
             </ErrorBoundary>
+
+            {showConstructionTimelapse && activeTimelapseStep && (
+              <div
+                className="timelapse-viewport-overlay"
+                data-with-photo={!!photoOverlayUrl && !renovationCompareMode}
+                data-testid="construction-timelapse-overlay"
+                aria-live="polite"
+              >
+                <div className="timelapse-viewport-main">
+                  <span className="label-mono">{activeTimelapseStep.scheduledDay}</span>
+                  <strong>{activeTimelapseStep.title}</strong>
+                  <span>{activeTimelapseStep.annotation}</span>
+                </div>
+                <div className="timelapse-viewport-progress" aria-hidden="true">
+                  <span
+                    style={{
+                      width: `${constructionTimelapsePlan.steps.length > 1
+                        ? Math.round((assemblyStepIndex / (constructionTimelapsePlan.steps.length - 1)) * 100)
+                        : 100}%`,
+                    }}
+                  />
+                </div>
+                <div className="timelapse-viewport-actions">
+                  <button
+                    type="button"
+                    className="timelapse-nav-btn"
+                    onClick={() => selectTimelapseStep(assemblyStepIndex - 1)}
+                    disabled={assemblyStepIndex <= 0}
+                    aria-label={t("timelapse.previous")}
+                  >
+                    &lt;&lt;
+                  </button>
+                  <button
+                    type="button"
+                    className="assembly-guide-play"
+                    onClick={() => setTimelapsePlaying((playing) => !playing)}
+                    aria-pressed={timelapsePlaying}
+                  >
+                    {timelapsePlaying ? t("timelapse.pause") : t("timelapse.play")}
+                  </button>
+                  <button
+                    type="button"
+                    className="timelapse-nav-btn"
+                    onClick={() => selectTimelapseStep(assemblyStepIndex + 1)}
+                    disabled={assemblyStepIndex >= constructionTimelapsePlan.steps.length - 1}
+                    aria-label={t("timelapse.next")}
+                  >
+                    &gt;&gt;
+                  </button>
+                  <span className="timelapse-viewport-meta">
+                    {assemblyStepIndex + 1}/{constructionTimelapsePlan.steps.length} / {timelapseSpeed}x / {timelapseCameraMode}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {renovationCompareMode && (
               <div className="renovation-cost-compare" data-testid="renovation-cost-compare">
@@ -3767,6 +3949,23 @@ export default function ProjectPage() {
                   <path d="M12 11v10" />
                 </svg>
                 {t("assemblyGuide.shortTitle")}
+              </button>
+            )}
+            {!isMobileEditor && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showConstructionTimelapse}
+                onClick={() => toggleConstructionTimelapse(false)}
+                title={t("timelapse.title")}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 5h16" />
+                  <path d="M4 19h16" />
+                  <path d="M7 5v14" />
+                  <path d="M17 5v14" />
+                  <path d="M10 9l5 3-5 3V9z" />
+                </svg>
+                {t("timelapse.shortTitle")}
               </button>
             )}
             <button
@@ -4260,6 +4459,23 @@ export default function ProjectPage() {
             onFocusStep={focusAssemblyStep}
             onOpenStepMaterial={openAssemblyStepMaterial}
             onClose={() => { setShowAssemblyGuide(false); setAssemblyPlaying(false); }}
+          />
+        )}
+
+        {isAdvancedMode && showConstructionTimelapse && !isMobileEditor && (
+          <ConstructionTimelapsePanel
+            guide={assemblyGuide}
+            activeStepIndex={assemblyStepIndex}
+            playing={timelapsePlaying}
+            speed={timelapseSpeed}
+            cameraMode={timelapseCameraMode}
+            projectName={projectName}
+            onStepChange={selectTimelapseStep}
+            onPlayingChange={setTimelapsePlaying}
+            onSpeedChange={setTimelapseSpeed}
+            onCameraModeChange={setTimelapseCameraMode}
+            onFocusStep={focusTimelapseStep}
+            onClose={() => { setShowConstructionTimelapse(false); setTimelapsePlaying(false); }}
           />
         )}
 

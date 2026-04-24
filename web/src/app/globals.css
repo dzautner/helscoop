@@ -439,6 +439,82 @@
   animation: timelapse-fade-in 0.3s ease-out;
 }
 
+.timelapse-viewport-overlay {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 21;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(229, 160, 75, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(17, 21, 18, 0.88), rgba(34, 43, 37, 0.78));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  pointer-events: auto;
+  animation: timelapse-fade-in 0.25s ease-out;
+}
+
+.timelapse-viewport-overlay[data-with-photo="true"] {
+  bottom: 92px;
+}
+
+.timelapse-viewport-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.timelapse-viewport-main strong,
+.timelapse-viewport-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelapse-viewport-main strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.timelapse-viewport-main span:not(.label-mono) {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.timelapse-viewport-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.timelapse-viewport-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--amber), #f1cf86);
+  transition: width 0.25s ease;
+}
+
+.timelapse-viewport-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timelapse-viewport-meta {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 @keyframes timelapse-fade-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }

@@ -47,6 +47,8 @@ export type AnalyticsEvent =
   | "presentation_render_downloaded"
   | "scenario_render_generated"
   | "scenario_render_downloaded"
+  | "construction_timelapse_started"
+  | "construction_timelapse_exported"
   | "quote_request_submitted"
   | "financing_widget_viewed"
   | "financing_partner_clicked"
@@ -101,6 +103,8 @@ export interface AnalyticsEventProps {
   presentation_render_downloaded: { preset: string; watermarked: boolean };
   scenario_render_generated: { project_id: string; view_count: number; lighting_preset: string; has_before_image: boolean; source: "manual" | "toolbar" };
   scenario_render_downloaded: { project_id: string; artifact: "single" | "contact_sheet"; view_count: number; lighting_preset: string };
+  construction_timelapse_started: { project_name: string; step_count: number; camera_mode: string; speed: number };
+  construction_timelapse_exported: { project_name: string; format: "json" | "svg"; step_count: number; camera_mode: string };
   quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
   financing_widget_viewed: { bom_total: number; loan_amount: number; term_years: number; offer_count: number; energy_grant_signal: boolean };
   financing_partner_clicked: { partner: string; loan_amount: number; term_years: number; target: "loan_comparison" | "materials_bnpl" };
