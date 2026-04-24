@@ -42,6 +42,8 @@ export type AnalyticsEvent =
   | "material_surface_replaced"
   | "presentation_link_copied"
   | "presentation_render_downloaded"
+  | "scenario_render_generated"
+  | "scenario_render_downloaded"
   | "quote_request_submitted"
   | "financing_widget_viewed"
   | "financing_partner_clicked"
@@ -91,6 +93,8 @@ export interface AnalyticsEventProps {
   material_surface_replaced: { from_material_id: string; to_material_id: string; category?: string };
   presentation_link_copied: { preset: string };
   presentation_render_downloaded: { preset: string; watermarked: boolean };
+  scenario_render_generated: { project_id: string; view_count: number; lighting_preset: string; has_before_image: boolean; source: "manual" | "toolbar" };
+  scenario_render_downloaded: { project_id: string; artifact: "single" | "contact_sheet"; view_count: number; lighting_preset: string };
   quote_request_submitted: { project_id: string; bom_line_count: number; estimated_cost: number };
   financing_widget_viewed: { bom_total: number; loan_amount: number; term_years: number; offer_count: number; energy_grant_signal: boolean };
   financing_partner_clicked: { partner: string; loan_amount: number; term_years: number; target: "loan_comparison" | "materials_bnpl" };
