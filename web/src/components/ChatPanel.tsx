@@ -11,7 +11,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { buildSavingsRecommendations } from "@/lib/bom-savings";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
 import { interpretScene } from "@/lib/scene-interpreter";
-import type { ChatMessage, BomItem, Material } from "@/types";
+import type { ChatMessage, BomItem, Material, ProjectImage } from "@/types";
 
 interface ChatContextBuildingInfo {
   address?: string;
@@ -90,6 +90,7 @@ export default function ChatPanel({
   projectDescription,
   buildingInfo,
   renovationRoiSummary,
+  referenceImages,
   onMessageCountChange,
 }: {
   projectId?: string;
@@ -101,6 +102,7 @@ export default function ChatPanel({
   projectDescription?: string;
   buildingInfo?: ChatContextBuildingInfo;
   renovationRoiSummary?: string;
+  referenceImages?: ProjectImage[];
   onMessageCountChange?: (count: number) => void;
 }) {
   const glow = useCursorGlow();
@@ -219,6 +221,7 @@ export default function ChatPanel({
         buildingInfo,
         projectInfo: { name: projectName, description: projectDescription },
         renovationRoiSummary,
+        projectId,
       }) as ChatMessage & { credits?: { cost: number; balance: number } };
       if (reply.credits && typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("helscoop:credits-updated", { detail: reply.credits }));
@@ -406,7 +409,7 @@ export default function ChatPanel({
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-        <textarea
+          <textarea
           ref={inputRef}
           className="chat-input"
           value={input}
@@ -426,8 +429,13 @@ export default function ChatPanel({
           placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.continueConversation')}
           disabled={loading}
           aria-label={t('editor.chatInputLabel')}
-        />
-        <button
+          />
+          {referenceImages && referenceImages.length > 0 && (
+            <div className="chat-reference-photo-context" aria-label={`${referenceImages.length} reference photos available to AI chat`}>
+              {referenceImages.length} house photo{referenceImages.length === 1 ? "" : "s"} attached to AI context
+            </div>
+          )}
+          <button
           className="chat-send-btn"
           onClick={send}
           disabled={loading || !input.trim()}

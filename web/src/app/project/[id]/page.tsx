@@ -13,6 +13,7 @@ import EnergyDashboard from "@/components/EnergyDashboard";
 import MaterialPicker from "@/components/MaterialPicker";
 import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
+import ReferencePhotosPanel from "@/components/ReferencePhotosPanel";
 import CreditBalancePill from "@/components/CreditBalancePill";
 import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/MobileEditorTabs";
 import SceneParamsPanel from "@/components/SceneParamsPanel";
@@ -71,7 +72,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
-import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary } from "@/types";
+import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary, ProjectImage } from "@/types";
 import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 import type { ViewportAssemblyGuideState, ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
@@ -422,6 +423,7 @@ export default function ProjectPage() {
   const [viewportKey, setViewportKey] = useState(0);
   const [sceneWarnings, setSceneWarnings] = useState<string[]>([]);
   const [chatMessageCount, setChatMessageCount] = useState(0);
+  const [projectImages, setProjectImages] = useState<ProjectImage[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const shareDialogRef = useRef<HTMLDivElement>(null);
   const araDialogRef = useRef<HTMLDivElement>(null);
@@ -667,6 +669,21 @@ export default function ProjectPage() {
         }
       });
   }, [projectId, router, toast, t]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    let cancelled = false;
+    api.getProjectImages(projectId)
+      .then((result) => {
+        if (!cancelled) setProjectImages(result.images);
+      })
+      .catch(() => {
+        if (!cancelled) setProjectImages([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -4581,6 +4598,7 @@ export default function ProjectPage() {
             projectDescription={projectDesc}
             buildingInfo={project?.building_info ?? undefined}
             renovationRoiSummary={renovationRoi?.summary}
+            referenceImages={projectImages}
             onMessageCountChange={setChatMessageCount}
           />
           <PriceSummaryBar
@@ -4832,6 +4850,13 @@ export default function ProjectPage() {
               householdDeductionJoint={householdDeductionJoint}
               onHouseholdDeductionJointChange={updateHouseholdDeductionMode}
               onApplyScene={handleBlueprintSceneApply}
+              referencePhotosSlot={(
+                <ReferencePhotosPanel
+                  projectId={projectId}
+                  images={projectImages}
+                  onImagesChange={setProjectImages}
+                />
+              )}
             />
           </>
         )}

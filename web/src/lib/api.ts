@@ -16,6 +16,8 @@ import type {
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
   ProjectType,
+  ProjectImage,
+  ProjectImagesResponse,
   ProLeadResponse,
   ProLeadStatus,
   PriceAlertEmailFrequency,
@@ -86,6 +88,13 @@ function downloadBlob(blob: Blob, filename: string): void {
   // Keep the object URL alive long enough for browser download managers and
   // Playwright's download observer to resolve the blob-backed navigation.
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const t = getToken();
+  if (t) headers.Authorization = `Bearer ${t}`;
+  return headers;
 }
 
 export class ApiError extends Error {
@@ -655,6 +664,56 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  getProjectImages: (projectId: string): Promise<ProjectImagesResponse> =>
+    apiFetch(`/projects/${encodeURIComponent(projectId)}/images`),
+  uploadProjectImage: (
+    projectId: string,
+    file: File,
+    options?: { onProgress?: (progress: number) => void; signal?: AbortSignal },
+  ): Promise<{ image: ProjectImage }> =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("image", file);
+
+      xhr.open("POST", `${API_URL}/projects/${encodeURIComponent(projectId)}/images`);
+      const t = getToken();
+      if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && options?.onProgress) {
+          options.onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(xhr.responseText);
+        } catch {
+          parsed = null;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(parsed as { image: ProjectImage });
+          return;
+        }
+        const body = parsed as { error?: string; message?: string } | null;
+        reject(new ApiError(body?.error || body?.message || ERROR_MESSAGES[xhr.status] || "Upload failed", xhr.status, xhr.statusText));
+      };
+      xhr.onerror = () => reject(new ApiError("Upload failed", xhr.status || 0, xhr.statusText || "Network error"));
+      xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+
+      options?.signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+      xhr.send(formData);
+    }),
+  getProjectImageAsset: async (url: string): Promise<Blob> => {
+    const res = await fetch(`${API_URL}${url}`, { headers: authHeaders() });
+    if (!res.ok) {
+      throw new ApiError(ERROR_MESSAGES[res.status] || `Error ${res.status}`, res.status, res.statusText);
+    }
+    return res.blob();
+  },
+  deleteProjectImage: (projectId: string, imageId: string): Promise<{ ok: boolean }> =>
+    apiFetch(`/projects/${encodeURIComponent(projectId)}/images/${encodeURIComponent(imageId)}`, { method: "DELETE" }),
   getProLeads: (params?: { status?: ProLeadStatus; limit?: number }): Promise<ProLeadResponse> => {
     const search = new URLSearchParams();
     if (params?.status) search.set("status", params.status);
@@ -711,6 +770,7 @@ export const api = {
       };
       projectInfo?: { name?: string; description?: string };
       renovationRoiSummary?: string;
+      projectId?: string;
     },
   ) =>
     apiFetch("/chat", {
@@ -723,6 +783,7 @@ export const api = {
         buildingInfo: context?.buildingInfo,
         projectInfo: context?.projectInfo,
         renovationRoiSummary: context?.renovationRoiSummary,
+        projectId: context?.projectId,
       }),
     }),
 

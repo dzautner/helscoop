@@ -40,6 +40,7 @@ import roomScanRouter from "./routes/room-scan";
 import marketplaceRouter from "./routes/marketplace";
 import terrainRouter from "./routes/terrain";
 import proRouter from "./routes/pro";
+import projectImagesRouter from "./routes/project-images";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 import { sendEmail } from "./email";
@@ -716,6 +717,7 @@ app.post("/auth/refresh", authLimiter, async (req, res) => {
 
 // Authenticated routes get the relaxed rate limiter (500 req/15min per user)
 app.use("/materials", authenticatedLimiter, materialsRouter);
+app.use("/projects", authenticatedLimiter, projectImagesRouter);
 app.use("/projects", authenticatedLimiter, projectsRouter);
 app.use("/bom", authenticatedLimiter, bomRouter);
 app.use("/suppliers", authenticatedLimiter, suppliersRouter);
