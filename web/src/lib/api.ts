@@ -21,6 +21,9 @@ import type {
   ProjectPriceChangeSummary,
   PhotoEstimateResponse,
   PhotoEstimateUpload,
+  QuantityTakeoffDrawing,
+  QuantityTakeoffOptions,
+  QuantityTakeoffResponse,
   ProjectMaterialTrendResponse,
   QuoteRequestPayload,
   RenovationCostEstimateRequest,
@@ -528,6 +531,18 @@ export const api = {
     data: { photos: PhotoEstimateUpload[]; building_info?: BuildingInfo | null },
   ): Promise<PhotoEstimateResponse> =>
     apiFetch(`/photo-estimate/projects/${encodeURIComponent(projectId)}/analyze`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  analyzeQuantityTakeoff: (
+    projectId: string,
+    data: {
+      drawings: QuantityTakeoffDrawing[];
+      options?: QuantityTakeoffOptions;
+      building_info?: BuildingInfo | null;
+    },
+  ): Promise<QuantityTakeoffResponse> =>
+    apiFetch(`/quantity-takeoff/projects/${encodeURIComponent(projectId)}/analyze`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
