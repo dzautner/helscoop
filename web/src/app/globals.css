@@ -4578,17 +4578,19 @@ select:focus {
   .viewport-thermal-legend { display: none; }
 }
 
-/* Energy dashboard */
+/* Daylight analysis */
 .daylight-panel {
   position: absolute;
   top: 10px;
   left: 10px;
   z-index: 25;
-  width: 260px;
+  width: 318px;
+  max-height: calc(100% - 20px);
+  overflow: auto;
   background: rgba(17, 17, 19, 0.88);
   backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -4602,11 +4604,20 @@ select:focus {
 }
 
 .daylight-panel-title {
+  display: block;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
+}
+
+.daylight-location {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
 .daylight-panel-presets {
@@ -4656,10 +4667,45 @@ select:focus {
   gap: 8px;
 }
 
+.daylight-date-input {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.daylight-time-slider-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
 .daylight-slider {
   flex: 1;
+  width: 100%;
   height: 4px;
   accent-color: var(--amber, #e5a04b);
+}
+
+.daylight-sun-marker {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 12px;
+  border-radius: 2px;
+  background: #6fbf73;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.daylight-sun-marker--sunset {
+  background: #d9973e;
 }
 
 .daylight-value {
@@ -4763,6 +4809,106 @@ select:focus {
 .daylight-night {
   color: var(--amber, #e5a04b);
   font-weight: 600;
+  font-size: 10px;
+}
+
+.daylight-study-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.daylight-study-toggle input {
+  accent-color: var(--amber, #e5a04b);
+}
+
+.daylight-study {
+  display: grid;
+  gap: 8px;
+}
+
+.daylight-study-ranges {
+  display: grid;
+  gap: 6px;
+}
+
+.daylight-study-ranges label {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.daylight-study-ranges strong {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.daylight-shadow-map {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.daylight-shadow-range {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.daylight-shadow-building {
+  fill: color-mix(in srgb, var(--bg-elevated) 88%, white);
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+}
+
+.daylight-shadow-north {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.daylight-shadow-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.daylight-study-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.daylight-export-btn {
+  min-height: 30px;
+  border: 1px solid rgba(229, 160, 75, 0.35);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--amber, #e5a04b) 14%, var(--bg-tertiary));
+  color: var(--amber, #e5a04b);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.daylight-export-btn:hover {
+  background: color-mix(in srgb, var(--amber, #e5a04b) 20%, var(--bg-tertiary));
 }
 
 @media (max-width: 640px) {
