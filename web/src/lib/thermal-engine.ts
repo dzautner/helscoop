@@ -15,11 +15,14 @@ export const DEFAULT_THERMAL_SETTINGS: ThermalSettings = {
 export interface SurfaceThermalData {
   materialId: string;
   category: string;
+  referenceCategory: ThermalReferenceCategory;
   conductivity: number;
   thickness_m: number;
   rValue: number;
   uValue: number;
   heatFluxDensity: number;
+  insideSurfaceTempC: number;
+  outsideSurfaceTempC: number;
 }
 
 export interface ThermalAnalysisResult {
@@ -30,7 +33,7 @@ export interface ThermalAnalysisResult {
   maxHeatFlux: number;
 }
 
-interface MaterialInput {
+export interface MaterialInput {
   id: string;
   category_name: string;
   thermal_conductivity?: number | string | null;
@@ -38,6 +41,23 @@ interface MaterialInput {
 }
 
 const ENVELOPE_CATEGORIES = new Set(["insulation", "opening"]);
+
+export type ThermalReferenceCategory = "wall" | "roof" | "floor" | "opening";
+
+function thermalSearchText(category: string, materialId = ""): string {
+  return `${category} ${materialId}`.toLowerCase().replace(/[_-]+/g, " ");
+}
+
+export function classifyThermalReferenceCategory(
+  category: string,
+  materialId = "",
+): ThermalReferenceCategory {
+  const text = thermalSearchText(category, materialId);
+  if (/\b(window|door|glass|opening|vent|flap|ikkuna|ovi|lasi)\b/.test(text)) return "opening";
+  if (/\b(roof|roofing|katto|katt|ylapohja|yläpohja)\b/.test(text)) return "roof";
+  if (/\b(floor|slab|foundation|base|perustus|lattia|alapohja)\b/.test(text)) return "floor";
+  return "wall";
+}
 
 export function calculateThermalLoss(
   materials: MaterialInput[],
@@ -64,15 +84,21 @@ export function calculateThermalLoss(
     const rTotal = settings.surfaceRInside + rMaterial + settings.surfaceROutside;
     const uValue = 1 / rTotal;
     const heatFluxDensity = uValue * deltaT;
+    const referenceCategory = classifyThermalReferenceCategory(mat.category_name, mat.id);
+    const insideSurfaceTempC = settings.insideTemp - heatFluxDensity * settings.surfaceRInside;
+    const outsideSurfaceTempC = settings.outsideTemp + heatFluxDensity * settings.surfaceROutside;
 
     surfaces.set(mat.id, {
       materialId: mat.id,
       category: mat.category_name,
+      referenceCategory,
       conductivity,
       thickness_m,
       rValue: rTotal,
       uValue,
       heatFluxDensity,
+      insideSurfaceTempC,
+      outsideSurfaceTempC,
     });
 
     if (ENVELOPE_CATEGORIES.has(mat.category_name)) {
@@ -135,24 +161,26 @@ export type ComplianceStatus = "pass" | "warn" | "fail";
 
 export interface CodeComplianceResult {
   category: string;
+  referenceCategory: ThermalReferenceCategory;
   uValue: number;
   referenceU: number;
   status: ComplianceStatus;
 }
 
-const REFERENCE_U_VALUES: Record<string, number> = {
-  insulation: 0.17,
+export const REFERENCE_U_VALUES: Record<ThermalReferenceCategory, number> = {
+  wall: 0.17,
+  roof: 0.09,
+  floor: 0.16,
   opening: 1.0,
-  roofing: 0.09,
-  cladding: 0.17,
-  sheathing: 0.17,
 };
 
 export function checkCodeCompliance(
   category: string,
   uValue: number,
+  materialId = "",
 ): CodeComplianceResult {
-  const referenceU = REFERENCE_U_VALUES[category] ?? 0.17;
+  const referenceCategory = classifyThermalReferenceCategory(category, materialId);
+  const referenceU = REFERENCE_U_VALUES[referenceCategory];
   let status: ComplianceStatus;
   if (uValue <= referenceU) {
     status = "pass";
@@ -161,7 +189,7 @@ export function checkCodeCompliance(
   } else {
     status = "fail";
   }
-  return { category, uValue, referenceU, status };
+  return { category, referenceCategory, uValue, referenceU, status };
 }
 
 export function getComplianceSummary(
@@ -170,7 +198,7 @@ export function getComplianceSummary(
   const results: CodeComplianceResult[] = [];
   let pass = 0, warn = 0, fail = 0;
   surfaces.forEach((data) => {
-    const result = checkCodeCompliance(data.category, data.uValue);
+    const result = checkCodeCompliance(data.category, data.uValue, data.materialId);
     results.push(result);
     if (result.status === "pass") pass++;
     else if (result.status === "warn") warn++;
@@ -275,6 +303,29 @@ export interface BomAreaItem {
   material_id: string;
   quantity: number;
   unit: string;
+}
+
+export function estimateBomAreaM2(materialId: string, bom: BomAreaItem[]): number {
+  return bom.reduce((sum, item) => {
+    if (item.material_id !== materialId) return sum;
+    const unit = item.unit.toLowerCase();
+    if (unit === "m2" || unit === "m²" || unit === "sqm") return sum + item.quantity;
+    return sum;
+  }, 0);
+}
+
+export function calculateSurfaceAnnualHeatLossKwh(
+  surface: SurfaceThermalData,
+  areaM2: number,
+  location: ClimateLocation,
+  insideTempC: number,
+): number {
+  if (areaM2 <= 0) return 0;
+  return location.monthlyAvgTemp.reduce((sum, outsideTemp, monthIndex) => {
+    const deltaT = Math.max(0, insideTempC - outsideTemp);
+    const hours = DAYS_PER_MONTH[monthIndex] * 24;
+    return sum + (surface.uValue * areaM2 * deltaT * hours) / 1000;
+  }, 0);
 }
 
 export function calculateAnnualEnergy(

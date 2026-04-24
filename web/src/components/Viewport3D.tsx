@@ -207,6 +207,26 @@ function prefersReducedMotion(): boolean {
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function updateMaterialColorTransitions(group: THREE.Group | null) {
+  if (!group) return;
+  const reducedMotion = prefersReducedMotion();
+  const target = new THREE.Color();
+  group.traverse((child) => {
+    if (!(child instanceof THREE.Mesh) || !(child.material instanceof THREE.MeshStandardMaterial)) return;
+    const targetColor = child.material.userData.targetColor as [number, number, number] | undefined;
+    if (!targetColor) return;
+    target.setRGB(targetColor[0], targetColor[1], targetColor[2]);
+    const dr = child.material.color.r - target.r;
+    const dg = child.material.color.g - target.g;
+    const db = child.material.color.b - target.b;
+    if (reducedMotion || (dr * dr + dg * dg + db * db) < 0.000016) {
+      child.material.color.copy(target);
+    } else {
+      child.material.color.lerp(target, 0.16);
+    }
+  });
+}
+
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
@@ -1471,6 +1491,7 @@ export default function Viewport3D({
       if (airflowRuntimeRef.current) {
         updateAirflowRuntime(airflowRuntimeRef.current, performance.now());
       }
+      updateMaterialColorTransitions(objectGroupRef.current);
       if (composer) {
         composer.render();
       } else {
@@ -1936,7 +1957,11 @@ export default function Viewport3D({
 
       mat.transparent = transparent;
       mat.opacity = opacity;
-      mat.color.setRGB(color[0], color[1], color[2]);
+      mat.userData.targetColor = color;
+      if (!mat.userData.hasColorTransitionTarget || prefersReducedMotion()) {
+        mat.color.setRGB(color[0], color[1], color[2]);
+        mat.userData.hasColorTransitionTarget = true;
+      }
 
       const emissiveBase: [number, number, number] = thermalRgb
         ? [thermalRgb[0] * 0.15, thermalRgb[1] * 0.15, thermalRgb[2] * 0.15]
