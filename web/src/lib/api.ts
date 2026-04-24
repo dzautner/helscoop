@@ -24,6 +24,9 @@ import type {
   QuantityTakeoffDrawing,
   QuantityTakeoffOptions,
   QuantityTakeoffResponse,
+  RoomScanOptions,
+  RoomScanResponse,
+  RoomScanUpload,
   ProjectMaterialTrendResponse,
   QuoteRequestPayload,
   RenovationCostEstimateRequest,
@@ -543,6 +546,18 @@ export const api = {
     },
   ): Promise<QuantityTakeoffResponse> =>
     apiFetch(`/quantity-takeoff/projects/${encodeURIComponent(projectId)}/analyze`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  importRoomScan: (
+    projectId: string,
+    data: {
+      scans: RoomScanUpload[];
+      options?: RoomScanOptions;
+      building_info?: BuildingInfo | null;
+    },
+  ): Promise<RoomScanResponse> =>
+    apiFetch(`/room-scan/projects/${encodeURIComponent(projectId)}/import`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
