@@ -35,6 +35,7 @@ import {
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
 import { calculateThermalLoss, heatFluxToColor, getComplianceSummary } from "@/lib/thermal-engine";
+import { analyzeAirflow } from "@/lib/airflow-engine";
 import type { BomImportMode } from "@/lib/bom-import";
 import { estimateRenovationRoi } from "@/lib/renovation-roi";
 import { formatRenovationCompareCurrency, summarizeRenovationComparison } from "@/lib/renovation-compare";
@@ -369,6 +370,12 @@ export default function ProjectPage() {
   const renovationCompareRef = useRef<HTMLDivElement>(null);
   const renovationCompareDragging = useRef(false);
   const [thermalView, setThermalView] = useState(false);
+  const [airflowView, setAirflowView] = useState(false);
+  const [airflowParticleDensity, setAirflowParticleDensity] = useState(500);
+  const [airflowSpeed, setAirflowSpeed] = useState(1);
+  const [airflowShowArrows, setAirflowShowArrows] = useState(true);
+  const [airflowWindSpeed, setAirflowWindSpeed] = useState(4);
+  const [airflowWindDirection, setAirflowWindDirection] = useState(225);
   const [lightingPreset, setLightingPreset] = useState<import("@/components/Viewport3D").LightingPresetId>("default");
   const [showLightingMenu, setShowLightingMenu] = useState(false);
   const [showScenarioRenderPanel, setShowScenarioRenderPanel] = useState(false);
@@ -917,6 +924,25 @@ export default function ProjectPage() {
   const sceneLayers = useMemo(() => buildSceneLayers(renderedLayers, bom), [bom, renderedLayers]);
   const assemblyGuide = useMemo(() => buildAssemblyGuide(sceneLayers, bom, materials), [bom, materials, sceneLayers]);
   const constructionTimelapsePlan = useMemo(() => buildConstructionTimelapse(assemblyGuide), [assemblyGuide]);
+  const airflowAnalysis = useMemo(
+    () => analyzeAirflow(sceneLayers, sceneParams, project?.building_info ?? null, {
+      particleDensity: airflowParticleDensity,
+      speedMultiplier: airflowSpeed,
+      showArrows: airflowShowArrows,
+      windSpeedMps: airflowWindSpeed,
+      windDirectionDeg: airflowWindDirection,
+    }),
+    [
+      airflowParticleDensity,
+      airflowShowArrows,
+      airflowSpeed,
+      airflowWindDirection,
+      airflowWindSpeed,
+      project?.building_info,
+      sceneLayers,
+      sceneParams,
+    ],
+  );
   const constructionSequenceActive = showAssemblyGuide || showConstructionTimelapse;
   const assemblyStepSignature = useMemo(
     () => assemblyGuide.steps.map((step) => step.id).join("|"),
@@ -1641,6 +1667,13 @@ export default function ProjectPage() {
       descriptionKey: "shortcuts.thermal",
     },
     {
+      key: "V",
+      mod: false,
+      code: "v",
+      action: () => setAirflowView((v) => !v),
+      descriptionKey: "shortcuts.airflow",
+    },
+    {
       key: "E",
       mod: false,
       code: "e",
@@ -1865,6 +1898,15 @@ export default function ProjectPage() {
         icon: icon("M4 4h16v10H4zM8 18h8M10 14l-2 4M14 14l2 4"),
         action: triggerScenarioRender,
         isActive: showScenarioRenderPanel,
+      },
+      {
+        id: "toggle-airflow",
+        labelKey: "commandPalette.toggleAirflow",
+        labelSecondaryKey: "commandPalette.toggleAirflowEn",
+        shortcut: "V",
+        icon: icon("M4 12c3-4 7 4 10 0 2-3 5 1 6 3M3 6c4-4 9 4 13 0M5 18c2-2 5 2 8 0"),
+        action: () => setAirflowView((value) => !value),
+        isActive: airflowView,
       },
       {
         id: "toggle-assembly-guide",
@@ -2138,7 +2180,7 @@ export default function ProjectPage() {
         isActive: isAdvancedMode && showDocs,
       },
     ];
-  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showConstructionTimelapse, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleConstructionTimelapse, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs, showScenarioRenderPanel, triggerScenarioRender]);
+  }, [save, toast, t, track, locale, projectName, projectDesc, bom, projectId, shareToken, toggleTheme, showCode, toggleCodePanel, wireframe, renovationCompareMode, showAssemblyGuide, showConstructionTimelapse, showBom, showDocs, isAdvancedMode, resolvedTheme, exportIfcPermitModel, exportPermitPack, exportProposalPdf, exportQuotePdf, resetViewportCamera, toggleAssemblyGuide, toggleConstructionTimelapse, toggleRenovationCompareMode, toggleViewportMeasurementMode, viewportMeasurementMode, toggleDocsPanel, renovationBaselineSceneJs, showScenarioRenderPanel, triggerScenarioRender, airflowView]);
 
   const handleViewportReset = useCallback(() => {
     queueSceneAnnouncement("editor.sceneResetAnnounced");
@@ -3501,6 +3543,8 @@ export default function ProjectPage() {
                       sunAltitude={sunAltitude}
                       shadowStudySamples={daylightShadowStudy?.samples ?? null}
                       assemblyGuideState={viewportAssemblyGuideState}
+                      airflowView={airflowView}
+                      airflowAnalysis={airflowAnalysis}
                       focusObjectRef={focusObjectRef}
                     />
                     <span className="renovation-compare-label renovation-compare-label--planned">{t("editor.comparePlanned")}</span>
@@ -3576,6 +3620,8 @@ export default function ProjectPage() {
                   sunAltitude={sunAltitude}
                   shadowStudySamples={daylightShadowStudy?.samples ?? null}
                   assemblyGuideState={viewportAssemblyGuideState}
+                  airflowView={airflowView}
+                  airflowAnalysis={airflowAnalysis}
                   focusObjectRef={focusObjectRef}
                 />
               )}
@@ -3865,6 +3911,19 @@ export default function ProjectPage() {
             </button>
             <button
               className="viewport-toolbar-btn"
+              data-active={airflowView}
+              onClick={() => setAirflowView((value) => !value)}
+              title={`${t('airflow.title')} (V)`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12c3-4 7 4 10 0 2-3 5 1 6 3" />
+                <path d="M3 6c4-4 9 4 13 0" />
+                <path d="M5 18c2-2 5 2 8 0" />
+              </svg>
+              {t('airflow.shortTitle')}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
               data-active={explodedView}
               onClick={() => setExplodedView(!explodedView)}
             >
@@ -4121,6 +4180,85 @@ export default function ProjectPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {airflowView && (
+            <div className="viewport-airflow-panel" data-testid="airflow-panel" aria-label={t("airflow.title")}>
+              <div className="viewport-airflow-header">
+                <div>
+                  <div className="label-mono">{t("airflow.eyebrow")}</div>
+                  <strong>{t("airflow.title")}</strong>
+                </div>
+                <span className={`airflow-ach-badge airflow-ach-badge--${airflowAnalysis.adequacy}`}>
+                  {airflowAnalysis.airChangesPerHour} {t("airflow.ach")}
+                </span>
+              </div>
+              <p className="viewport-airflow-summary">
+                {t(`airflow.${airflowAnalysis.adequacy}` as any, {
+                  openings: airflowAnalysis.openingCount,
+                  heat: airflowAnalysis.heatWatts,
+                })}
+              </p>
+              <div className="viewport-airflow-metrics">
+                <span>{t("airflow.stack")}: {airflowAnalysis.stackVelocityMps} m/s</span>
+                <span>{t("airflow.openings")}: {airflowAnalysis.openingCount}</span>
+                <span>{t("airflow.deltaT")}: {airflowAnalysis.deltaTempC} C</span>
+              </div>
+              <div className="viewport-airflow-controls">
+                <label>
+                  <span>{t("airflow.particles")}: {airflowParticleDensity}</span>
+                  <input
+                    type="range"
+                    min={50}
+                    max={1000}
+                    step={50}
+                    value={airflowParticleDensity}
+                    onChange={(event) => setAirflowParticleDensity(Number(event.currentTarget.value))}
+                  />
+                </label>
+                <label>
+                  <span>{t("airflow.speed")}: {airflowSpeed.toFixed(1)}x</span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={3}
+                    step={0.25}
+                    value={airflowSpeed}
+                    onChange={(event) => setAirflowSpeed(Number(event.currentTarget.value))}
+                  />
+                </label>
+                <label>
+                  <span>{t("airflow.wind")}: {airflowWindSpeed.toFixed(1)} m/s</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={15}
+                    step={0.5}
+                    value={airflowWindSpeed}
+                    onChange={(event) => setAirflowWindSpeed(Number(event.currentTarget.value))}
+                  />
+                </label>
+                <label>
+                  <span>{t("airflow.windDirection")}: {airflowWindDirection} deg</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={345}
+                    step={15}
+                    value={airflowWindDirection}
+                    onChange={(event) => setAirflowWindDirection(Number(event.currentTarget.value))}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="airflow-arrow-toggle"
+                data-active={airflowShowArrows}
+                onClick={() => setAirflowShowArrows((value) => !value)}
+              >
+                {airflowShowArrows ? t("airflow.hideArrows") : t("airflow.showArrows")}
+              </button>
             </div>
           )}
 
