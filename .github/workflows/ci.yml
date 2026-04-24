@@ -134,7 +134,7 @@ jobs:
           tags: ${{ steps.meta-api.outputs.tags }}
           labels: ${{ steps.meta-api.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
           build-args: |
             APP_VERSION=${{ github.sha }}
 
@@ -157,7 +157,7 @@ jobs:
           tags: ${{ steps.meta-web.outputs.tags }}
           labels: ${{ steps.meta-web.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://helscoop-api.fly.dev' }}
 
@@ -217,7 +217,7 @@ jobs:
 
   auto-merge:
     name: Auto Merge
-    needs: [test-api, test-web]
+    needs: [test-api, test-web, build-images]
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     permissions:
