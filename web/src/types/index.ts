@@ -314,6 +314,7 @@ export interface Material {
   category_name_fi: string | null;
   image_url: string | null;
   pricing: {
+    supplier_id?: string;
     unit_price: number;
     unit: string;
     supplier_name: string;
@@ -363,6 +364,7 @@ export interface BomItem {
   quantity: number;
   unit: string;
   unit_price?: number;
+  supplier_id?: string | null;
   supplier_name?: string;
   total?: number;
   supplier?: string;
@@ -374,6 +376,72 @@ export interface BomItem {
   note?: string;
   manual_override?: boolean;
   geometry_driven?: boolean;
+}
+
+export interface MarketplaceOrderLine {
+  id: string;
+  material_id: string;
+  material_name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+  link: string | null;
+  stock_level: StockLevel;
+}
+
+export interface MarketplaceOrder {
+  id: string;
+  project_id: string;
+  user_id: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  partner_id: string | null;
+  partner_name: string | null;
+  status: "draft" | "opened" | "ordered" | "confirmed" | "cancelled";
+  currency: string;
+  subtotal: number;
+  estimated_commission_rate: number;
+  estimated_commission_amount: number;
+  checkout_url: string | null;
+  external_order_ref: string | null;
+  created_at: string;
+  updated_at: string;
+  opened_at?: string | null;
+  ordered_at?: string | null;
+  confirmed_at?: string | null;
+  cancelled_at?: string | null;
+  lines: MarketplaceOrderLine[];
+}
+
+export interface MarketplaceSupplierCheckoutLineInput {
+  material_id: string;
+  material_name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+  link?: string | null;
+  stock_level?: StockLevel | null;
+}
+
+export interface MarketplaceSupplierCheckoutInput {
+  supplier_id?: string | null;
+  supplier_name: string;
+  subtotal: number;
+  currency?: string;
+  checkout_url?: string | null;
+  items: MarketplaceSupplierCheckoutLineInput[];
+}
+
+export interface MarketplaceCheckoutResponse {
+  orders: MarketplaceOrder[];
+}
+
+export interface MarketplaceOpenOrderResponse {
+  checkout_url: string | null;
+  click_count: number;
+  order: MarketplaceOrder | null;
 }
 
 export interface QuoteRequestPayload {

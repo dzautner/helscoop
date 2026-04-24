@@ -35,6 +35,7 @@ import keskoRouter from "./routes/kesko";
 import araGrantRouter from "./routes/ara-grant";
 import ryhtiRouter from "./routes/ryhti";
 import photoEstimateRouter from "./routes/photo-estimate";
+import marketplaceRouter from "./routes/marketplace";
 import terrainRouter from "./routes/terrain";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
@@ -72,7 +73,7 @@ app.use(
       ? process.env.CORS_ORIGIN.split(",")
       : ["http://localhost:3000", "http://localhost:3002", "http://localhost:3052"],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -736,6 +737,7 @@ app.use("/kesko", authenticatedLimiter, keskoRouter);
 app.use("/ara-grant", authenticatedLimiter, araGrantRouter);
 app.use("/ryhti", authenticatedLimiter, ryhtiRouter);
 app.use("/photo-estimate", authenticatedLimiter, photoEstimateRouter);
+app.use("/marketplace", authenticatedLimiter, marketplaceRouter);
 app.use("/terrain", buildingLimiter, terrainRouter);
 app.use("/api/terrain", buildingLimiter, terrainRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
