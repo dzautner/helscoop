@@ -16,6 +16,8 @@ import type {
   ProjectVersionsResponse,
   ProjectVersionSnapshot,
   ProjectType,
+  ProLeadResponse,
+  ProLeadStatus,
   PriceAlertEmailFrequency,
   PriceWatch,
   ProjectPriceChangeSummary,
@@ -652,6 +654,18 @@ export const api = {
     apiFetch(`/projects/${projectId}/quote-request`, {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+  getProLeads: (params?: { status?: ProLeadStatus; limit?: number }): Promise<ProLeadResponse> => {
+    const search = new URLSearchParams();
+    if (params?.status) search.set("status", params.status);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return apiFetch(`/pro/leads${suffix}`);
+  },
+  updateProLeadStatus: (leadId: string, status: ProLeadStatus) =>
+    apiFetch(`/pro/leads/${encodeURIComponent(leadId)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
     }),
 
   shareProject: (projectId: string) =>

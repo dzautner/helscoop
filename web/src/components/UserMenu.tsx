@@ -166,6 +166,15 @@ export default function UserMenu({ userName }: { userName: string }) {
             >
               {t("nav.settings")}
             </Link>
+            <Link
+              href="/pro"
+              className="menu-item"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => setOpen(false)}
+            >
+              Helscoop Pro
+            </Link>
             <button
               className="menu-item"
               role="menuitem"
