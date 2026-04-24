@@ -14,6 +14,9 @@ export interface BuildingInfo {
   climate_zone?: string;
   heating_degree_days?: number;
   data_source_error?: string;
+  ground_elevation_m?: number;
+  terrain_source?: string;
+  terrain_accuracy_m?: number;
 }
 
 export interface Project {
@@ -232,14 +235,54 @@ export interface BuildingResult {
     roof_type?: string;
     roof_material?: string;
     units?: number;
+    ground_elevation_m?: number;
+    terrain_source?: string;
+    terrain_accuracy_m?: number;
   };
   confidence: "verified" | "estimated" | "template" | "manual";
   data_sources: string[];
   climate_zone?: string;
   heating_degree_days?: number;
   data_source_error?: string;
+  terrain?: TerrainFootprintSample;
   scene_js: string;
   bom_suggestion: { material_id: string; quantity: number; unit: string }[];
+}
+
+export interface TerrainPoint {
+  lat: number;
+  lon: number;
+  x: number;
+  y: number;
+  elevation_m: number;
+}
+
+export interface TerrainGrid {
+  crs: "EPSG:3067" | "EPSG:4326";
+  bbox: [number, number, number, number];
+  source: string;
+  resolution_m: number;
+  accuracy_m: number;
+  rows: number;
+  cols: number;
+  base_elevation_m: number;
+  average_elevation_m: number;
+  min_elevation_m: number;
+  max_elevation_m: number;
+  points: TerrainPoint[];
+}
+
+export interface TerrainFootprintSample {
+  center: { lat: number; lon: number; x: number; y: number };
+  source: string;
+  resolutionM: number;
+  accuracyM: number;
+  baseElevationM: number;
+  averageElevationM: number;
+  minElevationM: number;
+  maxElevationM: number;
+  localReliefM: number;
+  points: TerrainPoint[];
 }
 
 export interface Template {

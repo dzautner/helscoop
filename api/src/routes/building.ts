@@ -1,6 +1,12 @@
 import { Router, Request, Response } from "express";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
+import {
+  appendTerrainScene,
+  estimateFootprintDimensions,
+  sampleTerrainForFootprint,
+  type TerrainFootprintSample,
+} from "../lib/terrain";
 
 const router = Router();
 
@@ -56,6 +62,9 @@ interface BuildingInfo {
   roof_type?: string;
   roof_material?: string;
   units?: number;
+  ground_elevation_m?: number;
+  terrain_source?: string;
+  terrain_accuracy_m?: number;
 }
 
 interface BomItem {
@@ -70,10 +79,21 @@ interface BuildingData {
   building_info: BuildingInfo;
   scene_js: string;
   bom_suggestion: BomItem[];
+  terrain?: TerrainFootprintSample;
   climate_zone?: string;
   heating_degree_days?: number;
   data_source_error?: string;
 }
+
+type TerrainDecoratedBuilding<T extends BuildingData> = Omit<T, "building_info" | "scene_js"> & {
+  building_info: T["building_info"] & {
+    ground_elevation_m?: number;
+    terrain_source?: string;
+    terrain_accuracy_m?: number;
+  };
+  scene_js: string;
+  terrain: TerrainFootprintSample;
+};
 
 interface ExternalBuildingResult extends BuildingData {
   confidence: "verified" | "estimated" | "manual";
@@ -225,6 +245,36 @@ function generateBomSuggestion(area: number): BomItem[] {
     // galvanized_roofing: Peltikatto Sinkitty (Ruukki), priced per sqm
     { material_id: "galvanized_roofing", quantity: Math.round(area * 0.55), unit: "sqm" },
   ];
+}
+
+function addTerrainContext<T extends BuildingData>(building: T): TerrainDecoratedBuilding<T> {
+  const footprint = estimateFootprintDimensions(
+    building.building_info.type,
+    building.building_info.floors,
+    building.building_info.area_m2,
+  );
+  const terrain = sampleTerrainForFootprint({
+    center: building.coordinates,
+    lengthMeters: footprint.lengthMeters,
+    widthMeters: footprint.widthMeters,
+  });
+
+  return {
+    ...building,
+    building_info: {
+      ...building.building_info,
+      ground_elevation_m: terrain.baseElevationM,
+      terrain_source: terrain.source,
+      terrain_accuracy_m: terrain.accuracyM,
+    },
+    scene_js: appendTerrainScene(building.scene_js, terrain, footprint),
+    terrain,
+  };
+}
+
+function withTerrainSource(sources: string[], terrain?: TerrainFootprintSample): string[] {
+  if (!terrain) return sources;
+  return sources.includes(terrain.source) ? sources : [...sources, terrain.source];
 }
 
 function inferGenericBuildingProfile(address: string, postalCode: string): {
@@ -831,7 +881,7 @@ function mapRegistryBuilding(
     dataSources.push(climate.source);
   }
 
-  return {
+  const mapped = addTerrainContext<ExternalBuildingResult>({
     ...generic,
     address: addressLookup.address,
     coordinates: addressLookup.coordinates,
@@ -849,6 +899,11 @@ function mapRegistryBuilding(
     scene_js: generateGenericScene(type, roundedFloors, roundedArea),
     confidence: "verified",
     data_sources: dataSources,
+  });
+
+  return {
+    ...mapped,
+    data_sources: withTerrainSource(dataSources, mapped.terrain),
   };
 }
 
@@ -960,7 +1015,7 @@ router.post("/generate", (req: Request, res: Response) => {
     ? body.address.trim().slice(0, MAX_ADDRESS_LENGTH)
     : "User-corrected building";
   const buildingInfo = sanitizeGeneratedBuildingInfo(body.building_info);
-  const result = {
+  const result = addTerrainContext({
     address,
     coordinates: sanitizeCoordinates(body.coordinates),
     building_info: buildingInfo,
@@ -968,9 +1023,12 @@ router.post("/generate", (req: Request, res: Response) => {
     data_sources: ["User-corrected building details", "Generated parametric model"],
     scene_js: generateGenericScene(buildingInfo.type, buildingInfo.floors, buildingInfo.area_m2),
     bom_suggestion: generateBomSuggestion(buildingInfo.area_m2),
-  };
+  });
 
-  return res.json(result);
+  return res.json({
+    ...result,
+    data_sources: withTerrainSource(result.data_sources, result.terrain),
+  });
 });
 
 // GET /building?address=<address>
@@ -997,10 +1055,14 @@ router.get("/", async (req: Request, res: Response) => {
   // Try to match against demo buildings
   for (const building of demoBuildings) {
     if (matchesDemoAddress(address, building.address)) {
+      const terrainBuilding = addTerrainContext(building);
       const result = {
-        ...building,
+        ...terrainBuilding,
         confidence: "verified" as const,
-        data_sources: ["Curated Helsinki metro demo data", "K-Rauta hinnat 04/2026"],
+        data_sources: withTerrainSource(
+          ["Curated Helsinki metro demo data", "K-Rauta hinnat 04/2026"],
+          terrainBuilding.terrain,
+        ),
       };
       setCache(cacheKey, result);
       return res.json(result);
@@ -1022,13 +1084,14 @@ router.get("/", async (req: Request, res: Response) => {
   const dataSources = partial
     ? [...partial.data_sources, `Yleinen ${generic.building_info.type}malli`]
     : [`Yleinen ${generic.building_info.type}malli`];
-  const result = {
+  const result = addTerrainContext({
     ...generic,
     ...(partial ? { address: partial.address, coordinates: partial.coordinates } : {}),
     confidence: "estimated" as const,
     data_sources: dataSources,
     ...(registryOutcome?.error ? { data_source_error: registryOutcome.error } : {}),
-  };
+  });
+  result.data_sources = withTerrainSource(result.data_sources, result.terrain);
   setCache(cacheKey, result);
   return res.json(result);
 });

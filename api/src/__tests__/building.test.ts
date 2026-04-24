@@ -207,6 +207,26 @@ describe("GET /building — demo address matching", () => {
     expect(body.scene_js).toContain("scene.add");
   });
 
+  it("adds NLS terrain metadata and visible terrain to demo scenes", async () => {
+    const res = await makeRequest(
+      "GET",
+      `/building?address=${encodeURIComponent("Ribbingintie 109")}`
+    );
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      building_info: { ground_elevation_m?: number; terrain_source?: string };
+      terrain?: { baseElevationM: number; points: unknown[]; source: string };
+      scene_js: string;
+      data_sources: string[];
+    };
+
+    expect(body.building_info.ground_elevation_m).toBeGreaterThan(0);
+    expect(body.building_info.terrain_source).toContain("NLS Elevation Model 2m");
+    expect(body.terrain?.points.length).toBe(9);
+    expect(body.scene_js).toContain("nls_terrain_plane");
+    expect(body.data_sources.some((source) => source.includes("NLS Elevation Model 2m"))).toBe(true);
+  });
+
   it("returns bom_suggestion for demo match", async () => {
     const res = await makeRequest(
       "GET",
@@ -477,6 +497,7 @@ describe("POST /building/generate", () => {
         material: string;
         heating: string;
         roof_type: string;
+        ground_elevation_m?: number;
       };
       data_sources: string[];
       scene_js: string;
@@ -495,7 +516,10 @@ describe("POST /building/generate", () => {
       roof_type: "mansardikatto",
     });
     expect(body.data_sources).toContain("User-corrected building details");
+    expect(body.data_sources.some((source) => source.includes("NLS Elevation Model 2m"))).toBe(true);
+    expect(body.building_info.ground_elevation_m).toBeGreaterThan(0);
     expect(body.scene_js).toContain("scene.add");
+    expect(body.scene_js).toContain("nls_terrain_base_elevation_m");
     expect(body.bom_suggestion.length).toBeGreaterThan(0);
   });
 
@@ -672,7 +696,54 @@ describe("GET /building — Finnish registry integration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Cache behavior
+// 5. Terrain endpoint
+// ---------------------------------------------------------------------------
+describe("GET /terrain", () => {
+  it("returns a sampled EPSG:3067 terrain grid for the requested bbox", async () => {
+    const res = await makeRequest(
+      "GET",
+      "/terrain?bbox=384900,6671900,385100,6672100&crs=3067&samples=5"
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      crs: string;
+      rows: number;
+      cols: number;
+      points: unknown[];
+      base_elevation_m: number;
+      source: string;
+    };
+
+    expect(body.crs).toBe("EPSG:3067");
+    expect(body.rows).toBe(5);
+    expect(body.cols).toBe(5);
+    expect(body.points.length).toBe(25);
+    expect(body.base_elevation_m).toBeGreaterThan(0);
+    expect(body.source).toContain("NLS Elevation Model 2m");
+  });
+
+  it("supports the documented /api/terrain alias", async () => {
+    const res = await makeRequest(
+      "GET",
+      "/api/terrain?lat=60.2685&lon=25.1955&length_m=12&width_m=10"
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      baseElevationM: number;
+      averageElevationM: number;
+      points: unknown[];
+    };
+
+    expect(body.baseElevationM).toBeGreaterThan(0);
+    expect(body.averageElevationM).toBeGreaterThanOrEqual(body.baseElevationM);
+    expect(body.points.length).toBe(9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Cache behavior
 // ---------------------------------------------------------------------------
 describe("GET /building — caching", () => {
   it("returns consistent results for the same address", async () => {

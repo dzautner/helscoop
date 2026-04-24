@@ -35,6 +35,7 @@ import keskoRouter from "./routes/kesko";
 import araGrantRouter from "./routes/ara-grant";
 import ryhtiRouter from "./routes/ryhti";
 import photoEstimateRouter from "./routes/photo-estimate";
+import terrainRouter from "./routes/terrain";
 import logger from "./logger";
 import { logAuditEvent } from "./audit";
 import { sendEmail } from "./email";
@@ -735,6 +736,8 @@ app.use("/kesko", authenticatedLimiter, keskoRouter);
 app.use("/ara-grant", authenticatedLimiter, araGrantRouter);
 app.use("/ryhti", authenticatedLimiter, ryhtiRouter);
 app.use("/photo-estimate", authenticatedLimiter, photoEstimateRouter);
+app.use("/terrain", buildingLimiter, terrainRouter);
+app.use("/api/terrain", buildingLimiter, terrainRouter);
 // Building endpoint: stricter rate limiting with tiered limits for anon vs authenticated
 app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRouter);
 
