@@ -5,8 +5,7 @@ import bcrypt from "bcryptjs";
 import { query } from "./db";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 import { Role, normalizeRole, ROLES, isValidRole } from "./permissions";
-
-const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
+import { getJwtSecret } from "./secrets";
 
 export interface AuthUser {
   id: string;
@@ -33,7 +32,7 @@ const ACCESS_TOKEN_SECONDS = 15 * 60;
 const REFRESH_GRACE_SECONDS = 60;
 
 export function signToken(user: AuthUser): string {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
+  return jwt.sign(user, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRES });
 }
 
 /** Returns the absolute expiry timestamp (epoch seconds) for a freshly-signed token. */
@@ -49,13 +48,13 @@ export function tokenExpiresAt(): number {
 export function verifyForRefresh(token: string): AuthUser | null {
   // First try normal verification
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as AuthUser;
+    const payload = jwt.verify(token, getJwtSecret()) as AuthUser;
     return { id: payload.id, email: payload.email, role: payload.role };
   } catch (err) {
     // If expired, check grace window
     if (err instanceof jwt.TokenExpiredError) {
       try {
-        const payload = jwt.verify(token, JWT_SECRET, {
+        const payload = jwt.verify(token, getJwtSecret(), {
           ignoreExpiration: true,
         }) as AuthUser & { exp: number };
         const expiredAgo = Math.floor(Date.now() / 1000) - payload.exp;
@@ -76,7 +75,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "Missing authorization header" });
   }
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as AuthUser;
+    const payload = jwt.verify(header.slice(7), getJwtSecret()) as AuthUser;
     req.user = payload;
     next();
   } catch {

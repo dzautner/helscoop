@@ -47,6 +47,7 @@ import { logAuditEvent } from "./audit";
 import { sendEmail } from "./email";
 import { hashViewerIp, logProjectView } from "./notifications";
 import { installCollaborationServer } from "./collaboration";
+import { assertProductionSecrets, getJwtSecret } from "./secrets";
 
 // ---------------------------------------------------------------------------
 // Sentry — initialize before anything else so it can instrument the app
@@ -60,7 +61,7 @@ if (process.env.SENTRY_DSN) {
   });
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
+assertProductionSecrets();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
@@ -117,7 +118,7 @@ function extractUserId(req: express.Request): string | null {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return null;
   try {
-    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as AuthUser;
+    const decoded = jwt.verify(header.slice(7), getJwtSecret()) as AuthUser;
     return decoded.id || null;
   } catch {
     return null;

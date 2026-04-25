@@ -4,8 +4,8 @@ import jwt from "jsonwebtoken";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { query } from "./db";
 import logger from "./logger";
+import { getJwtSecret } from "./secrets";
 
-const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 const COLORS = ["#e5a04b", "#7ab3e0", "#8bc48b", "#d4a0e0", "#f0b86a", "#e07a7a"];
 const MAX_SCENE_BYTES = 512 * 1024;
 
@@ -148,7 +148,7 @@ async function authorizeProjectAccess(projectId: string, token: string | null, s
   let payload: AuthPayload | null = null;
   if (token) {
     try {
-      payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
+      payload = jwt.verify(token, getJwtSecret()) as AuthPayload;
     } catch {
       if (!shareToken) return { authorized: false, payload: null };
     }
