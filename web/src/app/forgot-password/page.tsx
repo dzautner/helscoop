@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div style={{
+    <main id="main-content" tabIndex={-1} style={{
       minHeight: "100vh",
       display: "flex",
       alignItems: "center",
@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
       padding: 24,
       background: "var(--bg-primary)",
     }}>
-      <div style={{
+      <nav aria-label="Utility" style={{
         position: "fixed",
         top: 20,
         right: 20,
@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
       }}>
         <ThemeToggle />
         <LanguageSwitcher />
-      </div>
+      </nav>
 
       <div className="anim-up" style={{ width: "100%", maxWidth: 400 }}>
         <Link href="/" style={{ textDecoration: "none", display: "inline-block", marginBottom: 32 }}>
@@ -150,6 +150,6 @@ export default function ForgotPasswordPage() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -545,7 +545,7 @@ export default function ProjectList({
         />
       )}
       {/* Top bar */}
-      <div className="nav-bar">
+      <nav className="nav-bar" aria-label="Main">
         <div className="nav-inner" style={{ maxWidth: 1080 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
@@ -605,7 +605,7 @@ export default function ProjectList({
             {t('nav.logout')}
           </button>
         </div>
-      </div>
+      </nav>
 
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "40px 24px 80px" }}>
         {/* Hero create section */}

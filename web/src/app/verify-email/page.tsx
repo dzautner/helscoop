@@ -29,7 +29,7 @@ function VerifyEmailContent() {
   }, [token, t]);
 
   return (
-    <div style={{
+    <main id="main-content" tabIndex={-1} style={{
       minHeight: "100vh",
       display: "flex",
       alignItems: "center",
@@ -104,7 +104,7 @@ function VerifyEmailContent() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 
