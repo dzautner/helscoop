@@ -18,6 +18,7 @@ import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ViewCube from "@/components/ViewCube";
 import Minimap from "@/components/Minimap";
 import { groupLayerSeeds, type LayerSeed } from "@/lib/scene-layers";
+import { isMeshStandardMaterial } from "@/lib/three-material-guards";
 import type { ShadowStudySample } from "@/lib/sun-position";
 import type { AirflowAnalysis } from "@/lib/airflow-engine";
 
@@ -1764,10 +1765,11 @@ export default function Viewport3D({
             if (child instanceof THREE.Mesh) {
               meshes.push(child);
               origMaterials.push(child.material);
-              const surfaceMat = child.material as THREE.MeshStandardMaterial;
-              surfaceMat.transparent = true;
-              surfaceMat.opacity = 0;
-              surfaceMat.needsUpdate = true;
+              if (isMeshStandardMaterial(child.material)) {
+                child.material.transparent = true;
+                child.material.opacity = 0;
+                child.material.needsUpdate = true;
+              }
 
               const wireMat = new THREE.MeshBasicMaterial({
                 wireframe: true,
@@ -1837,9 +1839,12 @@ export default function Viewport3D({
               const p = Math.min((elapsed - P1_END) / (P2_END - P1_END), 1);
               const eased = easeOutCubic(p);
               for (let i = 0; i < meshes.length; i++) {
-                const mat = meshes[i].material as THREE.MeshStandardMaterial;
-                mat.opacity = eased;
-                mat.needsUpdate = true;
+                const rawMat = meshes[i].material;
+                const mat = Array.isArray(rawMat) ? rawMat[0] : rawMat;
+                if (isMeshStandardMaterial(mat)) {
+                  mat.opacity = eased;
+                  mat.needsUpdate = true;
+                }
               }
               for (const wm of wireframeMeshes) {
                 (wm.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - eased);
@@ -1880,10 +1885,13 @@ export default function Viewport3D({
               stagingGroup.remove(rimLight);
               rimLight.dispose();
               for (let i = 0; i < meshes.length; i++) {
-                const mat = meshes[i].material as THREE.MeshStandardMaterial;
-                mat.transparent = false;
-                mat.opacity = 1;
-                mat.needsUpdate = true;
+                const rawMat = meshes[i].material;
+                const mat = Array.isArray(rawMat) ? rawMat[0] : rawMat;
+                if (isMeshStandardMaterial(mat)) {
+                  mat.transparent = false;
+                  mat.opacity = 1;
+                  mat.needsUpdate = true;
+                }
               }
               if (!revealCompleteFired) {
                 onRevealComplete?.();
@@ -1916,8 +1924,9 @@ export default function Viewport3D({
 
     group.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
+      if (!isMeshStandardMaterial(child.material)) return;
 
-      const mat = child.material as THREE.MeshStandardMaterial;
+      const mat = child.material;
       const materialId = child.userData.materialId as string | undefined;
       const objectId = child.userData.objectId as string | undefined;
       const baseColor = Array.isArray(child.userData.baseColor)
@@ -2018,10 +2027,11 @@ export default function Viewport3D({
       const base = mesh.position.clone();
       assemblyBasePositionsRef.current.set(mesh, base);
       mesh.position.z = base.z + dropOffset;
-      const material = mesh.material as THREE.MeshStandardMaterial;
-      material.transparent = true;
-      material.opacity = 0.08;
-      material.needsUpdate = true;
+      if (isMeshStandardMaterial(mesh.material)) {
+        mesh.material.transparent = true;
+        mesh.material.opacity = 0.08;
+        mesh.material.needsUpdate = true;
+      }
     });
 
     const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
@@ -2033,11 +2043,12 @@ export default function Viewport3D({
         const base = assemblyBasePositionsRef.current.get(mesh);
         if (!base) continue;
         mesh.position.z = base.z + dropOffset * (1 - eased);
-        const material = mesh.material as THREE.MeshStandardMaterial;
-        const baseOpacity = typeof mesh.userData.baseOpacity === "number" ? mesh.userData.baseOpacity : 1;
-        material.opacity = Math.min(baseOpacity, 0.08 + eased * 0.92);
-        material.transparent = true;
-        material.needsUpdate = true;
+        if (isMeshStandardMaterial(mesh.material)) {
+          const baseOpacity = typeof mesh.userData.baseOpacity === "number" ? mesh.userData.baseOpacity : 1;
+          mesh.material.opacity = Math.min(baseOpacity, 0.08 + eased * 0.92);
+          mesh.material.transparent = true;
+          mesh.material.needsUpdate = true;
+        }
       }
 
       if (raw < 1) {
@@ -2129,7 +2140,9 @@ export default function Viewport3D({
       fill.intensity = config.fill.intensity;
     }
     if (ground) {
-      (ground.material as THREE.MeshStandardMaterial).color.setHex(config.groundColor);
+      if (isMeshStandardMaterial(ground.material)) {
+        ground.material.color.setHex(config.groundColor);
+      }
     }
     if (scene.fog instanceof THREE.Fog) {
       scene.fog.color.setHex(config.fogColor);
