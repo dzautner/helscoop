@@ -1839,9 +1839,11 @@ export default function Viewport3D({
               const p = Math.min((elapsed - P1_END) / (P2_END - P1_END), 1);
               const eased = easeOutCubic(p);
               for (let i = 0; i < meshes.length; i++) {
-                if (isMeshStandardMaterial(meshes[i].material)) {
-                  meshes[i].material.opacity = eased;
-                  meshes[i].material.needsUpdate = true;
+                const rawMat = meshes[i].material;
+                const mat = Array.isArray(rawMat) ? rawMat[0] : rawMat;
+                if (isMeshStandardMaterial(mat)) {
+                  mat.opacity = eased;
+                  mat.needsUpdate = true;
                 }
               }
               for (const wm of wireframeMeshes) {
@@ -1883,10 +1885,12 @@ export default function Viewport3D({
               stagingGroup.remove(rimLight);
               rimLight.dispose();
               for (let i = 0; i < meshes.length; i++) {
-                if (isMeshStandardMaterial(meshes[i].material)) {
-                  meshes[i].material.transparent = false;
-                  meshes[i].material.opacity = 1;
-                  meshes[i].material.needsUpdate = true;
+                const rawMat = meshes[i].material;
+                const mat = Array.isArray(rawMat) ? rawMat[0] : rawMat;
+                if (isMeshStandardMaterial(mat)) {
+                  mat.transparent = false;
+                  mat.opacity = 1;
+                  mat.needsUpdate = true;
                 }
               }
               if (!revealCompleteFired) {
