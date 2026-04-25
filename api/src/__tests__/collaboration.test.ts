@@ -21,7 +21,7 @@ vi.mock("../logger", () => ({
 
 import { broadcastProjectEvent, getRoomPeers, installCollaborationServer } from "../collaboration";
 
-const JWT_SECRET = "helscoop-dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
 function listen(server: http.Server): Promise<number> {
   return new Promise((resolve) => {
