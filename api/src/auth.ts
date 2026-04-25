@@ -33,7 +33,7 @@ const ACCESS_TOKEN_SECONDS = 15 * 60;
 const REFRESH_GRACE_SECONDS = 60;
 
 export function signToken(user: AuthUser): string {
-  return jwt.sign(user, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRES });
+  return jwt.sign(user, getJwtSecret(), { algorithm: "HS256", expiresIn: ACCESS_TOKEN_EXPIRES });
 }
 
 /** Returns the absolute expiry timestamp (epoch seconds) for a freshly-signed token. */
@@ -49,13 +49,14 @@ export function tokenExpiresAt(): number {
 export function verifyForRefresh(token: string): AuthUser | null {
   // First try normal verification
   try {
-    const payload = jwt.verify(token, getJwtSecret()) as AuthUser;
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as AuthUser;
     return { id: payload.id, email: payload.email, role: payload.role };
   } catch (err) {
     // If expired, check grace window
     if (err instanceof jwt.TokenExpiredError) {
       try {
         const payload = jwt.verify(token, getJwtSecret(), {
+          algorithms: ["HS256"],
           ignoreExpiration: true,
         }) as AuthUser & { exp: number };
         const expiredAgo = Math.floor(Date.now() / 1000) - payload.exp;
@@ -76,7 +77,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "Missing authentication token" });
   }
   try {
-    const payload = jwt.verify(token, getJwtSecret()) as AuthUser;
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as AuthUser;
     req.user = payload;
     next();
   } catch {
@@ -190,7 +191,11 @@ export async function resendVerification(userId: string): Promise<boolean> {
 // Google OAuth
 // ---------------------------------------------------------------------------
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+// Read GOOGLE_CLIENT_ID dynamically so tests can override it via process.env.
+function getGoogleClientId(): string {
+  return process.env.GOOGLE_CLIENT_ID || "";
+}
+
 const APPLE_CLIENT_ID = process.env.APPLE_CLIENT_ID || "";
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys";
@@ -293,8 +298,15 @@ export async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPay
     if (!res.ok) return null;
     const payload = (await res.json()) as Record<string, unknown>;
 
-    // Verify the token was issued for our application
-    if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
+    // Verify the token was issued for our application.
+    // IMPORTANT: If GOOGLE_CLIENT_ID is not configured, reject ALL tokens
+    // to prevent accepting tokens issued for other applications.
+    const clientId = getGoogleClientId();
+    if (!clientId) {
+      console.error("[AUTH] GOOGLE_CLIENT_ID not configured — rejecting Google OAuth attempt");
+      return null;
+    }
+    if (payload.aud !== clientId) {
       return null;
     }
 
