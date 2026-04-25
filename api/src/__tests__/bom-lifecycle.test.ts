@@ -402,6 +402,15 @@ describe("BOM management flow", () => {
     // -----------------------------------------------------------------------
     // Step 7: Export as CSV — verify format
     // -----------------------------------------------------------------------
+    // Ownership check — project belongs to user
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: PROJECT_ID }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    // BOM data query
     mockQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -680,6 +689,15 @@ describe("BOM validation", () => {
 
 describe("BOM JSON export", () => {
   it("exports BOM as JSON with locale-aware names", async () => {
+    // Ownership check — project belongs to user
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: PROJECT_ID }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    // BOM data query
     mockQuery.mockResolvedValueOnce({
       rows: [
         {
