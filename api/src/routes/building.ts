@@ -709,8 +709,23 @@ function collectPositions(value: unknown, out: number[][] = []): number[][] {
   return out;
 }
 
+function deduplicateClosingPoints(positions: number[][]): number[][] {
+  if (positions.length < 2) return positions;
+
+  // GeoJSON polygon rings repeat the first coordinate as the last point.
+  // Remove the duplicate closing point to avoid biasing the centroid.
+  const first = positions[0];
+  const last = positions[positions.length - 1];
+  if (first[0] === last[0] && first[1] === last[1]) {
+    return positions.slice(0, -1);
+  }
+
+  return positions;
+}
+
 function pointFromGeometry(geometry?: RegistryFeature["geometry"]): { lat: number; lon: number } | null {
-  const positions = collectPositions(geometry?.coordinates);
+  const raw = collectPositions(geometry?.coordinates);
+  const positions = deduplicateClosingPoints(raw);
   if (positions.length === 0) return null;
 
   const sum = positions.reduce(
@@ -900,6 +915,7 @@ function mapRegistryBuilding(
     climate_zone: climate.climate_zone,
     heating_degree_days: climate.heating_degree_days,
     scene_js: generateGenericScene(type, roundedFloors, roundedArea),
+    bom_suggestion: generateBomSuggestion(roundedArea),
     confidence: "verified",
     data_sources: dataSources,
   });
