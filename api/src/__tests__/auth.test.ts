@@ -64,7 +64,7 @@ describe("requireAuth middleware", () => {
     return { req, res, next };
   }
 
-  it("rejects requests without Authorization header", () => {
+  it("rejects requests without an auth token", () => {
     const { req, res, next } = createMockReqRes();
     requireAuth(req, res, next);
     expect(res._status).toBe(401);
@@ -116,6 +116,17 @@ describe("requireAuth middleware", () => {
     expect(req.user).toBeDefined();
     expect(req.user!.id).toBe("user-42");
     expect(req.user!.email).toBe("valid@test.com");
+  });
+
+  it("accepts a valid httpOnly session cookie and sets req.user", () => {
+    const user: AuthUser = { id: "cookie-user", email: "cookie@test.com", role: "user" };
+    const token = signToken(user);
+    const { req, res, next } = createMockReqRes({
+      cookie: `helscoop_session=${encodeURIComponent(token)}`,
+    });
+    requireAuth(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(req.user).toMatchObject(user);
   });
 
   it("rejects tokens signed with wrong secret", () => {

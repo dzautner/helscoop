@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, getToken, setToken } from "@/lib/api";
+import { api, hasAuthSession, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonTableRow } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -646,7 +646,7 @@ export default function AdminPage() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!hasAuthSession()) {
       window.location.href = "/";
       return;
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, getToken } from "@/lib/api";
+import { api, hasAuthSession } from "@/lib/api";
 import type { AppNotification } from "@/types";
 
 function formatTime(value: string): string {
@@ -22,7 +22,7 @@ export default function NotificationCenter() {
   }, []);
 
   async function refreshCount() {
-    if (!getToken()) return;
+    if (!hasAuthSession()) return;
     try {
       const result = await api.getUnreadNotificationCount();
       setUnread(result.unread);
@@ -32,7 +32,7 @@ export default function NotificationCenter() {
   }
 
   async function loadItems() {
-    if (!getToken()) return;
+    if (!hasAuthSession()) return;
     setLoading(true);
     try {
       const notifications = await api.getNotifications(20);
@@ -44,7 +44,7 @@ export default function NotificationCenter() {
   }
 
   useEffect(() => {
-    if (!mounted || !getToken()) return;
+    if (!mounted || !hasAuthSession()) return;
     void refreshCount();
     const timer = window.setInterval(() => {
       void refreshCount();
@@ -52,7 +52,7 @@ export default function NotificationCenter() {
     return () => window.clearInterval(timer);
   }, [mounted]);
 
-  if (!mounted || !getToken()) return null;
+  if (!mounted || !hasAuthSession()) return null;
 
   return (
     <div style={{ position: "fixed", top: 16, right: 16, zIndex: 80 }}>

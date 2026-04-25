@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { api, getToken, setToken } from "@/lib/api";
+import { api, hasAuthSession, setToken } from "@/lib/api";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -70,7 +70,7 @@ export default function ProPage() {
   }
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!hasAuthSession()) {
       window.location.href = "/";
       return;
     }

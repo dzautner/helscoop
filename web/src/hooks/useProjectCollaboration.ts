@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getToken } from "@/lib/api";
+import { getToken, hasAuthSession } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -146,7 +146,7 @@ export function useProjectCollaboration({
   useEffect(() => {
     if (!enabled || !projectId || typeof window === "undefined") return;
     const token = getToken();
-    if (!token && !shareToken) return;
+    if (!hasAuthSession() && !shareToken) return;
 
     let closedByCleanup = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

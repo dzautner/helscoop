@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { api, ApiError, setToken, getToken, stopRefreshTimer } from "@/lib/api";
+import { api, ApiError, setToken, getToken, hasAuthSession, stopRefreshTimer } from "@/lib/api";
 
 describe("ApiError", () => {
   it("sets name, status, and statusText", () => {
@@ -25,40 +25,40 @@ describe("setToken / getToken", () => {
     stopRefreshTimer();
   });
 
-  it("stores and retrieves a token", () => {
+  it("stores token in memory and only persists a non-secret session hint", () => {
     setToken("abc123");
     expect(getToken()).toBe("abc123");
-    expect(localStorage.getItem("helscoop_token")).toBe("abc123");
+    expect(hasAuthSession()).toBe(true);
+    expect(localStorage.getItem("helscoop_session_active")).toBe("true");
+    expect(localStorage.getItem("helscoop_token")).toBeNull();
   });
 
-  it("stores expiry timestamp when provided", () => {
+  it("stores non-secret expiry timestamp when provided", () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     setToken("t1", exp);
-    expect(localStorage.getItem("helscoop_token_expires_at")).toBe(String(exp));
+    expect(localStorage.getItem("helscoop_session_expires_at")).toBe(String(exp));
+    expect(localStorage.getItem("helscoop_token_expires_at")).toBeNull();
   });
 
-  it("clears token and expiry on null", () => {
+  it("clears token, session hint, and legacy localStorage tokens on null", () => {
     setToken("t2", 12345);
+    localStorage.setItem("helscoop_token", "legacy-token");
+    localStorage.setItem("helscoop_token_expires_at", "12345");
     setToken(null);
     expect(getToken()).toBeNull();
+    expect(hasAuthSession()).toBe(false);
+    expect(localStorage.getItem("helscoop_session_active")).toBeNull();
+    expect(localStorage.getItem("helscoop_session_expires_at")).toBeNull();
     expect(localStorage.getItem("helscoop_token")).toBeNull();
     expect(localStorage.getItem("helscoop_token_expires_at")).toBeNull();
   });
 
-  it("reads token from localStorage when in-memory is null", () => {
-    localStorage.setItem("helscoop_token", "from-storage");
-    setToken(null);
-    // Force in-memory to null without clearing localStorage
-    // getToken should fall back to localStorage
-    const directGet = getToken();
-    // After clearing with setToken(null), localStorage is also cleared
-    // So let's set it directly
-    localStorage.setItem("helscoop_token", "from-storage-2");
-    // Reset in-memory by accessing internal state via a trick:
-    // We need to call setToken(null) which clears localStorage, then manually set localStorage
-    setToken(null);
+  it("does not restore bearer tokens from legacy localStorage", () => {
     localStorage.setItem("helscoop_token", "fallback-token");
-    expect(getToken()).toBe("fallback-token");
+    localStorage.setItem("helscoop_token_expires_at", "9999999999");
+    expect(getToken()).toBeNull();
+    expect(localStorage.getItem("helscoop_token")).toBeNull();
+    expect(localStorage.getItem("helscoop_token_expires_at")).toBeNull();
   });
 });
 
@@ -116,6 +116,7 @@ describe("blob-backed downloads", () => {
     await api.exportPdf("project-1", "My Project", "fi");
 
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:3001/projects/project-1/pdf?lang=fi", {
+      credentials: "include",
       headers: { Authorization: "Bearer download-token" },
     });
     expect(clickedAnchor).not.toBeNull();
@@ -142,6 +143,7 @@ describe("blob-backed downloads", () => {
 
     expect(ifcText).toBe("ISO-10303-21; IFC4X3_ADD2;");
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:3001/ifc-export/generate?projectId=project-1", {
+      credentials: "include",
       headers: { Authorization: "Bearer download-token" },
     });
     expect(document.querySelector("a[download]")).toBeNull();

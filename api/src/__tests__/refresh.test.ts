@@ -150,6 +150,12 @@ describe("/auth/refresh endpoint contract", () => {
     expect(src).toContain("const dbUser = result.rows[0]");
     expect(src).toContain("signToken(dbUser)");
   });
+
+  it("refresh and logout maintain httpOnly cookie session state", () => {
+    expect(src).toContain("setAuthCookie(res, token, expiresAt)");
+    expect(src).toContain('app.post("/auth/logout"');
+    expect(src).toContain("clearAuthCookie(res)");
+  });
 });
 
 describe("frontend refresh integration", () => {
