@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, apiUrl } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, expectMainViewportVisible } from "./helpers";
 
 test.describe("AI Chat — message, response, and apply flow", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -21,7 +21,7 @@ test.describe("AI Chat — message, response, and apply flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // 1. Verify chat input is visible
     const chatInput = page.locator(".chat-input, textarea[aria-label]").last();
@@ -70,7 +70,7 @@ test.describe("AI Chat — message, response, and apply flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Find suggestion chips
     const chips = page.locator(".chat-suggestion-chip");
@@ -101,7 +101,7 @@ test.describe("AI Chat — message, response, and apply flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Intercept the chat API to simulate failure
     await page.route("**/chat", (route) => {
@@ -129,7 +129,7 @@ test.describe("AI Chat — message, response, and apply flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Send a message
     const chatInput = page.locator(".chat-input, textarea[aria-label]").last();

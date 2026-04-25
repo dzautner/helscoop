@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, apiUrl } from "./helpers";
+import { registerUser, loginViaUI, apiUrl, expectMainViewportVisible } from "./helpers";
 
 test.describe("BOM Panel — Item CRUD", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -26,7 +26,7 @@ test.describe("BOM Panel — Item CRUD", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     const addBtn = page.getByRole("button", { name: /lisää|add material/i });
     if (await addBtn.isVisible({ timeout: 10_000 }).catch(() => false)) {
@@ -56,7 +56,7 @@ test.describe("BOM Panel — Item CRUD", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     const qtyInput = page.locator('input[type="number"]').first();
     if (await qtyInput.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -79,7 +79,7 @@ test.describe("BOM Panel — Item CRUD", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     const bomItems = page.locator('[data-testid="bom-item"], [class*="bom-row"], [class*="bom-item"]');
     const countBefore = await bomItems.count().catch(() => 0);
@@ -104,7 +104,7 @@ test.describe("BOM Panel — Item CRUD", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     const totalEl = page.getByText(/yhteensä|total/i).first();
     const initialTotal = await totalEl.textContent().catch(() => null);

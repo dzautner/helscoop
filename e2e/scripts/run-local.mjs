@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 const e2eDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(e2eDir, "..");
 const databaseUrl = process.env.E2E_DATABASE_URL || "postgres://helscoop:helscoop_dev@localhost:5433/helscoop";
-const apiUrl = process.env.TEST_API_URL || "http://localhost:3051";
+const apiPort = process.env.E2E_API_PORT || "3051";
+const webPort = process.env.E2E_WEB_PORT || "3052";
+const apiUrl = process.env.TEST_API_URL || `http://localhost:${apiPort}`;
+const webUrl = process.env.TEST_WEB_URL || `http://localhost:${webPort}`;
 
 const passthroughArgs = process.argv.slice(2);
 
@@ -99,6 +102,7 @@ async function main() {
       ...process.env,
       E2E_DATABASE_URL: databaseUrl,
       TEST_API_URL: apiUrl,
+      TEST_WEB_URL: webUrl,
     },
     timeoutMs: 0,
   });

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, dismissOnboarding } from "./helpers";
+import { registerUser, loginViaUI, dismissOnboarding, expectMainViewportVisible, mainViewportCanvas, expectObjectCount } from "./helpers";
 
 const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
@@ -41,9 +41,7 @@ test.describe("Project CRUD", () => {
     await page.waitForURL(/\/project\//, { timeout: 15_000 });
 
     // 3D viewport area should be visible
-    await expect(page.locator("canvas")).toBeVisible({
-      timeout: 15_000,
-    });
+    await expectMainViewportVisible(page);
   });
 
   test("project editor renders 3D viewport with objects", async ({ page }) => {
@@ -72,7 +70,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     await page.waitForLoadState("networkidle");
 
     // Wait for Three.js canvas
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
 
     // Check canvas has real dimensions
@@ -82,9 +80,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     expect(canvasSize!.height).toBeGreaterThan(100);
 
     // Check object count is shown (Finnish: "2 objektia")
-    await expect(
-      page.getByText(/2\s*(objects|objektia)/i)
-    ).toBeVisible({ timeout: 5000 });
+    await expectObjectCount(page, 2, 5000);
 
     await page.screenshot({
       path: "test-results/viewport-render.png",
@@ -110,9 +106,10 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
 
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Toggle code editor
+    await page.getByRole("button", { name: /advanced/i }).click();
     await page
       .getByRole("button", { name: /koodi|code/i })
       .click();
@@ -123,9 +120,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
     });
 
     // Object count = 1
-    await expect(
-      page.getByText(/1\s*(objects|objektia)/i)
-    ).toBeVisible({ timeout: 5000 });
+    await expectObjectCount(page, 1, 5000);
   });
 
   test("project name is editable and auto-saves", async ({ page }) => {
@@ -179,7 +174,7 @@ scene.add(wall, { material: "lumber", color: [0.85, 0.75, 0.55] });
 
     // Click delete on the project card
     const card = page.locator(".project-card-grid").filter({ hasText: "To Be Deleted" });
-    await card.getByRole("button", { name: /delete|poista/i }).click();
+    await card.getByRole("button", { name: /^(delete project|poista projekti)/i }).click();
 
     // Confirm in the modal dialog
     const modal = page.locator("dialog, [role='dialog']");

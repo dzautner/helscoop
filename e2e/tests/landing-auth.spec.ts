@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
-const API_URL = process.env.TEST_API_URL || "http://localhost:3002";
+const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
-test.use({ baseURL: "http://localhost:3052" });
+test.use({ baseURL: process.env.TEST_WEB_URL || "http://localhost:3052" });
 
 // ---------------------------------------------------------------------------
 // Helpers

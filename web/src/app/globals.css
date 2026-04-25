@@ -4108,6 +4108,11 @@ select:focus {
     var(--bg-base);
 }
 
+.editor-viewport-shell {
+  position: relative;
+  overflow: hidden;
+}
+
 [data-theme="light"] .editor-viewport-area {
   background: var(--bg-base);
 }
@@ -4511,6 +4516,8 @@ select:focus {
 
 /* Embedded chat */
 .chat-embedded {
+  position: relative;
+  z-index: 30;
   flex-shrink: 0;
   padding: 0 8px 8px 8px;
 }
@@ -5092,6 +5099,8 @@ select:focus {
 }
 
 .editor-header {
+  position: relative;
+  z-index: 100;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -5402,7 +5411,7 @@ select:focus {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 99px;
   position: absolute;
-  bottom: 12px;
+  bottom: 72px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;

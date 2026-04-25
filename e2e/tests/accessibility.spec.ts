@@ -3,6 +3,8 @@ import type { AxeResults, Result as AxeViolation } from "axe-core";
 import { test, expect, type Page } from "@playwright/test";
 import {
   createProjectViaAPI,
+  expectMainViewportVisible,
+  mainViewportCanvas,
   registerUser,
   saveBomViaAPI,
   setAuthToken,
@@ -97,13 +99,13 @@ test.describe("Accessibility audits", () => {
     await setAuthToken(page, user.token);
     await page.goto(`/project/${projectId}`);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     await expect(
       page.getByRole("application", { name: /3d|viewport|näkymä|malli/i })
     ).toBeVisible();
-    await expect(page.locator("canvas").first()).toHaveAttribute("aria-hidden", "true");
-    await expect(page.getByRole("grid", { name: /material|materiaali/i })).toBeVisible();
+    await expect(mainViewportCanvas(page)).toHaveAttribute("aria-hidden", "true");
+    await expect(page.getByRole("list", { name: /material|materiaali/i })).toBeVisible();
     await expect(page.getByRole("textbox", { name: /chat|viesti|message/i })).toBeVisible();
 
     const unlabeledIconButtons = await page.locator("button").evaluateAll((buttons) =>
