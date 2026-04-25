@@ -6,6 +6,7 @@ import { requireAuth } from "../auth";
 import { requirePermission } from "../permissions";
 import { logAuditEvent } from "../audit";
 import { sendEmail, type EmailAttachment } from "../email";
+import { broadcastProjectEvent, getCollaborationClientId } from "../collaboration";
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1242,7 +1243,23 @@ router.put("/:id", async (req, res) => {
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
-  res.json(result.rows[0]);
+  const updatedProject = result.rows[0];
+  const collaborationPatch: Record<string, unknown> = {};
+  if (typeof name === "string") collaborationPatch.name = updatedProject.name;
+  if (description !== undefined) collaborationPatch.description = updatedProject.description;
+  if (typeof scene_js === "string") collaborationPatch.scene_js = updatedProject.scene_js;
+  if (photoOverlayProvided) collaborationPatch.photo_overlay = updatedProject.photo_overlay;
+  if (Object.keys(collaborationPatch).length > 0) {
+    broadcastProjectEvent(req.params.id, {
+      type: "project:update",
+      projectId: req.params.id,
+      patch: collaborationPatch,
+      updated_at: updatedProject.updated_at,
+      sourceClientId: getCollaborationClientId(body.collaboration_client_id),
+      sourceName: req.user?.email?.split("@")[0] || "Collaborator",
+    });
+  }
+  res.json(updatedProject);
 });
 
 router.delete("/:id", async (req, res) => {
@@ -1522,16 +1539,30 @@ router.put("/:id/bom", async (req, res) => {
   try {
     await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
     let inserted = 0;
+    const savedItems: { material_id: string; quantity: number; unit: string }[] = [];
     for (const item of items) {
       const matExists = await query("SELECT id FROM materials WHERE id=$1", [item.material_id]);
       if (matExists.rows.length === 0) continue;
+      const quantity = Number(item.quantity);
+      const unit = typeof item.unit === "string" && item.unit.trim()
+        ? item.unit.trim().slice(0, 24)
+        : "kpl";
       await query(
         `INSERT INTO project_bom (project_id, material_id, quantity, unit)
          VALUES ($1, $2, $3, $4)`,
-        [req.params.id, item.material_id, item.quantity, item.unit || "kpl"]
+        [req.params.id, item.material_id, quantity, unit]
       );
+      savedItems.push({ material_id: item.material_id, quantity, unit });
       inserted++;
     }
+    broadcastProjectEvent(req.params.id, {
+      type: "bom:update",
+      projectId: req.params.id,
+      items: savedItems,
+      count: inserted,
+      sourceClientId: getCollaborationClientId(req.body?.collaboration_client_id),
+      sourceName: req.user?.email?.split("@")[0] || "Collaborator",
+    });
     res.json({ ok: true, count: inserted, skipped: items.length - inserted });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to save BOM", detail: err.message });

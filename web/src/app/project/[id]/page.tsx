@@ -67,6 +67,11 @@ import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
+import {
+  useProjectCollaboration,
+  type CollaborationBomUpdateEvent,
+  type CollaborationProjectUpdateEvent,
+} from "@/hooks/useProjectCollaboration";
 import type { SaveableFields } from "@/hooks/useAutoSave";
 import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
@@ -328,6 +333,10 @@ export default function ProjectPage() {
   const [projectName, setProjectName] = useState("");
   const previousNameRef = useRef("");
   const [projectDesc, setProjectDesc] = useState("");
+  const collaborationClientIdRef = useRef<string | null>(null);
+  const lastRemoteSceneRef = useRef<string | null>(null);
+  const lastRemoteBomJsonRef = useRef<string | null>(null);
+  const lastCollaborationToastRef = useRef(0);
   const [projectStatus, setProjectStatus] = useState<import("@/types").ProjectStatus>("planning");
   const [projectTags, setProjectTags] = useState<string[]>([]);
   const [householdDeductionJoint, setHouseholdDeductionJoint] = useState(false);
@@ -731,11 +740,11 @@ export default function ProjectPage() {
 
   const autoSaveCallbacks = useMemo(
     () => ({
-      onSaveProject: async (dirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js">>) => {
-        await api.updateProject(projectId, dirty);
+      onSaveProject: async (dirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js" | "photo_overlay">>) => {
+        await api.updateProject(projectId, dirty, collaborationClientIdRef.current);
       },
       onSaveBom: async (items: SaveableFields["bom"]) => {
-        await api.saveBOM(projectId, items);
+        await api.saveBOM(projectId, items, collaborationClientIdRef.current);
       },
       onSaveThumbnail: async () => {
         const thumbDataUrl = captureThumbRef.current?.();
@@ -780,6 +789,168 @@ export default function ProjectPage() {
     typingDebounceMs: 4000,
     rapidFireThresholdMs: 800,
   });
+
+  const notifyCollaborationChange = useCallback((message: string) => {
+    const now = Date.now();
+    if (now - lastCollaborationToastRef.current < 5000) return;
+    lastCollaborationToastRef.current = now;
+    toast(message, "info");
+  }, [toast]);
+
+  const handleRemoteProjectUpdate = useCallback((event: CollaborationProjectUpdateEvent) => {
+    const patch = event.patch;
+    let nextName = projectName;
+    let nextDescription = projectDesc;
+    let nextScene = sceneJs;
+    let nextPhotoOverlay = photoOverlay;
+
+    if (typeof patch.name === "string") {
+      nextName = patch.name;
+      previousNameRef.current = patch.name;
+      setProjectName(patch.name);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "description")) {
+      nextDescription = typeof patch.description === "string" ? patch.description : "";
+      setProjectDesc(nextDescription);
+    }
+    if (typeof patch.scene_js === "string" && patch.scene_js !== sceneJs) {
+      nextScene = patch.scene_js;
+      lastRemoteSceneRef.current = patch.scene_js;
+      setSceneJs(patch.scene_js);
+      setSavedScript(patch.scene_js);
+      pushHistory(patch.scene_js);
+      geometryBaselineRef.current = { sceneJs: patch.scene_js, metrics: analyzeSceneGeometry(patch.scene_js) };
+      dismissedGeometrySceneRef.current = null;
+      setSceneA11yAnnouncement(t("collaboration.remoteProjectUpdate", {
+        name: event.sourceName || t("collaboration.someone"),
+      }));
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "photo_overlay")) {
+      nextPhotoOverlay = normalizePhotoOverlayState(patch.photo_overlay);
+      setPhotoOverlay(nextPhotoOverlay);
+    }
+
+    setProject((current) => current ? {
+      ...current,
+      name: nextName,
+      description: nextDescription,
+      scene_js: nextScene,
+      photo_overlay: nextPhotoOverlay,
+    } : current);
+    setSavedSnapshot({
+      name: nextName,
+      description: nextDescription,
+      scene_js: nextScene,
+      bom: bomForSave,
+      photo_overlay: nextPhotoOverlay,
+    });
+    notifyCollaborationChange(t("collaboration.remoteProjectUpdate", {
+      name: event.sourceName || t("collaboration.someone"),
+    }));
+  }, [
+    bomForSave,
+    notifyCollaborationChange,
+    photoOverlay,
+    projectDesc,
+    projectName,
+    pushHistory,
+    sceneJs,
+    setSavedSnapshot,
+    t,
+  ]);
+
+  const handleRemoteBomUpdate = useCallback((event: CollaborationBomUpdateEvent) => {
+    const nextBom = event.items.map((item) => {
+      const material = materials.find((candidate) => candidate.id === item.material_id);
+      if (!material) {
+        return {
+          material_id: item.material_id,
+          material_name: item.material_id,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: 0,
+          total: 0,
+          stock_level: "unknown" as const,
+        };
+      }
+      const hydrated = buildBomItemFromMaterial(material, item.quantity);
+      return {
+        ...hydrated,
+        unit: item.unit || hydrated.unit,
+        total: (hydrated.unit_price || 0) * item.quantity,
+      };
+    });
+    lastRemoteBomJsonRef.current = JSON.stringify(event.items);
+    setBom(nextBom);
+    setSavedSnapshot({
+      name: projectName,
+      description: projectDesc,
+      scene_js: sceneJs,
+      bom: event.items,
+      photo_overlay: photoOverlay,
+    });
+    notifyCollaborationChange(t("collaboration.remoteBomUpdate", {
+      name: event.sourceName || t("collaboration.someone"),
+    }));
+  }, [
+    materials,
+    notifyCollaborationChange,
+    photoOverlay,
+    projectDesc,
+    projectName,
+    sceneJs,
+    setSavedSnapshot,
+    t,
+  ]);
+
+  const collaboration = useProjectCollaboration({
+    projectId,
+    enabled: initialLoadDone,
+    shareToken,
+    onProjectUpdate: handleRemoteProjectUpdate,
+    onBomUpdate: handleRemoteBomUpdate,
+  });
+  const {
+    clientId: collaborationClientId,
+    peers: collaborationPeers,
+    status: collaborationStatus,
+    sendCursor: sendCollaborationCursor,
+    sendSceneUpdate,
+    sendBomUpdate,
+  } = collaboration;
+
+  useEffect(() => {
+    collaborationClientIdRef.current = collaborationClientId;
+  }, [collaborationClientId]);
+
+  useEffect(() => {
+    if (!initialLoadDone || collaborationStatus !== "connected") return;
+    if (lastRemoteSceneRef.current === sceneJs) {
+      lastRemoteSceneRef.current = null;
+      return;
+    }
+    sendSceneUpdate(sceneJs);
+  }, [collaborationStatus, initialLoadDone, sceneJs, sendSceneUpdate]);
+
+  useEffect(() => {
+    if (!initialLoadDone || collaborationStatus !== "connected") return;
+    const bomJson = JSON.stringify(bomForSave);
+    if (lastRemoteBomJsonRef.current === bomJson) {
+      lastRemoteBomJsonRef.current = null;
+      return;
+    }
+    sendBomUpdate(bomForSave);
+  }, [bomForSave, collaborationStatus, initialLoadDone, sendBomUpdate]);
+
+  const collaborationPresenceLabel = useMemo(() => {
+    if (collaborationStatus === "connecting") return t("collaboration.connecting");
+    if (collaborationStatus !== "connected") return t("collaboration.offline");
+    if (collaborationPeers.length === 0) return t("collaboration.connectedSolo");
+    if (collaborationPeers.length === 1) {
+      return t("collaboration.alsoViewing", { name: collaborationPeers[0].name });
+    }
+    return t("collaboration.manyViewing", { count: collaborationPeers.length + 1 });
+  }, [collaborationPeers, collaborationStatus, t]);
 
   // Block navigation when there are unsaved changes
   useEffect(() => {
@@ -2870,6 +3041,59 @@ export default function ProjectPage() {
           )}
         </div>
         <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
+        <div
+          className="collaboration-presence"
+          title={collaborationPresenceLabel}
+          aria-label={collaborationPresenceLabel}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            minHeight: 28,
+            padding: "3px 8px",
+            border: "1px solid var(--border)",
+            borderRadius: 999,
+            background: "var(--bg-tertiary)",
+            color: collaborationStatus === "connected" ? "var(--text-secondary)" : "var(--text-muted)",
+            fontSize: 11,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: 999,
+              background: collaborationStatus === "connected" ? "#8bc48b" : collaborationStatus === "connecting" ? "#e5a04b" : "var(--text-muted)",
+              boxShadow: collaborationStatus === "connected" ? "0 0 0 3px rgba(139, 196, 139, 0.16)" : "none",
+              flexShrink: 0,
+            }}
+          />
+          {collaborationPeers.slice(0, 3).map((peer) => (
+            <span
+              key={peer.clientId}
+              aria-hidden
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginLeft: -4,
+                background: peer.color,
+                color: "#101012",
+                fontSize: 9,
+                fontWeight: 800,
+                border: "1px solid var(--bg-tertiary)",
+              }}
+            >
+              {peer.name.slice(0, 1).toUpperCase()}
+            </span>
+          ))}
+          <span>{collaborationPresenceLabel}</span>
+        </div>
         <select
           className="select"
           value={projectStatus}
@@ -2880,7 +3104,7 @@ export default function ProjectPage() {
               setShowConfetti(true);
               toast(t("project.completionCelebration"), "success");
             }
-            api.updateProject(projectId, { status: newStatus } as Record<string, unknown>).catch(() => {});
+            api.updateProject(projectId, { status: newStatus } as Record<string, unknown>, collaborationClientIdRef.current).catch(() => {});
           }}
           aria-label={t('project.filterByStatus')}
           style={{ fontSize: 11, padding: "3px 6px", maxWidth: 110, height: 28 }}
@@ -4609,6 +4833,8 @@ export default function ProjectPage() {
                 error={sceneError}
                 errorLine={sceneErrorLine}
                 materials={materials}
+                remoteCursors={collaborationPeers}
+                onCursorChange={sendCollaborationCursor}
               />
             </div>
           )}

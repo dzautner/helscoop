@@ -107,4 +107,30 @@ describe("SceneEditor", () => {
     fireEvent.keyDown(textarea, { key: "Tab" });
     expect(onChange).toHaveBeenCalled();
   });
+
+  it("reports cursor position for collaboration presence", () => {
+    const onCursorChange = vi.fn();
+    render(<SceneEditor sceneJs={sampleCode} onChange={vi.fn()} onCursorChange={onCursorChange} />);
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    textarea.selectionStart = sampleCode.indexOf("scene.add");
+    textarea.selectionEnd = textarea.selectionStart;
+    fireEvent.keyUp(textarea);
+    expect(onCursorChange).toHaveBeenCalledWith(expect.objectContaining({ line: 4, column: 0 }));
+  });
+
+  it("renders remote collaborator cursor labels", () => {
+    render(
+      <SceneEditor
+        sceneJs={sampleCode}
+        onChange={vi.fn()}
+        remoteCursors={[{
+          clientId: "peer-1",
+          name: "Mika",
+          color: "#8bc48b",
+          cursor: { line: 2, column: 3 },
+        }]}
+      />,
+    );
+    expect(screen.getByText("Mika")).toBeInTheDocument();
+  });
 });
