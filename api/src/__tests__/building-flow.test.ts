@@ -174,18 +174,20 @@ describe("Building flow: address to BOM", () => {
     const body = res.body as BuildingResponse;
 
     // Step 1: Building info correct for downtown Helsinki
+    // "Mannerheimintie" matches the urban street pattern, so this gets
+    // the urban variant: 7 floors, 72m2
     expect(body.building_info.type).toBe("kerrostalo");
-    expect(body.building_info.floors).toBe(5);
-    expect(body.building_info.area_m2).toBe(65);
-    expect(body.building_info.year_built).toBe(1960);
+    expect(body.building_info.floors).toBe(7);
+    expect(body.building_info.area_m2).toBe(72);
+    expect(body.building_info.year_built).toBe(1938);
     expect(body.building_info.material).toBe("betoni");
 
     // Step 2: Scene geometry matches area
     expect(body.scene_js).toContain("scene.add");
     expect(body.scene_js).toContain("foundation");
-    // 5 floors should produce gf_ prefix for ground floor and f1_ through f4_
+    // 7 floors should produce gf_ prefix for ground floor and f1_ through f6_
     expect(body.scene_js).toContain("gf_front");
-    expect(body.scene_js).toContain("f4_front");
+    expect(body.scene_js).toContain("f6_front");
 
     // Step 3: BOM has valid material IDs
     for (const item of body.bom_suggestion) {
@@ -206,22 +208,23 @@ describe("Building flow: address to BOM", () => {
     expect(res.status).toBe(200);
     const body = res.body as BuildingResponse;
 
+    // "Kivenlahdentie" is not urban or small, prefix 02 -> omakotitalo, area=158
     expect(body.building_info.type).toBe("omakotitalo");
     expect(body.building_info.floors).toBe(2);
-    expect(body.building_info.area_m2).toBe(145);
-    expect(body.building_info.year_built).toBe(1995);
+    expect(body.building_info.area_m2).toBe(158);
+    expect(body.building_info.year_built).toBe(1994);
     expect(body.building_info.material).toBe("puu");
 
-    // BOM quantities should be proportional to 145 m2
+    // BOM quantities should be proportional to 158 m2
     const lumber148 = body.bom_suggestion.find(
       (b) => b.material_id === "pine_48x148_c24"
     );
     expect(lumber148).toBeDefined();
-    expect(lumber148!.quantity).toBe(Math.round(145 * 0.6));
+    expect(lumber148!.quantity).toBe(Math.round(158 * 0.6));
 
     const osb = body.bom_suggestion.find((b) => b.material_id === "osb_9mm");
     expect(osb).toBeDefined();
-    expect(osb!.quantity).toBe(Math.ceil(145 * 0.35 / 2.88));
+    expect(osb!.quantity).toBe(Math.ceil(158 * 0.35 / 2.88));
   });
 
   it("Helsinki suburb full flow", async () => {
@@ -232,9 +235,10 @@ describe("Building flow: address to BOM", () => {
     expect(res.status).toBe(200);
     const body = res.body as BuildingResponse;
 
-    // Postal 006xx -> 00 prefix, code >= 300 -> omakotitalo
-    expect(body.building_info.type).toBe("omakotitalo");
-    expect(body.building_info.area_m2).toBe(130);
+    // Postal 00630 -> prefix "00", code < 700; "kuja" matches small street
+    // pattern, not urban -> type = "rivitalo", area = 128
+    expect(body.building_info.type).toBe("rivitalo");
+    expect(body.building_info.area_m2).toBe(128);
     expect(body.building_info.floors).toBe(2);
   });
 });
@@ -293,7 +297,9 @@ describe("Scene geometry: area consistency", () => {
     expect(foundation).toBeDefined();
 
     // Foundation dimensions should match the computed footprint
-    const ratio = 1.2;
+    // footprintRatio varies by building type (kerrostalo=1.7, rivitalo=3.2, etc.)
+    const type = body.building_info.type;
+    const ratio = type === "rivitalo" ? 3.2 : type === "kerrostalo" ? 1.7 : type === "paritalo" ? 2.0 : 1.2;
     const expectedWidth = Math.sqrt(area / floors / ratio);
     const expectedLength = expectedWidth * ratio;
     const w = Math.round(expectedWidth * 10) / 10;
@@ -581,9 +587,10 @@ describe("Edge cases: postal code handling", () => {
     const body = res.body as BuildingResponse;
 
     // Without a postal code, it defaults to "00100" -> prefix "00", code 100 < 300 -> kerrostalo
+    // "katu" in the name makes it urban -> floors=7, area=72
     expect(body.building_info.type).toBe("kerrostalo");
-    expect(body.building_info.floors).toBe(5);
-    expect(body.building_info.area_m2).toBe(65);
+    expect(body.building_info.floors).toBe(7);
+    expect(body.building_info.area_m2).toBe(72);
   });
 
   it("Tampere postal code (33100) falls back to default omakotitalo", async () => {
@@ -594,10 +601,10 @@ describe("Edge cases: postal code handling", () => {
     expect(res.status).toBe(200);
     const body = res.body as BuildingResponse;
 
-    // Prefix "33" doesn't match 00 or 02 -> default
+    // Prefix "33" doesn't match 00, 01, 02 -> falls through to default
     expect(body.building_info.type).toBe("omakotitalo");
     expect(body.building_info.floors).toBe(2);
-    expect(body.building_info.area_m2).toBe(120);
+    expect(body.building_info.area_m2).toBe(125);
   });
 
   it("Oulu postal code (90100) falls back to default omakotitalo", async () => {
@@ -610,7 +617,7 @@ describe("Edge cases: postal code handling", () => {
 
     expect(body.building_info.type).toBe("omakotitalo");
     expect(body.building_info.floors).toBe(2);
-    expect(body.building_info.area_m2).toBe(120);
+    expect(body.building_info.area_m2).toBe(125);
   });
 
   it("Turku postal code (20100) falls back to default omakotitalo", async () => {
@@ -622,7 +629,7 @@ describe("Edge cases: postal code handling", () => {
     const body = res.body as BuildingResponse;
 
     expect(body.building_info.type).toBe("omakotitalo");
-    expect(body.building_info.area_m2).toBe(120);
+    expect(body.building_info.area_m2).toBe(125);
   });
 
   it("Vantaa postal code (01300) falls back to default omakotitalo", async () => {
@@ -633,8 +640,8 @@ describe("Edge cases: postal code handling", () => {
     expect(res.status).toBe(200);
     const body = res.body as BuildingResponse;
 
-    // Prefix "01" doesn't match 00 or 02 -> default
-    expect(body.building_info.type).toBe("omakotitalo");
+    // Prefix "01", "tikkurilantie" is not small or urban -> rivitalo
+    expect(body.building_info.type).toBe("rivitalo");
   });
 });
 
