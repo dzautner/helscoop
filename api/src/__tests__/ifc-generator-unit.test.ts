@@ -83,8 +83,8 @@ describe("classifyElement", () => {
     expect(classifyElement("base_1", "betoni")).toBe("slab");
   });
 
-  it("defaults to wall for unclassified elements", () => {
-    expect(classifyElement("structural_beam")).toBe("wall");
+  it("defaults to generic for unclassified elements", () => {
+    expect(classifyElement("structural_beam")).toBe("generic");
   });
 });
 
