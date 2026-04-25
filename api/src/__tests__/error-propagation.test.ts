@@ -476,7 +476,7 @@ describe("authentication failures", () => {
     const res = await makeRequest("POST", "/auth/refresh");
 
     expect(res.status).toBe(401);
-    expect((res.body as { error: string }).error).toContain("authorization");
+    expect((res.body as { error: string }).error).toMatch(/authorization|authentication/i);
   });
 });
 

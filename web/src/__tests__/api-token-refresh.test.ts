@@ -385,13 +385,15 @@ describe("error message propagation", () => {
 // ---------------------------------------------------------------------------
 
 describe("token state management", () => {
-  it("setToken persists to localStorage", () => {
+  it("setToken persists session hint to localStorage", () => {
     const now = Math.floor(Date.now() / 1000);
     setToken("test-token", now + 900);
 
-    expect(localStorageMock.setItem).toHaveBeenCalledWith("helscoop_token", "test-token");
+    // Session cookie flow: token lives in memory + http-only cookie,
+    // localStorage only stores a session-active hint and expiry for the UI.
+    expect(localStorageMock.setItem).toHaveBeenCalledWith("helscoop_session_active", "true");
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
-      "helscoop_token_expires_at",
+      "helscoop_session_expires_at",
       String(now + 900),
     );
   });
@@ -399,17 +401,17 @@ describe("token state management", () => {
   it("setToken(null) removes from localStorage", () => {
     setToken(null);
 
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith("helscoop_token");
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith("helscoop_token_expires_at");
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("helscoop_session_active");
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("helscoop_session_expires_at");
   });
 
-  it("getToken reads from localStorage when not in memory", () => {
+  it("getToken returns in-memory token set via setToken", () => {
     // Reset in-memory token
     setToken(null);
 
-    // Simulate localStorage having a token
-    store["helscoop_token"] = "stored-token";
-    store["helscoop_token_expires_at"] = String(Math.floor(Date.now() / 1000) + 600);
+    // Set a token — it's kept in memory, not localStorage
+    const now = Math.floor(Date.now() / 1000);
+    setToken("stored-token", now + 600);
 
     const token = getToken();
     expect(token).toBe("stored-token");

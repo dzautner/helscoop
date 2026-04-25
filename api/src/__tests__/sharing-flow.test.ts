@@ -202,11 +202,27 @@ describe("project sharing flow", () => {
       oid: 0,
       fields: [],
     });
+    // logProjectView INSERT (deduped view tracking)
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "INSERT",
+      rowCount: 0,
+      oid: 0,
+      fields: [],
+    });
     // BOM lookup
     mockQuery.mockResolvedValueOnce({
       rows: BOM_DATA,
       command: "SELECT",
       rowCount: 2,
+      oid: 0,
+      fields: [],
+    });
+    // Comments lookup
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "SELECT",
+      rowCount: 0,
       oid: 0,
       fields: [],
     });
@@ -369,10 +385,26 @@ describe("share token edge cases", () => {
       oid: 0,
       fields: [],
     });
+    // logProjectView INSERT
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "INSERT",
+      rowCount: 0,
+      oid: 0,
+      fields: [],
+    });
     mockQuery.mockResolvedValueOnce({
       rows: BOM_DATA,
       command: "SELECT",
       rowCount: 2,
+      oid: 0,
+      fields: [],
+    });
+    // Comments lookup
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "SELECT",
+      rowCount: 0,
       oid: 0,
       fields: [],
     });
@@ -399,6 +431,22 @@ describe("share token edge cases", () => {
       oid: 0,
       fields: [],
     });
+    // logProjectView INSERT
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "INSERT",
+      rowCount: 0,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "SELECT",
+      rowCount: 0,
+      oid: 0,
+      fields: [],
+    });
+    // Comments lookup
     mockQuery.mockResolvedValueOnce({
       rows: [],
       command: "SELECT",
