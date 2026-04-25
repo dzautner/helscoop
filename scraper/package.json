@@ -5,7 +5,8 @@
   "scripts": {
     "scrape": "tsx src/scrape.ts",
     "scrape:krauta": "tsx src/scrape.ts --supplier k-rauta",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -16,6 +17,6 @@
     "@types/pg": "^8.10.9",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.0"
+    "vitest": "^3.2.4"
   }
 }
