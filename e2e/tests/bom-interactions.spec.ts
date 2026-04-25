@@ -1,11 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   loginUser,
+  registerUser,
   setAuthToken,
   createProjectViaAPI,
   deleteProjectViaAPI,
-  saveBomViaAPI,
-  apiUrl,
 } from "./helpers";
 
 /**
@@ -16,22 +15,21 @@ import {
  * editing / removing materials, cost calculations, and export buttons.
  */
 
-const TEST_EMAIL = "test@test.com";
-const TEST_PASSWORD = "Test1234!";
-
 /* ── Shared helpers ──────────────────────────────────────────── */
 
 async function loginAndNavigateToProject(
   page: Page,
   projectId: string,
+  email: string,
+  password: string,
 ): Promise<void> {
-  const token = await loginUser(page, TEST_EMAIL, TEST_PASSWORD);
+  const token = await loginUser(page, email, password);
   await setAuthToken(page, token);
   await page.goto(`/project/${projectId}`);
   await page.waitForLoadState("networkidle");
   // Wait for the editor layout to be ready (canvas or BOM panel)
   await page
-    .locator(".editor-bom-panel, canvas")
+    .locator(".editor-bom-panel, canvas[data-engine^='three.js'][aria-hidden='true']")
     .first()
     .waitFor({ state: "visible", timeout: 20_000 });
   // Extra settle time for React hydration and material fetches
@@ -97,6 +95,7 @@ test.describe("BOM Panel Interactions", () => {
 
   let token: string;
   let projectId: string;
+  let user: { email: string; password: string };
 
   // Scene with a few material declarations so the BOM panel recognises them
   const SCENE_JS = `
@@ -108,7 +107,8 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    token = await loginUser(page, TEST_EMAIL, TEST_PASSWORD);
+    user = await registerUser(page, `bom-interactions-${Date.now()}`);
+    token = user.token;
     projectId = await createProjectViaAPI(page, token, {
       name: "BOM Interactions E2E",
       scene_js: SCENE_JS,
@@ -127,7 +127,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
    * ────────────────────────────────────────────────────────────── */
 
   test("1 — BOM panel is visible on project page", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Should contain the header text "Materiaalilista" / "Material list"
@@ -137,7 +137,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("2 — BOM is initially empty", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Empty-state text
@@ -154,7 +154,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("3 — material catalog browser is accessible", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // "SELAA MATERIAALEJA" / "BROWSE MATERIALS" label (use label-mono class to disambiguate)
@@ -176,7 +176,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
    * ────────────────────────────────────────────────────────────── */
 
   test("4 — clicking a catalog material shows quick-add row", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Click first material card
@@ -193,7 +193,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("5 — adding a material makes it appear in the BOM list", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Add pine lumber (48x148)
@@ -210,7 +210,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("6 — BOM item shows name, quantity input, unit, and price", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Add a material if BOM is empty
@@ -245,7 +245,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("7 — adding multiple materials → all appear in BOM", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Add two materials
@@ -262,7 +262,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
    * ────────────────────────────────────────────────────────────── */
 
   test("8 — changing quantity updates the item total", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Ensure at least one material is present
@@ -297,7 +297,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("9 — quantity input has min constraint (no negative numbers)", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -322,7 +322,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("10 — quantity input is a number input (rejects non-numeric)", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -357,7 +357,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
    * ────────────────────────────────────────────────────────────── */
 
   test("11 — clicking a BOM item opens price comparison details", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -387,7 +387,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("12 — stock status badge is visible on BOM items", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -423,7 +423,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("13 — supplier info is shown on BOM items", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -459,7 +459,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   test("14 — quote summary shows materials, labour, waste, VAT, and grand total", async ({
     page,
   }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Ensure materials in BOM
@@ -501,7 +501,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   test("15 — changing quantity updates the estimated total in real-time", async ({
     page,
   }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -547,7 +547,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("16 — cost breakdown chart is visible when items exist", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -577,7 +577,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   test("17 — Export CSV button in BOM panel exists and is clickable", async ({
     page,
   }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -607,7 +607,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   });
 
   test("18 — Export dropdown in toolbar has PDF option", async ({ page }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     const hasBomItems = await page
@@ -651,7 +651,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   test("19 — deleting a material from BOM removes it and updates total", async ({
     page,
   }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Ensure we have at least one material
@@ -696,7 +696,7 @@ scene.add(w1, { material: "lumber", color: [0.85, 0.75, 0.55] });
   test("20 — deleting all materials shows empty state with zero total", async ({
     page,
   }) => {
-    await loginAndNavigateToProject(page, projectId);
+    await loginAndNavigateToProject(page, projectId, user.email, user.password);
     await ensureBomPanelVisible(page);
 
     // Add a material if BOM is empty to make the test meaningful
