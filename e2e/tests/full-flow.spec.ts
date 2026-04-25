@@ -36,7 +36,9 @@ test.describe("Full User Flows", () => {
     await page.getByRole("button", { name: /luo tili|create account/i }).click({ force: true });
 
     await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
-    userToken = await page.evaluate(() => localStorage.getItem("helscoop_token") || "");
+    const sessionActive = await page.evaluate(() => localStorage.getItem("helscoop_session_active") || "");
+    expect(sessionActive).toBe("true");
+    userToken = await apiLogin(page);
     expect(userToken).toBeTruthy();
   });
 
@@ -48,7 +50,7 @@ test.describe("Full User Flows", () => {
     if (await logoutBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await logoutBtn.click();
     } else {
-      await page.evaluate(() => localStorage.removeItem("helscoop_token"));
+      await page.evaluate(() => localStorage.removeItem("helscoop_session_active"));
       await page.reload();
     }
     await page.waitForLoadState("networkidle");
@@ -76,7 +78,7 @@ test.describe("Full User Flows", () => {
 
   test("protected routes redirect without auth", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() => localStorage.removeItem("helscoop_token"));
+    await page.evaluate(() => localStorage.removeItem("helscoop_session_active"));
     await page.goto("/project/some-fake-id");
     await page.waitForTimeout(3000);
     expect(page.url()).not.toContain("/project/");

@@ -12,6 +12,25 @@ git submodule update --init --recursive
 
 This repository is mostly autonomously written by an LLM.
 
+### Browser E2E
+
+The Playwright browser suite expects the repo-local Docker Postgres service:
+
+```
+cd api && npm ci
+cd ../web && npm ci
+cd ../e2e && npm ci
+npm run test:local
+```
+
+`npm run test:local` starts `docker compose up -d db`, waits for the `helscoop` database, runs API migrations, then launches the API and web Playwright web servers. The default database URL is `postgres://helscoop:helscoop_dev@localhost:5433/helscoop`, matching `docker-compose.yml`.
+
+Override the database when needed:
+
+```
+E2E_DATABASE_URL=postgres://user:pass@localhost:5433/db npm run test:local -- tests/auth.spec.ts
+```
+
 ### Keyboard Shortcuts
 
 | Key | Action |

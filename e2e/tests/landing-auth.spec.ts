@@ -289,16 +289,17 @@ test.describe("Registration flow", () => {
     await page.goto("/");
     await dismissOnboarding(page);
 
-    // Log in via API to get the token
+    // Log in via API; the API response sets the httpOnly session cookie in
+    // Playwright's browser context, while the web app uses a non-secret
+    // localStorage hint to decide whether to attempt authenticated loading.
     const res = await page.request.post(`${API_URL}/auth/login`, {
       data: { email: testEmail, password: testPassword },
     });
-    const { token } = await res.json();
+    await res.json();
 
-    // Set token in localStorage
-    await page.evaluate((t) => {
-      localStorage.setItem("helscoop_token", t);
-    }, token);
+    await page.evaluate(() => {
+      localStorage.setItem("helscoop_session_active", "true");
+    });
     await page.reload();
     await page.waitForLoadState("networkidle");
 
@@ -410,8 +411,8 @@ test.describe("Login flow", () => {
     if (await logoutBtn.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
       await logoutBtn.first().click();
     } else {
-      // Fallback: clear token manually
-      await page.evaluate(() => localStorage.removeItem("helscoop_token"));
+      // Fallback: clear the non-secret session hint manually.
+      await page.evaluate(() => localStorage.removeItem("helscoop_session_active"));
       await page.reload();
     }
 
