@@ -139,6 +139,7 @@ describe("SubsidyCalculator", () => {
     expect(screen.getByText("Tavoitelammitys")).toBeDefined();
     expect(screen.getByText("Talous")).toBeDefined();
     expect(screen.getByText("Jarjestelman kunto")).toBeDefined();
+    await screen.findByText("Oikeutettu avustukseen");
   });
 
   it("renders the year-round residential checkbox", async () => {
@@ -148,6 +149,7 @@ describe("SubsidyCalculator", () => {
     expect(screen.getByText("Ymparivuotinen asuminen")).toBeDefined();
     const checkbox = screen.getByRole("checkbox");
     expect((checkbox as HTMLInputElement).checked).toBe(true);
+    await screen.findByText("Oikeutettu avustukseen");
   });
 
   it("shows loading state initially", () => {

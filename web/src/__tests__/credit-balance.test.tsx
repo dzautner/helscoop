@@ -61,6 +61,20 @@ beforeEach(() => {
   mockGetEntitlements.mockResolvedValue({ credits: baseCreditState });
 });
 
+async function renderLoadedCreditBalance(ui = <CreditBalancePill />) {
+  render(ui);
+  await waitFor(() => {
+    expect(screen.getByText("42")).toBeInTheDocument();
+  });
+}
+
+async function openCreditDialog() {
+  fireEvent.click(screen.getByLabelText(/credits\.balanceAria/));
+  await waitFor(() => {
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+}
+
 describe("CreditBalancePill", () => {
   it("shows loading state initially", () => {
     mockGetEntitlements.mockReturnValue(new Promise(() => {}));
@@ -91,25 +105,22 @@ describe("CreditBalancePill", () => {
   });
 
   it("opens dialog on click", async () => {
-    render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("42"));
-    fireEvent.click(screen.getByText("42"));
+    await renderLoadedCreditBalance();
+    await openCreditDialog();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("credits.title")).toBeInTheDocument();
   });
 
   it("shows current balance in dialog", async () => {
-    render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("42"));
-    fireEvent.click(screen.getByText("42"));
+    await renderLoadedCreditBalance();
+    await openCreditDialog();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("42");
   });
 
   it("renders credit packs in dialog", async () => {
-    render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("42"));
-    fireEvent.click(screen.getByText("42"));
+    await renderLoadedCreditBalance();
+    await openCreditDialog();
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("50")).toBeInTheDocument();
     expect(screen.getByText("4.99 EUR")).toBeInTheDocument();
@@ -117,28 +128,28 @@ describe("CreditBalancePill", () => {
   });
 
   it("shows savings badge on discounted pack", async () => {
-    render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("42"));
-    fireEvent.click(screen.getByText("42"));
+    await renderLoadedCreditBalance();
+    await openCreditDialog();
     expect(screen.getByText(/credits\.savings/)).toBeInTheDocument();
   });
 
   it("closes dialog via close button", async () => {
-    render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("42"));
-    fireEvent.click(screen.getByText("42"));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await renderLoadedCreditBalance();
+    await openCreditDialog();
     fireEvent.click(screen.getByLabelText("dialog.close"));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 
   it("closes dialog on backdrop click", async () => {
-    render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("42"));
-    fireEvent.click(screen.getByText("42"));
+    await renderLoadedCreditBalance();
+    await openCreditDialog();
     const backdrop = screen.getByRole("presentation");
     fireEvent.mouseDown(backdrop);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 
   it("shows low credit warning styling", async () => {
@@ -156,8 +167,10 @@ describe("CreditBalancePill", () => {
       credits: { ...baseCreditState, balance: 5, lowCredit: true },
     });
     render(<CreditBalancePill />);
-    await waitFor(() => screen.getByText("5"));
-    fireEvent.click(screen.getByText("5"));
+    await waitFor(() => {
+      expect(screen.getByText("5")).toBeInTheDocument();
+    });
+    await openCreditDialog();
     expect(screen.getByText("credits.lowBadge")).toBeInTheDocument();
   });
 

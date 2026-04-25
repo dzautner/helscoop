@@ -269,8 +269,13 @@ describe("useToast outside provider", () => {
       return <div />;
     }
 
-    expect(() => render(<BadConsumer />)).toThrow(
-      "useToast must be used within a ToastProvider",
-    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(() => render(<BadConsumer />)).toThrow(
+        "useToast must be used within a ToastProvider",
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

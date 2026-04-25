@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import BomPanel from "@/components/BomPanel";
 import type { BomItem, Material } from "@/types";
+
+const mockGetCategories = vi.fn();
 
 // Mock API calls so no network requests are made
 vi.mock("@/lib/api", () => ({
   api: {
-    getCategories: vi.fn().mockResolvedValue([]),
+    getCategories: (...args: unknown[]) => mockGetCategories(...args),
     getMaterialPrices: vi.fn().mockResolvedValue({ prices: [], savings_per_unit: 0 }),
     getPriceHistory: vi.fn().mockResolvedValue([]),
     getRenovationCostIndex: vi.fn().mockResolvedValue({
@@ -96,33 +98,41 @@ const defaultProps = {
   onUpdateQty: vi.fn(),
 };
 
+async function waitForBomPanelEffects() {
+  await waitFor(() => expect(mockGetCategories).toHaveBeenCalled());
+}
+
 describe("BomPanel material browser cards – keyboard accessibility (#619)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCategories.mockResolvedValue([]);
   });
 
-  it("renders material cards with role=button", () => {
+  it("renders material cards with role=button", async () => {
     const materials = [makeMaterial("mat-1", "Pine Beam")];
     render(<BomPanel {...defaultProps} materials={materials} />);
     const cards = screen.getAllByRole("button", { name: /Add Pine Beam/i });
     expect(cards.length).toBeGreaterThan(0);
+    await waitForBomPanelEffects();
   });
 
-  it("material cards have tabIndex=0", () => {
+  it("material cards have tabIndex=0", async () => {
     const materials = [makeMaterial("mat-1", "Pine Beam")];
     render(<BomPanel {...defaultProps} materials={materials} />);
     const card = screen.getByRole("button", { name: /Add Pine Beam/i });
     expect(card.getAttribute("tabindex")).toBe("0");
+    await waitForBomPanelEffects();
   });
 
-  it("material cards have a descriptive aria-label containing the material name", () => {
+  it("material cards have a descriptive aria-label containing the material name", async () => {
     const materials = [makeMaterial("mat-2", "Spruce Plank")];
     render(<BomPanel {...defaultProps} materials={materials} />);
     const card = screen.getByRole("button", { name: /Spruce Plank/i });
     expect(card.getAttribute("aria-label")).toContain("Spruce Plank");
+    await waitForBomPanelEffects();
   });
 
-  it("pressing Enter on a material card triggers the quick-add action", () => {
+  it("pressing Enter on a material card triggers the quick-add action", async () => {
     const onAdd = vi.fn();
     const materials = [makeMaterial("mat-3", "Roof Tile")];
     render(<BomPanel {...defaultProps} materials={materials} onAdd={onAdd} />);
@@ -130,33 +140,37 @@ describe("BomPanel material browser cards – keyboard accessibility (#619)", ()
     fireEvent.keyDown(card, { key: "Enter" });
     // Card should now show as selected (aria-pressed="true")
     expect(card.getAttribute("aria-pressed")).toBe("true");
+    await waitForBomPanelEffects();
   });
 
-  it("pressing Space on a material card triggers the quick-add action", () => {
+  it("pressing Space on a material card triggers the quick-add action", async () => {
     const onAdd = vi.fn();
     const materials = [makeMaterial("mat-4", "Insulation")];
     render(<BomPanel {...defaultProps} materials={materials} onAdd={onAdd} />);
     const card = screen.getByRole("button", { name: /Insulation/i });
     fireEvent.keyDown(card, { key: " " });
     expect(card.getAttribute("aria-pressed")).toBe("true");
+    await waitForBomPanelEffects();
   });
 
-  it("other keys do not trigger the quick-add action", () => {
+  it("other keys do not trigger the quick-add action", async () => {
     const materials = [makeMaterial("mat-5", "Membrane")];
     render(<BomPanel {...defaultProps} materials={materials} />);
     const card = screen.getByRole("button", { name: /Membrane/i });
     fireEvent.keyDown(card, { key: "Tab" });
     expect(card.getAttribute("aria-pressed")).toBe("false");
+    await waitForBomPanelEffects();
   });
 
-  it("cards start with aria-pressed=false (not selected)", () => {
+  it("cards start with aria-pressed=false (not selected)", async () => {
     const materials = [makeMaterial("mat-6", "Concrete")];
     render(<BomPanel {...defaultProps} materials={materials} />);
     const card = screen.getByRole("button", { name: /Concrete/i });
     expect(card.getAttribute("aria-pressed")).toBe("false");
+    await waitForBomPanelEffects();
   });
 
-  it("announces BOM total updates through a polite live region", () => {
+  it("announces BOM total updates through a polite live region", async () => {
     render(
       <BomPanel
         {...defaultProps}
@@ -171,5 +185,6 @@ describe("BomPanel material browser cards – keyboard accessibility (#619)", ()
     expect(announcer.getAttribute("aria-atomic")).toBe("true");
     expect(announcer.textContent).toContain("1 item");
     expect(announcer.textContent).toContain("€20");
+    await waitForBomPanelEffects();
   });
 });
