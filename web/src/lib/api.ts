@@ -14,6 +14,7 @@ import type {
   MarketplaceSupplierCheckoutInput,
   MaterialSubstitutionResponse,
   NeighborhoodInsightsResponse,
+  MoodBoardState,
   AppNotification,
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
@@ -459,6 +460,17 @@ export const api = {
     apiFetch(`/projects/${id}/thumbnail`, {
       method: "PUT",
       body: JSON.stringify({ thumbnail }),
+    }),
+  saveMoodBoard: (
+    id: string,
+    moodBoard: MoodBoardState | null | undefined,
+    collaborationClientId?: string | null,
+  ): Promise<{ ok: boolean; mood_board: MoodBoardState }> =>
+    apiFetch(`/projects/${id}/mood-board`, {
+      method: "PUT",
+      body: JSON.stringify(collaborationClientId
+        ? { mood_board: moodBoard ?? { items: [] }, collaboration_client_id: collaborationClientId }
+        : { mood_board: moodBoard ?? { items: [] } }),
     }),
 
   getMaterials: () => apiFetch("/materials"),

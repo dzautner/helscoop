@@ -185,6 +185,76 @@ function normalizePhotoOverlay(value: unknown): Record<string, unknown> | null {
   };
 }
 
+function normalizeMoodBoard(value: unknown): Record<string, unknown> {
+  if (value == null) return { items: [] };
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("mood_board must be an object");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  if (items.length > 100) {
+    throw new Error("mood_board.items must contain at most 100 cards");
+  }
+
+  const normalizedItems = items.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("mood_board.items rows must be objects");
+    }
+    const card = item as Record<string, unknown>;
+    const type = card.type;
+    if (type !== "material" && type !== "photo" && type !== "color" && type !== "note") {
+      throw new Error("mood_board item type is invalid");
+    }
+    const base = {
+      id: typeof card.id === "string" && card.id ? card.id.slice(0, 80) : `mood-${index + 1}`,
+      type,
+      x: clampNumber(card.x, 0, 5000, 24),
+      y: clampNumber(card.y, 0, 5000, 24),
+      width: clampNumber(card.width, 48, 800, type === "note" ? 180 : 140),
+      height: clampNumber(card.height, 48, 800, type === "note" ? 120 : 140),
+      title: typeof card.title === "string" ? card.title.slice(0, 160) : undefined,
+    };
+
+    if (type === "material") {
+      const materialId = typeof card.material_id === "string" ? card.material_id.slice(0, 120) : "";
+      if (!materialId) throw new Error("mood_board material cards require material_id");
+      return { ...base, material_id: materialId };
+    }
+    if (type === "photo") {
+      const src = typeof card.src === "string" ? card.src : "";
+      if (!/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(src)) {
+        throw new Error("mood_board photo cards require image data URLs");
+      }
+      if (src.length > 1_500_000) {
+        throw new Error("mood_board photo card is too large");
+      }
+      return {
+        ...base,
+        src,
+        file_name: typeof card.file_name === "string" ? card.file_name.slice(0, 160) : undefined,
+      };
+    }
+    if (type === "color") {
+      const color = typeof card.color === "string" && /^#[0-9a-f]{6}$/i.test(card.color) ? card.color : "#d6a15d";
+      return { ...base, color };
+    }
+    return {
+      ...base,
+      text: typeof card.text === "string" ? card.text.slice(0, 2000) : "",
+    };
+  });
+
+  const normalized = {
+    items: normalizedItems,
+    updated_at: typeof raw.updated_at === "string" ? raw.updated_at : new Date().toISOString(),
+  };
+  if (JSON.stringify(normalized).length > 2_000_000) {
+    throw new Error("mood_board is too large");
+  }
+  return normalized;
+}
+
 function formatCurrency(value: number, locale: "fi" | "en"): string {
   return `${value.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", {
     minimumFractionDigits: 2,
@@ -1262,6 +1332,27 @@ router.put("/:id", async (req, res) => {
   res.json(updatedProject);
 });
 
+router.put("/:id/mood-board", async (req, res) => {
+  let safeMoodBoard: Record<string, unknown>;
+  try {
+    safeMoodBoard = normalizeMoodBoard(req.body?.mood_board);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid mood_board" });
+  }
+
+  const result = await query(
+    `UPDATE projects
+     SET mood_board = $1::jsonb, updated_at = now()
+     WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL
+     RETURNING mood_board, updated_at`,
+    [JSON.stringify(safeMoodBoard), req.params.id, req.user!.id],
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+  res.json({ ok: true, mood_board: result.rows[0].mood_board, updated_at: result.rows[0].updated_at });
+});
+
 router.delete("/:id", async (req, res) => {
   await query(
     "UPDATE projects SET deleted_at = NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
@@ -1605,9 +1696,9 @@ router.post("/:id/duplicate", requirePermission("project:create"), async (req, r
     `INSERT INTO projects (
        user_id, name, description, scene_js, original_scene_js, building_info,
        project_type, unit_count, business_id, property_manager_name,
-       property_manager_email, property_manager_phone, shareholder_shares
+       property_manager_email, property_manager_phone, shareholder_shares, mood_board
      )
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
     [
       req.user!.id,
       `${p.name} ${suffix}`,
@@ -1622,6 +1713,7 @@ router.post("/:id/duplicate", requirePermission("project:create"), async (req, r
       p.property_manager_email ?? null,
       p.property_manager_phone ?? null,
       jsonbParam(p.shareholder_shares ?? []),
+      jsonbParam(p.mood_board ?? { items: [] }),
     ]
   );
   const newId = dup.rows[0].id;

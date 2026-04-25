@@ -58,6 +58,7 @@ export interface Project {
   cost_band?: GalleryCostRange;
   material_highlights?: string[];
   building_info?: BuildingInfo | null;
+  mood_board?: MoodBoardState | null;
   permit_metadata?: RyhtiPermitMetadata | null;
   photo_overlay?: PhotoOverlayState | null;
   share_token?: string | null;
@@ -135,6 +136,50 @@ export interface PhotoOverlayState {
   offset_y: number;
   scale: number;
   rotation: number;
+  updated_at?: string;
+}
+
+export type MoodBoardItemType = "material" | "photo" | "color" | "note";
+
+export interface MoodBoardBaseItem {
+  id: string;
+  type: MoodBoardItemType;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  title?: string;
+}
+
+export interface MoodBoardMaterialItem extends MoodBoardBaseItem {
+  type: "material";
+  material_id: string;
+}
+
+export interface MoodBoardPhotoItem extends MoodBoardBaseItem {
+  type: "photo";
+  src: string;
+  file_name?: string;
+}
+
+export interface MoodBoardColorItem extends MoodBoardBaseItem {
+  type: "color";
+  color: string;
+}
+
+export interface MoodBoardNoteItem extends MoodBoardBaseItem {
+  type: "note";
+  text: string;
+}
+
+export type MoodBoardItem =
+  | MoodBoardMaterialItem
+  | MoodBoardPhotoItem
+  | MoodBoardColorItem
+  | MoodBoardNoteItem;
+
+export interface MoodBoardState {
+  items: MoodBoardItem[];
   updated_at?: string;
 }
 
