@@ -65,8 +65,11 @@ router.get("/calculate", async (req, res) => {
       typeof project.building_info === "string"
         ? JSON.parse(project.building_info)
         : project.building_info;
-    if (info.area && typeof info.area === "number" && info.area > 0) {
-      buildingAreaM2 = info.area;
+    // building_info stores area as area_m2 (see building.ts BuildingInfo interface).
+    // Fall back to legacy "area" field for old projects.
+    const rawArea = info.area_m2 ?? info.area;
+    if (rawArea != null && typeof rawArea === "number" && Number.isFinite(rawArea) && rawArea > 0) {
+      buildingAreaM2 = rawArea;
     }
   }
 

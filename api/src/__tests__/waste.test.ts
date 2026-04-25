@@ -299,7 +299,92 @@ describe("GET /waste/estimate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 10. Response structure matches expected schema
+  // 10. NULL waste_factor uses category-specific default
+  // ---------------------------------------------------------------------------
+  it("uses category-specific default when waste_factor is NULL (insulation = 10%)", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: PROJECT_ID }] } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { quantity: 100, unit: "m2", category_id: "insulation", waste_factor: null, category_name: "Insulation" },
+      ],
+    } as never);
+
+    const res = await makeRequest("GET", `/waste/estimate?projectId=${PROJECT_ID}`, {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+
+    const body = res.body as { totalWeightKg: number; categories: { type: string; weightKg: number }[] };
+    // insulation defaultWasteFactor = 1.10 → 10% waste fraction
+    // wasteQty = 100 * 0.10 = 10 units, weightKg = 10 * 0.5 = 5.0 kg
+    const eristejate = body.categories.find(c => c.type === "eristejate");
+    expect(eristejate).toBeDefined();
+    expect(eristejate!.weightKg).toBe(5.0);
+  });
+
+  it("uses category-specific default when waste_factor is NULL (foundation = 3%)", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: PROJECT_ID }] } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { quantity: 100, unit: "kpl", category_id: "foundation", waste_factor: null, category_name: "Foundation" },
+      ],
+    } as never);
+
+    const res = await makeRequest("GET", `/waste/estimate?projectId=${PROJECT_ID}`, {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+
+    const body = res.body as { totalWeightKg: number; categories: { type: string; weightKg: number }[] };
+    // foundation defaultWasteFactor = 1.03 → 3% waste fraction
+    // wasteQty = 100 * 0.03 = 3 units, weightKg = 3 * 12.0 = 36.0 kg
+    const kivijate = body.categories.find(c => c.type === "kivijate");
+    expect(kivijate).toBeDefined();
+    expect(kivijate!.weightKg).toBe(36.0);
+  });
+
+  it("uses explicit waste_factor from material when provided", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: PROJECT_ID }] } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { quantity: 100, unit: "jm", category_id: "lumber", waste_factor: 1.08, category_name: "Lumber" },
+      ],
+    } as never);
+
+    const res = await makeRequest("GET", `/waste/estimate?projectId=${PROJECT_ID}`, {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+
+    const body = res.body as { totalWeightKg: number; categories: { type: string; weightKg: number }[] };
+    // explicit waste_factor = 1.08 → 8% waste fraction
+    // wasteQty = 100 * 0.08 = 8 units, weightKg = 8 * 3.2 = 25.6 kg
+    const puujate = body.categories.find(c => c.type === "puujate");
+    expect(puujate).toBeDefined();
+    expect(puujate!.weightKg).toBe(25.6);
+  });
+
+  it("clamps negative waste fraction to zero", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: PROJECT_ID }] } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        // waste_factor < 1.0 would mean negative waste — clamp to 0
+        { quantity: 100, unit: "jm", category_id: "lumber", waste_factor: 0.95, category_name: "Lumber" },
+      ],
+    } as never);
+
+    const res = await makeRequest("GET", `/waste/estimate?projectId=${PROJECT_ID}`, {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+
+    const body = res.body as { totalWeightKg: number };
+    // waste_factor 0.95 - 1.0 = -0.05, clamped to 0 → no waste
+    expect(body.totalWeightKg).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 11. Response structure matches expected schema
   // ---------------------------------------------------------------------------
   it("returns correct response structure", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ id: PROJECT_ID }] } as never);

@@ -42,6 +42,12 @@ export interface WasteFactor {
   recyclingRate: number;
   /** Disposal cost EUR per tonne at Sortti station */
   disposalCostPerTonne: number;
+  /**
+   * Default waste fraction for this category when material.waste_factor is NULL.
+   * Expressed as a multiplier (e.g. 1.05 = 5% waste). Falls back to 1.05 if absent.
+   * Varies by category: lumber ~5%, insulation ~10%, paint ~3%, etc.
+   */
+  defaultWasteFactor?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +61,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.003,   // wood is bulky, ~300 kg/m3 loose
     recyclingRate: 0.85,   // wood can be recycled/energy recovery
     disposalCostPerTonne: 0, // puhdas puujate is free at Sortti
+    defaultWasteFactor: 1.05, // 5% — precise cuts, moderate waste
   },
   panels: {
     wasteType: "puujate",
@@ -63,6 +70,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.004,
     recyclingRate: 0.70,
     disposalCostPerTonne: 0,
+    defaultWasteFactor: 1.08, // 8% — sheet cutting generates offcuts
   },
   insulation: {
     wasteType: "eristejate",
@@ -71,6 +79,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.02,    // very bulky for its weight
     recyclingRate: 0.15,   // mineral wool recyclability limited
     disposalCostPerTonne: 150, // classified as sekajate at Sortti
+    defaultWasteFactor: 1.10, // 10% — batts need trimming at corners/openings
   },
   roofing: {
     wasteType: "metallijate",
@@ -79,6 +88,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.002,
     recyclingRate: 0.95,   // metal is highly recyclable
     disposalCostPerTonne: 0, // clean metal is free
+    defaultWasteFactor: 1.05, // 5% — sheet overlap/trim waste
   },
   foundation: {
     wasteType: "kivijate",
@@ -87,6 +97,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.0005,  // dense material
     recyclingRate: 0.90,   // concrete can be crushed and reused
     disposalCostPerTonne: 40, // puhdas kivijate pricing
+    defaultWasteFactor: 1.03, // 3% — minimal for pre-formed blocks
   },
   fasteners: {
     wasteType: "metallijate",
@@ -95,6 +106,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.001,
     recyclingRate: 0.98,
     disposalCostPerTonne: 0,
+    defaultWasteFactor: 1.02, // 2% — dropped/damaged screws
   },
   plumbing: {
     wasteType: "metallijate",
@@ -104,6 +116,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.002,
     recyclingRate: 0.80,
     disposalCostPerTonne: 0,
+    defaultWasteFactor: 1.05, // 5% — pipe cut-offs
   },
   electrical: {
     wasteType: "sekajate",
@@ -113,6 +126,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.005,
     recyclingRate: 0.50,
     disposalCostPerTonne: 150,
+    defaultWasteFactor: 1.05, // 5% — cable off-cuts
   },
   windows: {
     wasteType: "lasijate",
@@ -122,6 +136,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.003,
     recyclingRate: 0.60,
     disposalCostPerTonne: 80,
+    defaultWasteFactor: 1.02, // 2% — breakage only, windows are discrete units
   },
   paint: {
     wasteType: "vaarallinen_jate",
@@ -130,6 +145,7 @@ export const WASTE_FACTORS: Record<string, WasteFactor> = {
     volumePerKg: 0.001,
     recyclingRate: 0.0,    // paint waste is hazardous
     disposalCostPerTonne: 500,
+    defaultWasteFactor: 1.03, // 3% — residual paint in cans
   },
 };
 
@@ -144,6 +160,7 @@ export const DEFAULT_WASTE_FACTOR: WasteFactor = {
   volumePerKg: 0.003,
   recyclingRate: 0.30,
   disposalCostPerTonne: 150,
+  defaultWasteFactor: 1.05, // 5% — conservative default for unknown categories
 };
 
 // ---------------------------------------------------------------------------

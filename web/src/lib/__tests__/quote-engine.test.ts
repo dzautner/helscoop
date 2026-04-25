@@ -123,11 +123,12 @@ describe("calculateQuote — basic calculation", () => {
     const materialCost = Math.round(totalQty * 2.60 * 100) / 100; // 28.60
     expect(line.materialCost).toBe(materialCost);
 
-    // Lumber labourHoursPerUnit = 0.5
-    const labourHours = Math.round(totalQty * 0.5 * 100) / 100; // 5.5
+    // Lumber labourHoursPerUnit = 0.5, labour uses designQty (not totalQty)
+    // because you don't labour on waste materials
+    const labourHours = Math.round(10 * 0.5 * 100) / 100; // 5.0
     expect(line.labourHours).toBe(labourHours);
 
-    const labourCost = Math.round(labourHours * 45 * 100) / 100; // 247.50
+    const labourCost = Math.round(labourHours * 45 * 100) / 100; // 225.00
     expect(line.labourCost).toBe(labourCost);
   });
 
@@ -232,12 +233,16 @@ describe("calculateQuote — homeowner vs contractor", () => {
     expect(contractor.grandTotal).toBeGreaterThan(homeowner.grandTotal);
   });
 
-  it("contractor margin is applied after VAT", () => {
+  it("contractor margin is applied before VAT (Finnish AVL)", () => {
     const quote = calculateQuote(bom, allMaterials, contractorConfig);
-    const baseWithVat = Math.round((quote.subtotalExVat + quote.vatTotal) * 100) / 100;
-    const expectedMargin = Math.round(baseWithVat * 0.15 * 100) / 100;
+    // Margin is on subtotalExVat (material + labour, before VAT)
+    const expectedMargin = Math.round(quote.subtotalExVat * 0.15 * 100) / 100;
     expect(quote.contractorMargin).toBe(expectedMargin);
-    expect(quote.grandTotal).toBe(Math.round((baseWithVat + expectedMargin) * 100) / 100);
+    // VAT is then calculated on (subtotalExVat + margin)
+    const taxableBase = Math.round((quote.subtotalExVat + expectedMargin) * 100) / 100;
+    const expectedVat = Math.round(taxableBase * 0.255 * 100) / 100;
+    expect(quote.vatTotal).toBe(expectedVat);
+    expect(quote.grandTotal).toBe(Math.round((taxableBase + expectedVat) * 100) / 100);
   });
 
   it("contractor with 0% margin equals homeowner total", () => {
@@ -369,6 +374,92 @@ describe("calculateQuote — multi-line aggregates", () => {
     const quote = calculateQuote(bom, allMaterials, homeownerConfig);
     expect(quote.subtotalExVat).toBe(
       Math.round((quote.materialSubtotal + quote.labourSubtotal) * 100) / 100,
+    );
+  });
+});
+
+/* ── 10. Labour hours use designQty (not totalQty including wastage) ── */
+
+describe("calculateQuote — labour hours exclude wastage", () => {
+  it("labour hours are based on designQty, not totalQty", () => {
+    const bom: BomItem[] = [{ material_id: "pine_48x98_c24", quantity: 100, unit: "jm" }];
+    const config: QuoteConfig = { ...homeownerConfig, wastagePercent: 0.20 };
+    const quote = calculateQuote(bom, allMaterials, config);
+    const line = quote.lines[0];
+
+    // designQty = 100, wastageQty = 100 * 0.20 = 20
+    expect(line.designQty).toBe(100);
+    expect(line.wastageQty).toBe(20);
+
+    // Labour should be on designQty only: 100 * 0.5 = 50 hours
+    // NOT 120 * 0.5 = 60 hours (the old bug)
+    expect(line.labourHours).toBe(50);
+  });
+
+  it("with zero wastage, labour hours equal designQty * rate", () => {
+    const bom: BomItem[] = [{ material_id: "rockwool_50mm", quantity: 40, unit: "m2" }];
+    const config: QuoteConfig = { ...homeownerConfig, wastagePercent: 0 };
+    const quote = calculateQuote(bom, allMaterials, config);
+    // 40 * 0.3 = 12 hours (same either way when wastage is 0)
+    expect(quote.lines[0].labourHours).toBe(12);
+  });
+
+  it("material cost still includes wastage quantity", () => {
+    const bom: BomItem[] = [{ material_id: "pine_48x98_c24", quantity: 100, unit: "jm" }];
+    const config: QuoteConfig = { ...homeownerConfig, wastagePercent: 0.10 };
+    const quote = calculateQuote(bom, allMaterials, config);
+    const line = quote.lines[0];
+
+    // totalQty = 110, materialCost = 110 * 2.60 = 286.00
+    expect(line.materialCost).toBe(286.0);
+    // But labourHours = 100 * 0.5 = 50
+    expect(line.labourHours).toBe(50);
+  });
+});
+
+/* ── 11. Contractor VAT order (Finnish AVL) ──────────────────── */
+
+describe("calculateQuote — contractor VAT order", () => {
+  it("VAT is calculated on (material + labour + margin), not added after margin", () => {
+    const bom: BomItem[] = [{ material_id: "pine_48x98_c24", quantity: 100, unit: "jm" }];
+    const config: QuoteConfig = {
+      mode: "contractor",
+      vatRate: 0.255,
+      labourRatePerHour: 45,
+      wastagePercent: 0.10,
+      contractorMarginPercent: 0.15,
+    };
+    const quote = calculateQuote(bom, allMaterials, config);
+
+    // Step 1: subtotalExVat = materialSubtotal + labourSubtotal
+    // materialCost = 110 * 2.60 = 286.00
+    // labourHours = 100 * 0.5 = 50, labourCost = 50 * 45 = 2250.00
+    // subtotalExVat = 286.00 + 2250.00 = 2536.00
+    expect(quote.subtotalExVat).toBe(2536.0);
+
+    // Step 2: margin on subtotal (before VAT)
+    // margin = 2536.00 * 0.15 = 380.40
+    expect(quote.contractorMargin).toBe(380.4);
+
+    // Step 3: VAT on taxable base (subtotal + margin)
+    // taxableBase = 2536.00 + 380.40 = 2916.40
+    // VAT = 2916.40 * 0.255 = 743.68 (rounded)
+    const expectedVat = Math.round(2916.4 * 0.255 * 100) / 100;
+    expect(quote.vatTotal).toBe(expectedVat);
+
+    // Step 4: grandTotal = taxableBase + VAT
+    expect(quote.grandTotal).toBe(Math.round((2916.4 + expectedVat) * 100) / 100);
+  });
+
+  it("homeowner mode: no margin, VAT on subtotal only", () => {
+    const bom: BomItem[] = [{ material_id: "pine_48x98_c24", quantity: 100, unit: "jm" }];
+    const quote = calculateQuote(bom, allMaterials, homeownerConfig);
+
+    expect(quote.contractorMargin).toBeUndefined();
+    // VAT is on subtotalExVat directly
+    expect(quote.vatTotal).toBe(Math.round(quote.subtotalExVat * 0.255 * 100) / 100);
+    expect(quote.grandTotal).toBe(
+      Math.round((quote.subtotalExVat + quote.vatTotal) * 100) / 100,
     );
   });
 });

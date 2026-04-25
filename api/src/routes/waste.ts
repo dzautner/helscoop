@@ -85,8 +85,14 @@ router.get("/estimate", requireAuth, async (req, res) => {
 
     // Waste weight = quantity * waste_factor_from_material * kgPerUnit
     // The material's waste_factor represents the fraction of material that becomes waste
-    // (e.g. 1.05 means 5% extra is purchased, so 0.05 * quantity becomes waste)
-    const wasteFraction = (row.waste_factor || 1.05) - 1.0;
+    // (e.g. 1.05 means 5% extra is purchased, so 0.05 * quantity becomes waste).
+    // When waste_factor is NULL, use the category-specific default from WASTE_FACTORS
+    // rather than a blanket 5%, because waste rates vary widely by material type
+    // (e.g. insulation 10%, windows 2%, foundation blocks 3%).
+    const materialWasteFactor = row.waste_factor != null
+      ? parseFloat(row.waste_factor)
+      : (factor.defaultWasteFactor ?? 1.05);
+    const wasteFraction = Math.max(0, materialWasteFactor - 1.0);
     const wasteQty = row.quantity * wasteFraction;
     const weightKg = wasteQty * factor.kgPerUnit;
     const volumeM3 = weightKg * factor.volumePerKg;
