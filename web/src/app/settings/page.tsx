@@ -285,7 +285,7 @@ export default function SettingsPage() {
     return (
       <div style={{ minHeight: "100vh" }}>
         {/* Top bar skeleton */}
-        <div className="nav-bar">
+        <nav className="nav-bar" aria-label="Main">
           <div className="nav-inner" style={{ maxWidth: 720 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <SkeletonBlock width={100} height={20} />
@@ -298,8 +298,8 @@ export default function SettingsPage() {
               <SkeletonBlock width={120} height={32} />
             </div>
           </div>
-        </div>
-        <div style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
+        </nav>
+        <main id="main-content" tabIndex={-1} style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
           {/* Title skeleton */}
           <div style={{ marginBottom: 40 }}>
             <SkeletonBlock width={200} height={36} />
@@ -330,7 +330,7 @@ export default function SettingsPage() {
               <Skeleton variant="rect" width={140} height={40} style={{ marginTop: 16 }} />
             </div>
           ))}
-        </div>
+        </main>
       </div>
     );
   }
@@ -338,7 +338,7 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight: "100vh" }}>
       {/* Top bar */}
-      <div className="nav-bar">
+      <nav className="nav-bar" aria-label="Main">
         <div className="nav-inner" style={{ maxWidth: 720 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
@@ -370,9 +370,11 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
-      </div>
+      </nav>
 
-      <div
+      <main
+        id="main-content"
+        tabIndex={-1}
         style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}
       >
         <div className="anim-up" style={{ marginBottom: 40 }}>
@@ -933,7 +935,7 @@ export default function SettingsPage() {
             {t("settings.deleteAccount")}
           </button>
         </div>
-      </div>
+      </main>
 
       <ConfirmDialog
         open={showDeleteConfirm}

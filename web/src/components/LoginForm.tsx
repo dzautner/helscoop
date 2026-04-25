@@ -267,7 +267,7 @@ export default function LoginForm({
 
       {/* Right: Login form */}
       <div className="login-form-panel">
-        <div style={{
+        <nav aria-label="Utility" style={{
           position: "absolute",
           top: 20,
           right: 20,
@@ -277,7 +277,7 @@ export default function LoginForm({
         }}>
           <ThemeToggle />
           <LanguageSwitcher />
-        </div>
+        </nav>
         <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ marginBottom: 32 }}>
             <h2 className="heading-display" style={{ fontSize: 24, marginBottom: 8 }}>

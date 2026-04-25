@@ -226,7 +226,7 @@ export default function ResetPasswordPage() {
   const { t } = useTranslation();
 
   return (
-    <div style={{
+    <main id="main-content" tabIndex={-1} style={{
       minHeight: "100vh",
       display: "flex",
       alignItems: "center",
@@ -234,7 +234,7 @@ export default function ResetPasswordPage() {
       padding: 24,
       background: "var(--bg-primary)",
     }}>
-      <div style={{
+      <nav aria-label="Utility" style={{
         position: "fixed",
         top: 20,
         right: 20,
@@ -244,7 +244,7 @@ export default function ResetPasswordPage() {
       }}>
         <ThemeToggle />
         <LanguageSwitcher />
-      </div>
+      </nav>
 
       <Suspense fallback={
         <div className="anim-up" style={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
@@ -259,6 +259,6 @@ export default function ResetPasswordPage() {
       }>
         <ResetPasswordForm />
       </Suspense>
-    </div>
+    </main>
   );
 }

@@ -682,7 +682,8 @@ export default function AdminPage() {
 
   return (
     <div className="anim-up" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
-      <div
+      <nav
+        aria-label="Main"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -709,8 +710,9 @@ export default function AdminPage() {
             {t('nav.back')}
           </button>
         </div>
-      </div>
+      </nav>
 
+      <main id="main-content" tabIndex={-1}>
       <div role="tablist" style={{ display: "flex", gap: 4, marginBottom: 24 }}>
         {tabs.map((tabItem) => (
           <button
@@ -742,6 +744,7 @@ export default function AdminPage() {
         {tab === "suppliers" && <SuppliersTab />}
         {tab === "pricing" && <PricingTab />}
       </div>
+      </main>
     </div>
   );
 }
