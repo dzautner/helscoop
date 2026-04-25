@@ -3,7 +3,8 @@ import { test, expect, type Page } from "@playwright/test";
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-const TEST_EMAIL = "test@test.com";
+const API_URL = process.env.TEST_API_URL || "http://localhost:3051";
+const TEST_EMAIL = `project-editor-${Date.now()}@test.com`;
 const TEST_PASSWORD = "Test1234!";
 
 /**
@@ -178,43 +179,15 @@ test.describe("Project CRUD and Scene Editor", () => {
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
+    apiUrl = API_URL;
 
-    // Intercept network requests to discover the actual API URL
-    let detectedApiUrl = "";
-    page.on("request", (req) => {
-      const url = req.url();
-      const match = url.match(/^(https?:\/\/[^/]+)\/(auth|projects|templates)/);
-      if (match && !detectedApiUrl) {
-        detectedApiUrl = match[1];
-      }
+    const res = await page.request.post(`${apiUrl}/auth/register`, {
+      data: { email: TEST_EMAIL, password: TEST_PASSWORD, name: "Project Editor E2E" },
     });
-
-    // Login via UI to detect the API URL from network traffic
-    await loginViaUI(page);
-
-    // Use the detected API URL, falling back to env var or common ports
-    apiUrl = detectedApiUrl || process.env.TEST_API_URL || "";
-    if (!apiUrl) {
-      for (const port of [3051, 3002, 3001]) {
-        const check = await page.request
-          .get(`http://localhost:${port}/auth/me`)
-          .catch(() => null);
-        if (check && (check.ok() || check.status() === 401)) {
-          apiUrl = `http://localhost:${port}`;
-          break;
-        }
-      }
-    }
-    if (!apiUrl) {
-      throw new Error("Could not detect API URL");
-    }
-
-    // Get a JWT for direct API calls (project creation, deletion, etc.)
-    const res = await page.request.post(`${apiUrl}/auth/login`, {
-      data: { email: TEST_EMAIL, password: TEST_PASSWORD },
-    });
+    expect(res.ok(), `Register project-editor test user failed: ${res.status()}`).toBeTruthy();
     const body = await res.json();
     token = body.token;
+    expect(token).toBeTruthy();
 
     console.log(`[e2e] Detected API URL: ${apiUrl}`);
     console.log(`[e2e] Token length: ${token.length}`);
@@ -224,10 +197,13 @@ test.describe("Project CRUD and Scene Editor", () => {
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
+    let freshToken = token;
     const res = await page.request.post(`${apiUrl}/auth/login`, {
       data: { email: TEST_EMAIL, password: TEST_PASSWORD },
     });
-    const freshToken = (await res.json()).token || token;
+    if (res.ok()) {
+      freshToken = (await res.json()).token || token;
+    }
     for (const id of cleanup) {
       await deleteProjectViaAPI(page, apiUrl, freshToken, id).catch(() => {});
       await permanentDeleteViaAPI(page, apiUrl, freshToken, id).catch(
@@ -700,7 +676,7 @@ scene.add(b, { material: "lumber", color: [0.8, 0.6, 0.4] });`;
     await sharedPage.waitForTimeout(3000);
 
     await expect(
-      sharedPage.getByText(`E2E SharedView ${suffix}`)
+      sharedPage.getByRole("heading", { name: `E2E SharedView ${suffix}` })
     ).toBeVisible({ timeout: 10_000 });
 
     // Read-only badge
@@ -743,7 +719,7 @@ scene.add(b, { material: "lumber", color: [0.8, 0.6, 0.4] });`;
 
     // Project name visible
     await expect(
-      sharedPage.getByText(`E2E NoEditor ${suffix}`)
+      sharedPage.getByRole("heading", { name: `E2E NoEditor ${suffix}` })
     ).toBeVisible({ timeout: 10_000 });
 
     // Either canvas or crash fallback visible

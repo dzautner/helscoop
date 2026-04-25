@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI } from "./helpers";
+import { registerUser, loginViaUI, mainViewportCanvas, readObjectCount } from "./helpers";
+
+const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
 test.describe("Templates", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -11,7 +13,7 @@ test.describe("Templates", () => {
   });
 
   test("API returns all templates with valid scene_js", async ({ page }) => {
-    const res = await page.request.get("http://localhost:3001/templates");
+    const res = await page.request.get(`${API_URL}/templates`);
     expect(res.status()).toBe(200);
     const templates = await res.json();
     expect(templates.length).toBeGreaterThanOrEqual(4);
@@ -27,17 +29,19 @@ test.describe("Templates", () => {
   test("each template scene renders correctly in viewport", async ({
     page,
   }) => {
+    test.setTimeout(180_000);
+
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
 
     // Get templates
-    const res = await page.request.get("http://localhost:3001/templates");
+    const res = await page.request.get(`${API_URL}/templates`);
     const templates = await res.json();
 
     for (const tpl of templates) {
       // Create project from template
       const projRes = await page.request.post(
-        "http://localhost:3001/projects",
+        `${API_URL}/projects`,
         {
           headers: { Authorization: `Bearer ${user.token}` },
           data: {
@@ -48,20 +52,13 @@ test.describe("Templates", () => {
       );
       const project = await projRes.json();
 
-      await page.goto(`/project/${project.id}`);
+      await page.goto(`/project/${project.id}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await page.waitForTimeout(2000);
-      const canvas = page.locator("canvas");
+      const canvas = mainViewportCanvas(page);
       await expect(canvas).toBeVisible({ timeout: 15_000 });
 
       // Verify objects rendered
-      await expect(
-        page.getByText(/\d+\s*(objects|objektia)/i)
-      ).toBeVisible({ timeout: 10_000 });
-
-      const countText = await page
-        .getByText(/\d+\s*(objects|objektia)/i)
-        .textContent();
-      const count = parseInt(countText?.match(/(\d+)/)?.[1] || "0");
+      const count = await readObjectCount(page, 15_000);
       expect(count).toBeGreaterThan(0);
 
       await page.screenshot({

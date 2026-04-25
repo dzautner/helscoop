@@ -201,6 +201,32 @@ const VIEWPORT_KEY_ZOOM_OUT = 1.12;
 const AIRFLOW_COLD = new THREE.Color(0x58c7ff);
 const AIRFLOW_MIXED = new THREE.Color(0xddefff);
 const AIRFLOW_WARM = new THREE.Color(0xffa64d);
+const FALLBACK_MESH_COLOR: [number, number, number] = [0.8, 0.8, 0.8];
+
+function normalizeColorChannel(value: unknown, fallback: number): number {
+  const channel = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.min(1, Math.max(0, channel));
+}
+
+function normalizeRgbColor(
+  value: unknown,
+  fallback: [number, number, number] = FALLBACK_MESH_COLOR,
+): [number, number, number] {
+  const source = Array.isArray(value) ? value : fallback;
+  return [
+    normalizeColorChannel(source[0], fallback[0]),
+    normalizeColorChannel(source[1], fallback[1]),
+    normalizeColorChannel(source[2], fallback[2]),
+  ];
+}
+
+function setMaterialColor(material: THREE.MeshStandardMaterial, color: [number, number, number]): void {
+  material.color?.setRGB?.(color[0], color[1], color[2]);
+}
+
+function setMaterialEmissive(material: THREE.MeshStandardMaterial, color: [number, number, number]): void {
+  material.emissive?.setRGB?.(color[0], color[1], color[2]);
+}
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" &&
@@ -215,8 +241,9 @@ function updateMaterialColorTransitions(group: THREE.Group | null) {
   group.traverse((child) => {
     if (!(child instanceof THREE.Mesh) || !(child.material instanceof THREE.MeshStandardMaterial)) return;
     const targetColor = child.material.userData.targetColor as [number, number, number] | undefined;
-    if (!targetColor) return;
-    target.setRGB(targetColor[0], targetColor[1], targetColor[2]);
+    if (!Array.isArray(targetColor)) return;
+    const rgb = normalizeRgbColor(targetColor);
+    target.setRGB(rgb[0], rgb[1], rgb[2]);
     const dr = child.material.color.r - target.r;
     const dg = child.material.color.g - target.g;
     const db = child.material.color.b - target.b;
@@ -540,6 +567,7 @@ function addSingleTessellatedMesh(
   tess: TessellatedObject,
   wireframe: boolean
 ): void {
+  const color = normalizeRgbColor(tess.color);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(tess.positions, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(tess.normals, 3));
@@ -547,7 +575,7 @@ function addSingleTessellatedMesh(
 
   const pbr = getMaterialPBR(tess.material);
   const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(tess.color[0], tess.color[1], tess.color[2]),
+    color: new THREE.Color(color[0], color[1], color[2]),
     roughness: pbr.roughness,
     metalness: pbr.metalness,
     wireframe,
@@ -557,7 +585,7 @@ function addSingleTessellatedMesh(
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData.materialId = tess.material;
   mesh.userData.objectId = tess.objectId;
-  mesh.userData.baseColor = tess.color;
+  mesh.userData.baseColor = color;
   mesh.userData.baseOpacity = pbr.opacity ?? 1;
   mesh.userData.baseTransparent = Boolean(pbr.transparent);
   mesh.castShadow = true;
@@ -581,7 +609,7 @@ function buildRenderedLayerSeeds(meshes: TessellatedObject[]): LayerSeed[] {
     meshes.map((mesh) => ({
       objectId: mesh.objectId,
       materialId: mesh.material,
-      color: mesh.color,
+      color: normalizeRgbColor(mesh.color),
     })),
   );
 }
@@ -1929,9 +1957,7 @@ export default function Viewport3D({
       const mat = child.material;
       const materialId = child.userData.materialId as string | undefined;
       const objectId = child.userData.objectId as string | undefined;
-      const baseColor = Array.isArray(child.userData.baseColor)
-        ? child.userData.baseColor as [number, number, number]
-        : [1, 1, 1] as [number, number, number];
+      const baseColor = normalizeRgbColor(child.userData.baseColor, [1, 1, 1]);
       const baseOpacity = typeof child.userData.baseOpacity === "number" ? child.userData.baseOpacity : 1;
       const baseTransparent = Boolean(child.userData.baseTransparent);
       const thermalRgb = thermalView && materialId ? thermalColorMap?.get(materialId) : undefined;
@@ -1968,7 +1994,7 @@ export default function Viewport3D({
       mat.opacity = opacity;
       mat.userData.targetColor = color;
       if (!mat.userData.hasColorTransitionTarget || prefersReducedMotion()) {
-        mat.color.setRGB(color[0], color[1], color[2]);
+        setMaterialColor(mat, color);
         mat.userData.hasColorTransitionTarget = true;
       }
 
@@ -1976,13 +2002,13 @@ export default function Viewport3D({
         ? [thermalRgb[0] * 0.15, thermalRgb[1] * 0.15, thermalRgb[2] * 0.15]
         : [0, 0, 0];
       if (isSelected || isAssemblyCurrent) {
-        mat.emissive.setRGB(
+        setMaterialEmissive(mat, [
           Math.min(1, emissiveBase[0] + 0.45),
           Math.min(1, emissiveBase[1] + 0.24),
           Math.min(1, emissiveBase[2] + 0.06),
-        );
+        ]);
       } else {
-        mat.emissive.setRGB(emissiveBase[0], emissiveBase[1], emissiveBase[2]);
+        setMaterialEmissive(mat, emissiveBase);
       }
       mat.needsUpdate = true;
     });

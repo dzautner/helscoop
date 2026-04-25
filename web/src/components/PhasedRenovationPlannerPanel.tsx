@@ -300,6 +300,8 @@ export default function PhasedRenovationPlannerPanel({
       </p>
 
       <div
+        role="region"
+        tabIndex={0}
         aria-label={copy.timeline}
         style={{
           marginTop: 13,

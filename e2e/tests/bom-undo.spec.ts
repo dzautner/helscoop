@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { registerUser, loginViaUI, createProjectViaAPI, saveBomViaAPI } from "./helpers";
 
+const framingMaterialPattern = /48\s*x?\s*98|framing timber|runkopuu/i;
+const osbMaterialPattern = /osb.*9\s*mm/i;
+
 test.describe("BOM item removal — undo toast flow", () => {
   let user: { email: string; password: string; name: string; token: string };
 
@@ -38,9 +41,11 @@ test.describe("BOM item removal — undo toast flow", () => {
     }
 
     // Verify both BOM items are present
-    const pineRow = page.getByText(/pine.*48.*98|mänty.*48.*98/i).first();
-    const osbRow = page.getByText(/osb.*9.*mm/i).first();
-    await expect(pineRow).toBeVisible({ timeout: 5_000 });
+    const framingRow = page.locator(".bom-item-card").filter({ hasText: framingMaterialPattern }).first();
+    const osbRow = page.locator(".bom-item-card").filter({ hasText: osbMaterialPattern }).first();
+    await framingRow.scrollIntoViewIfNeeded();
+    await expect(framingRow).toBeVisible({ timeout: 5_000 });
+    await osbRow.scrollIntoViewIfNeeded();
     await expect(osbRow).toBeVisible({ timeout: 5_000 });
 
     // Remove the pine item by clicking its remove button
@@ -49,7 +54,7 @@ test.describe("BOM item removal — undo toast flow", () => {
     await removeBtn.click();
 
     // Confirm removal dialog if present
-    const confirmBtn = page.locator('button').filter({ hasText: /poista|remove|kyllä|yes|vahvista|confirm/i });
+    const confirmBtn = page.locator('button').filter({ hasText: /delete|poista|remove|radera|kyllä|yes|vahvista|confirm/i });
     if (await confirmBtn.first().isVisible({ timeout: 1_500 }).catch(() => false)) {
       await confirmBtn.first().click();
     }
@@ -63,8 +68,8 @@ test.describe("BOM item removal — undo toast flow", () => {
     await page.waitForTimeout(500);
 
     // Verify the item is restored — both items should be visible again
-    await expect(page.getByText(/pine.*48.*98|mänty.*48.*98/i).first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(/osb.*9.*mm/i).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator(".bom-item-card").filter({ hasText: framingMaterialPattern }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator(".bom-item-card").filter({ hasText: osbMaterialPattern }).first()).toBeVisible({ timeout: 5_000 });
   });
 
   test("remove BOM item without undo permanently removes it", async ({ page }) => {
@@ -94,8 +99,9 @@ test.describe("BOM item removal — undo toast flow", () => {
     }
 
     // Verify item exists
-    const pineRow = page.getByText(/pine.*48.*98|mänty.*48.*98/i).first();
-    await expect(pineRow).toBeVisible({ timeout: 5_000 });
+    const framingRow = page.locator(".bom-item-card").filter({ hasText: framingMaterialPattern }).first();
+    await framingRow.scrollIntoViewIfNeeded();
+    await expect(framingRow).toBeVisible({ timeout: 5_000 });
 
     // Remove item
     const removeBtn = page.locator('button.bom-remove-btn, button[aria-label*="poista" i], button[aria-label*="remove" i]').first();
@@ -103,7 +109,7 @@ test.describe("BOM item removal — undo toast flow", () => {
     await removeBtn.click();
 
     // Confirm removal dialog if present
-    const confirmBtn = page.locator('button').filter({ hasText: /poista|remove|kyllä|yes|vahvista|confirm/i });
+    const confirmBtn = page.locator('button').filter({ hasText: /delete|poista|remove|radera|kyllä|yes|vahvista|confirm/i });
     if (await confirmBtn.first().isVisible({ timeout: 1_500 }).catch(() => false)) {
       await confirmBtn.first().click();
     }
@@ -115,7 +121,7 @@ test.describe("BOM item removal — undo toast flow", () => {
     // Wait for toast to disappear
     await page.waitForTimeout(6_000);
 
-    // Verify item is gone — BOM should be empty or not show pine
-    await expect(page.getByText(/pine.*48.*98|mänty.*48.*98/i).first()).not.toBeVisible({ timeout: 3_000 });
+    // Verify item is gone — BOM should be empty or not show the framing row.
+    await expect(page.locator(".bom-item-card").filter({ hasText: framingMaterialPattern }).first()).not.toBeVisible({ timeout: 3_000 });
   });
 });

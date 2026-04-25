@@ -1067,6 +1067,7 @@ function PriceComparisonPopup({
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span
+                          role="img"
                           title={priceStockTooltip}
                           aria-label={priceStockTooltip}
                           style={{
@@ -1599,7 +1600,7 @@ function BomItemCard({
       ref={cardRef}
       className={`bom-item-card${isFocused ? ' bom-item-focused' : ''}${isDragTarget ? ' bom-drag-target' : ''}`}
       tabIndex={0}
-      role="row"
+      role="listitem"
       aria-label={t('editor.bomItemRow', { name: materialName, qty: localQty, total: Number(item.total || 0).toFixed(2) })}
       data-bom-index={index}
       draggable={!!onDragStart}
@@ -1732,6 +1733,7 @@ function BomItemCard({
           )}
         </span>
         <span
+          role="img"
           title={stockTooltipText}
           aria-label={stockTooltipText}
           style={{
@@ -2467,6 +2469,7 @@ export default function BomPanel({
   return (
     <div
       className="editor-bom-panel panel-glow"
+      data-testid="bom-panel"
       data-panel="bom"
       data-tour="bom-panel"
       style={{ position: "relative", ...style }}
@@ -3125,7 +3128,7 @@ export default function BomPanel({
         </div>
       )}
 
-      <div className="bom-list" role="grid" aria-label={t('editor.materialList')}>
+      <div className="bom-list" role="list" aria-label={t('editor.materialList')}>
         {bom.length === 0 ? (
           <div className="bom-empty anim-up">
             <div className="bom-empty-icon">
@@ -3602,6 +3605,7 @@ export default function BomPanel({
                     </div>
                     {price ? (
                       <span
+                        role="img"
                         title={priceStockTooltip}
                         aria-label={priceStockTooltip}
                         style={{

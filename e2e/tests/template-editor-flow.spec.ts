@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, dismissOnboarding } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, readObjectCount, expectMainViewportVisible } from "./helpers";
 
 test.describe("Template → Editor → Save → Reload", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -14,29 +14,24 @@ test.describe("Template → Editor → Save → Reload", () => {
     await loginViaUI(page, user.email, user.password);
     await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
 
-    // Step 1: Navigate to templates and pick one
-    const templateCard = page.locator('[data-testid="template-card"], [class*="template"]').first();
-    if (await templateCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await templateCard.click();
-    } else {
-      const templateLink = page.getByText(/mallit|templates|pihasauna|autotalli|varasto/i).first();
-      await templateLink.click();
-    }
-
+    // Step 1: Create a project from a real template via API, then open it.
+    const templatesRes = await page.request.get(`${process.env.TEST_API_URL || "http://localhost:3001"}/templates`);
+    const templates = await templatesRes.json();
+    const template = templates.find((item: { scene_js?: string }) => Boolean(item.scene_js)) ?? templates[0];
+    const projectId = await createProjectViaAPI(page, user.token, {
+      name: `Template: ${template.name}`,
+      scene_js: template.scene_js,
+    });
+    await page.goto(`/project/${projectId}`);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
 
     // Step 2: Verify 3D viewport renders
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Step 3: Verify objects rendered
-    const objectCountText = page.getByText(/[1-9]\d*\s*(objects|objektia)/i);
-    let objectCount = 0;
-    if (await objectCountText.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      const countText = await objectCountText.textContent();
-      objectCount = parseInt(countText?.match(/(\d+)/)?.[1] || "0");
-      expect(objectCount).toBeGreaterThanOrEqual(1);
-    }
+    const objectCount = await readObjectCount(page);
+    expect(objectCount).toBeGreaterThanOrEqual(1);
 
     // Step 4: Verify BOM items populated from template
     const bomText = page.getByText(/materiaalilista|material list|arvioitu|estimated/i).first();
@@ -68,16 +63,12 @@ test.describe("Template → Editor → Save → Reload", () => {
     await page.waitForTimeout(2000);
 
     // Step 9: Verify the edit persisted — canvas still renders
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Object count should be at least what it was before (we added one)
     if (objectCount > 0) {
-      const newCountText = page.getByText(/[1-9]\d*\s*(objects|objektia)/i);
-      if (await newCountText.isVisible({ timeout: 10_000 }).catch(() => false)) {
-        const text = await newCountText.textContent();
-        const newCount = parseInt(text?.match(/(\d+)/)?.[1] || "0");
-        expect(newCount).toBeGreaterThanOrEqual(objectCount);
-      }
+      const newCount = await readObjectCount(page);
+      expect(newCount).toBeGreaterThanOrEqual(objectCount);
     }
 
     await page.screenshot({ path: "test-results/template-editor-flow.png" });

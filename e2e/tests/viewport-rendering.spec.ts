@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI } from "./helpers";
+import { registerUser, loginViaUI, expectMainViewportVisible, mainViewportCanvas, expectObjectCount, readObjectCount } from "./helpers";
 
 const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
@@ -30,12 +30,10 @@ test.describe("3D Viewport Rendering", () => {
 
     await page.goto(`/project/${project.id}`);
     await page.waitForTimeout(2000);
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByText(/1\s*(objects|objektia)/i)).toBeVisible({
-      timeout: 5000,
-    });
+    await expectObjectCount(page, 1, 5000);
 
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox!.width).toBeGreaterThan(200);
@@ -72,11 +70,9 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
 
     await page.goto(`/project/${project.id}`);
     await page.waitForTimeout(2000);
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
-    await expect(page.getByText(/7\s*(objects|objektia)/i)).toBeVisible({
-      timeout: 10_000,
-    });
+    await expectObjectCount(page, 7);
 
     await page.screenshot({ path: "test-results/viewport-sauna.png" });
   });
@@ -104,15 +100,9 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
 
     await page.goto(`/project/${project.id}`);
     await page.waitForTimeout(2000);
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
-    await expect(
-      page.getByText(/[1-9]\d*\s*(objects|objektia)/i)
-    ).toBeVisible({ timeout: 15_000 });
-    const countText = await page
-      .getByText(/[1-9]\d*\s*(objects|objektia)/i)
-      .textContent();
-    const count = parseInt(countText?.match(/(\d+)/)?.[1] || "0");
+    const count = await readObjectCount(page, 15_000);
     expect(count).toBeGreaterThanOrEqual(10);
 
     await page.screenshot({
@@ -136,7 +126,7 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
 
     await page.goto(`/project/${project.id}`);
     await page.waitForTimeout(2000);
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     await page.screenshot({ path: "test-results/viewport-solid.png" });
 

@@ -1,10 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const API_PORT = 3051;
-const WEB_PORT = 3052;
+function readPort(name: string, fallback: number) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+  return Number.isInteger(value) && value > 0 && value < 65536 ? value : fallback;
+}
+
+const API_PORT = readPort("E2E_API_PORT", 3051);
+const WEB_PORT = readPort("E2E_WEB_PORT", 3052);
 const DEFAULT_E2E_DATABASE_URL = "postgres://helscoop:helscoop_dev@localhost:5433/helscoop";
 
 process.env.TEST_API_URL ??= `http://localhost:${API_PORT}`;
+process.env.TEST_WEB_URL ??= `http://localhost:${WEB_PORT}`;
 process.env.E2E_DATABASE_URL ??= DEFAULT_E2E_DATABASE_URL;
 
 export default defineConfig({
@@ -17,7 +23,7 @@ export default defineConfig({
   timeout: 60_000,
 
   use: {
-    baseURL: `http://localhost:${WEB_PORT}`,
+    baseURL: process.env.TEST_WEB_URL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -55,7 +61,7 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         ...process.env,
-        NEXT_PUBLIC_API_URL: `http://localhost:${API_PORT}`,
+        NEXT_PUBLIC_API_URL: process.env.TEST_API_URL,
       },
     },
   ],

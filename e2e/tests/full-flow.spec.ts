@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { apiUrl, loginViaUI } from "./helpers";
+import { apiUrl, loginViaUI, expectMainViewportVisible, expectObjectCount } from "./helpers";
 
 test.describe("Full User Flows", () => {
   test.describe.configure({ mode: "serial" });
@@ -116,8 +116,8 @@ scene.add(roof_r, { material: "roofing", color: [0.3, 0.35, 0.28] });`,
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(5000);
 
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/6\s*(objects|objektia)/i)).toBeVisible({ timeout: 10_000 });
+    await expectMainViewportVisible(page);
+    await expectObjectCount(page, 6);
     await expect(page.locator('input[value="Kanala Test"]')).toBeVisible({ timeout: 5000 });
   });
 
@@ -127,7 +127,7 @@ scene.add(roof_r, { material: "roofing", color: [0.3, 0.35, 0.28] });`,
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(5000);
 
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
     await expect(page.locator(".chat-input")).toBeVisible({ timeout: 5000 });
   });
 
@@ -137,7 +137,7 @@ scene.add(roof_r, { material: "roofing", color: [0.3, 0.35, 0.28] });`,
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(5000);
 
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
     const nameInput = page.locator('input[value="Kanala Test"]');
     await expect(nameInput).toBeVisible({ timeout: 5000 });
     await nameInput.fill("Kanala Updated");
@@ -189,7 +189,8 @@ scene.add(roof_r, { material: "roofing", color: [0.3, 0.35, 0.28] });`,
     const kanala = templates.find((t: { id: string }) => t.id === "kanala");
     expect(kanala).toBeTruthy();
     expect(kanala.name).toContain("Kanala");
-    expect(kanala.scene_js).toContain("Chicken Coop");
+    expect(kanala.scene_js).toContain("Kanala");
+    expect(kanala.scene_js).toContain("scene.add(");
   });
 
   test("delete project removes it", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI } from "./helpers";
+import { registerUser, loginViaUI, expectMainViewportVisible } from "./helpers";
 
 const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
@@ -67,7 +67,7 @@ test.describe("BOM Panel", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // BOM should be visible initially
     const bomPanel = page.getByText(/materiaalilista|material list/i).first();

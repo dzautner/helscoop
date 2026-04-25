@@ -8,9 +8,6 @@ const API_URL = process.env.TEST_API_URL || "http://localhost:3051";
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const TEST_EMAIL = "test@test.com";
-const TEST_PASSWORD = "Test1234!";
-
 /** Register a fresh user via API and return credentials + token */
 async function registerFreshUser(
   request: APIRequestContext,
@@ -37,9 +34,11 @@ test.describe("API endpoint smoke tests", () => {
   let token: string;
   let projectId: string;
   let request: APIRequestContext;
+  let user: { email: string; password: string; token: string };
 
   test.beforeAll(async ({ playwright }) => {
     request = await playwright.request.newContext({ baseURL: API_URL });
+    user = await registerFreshUser(request, `smoke-${Date.now()}`);
   });
 
   test.afterAll(async () => {
@@ -61,7 +60,7 @@ test.describe("API endpoint smoke tests", () => {
   // 2. POST /auth/login valid -> 200, returns token
   test("2. POST /auth/login with valid creds returns 200 and token", async () => {
     const res = await request.post("/auth/login", {
-      data: { email: TEST_EMAIL, password: TEST_PASSWORD },
+      data: { email: user.email, password: user.password },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();
@@ -74,7 +73,7 @@ test.describe("API endpoint smoke tests", () => {
   // 3. POST /auth/login wrong password -> 401
   test("3. POST /auth/login with wrong password returns 401", async () => {
     const res = await request.post("/auth/login", {
-      data: { email: TEST_EMAIL, password: "wrongpassword" },
+      data: { email: user.email, password: "wrongpassword" },
     });
     expect(res.status()).toBe(401);
   });
@@ -238,9 +237,19 @@ test.describe("Auth edge cases", () => {
 
   // 15. Register with existing email -> error
   test("15. Register with existing email returns 409 conflict", async () => {
+    const email = `duplicate-${Date.now()}@test.com`;
+    const first = await request.post("/auth/register", {
+      data: {
+        email,
+        password: "testpass123",
+        name: "Duplicate Baseline User",
+      },
+    });
+    expect([200, 201]).toContain(first.status());
+
     const res = await request.post("/auth/register", {
       data: {
-        email: "test@test.com",
+        email,
         password: "testpass123",
         name: "Duplicate User",
       },

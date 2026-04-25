@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, apiUrl } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, apiUrl, expectMainViewportVisible, mainViewportCanvas } from "./helpers";
 
 test.describe("Shared project viewer flow", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -22,7 +22,7 @@ test.describe("Shared project viewer flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // 2. Click share button
     const shareBtn = page.locator('button[aria-label*="jaa" i], button[aria-label*="share" i]');
@@ -39,7 +39,7 @@ test.describe("Shared project viewer flow", () => {
     expect(shareUrl).toMatch(/\/shared\/[a-f0-9-]+/);
 
     // 4. Copy link button is present
-    const copyBtn = dialog.getByRole("button", { name: /kopioi|copy/i });
+    const copyBtn = dialog.getByRole("button", { name: /^(kopioi linkki|copy link)$/i });
     await expect(copyBtn).toBeVisible();
     await copyBtn.click();
     await page.waitForTimeout(500);
@@ -72,7 +72,7 @@ test.describe("Shared project viewer flow", () => {
     await expect(ctaLink.first()).toBeVisible({ timeout: 5_000 });
 
     // 8. Verify project name is visible
-    await expect(anonPage.getByText("Share Flow Test")).toBeVisible({ timeout: 5_000 });
+    await expect(anonPage.getByRole("heading", { name: "Share Flow Test" })).toBeVisible({ timeout: 5_000 });
 
     await anonPage.screenshot({ path: "test-results/share-anonymous-view.png" });
     await anonPage.close();
@@ -120,7 +120,7 @@ test.describe("Shared project viewer flow", () => {
     await anonPage.waitForTimeout(3000);
 
     // Verify 3D canvas renders
-    const canvas = anonPage.locator("canvas");
+    const canvas = mainViewportCanvas(anonPage);
     if (await canvas.isVisible({ timeout: 10_000 }).catch(() => false)) {
       const box = await canvas.boundingBox();
       expect(box).toBeTruthy();

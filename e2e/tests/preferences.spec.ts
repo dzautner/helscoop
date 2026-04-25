@@ -108,8 +108,8 @@ test.describe("Language switcher persistence", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
-    const finnishText = await page.getByText(/kirjaudu/i).isVisible({ timeout: 3000 }).catch(() => false);
-    expect(finnishText).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe("fi");
+    await expect.poll(() => page.locator("body").innerText()).toMatch(/Parametrinen|HAE OSOITTEELLA/);
 
     await page.evaluate(() => {
       localStorage.setItem("helscoop_locale", "en");
@@ -118,8 +118,8 @@ test.describe("Language switcher persistence", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
-    const englishText = await page.getByText(/sign in|log in/i).isVisible({ timeout: 3000 }).catch(() => false);
-    expect(englishText).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe("en");
+    await expect.poll(() => page.locator("body").innerText()).toMatch(/Parametric|SEARCH BY ADDRESS/);
   });
 });
 

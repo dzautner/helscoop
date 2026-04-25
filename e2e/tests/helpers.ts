@@ -1,4 +1,4 @@
-import { type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
@@ -127,8 +127,31 @@ export function apiUrl(path: string): string {
   return `${API_URL}${path}`;
 }
 
+export function mainViewportCanvas(page: Page): Locator {
+  return page.locator('canvas[data-engine^="three.js"][aria-hidden="true"]');
+}
+
+export async function expectMainViewportVisible(page: Page, timeout = 15_000): Promise<void> {
+  await expect(mainViewportCanvas(page)).toBeVisible({ timeout });
+}
+
+export function objectCountStatus(page: Page, pattern: RegExp = /[1-9]\d*\s*(objects|objektia)/i): Locator {
+  return page.locator(".viewport-status, .editor-status-segment").filter({ hasText: pattern }).first();
+}
+
+export async function expectObjectCount(page: Page, count: number, timeout = 10_000): Promise<void> {
+  await expect(objectCountStatus(page, new RegExp(`${count}\\s*(objects|objektia)`, "i"))).toBeVisible({ timeout });
+}
+
+export async function readObjectCount(page: Page, timeout = 10_000): Promise<number> {
+  const status = objectCountStatus(page);
+  await expect(status).toBeVisible({ timeout });
+  const text = await status.textContent();
+  return parseInt(text?.match(/(\d+)/)?.[1] || "0", 10);
+}
+
 export async function dismissOnboarding(page: Page): Promise<void> {
-  const skipBtn = page.getByText(/ohita|skip/i).first();
+  const skipBtn = page.getByRole("button", { name: /ohita|skip/i }).first();
   if (await skipBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await skipBtn.click();
     await page.waitForTimeout(300);

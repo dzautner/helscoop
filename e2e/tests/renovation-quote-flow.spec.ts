@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, saveBomViaAPI, apiUrl } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, saveBomViaAPI, apiUrl, expectMainViewportVisible } from "./helpers";
 
 test.describe("Complete renovation quote flow", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -15,7 +15,7 @@ test.describe("Complete renovation quote flow", () => {
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
 
     // 1. Enter a Finnish address in the address search
-    const addressInput = page.locator('[data-tour="address-input"] input');
+    const addressInput = page.locator('[data-tour="address-input"] input').first();
     if (await addressInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await addressInput.fill("Ribbingintie 109");
       await page.waitForTimeout(500);
@@ -40,14 +40,14 @@ test.describe("Complete renovation quote flow", () => {
           await expect(page).toHaveURL(/\/project\//, { timeout: 15_000 });
 
           // 4. Verify 3D scene renders
-          await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+          await expectMainViewportVisible(page);
 
           // 5. Verify BOM panel has items
-          const bomGrid = page.locator('[role="grid"]');
-          if (await bomGrid.isVisible({ timeout: 10_000 }).catch(() => false)) {
-            const bomRows = bomGrid.locator('[role="row"]');
-            const rowCount = await bomRows.count().catch(() => 0);
-            expect(rowCount).toBeGreaterThan(0);
+          const bomList = page.locator('[role="list"][aria-label*="Material"], [role="list"][aria-label*="Materiaali"]');
+          if (await bomList.isVisible({ timeout: 10_000 }).catch(() => false)) {
+            const bomItems = bomList.locator('[role="listitem"]');
+            const itemCount = await bomItems.count().catch(() => 0);
+            expect(itemCount).toBeGreaterThan(0);
           }
 
           await page.screenshot({ path: "test-results/reno-flow-project.png" });
@@ -65,8 +65,7 @@ test.describe("Complete renovation quote flow", () => {
       scene_js: 'scene.add(box(6,0.2,4), {material:"foundation"});',
     });
     await saveBomViaAPI(page, user.token, projectId, [
-      { material_id: "lumber_48x98", quantity: 50, unit: "jm" },
-      { material_id: "concrete_c25", quantity: 5, unit: "m3" },
+      { material_id: "pine_48x98_c24", quantity: 50, unit: "jm" },
     ]);
 
     await loginViaUI(page, user.email, user.password);
@@ -74,17 +73,19 @@ test.describe("Complete renovation quote flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
-    // Find a quantity input and change it
-    const qtyInput = page.locator('input[type="number"]').first();
+    // Find the BOM row quantity input and change it.
+    const bomRow = page.locator(".bom-item-card").first();
+    await bomRow.scrollIntoViewIfNeeded();
+    const qtyInput = bomRow.locator(".bom-item-qty-input");
     if (await qtyInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const totalBefore = await page.getByText(/yhteensä|total/i).first().textContent().catch(() => "");
+      const totalBefore = await bomRow.locator(".bom-item-total").textContent().catch(() => "");
       await qtyInput.fill("100");
       await qtyInput.press("Tab");
-      await page.waitForTimeout(1500);
+      await expect(qtyInput).toHaveValue("100", { timeout: 5_000 });
 
-      const totalAfter = await page.getByText(/yhteensä|total/i).first().textContent().catch(() => "");
+      const totalAfter = await bomRow.locator(".bom-item-total").textContent().catch(() => "");
       if (totalBefore && totalAfter) {
         expect(totalAfter).not.toBe(totalBefore);
       }
@@ -107,7 +108,7 @@ test.describe("Complete renovation quote flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Open export menu
     const exportBtn = page.locator('[data-tour="export-btn"] button').first();
@@ -144,7 +145,7 @@ test.describe("Complete renovation quote flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Try the BOM panel CSV button
     const bomCsvBtn = page.locator('button[aria-label*="csv" i], button[aria-label*="lataa" i]').first();
@@ -188,7 +189,7 @@ test.describe("Complete renovation quote flow", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForTimeout(2000);
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("canvas")).toBeVisible({ timeout: 15_000 });
+    await expectMainViewportVisible(page);
 
     // Check for empty state
     const emptyState = page.locator('.bom-empty, [class*="bom-empty"]');

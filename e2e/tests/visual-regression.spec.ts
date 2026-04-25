@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, apiUrl } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, mainViewportCanvas } from "./helpers";
 
 test.describe("3D Viewport — Visual Regression", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -22,7 +22,7 @@ test.describe("3D Viewport — Visual Regression", () => {
     await page.waitForTimeout(3000);
     await page.waitForLoadState("networkidle");
 
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
 
     const box = await canvas.boundingBox();
@@ -66,7 +66,7 @@ scene.add(wall4, { material: "lumber" });
     await page.waitForTimeout(4000);
     await page.waitForLoadState("networkidle");
 
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: "test-results/vr-complex-scene.png" });
     await expect(canvas).toHaveScreenshot("complex-scene.png", {
@@ -87,7 +87,7 @@ scene.add(wall4, { material: "lumber" });
     await page.waitForTimeout(3000);
     await page.waitForLoadState("networkidle");
 
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
 
     // Take solid-mode baseline
@@ -121,7 +121,7 @@ scene.add(wall4, { material: "lumber" });
     await page.waitForTimeout(3000);
     await page.waitForLoadState("networkidle");
 
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
 
     // Take default angle baseline
@@ -159,7 +159,7 @@ scene.add(result, { material: "lumber" });
     await page.waitForTimeout(4000);
     await page.waitForLoadState("networkidle");
 
-    const canvas = page.locator("canvas");
+    const canvas = mainViewportCanvas(page);
     await expect(canvas).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: "test-results/vr-boolean-ops.png" });
     await expect(canvas).toHaveScreenshot("boolean-scene.png", {
