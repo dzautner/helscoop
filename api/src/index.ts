@@ -48,6 +48,8 @@ import { sendEmail } from "./email";
 import { hashViewerIp, logProjectView } from "./notifications";
 import { installCollaborationServer } from "./collaboration";
 import { assertProductionSecrets, getJwtSecret } from "./secrets";
+import { clearAuthCookie, getAuthTokenFromRequest, setAuthCookie } from "./session-cookie";
+import { configuredCorsOrigins, rejectCrossOriginCookieAuth } from "./csrf";
 
 // ---------------------------------------------------------------------------
 // Sentry — initialize before anything else so it can instrument the app
@@ -69,6 +71,8 @@ const IS_TEST = process.env.NODE_ENV === "test";
 const IS_E2E = process.env.E2E === "1";
 const startedAt = Date.now();
 const IS_DEV = process.env.NODE_ENV === "development";
+const DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://localhost:3002", "http://localhost:3052"];
+const ALLOWED_CORS_ORIGINS = configuredCorsOrigins(process.env.CORS_ORIGIN, DEFAULT_CORS_ORIGINS);
 
 // Security headers
 app.use(helmet());
@@ -76,14 +80,13 @@ app.use(helmet());
 // CORS configuration
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(",")
-      : ["http://localhost:3000", "http://localhost:3002", "http://localhost:3052"],
+    origin: ALLOWED_CORS_ORIGINS,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+app.use(rejectCrossOriginCookieAuth(ALLOWED_CORS_ORIGINS));
 
 // Stripe sends signed webhook payloads; this route must receive the raw body
 // before the JSON parser mutates it.
@@ -115,10 +118,10 @@ app.use((req, _res, next) => {
 
 // Try to extract user ID from JWT for rate-limit keying (does NOT enforce auth)
 function extractUserId(req: express.Request): string | null {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return null;
+  const token = getAuthTokenFromRequest(req);
+  if (!token) return null;
   try {
-    const decoded = jwt.verify(header.slice(7), getJwtSecret()) as AuthUser;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
     return decoded.id || null;
   } catch {
     return null;
@@ -364,6 +367,13 @@ function publicGalleryWhere(): string[] {
   ];
 }
 
+function sendAuthSession(res: express.Response, user: AuthUser, status = 200) {
+  const token = signToken(user);
+  const expiresAt = tokenExpiresAt();
+  setAuthCookie(res, token, expiresAt);
+  return res.status(status).json({ token, token_expires_at: expiresAt, user });
+}
+
 app.post("/auth/login", authLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -374,7 +384,7 @@ app.post("/auth/login", authLimiter, async (req, res) => {
   }
   const user = await login(email, password);
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
-  res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
+  sendAuthSession(res, user);
 });
 
 app.post("/auth/register", authLimiter, async (req, res) => {
@@ -394,7 +404,7 @@ app.post("/auth/register", authLimiter, async (req, res) => {
   const sanitizedName = sanitize(name);
   try {
     const user = await register(email, password, sanitizedName);
-    res.status(201).json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
+    sendAuthSession(res, user, 201);
   } catch (e: unknown) {
     logger.error({ err: e }, "Registration error");
     Sentry.captureException(e);
@@ -420,7 +430,7 @@ app.post("/auth/google", authLimiter, async (req, res) => {
       return res.status(401).json({ error: "Google email is not verified" });
     }
     const user = await googleLogin(payload);
-    res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
+    sendAuthSession(res, user);
   } catch (e: unknown) {
     logger.error({ err: e }, "Google auth error");
     Sentry.captureException(e);
@@ -451,7 +461,7 @@ app.post("/auth/apple", authLimiter, async (req, res) => {
       return res.status(401).json({ error: "Apple email is not verified" });
     }
     const user = await appleLogin(payload);
-    res.json({ token: signToken(user), token_expires_at: tokenExpiresAt(), user });
+    sendAuthSession(res, user);
   } catch (e: unknown) {
     logger.error({ err: e }, "Apple auth error");
     Sentry.captureException(e);
@@ -758,17 +768,22 @@ app.post("/auth/resend-verification", authenticatedLimiter, requireAuth, async (
   }
 });
 
+app.post("/auth/logout", authLimiter, (_req, res) => {
+  clearAuthCookie(res);
+  res.json({ message: "Logged out" });
+});
+
 // Refresh token endpoint — accepts a valid or recently-expired JWT and returns
 // a new access token.  Uses authLimiter to prevent abuse.
 // Validates that the user still exists in the database before issuing a new token.
 app.post("/auth/refresh", authLimiter, async (req, res) => {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing authorization header" });
+  const oldToken = getAuthTokenFromRequest(req);
+  if (!oldToken) {
+    return res.status(401).json({ error: "Missing authentication token" });
   }
-  const oldToken = header.slice(7);
   const user = verifyForRefresh(oldToken);
   if (!user) {
+    clearAuthCookie(res);
     return res.status(401).json({ error: "Token expired or invalid" });
   }
 
@@ -779,11 +794,15 @@ app.post("/auth/refresh", authLimiter, async (req, res) => {
       [user.id]
     );
     if (result.rows.length === 0) {
+      clearAuthCookie(res);
       return res.status(401).json({ error: "User no longer exists" });
     }
     // Use the latest user data from DB (role/email may have changed)
     const dbUser = result.rows[0];
-    res.json({ token: signToken(dbUser), token_expires_at: tokenExpiresAt() });
+    const token = signToken(dbUser);
+    const expiresAt = tokenExpiresAt();
+    setAuthCookie(res, token, expiresAt);
+    res.json({ token, token_expires_at: expiresAt });
   } catch (e) {
     logger.error({ err: e }, "Token refresh error");
     res.status(500).json({ error: "Failed to refresh token" });

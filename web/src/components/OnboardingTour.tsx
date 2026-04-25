@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
-import { getToken } from "@/lib/api";
+import { hasAuthSession } from "@/lib/api";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const STORAGE_KEY = "helscoop_onboarding_completed";
@@ -527,7 +527,7 @@ export default function OnboardingTour() {
   );
 
   useEffect(() => {
-    if (!getToken() || isOnboardingCompleted()) {
+    if (!hasAuthSession() || isOnboardingCompleted()) {
       setPhase("done");
     } else {
       setPhase("welcome");

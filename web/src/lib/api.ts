@@ -48,6 +48,10 @@ import type {
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const SESSION_ACTIVE_KEY = "helscoop_session_active";
+const SESSION_EXPIRES_KEY = "helscoop_session_expires_at";
+const LEGACY_TOKEN_KEY = "helscoop_token";
+const LEGACY_TOKEN_EXPIRES_KEY = "helscoop_token_expires_at";
 
 let token: string | null = null;
 
@@ -58,28 +62,80 @@ let tokenExpiresAt: number | null = null;
 // Background refresh timer handle — see scheduleProactiveRefresh() below.
 let _refreshTimerId: ReturnType<typeof setTimeout> | null = null;
 
+function hasStorage(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return typeof window.localStorage !== "undefined";
+  } catch {
+    return false;
+  }
+}
+
+function clearLegacyTokenStorage(): void {
+  if (!hasStorage()) return;
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_EXPIRES_KEY);
+}
+
+function persistSessionHint(expiresAt?: number | null): void {
+  if (!hasStorage()) return;
+  clearLegacyTokenStorage();
+  localStorage.setItem(SESSION_ACTIVE_KEY, "true");
+  if (expiresAt) {
+    localStorage.setItem(SESSION_EXPIRES_KEY, String(expiresAt));
+  } else {
+    localStorage.removeItem(SESSION_EXPIRES_KEY);
+  }
+}
+
+function clearSessionHint(): void {
+  if (!hasStorage()) return;
+  clearLegacyTokenStorage();
+  localStorage.removeItem(SESSION_ACTIVE_KEY);
+  localStorage.removeItem(SESSION_EXPIRES_KEY);
+}
+
+function loadSessionExpiryHint(): number | null {
+  if (!hasStorage()) return tokenExpiresAt;
+  const raw = localStorage.getItem(SESSION_EXPIRES_KEY);
+  if (!raw) return tokenExpiresAt;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) {
+    localStorage.removeItem(SESSION_EXPIRES_KEY);
+    return tokenExpiresAt;
+  }
+  tokenExpiresAt = parsed;
+  return parsed;
+}
+
 export function setToken(t: string | null, expiresAt?: number) {
   token = t;
   tokenExpiresAt = expiresAt ?? null;
   if (t) {
-    localStorage.setItem("helscoop_token", t);
-    if (expiresAt) localStorage.setItem("helscoop_token_expires_at", String(expiresAt));
+    persistSessionHint(expiresAt ?? null);
   } else {
-    localStorage.removeItem("helscoop_token");
-    localStorage.removeItem("helscoop_token_expires_at");
+    clearSessionHint();
   }
   // (Re-)schedule the background refresh timer whenever the token changes.
   _scheduleProactiveRefresh();
 }
 
 export function getToken(): string | null {
-  if (token) return token;
-  if (typeof window !== "undefined") {
-    token = localStorage.getItem("helscoop_token");
-    const exp = localStorage.getItem("helscoop_token_expires_at");
-    if (exp) tokenExpiresAt = parseInt(exp, 10);
-  }
+  clearLegacyTokenStorage();
   return token;
+}
+
+export function hasAuthSession(): boolean {
+  if (token) return true;
+  if (!hasStorage()) return false;
+  clearLegacyTokenStorage();
+  if (localStorage.getItem(SESSION_ACTIVE_KEY) !== "true") return false;
+  const expiresAt = loadSessionExpiryHint();
+  if (expiresAt && expiresAt <= Math.floor(Date.now() / 1000)) {
+    clearSessionHint();
+    return false;
+  }
+  return true;
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -179,14 +235,16 @@ let refreshPromise: Promise<boolean> | null = null;
  */
 async function refreshAccessToken(): Promise<boolean> {
   const t = getToken();
-  if (!t) return false;
+  if (!t && !hasAuthSession()) return false;
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (t) headers.Authorization = `Bearer ${t}`;
     const res = await fetch(`${API_URL}/auth/refresh`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${t}`,
-      },
+      credentials: "include",
+      headers,
     });
     if (!res.ok) return false;
     const body = await res.json();
@@ -212,9 +270,10 @@ function refreshOnce(): Promise<boolean> {
 
 /** Returns true if the current token is about to expire. */
 function tokenNeedsRefresh(): boolean {
-  if (!tokenExpiresAt) return false;
+  const expiresAt = tokenExpiresAt ?? loadSessionExpiryHint();
+  if (!expiresAt) return false;
   const nowSeconds = Math.floor(Date.now() / 1000);
-  return tokenExpiresAt - nowSeconds < REFRESH_THRESHOLD_SECONDS;
+  return expiresAt - nowSeconds < REFRESH_THRESHOLD_SECONDS;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,11 +292,12 @@ function _scheduleProactiveRefresh(): void {
     _refreshTimerId = null;
   }
 
-  // Nothing to schedule if there's no token or no expiry info
-  if (!token || !tokenExpiresAt) return;
+  // Nothing to schedule if there's no session or no expiry info
+  const expiresAt = tokenExpiresAt ?? loadSessionExpiryHint();
+  if (!hasAuthSession() || !expiresAt) return;
 
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const ttl = tokenExpiresAt - nowSeconds; // seconds until expiry
+  const ttl = expiresAt - nowSeconds; // seconds until expiry
   if (ttl <= 0) return; // already expired, nothing to schedule
 
   // Fire at 80% of lifetime (e.g. 12 min into a 15 min token).
@@ -247,7 +307,7 @@ function _scheduleProactiveRefresh(): void {
 
   _refreshTimerId = setTimeout(async () => {
     _refreshTimerId = null;
-    if (getToken()) {
+    if (hasAuthSession()) {
       await refreshOnce();
       // If refresh succeeded, setToken was called and a new timer is already scheduled.
       // If refresh failed, no new timer — the next apiFetch will attempt a 401 refresh.
@@ -263,6 +323,18 @@ export function stopRefreshTimer(): void {
   }
 }
 
+export async function logout(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+  } finally {
+    setToken(null);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Core fetch wrapper with automatic token refresh
 // ---------------------------------------------------------------------------
@@ -270,7 +342,7 @@ export function stopRefreshTimer(): void {
 async function apiFetch(path: string, opts?: RequestInit) {
   // Proactive refresh: if token expires soon, refresh before the request.
   const isRefreshEndpoint = path === "/auth/refresh";
-  if (!isRefreshEndpoint && getToken() && tokenNeedsRefresh()) {
+  if (!isRefreshEndpoint && hasAuthSession() && tokenNeedsRefresh()) {
     await refreshOnce();
   }
 
@@ -281,7 +353,7 @@ async function apiFetch(path: string, opts?: RequestInit) {
   const t = getToken();
   if (t) headers.Authorization = `Bearer ${t}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...opts, headers });
+  const res = await fetch(`${API_URL}${path}`, { ...opts, credentials: "include", headers });
 
   if (!res.ok) {
     const isAuthEndpoint =
@@ -291,7 +363,7 @@ async function apiFetch(path: string, opts?: RequestInit) {
 
     // On 401 for a non-auth endpoint, attempt a single token refresh
     if (res.status === 401 && !isAuthEndpoint) {
-      const refreshed = await refreshOnce();
+      const refreshed = hasAuthSession() ? await refreshOnce() : false;
       if (refreshed) {
         // Retry the original request with the new token
         const retryHeaders: Record<string, string> = {
@@ -300,7 +372,7 @@ async function apiFetch(path: string, opts?: RequestInit) {
         };
         const newToken = getToken();
         if (newToken) retryHeaders.Authorization = `Bearer ${newToken}`;
-        const retryRes = await fetch(`${API_URL}${path}`, { ...opts, headers: retryHeaders });
+        const retryRes = await fetch(`${API_URL}${path}`, { ...opts, credentials: "include", headers: retryHeaders });
         if (retryRes.ok) return retryRes.json();
         // Retry also failed — fall through to logout
       }
@@ -663,9 +735,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
   exportBOMCsv: async (projectId: string, projectName: string) => {
-    const t = getToken();
     const res = await fetch(`${API_URL}/bom/export/${projectId}?format=csv`, {
-      headers: { Authorization: `Bearer ${t}` },
+      credentials: "include",
+      headers: authHeaders(),
     });
     if (!res.ok) {
       throw new ApiError(
@@ -678,9 +750,9 @@ export const api = {
     downloadBlob(blob, `helscoop_${projectName.replace(/\s+/g, '_')}.csv`);
   },
   exportIFC: async (projectId: string, projectName: string) => {
-    const t = getToken();
     const res = await fetch(`${API_URL}/ifc-export/generate?projectId=${encodeURIComponent(projectId)}`, {
-      headers: { Authorization: `Bearer ${t}` },
+      credentials: "include",
+      headers: authHeaders(),
     });
     if (!res.ok) {
       throw new ApiError(
@@ -693,9 +765,9 @@ export const api = {
     downloadBlob(blob, `helscoop_permit_${projectName.replace(/\s+/g, '_')}.ifc`);
   },
   getIFC: async (projectId: string): Promise<string> => {
-    const t = getToken();
     const res = await fetch(`${API_URL}/ifc-export/generate?projectId=${encodeURIComponent(projectId)}`, {
-      headers: { Authorization: `Bearer ${t}` },
+      credentials: "include",
+      headers: authHeaders(),
     });
     if (!res.ok) {
       throw new ApiError(
@@ -707,9 +779,9 @@ export const api = {
     return res.text();
   },
   exportPermitPack: async (projectId: string, projectName: string) => {
-    const t = getToken();
     const res = await fetch(`${API_URL}/permit-pack/projects/${encodeURIComponent(projectId)}/export`, {
-      headers: { Authorization: `Bearer ${t}` },
+      credentials: "include",
+      headers: authHeaders(),
     });
     if (!res.ok) {
       throw new ApiError(
@@ -722,9 +794,9 @@ export const api = {
     downloadBlob(blob, `helscoop_permit_pack_${projectName.replace(/\s+/g, '_')}.zip`);
   },
   exportPdf: async (projectId: string, projectName: string, lang: string) => {
-    const t = getToken();
     const res = await fetch(`${API_URL}/projects/${projectId}/pdf?lang=${lang}`, {
-      headers: { Authorization: `Bearer ${t}` },
+      credentials: "include",
+      headers: authHeaders(),
     });
     if (!res.ok) {
       throw new ApiError(
@@ -771,6 +843,7 @@ export const api = {
       formData.append("image", file);
 
       xhr.open("POST", `${API_URL}/projects/${encodeURIComponent(projectId)}/images`);
+      xhr.withCredentials = true;
       const t = getToken();
       if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
 
@@ -800,7 +873,7 @@ export const api = {
       xhr.send(formData);
     }),
   getProjectImageAsset: async (url: string): Promise<Blob> => {
-    const res = await fetch(`${API_URL}${url}`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}${url}`, { credentials: "include", headers: authHeaders() });
     if (!res.ok) {
       throw new ApiError(ERROR_MESSAGES[res.status] || `Error ${res.status}`, res.status, res.statusText);
     }

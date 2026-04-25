@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken, getToken } from "@/lib/api";
+import { api, setToken, hasAuthSession } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 import AddressSearch from "@/components/AddressSearch";
 import FeatureHighlights from "@/components/FeatureHighlights";
@@ -20,7 +20,7 @@ export default function Home() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (getToken()) {
+    if (hasAuthSession()) {
       api.me().then(() => setLoggedIn(true)).catch(() => setToken(null));
     }
   }, []);

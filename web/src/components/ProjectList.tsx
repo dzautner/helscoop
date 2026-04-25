@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken } from "@/lib/api";
+import { api, logout } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard, SkeletonBlock } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -569,7 +569,7 @@ export default function ProjectList({
               </svg>
               {t('nav.settings')}
             </Link>
-            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => { setToken(null); window.location.reload(); }}>
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={async () => { await logout(); window.location.reload(); }}>
               {t('nav.logout')}
             </button>
           </div>
@@ -601,7 +601,7 @@ export default function ProjectList({
             </svg>
             {t('nav.settings')}
           </Link>
-          <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={() => { setToken(null); window.location.reload(); }}>
+          <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", justifyContent: "flex-start" }} onClick={async () => { await logout(); window.location.reload(); }}>
             {t('nav.logout')}
           </button>
         </div>

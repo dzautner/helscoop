@@ -6,6 +6,7 @@ import { query } from "./db";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./email";
 import { Role, normalizeRole, ROLES, isValidRole } from "./permissions";
 import { getJwtSecret } from "./secrets";
+import { getAuthTokenFromRequest } from "./session-cookie";
 
 export interface AuthUser {
   id: string;
@@ -70,12 +71,12 @@ export function verifyForRefresh(token: string): AuthUser | null {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing authorization header" });
+  const token = getAuthTokenFromRequest(req);
+  if (!token) {
+    return res.status(401).json({ error: "Missing authentication token" });
   }
   try {
-    const payload = jwt.verify(header.slice(7), getJwtSecret()) as AuthUser;
+    const payload = jwt.verify(token, getJwtSecret()) as AuthUser;
     req.user = payload;
     next();
   } catch {

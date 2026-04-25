@@ -5,6 +5,7 @@ import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { query } from "./db";
 import logger from "./logger";
 import { getJwtSecret } from "./secrets";
+import { getAuthCookieToken } from "./session-cookie";
 
 const COLORS = ["#e5a04b", "#7ab3e0", "#8bc48b", "#d4a0e0", "#f0b86a", "#e07a7a"];
 const MAX_SCENE_BYTES = 512 * 1024;
@@ -245,7 +246,7 @@ async function handleConnection(socket: WebSocket, req: http.IncomingMessage): P
 
   const auth = await authorizeProjectAccess(
     projectId,
-    url.searchParams.get("token"),
+    url.searchParams.get("token") || getAuthCookieToken(req),
     url.searchParams.get("shareToken"),
   );
   if (!auth.authorized) {

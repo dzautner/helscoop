@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { api, setToken, getToken } from "@/lib/api";
+import { api, hasAuthSession, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -62,7 +62,7 @@ export default function SettingsPage() {
   const { mood, setMood, resolved } = useTheme();
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!hasAuthSession()) {
       window.location.href = "/";
       return;
     }
