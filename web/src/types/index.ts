@@ -1,5 +1,11 @@
 export interface BuildingInfo {
   address?: string;
+  postal_code?: string;
+  postalCode?: string;
+  postinumero?: string;
+  city?: string;
+  municipality?: string;
+  region?: string;
   type?: string;
   year_built?: number;
   material?: string;
@@ -48,6 +54,7 @@ export interface Project {
   clone_count?: number;
   owner_name?: string | null;
   region?: string | null;
+  postal_code_area?: string | null;
   cost_band?: GalleryCostRange;
   material_highlights?: string[];
   building_info?: BuildingInfo | null;
@@ -87,12 +94,35 @@ export interface GalleryProject {
   project_type?: ProjectType;
   owner_name?: string | null;
   region?: string | null;
+  postal_code_area?: string | null;
   estimated_cost: number;
   cost_band?: GalleryCostRange;
   material_highlights: string[];
   view_count: number;
   heart_count: number;
   clone_count: number;
+}
+
+export interface NeighborhoodInsightMaterial {
+  name: string;
+  project_count: number;
+  share_pct: number;
+}
+
+export interface NeighborhoodInsightType {
+  type: string;
+  count: number;
+}
+
+export interface NeighborhoodInsightsResponse {
+  postal_code_area: string;
+  project_type?: ProjectType | null;
+  project_count: number;
+  projects_this_year: number;
+  average_cost: number;
+  renovation_types: NeighborhoodInsightType[];
+  popular_materials: NeighborhoodInsightMaterial[];
+  similar_projects: GalleryProject[];
 }
 
 export interface PhotoOverlayState {
