@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   sendEmail,
   sendPasswordResetEmail,
@@ -7,10 +7,45 @@ import {
 } from "../email";
 
 let consoleSpy: ReturnType<typeof vi.spyOn>;
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+const originalEnv = {
+  APP_URL: process.env.APP_URL,
+  EMAIL_FROM: process.env.EMAIL_FROM,
+  NODE_ENV: process.env.NODE_ENV,
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+};
 
 beforeEach(() => {
+  process.env.NODE_ENV = "test";
+  process.env.APP_URL = "https://app.helscoop.test";
+  delete process.env.EMAIL_FROM;
+  delete process.env.RESEND_API_KEY;
   consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 });
+
+afterEach(() => {
+  restoreEnv("APP_URL", originalEnv.APP_URL);
+  restoreEnv("EMAIL_FROM", originalEnv.EMAIL_FROM);
+  restoreEnv("NODE_ENV", originalEnv.NODE_ENV);
+  restoreEnv("RESEND_API_KEY", originalEnv.RESEND_API_KEY);
+  vi.restoreAllMocks();
+});
+
+function restoreEnv(name: keyof typeof originalEnv, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
+function loggedOutput() {
+  return [
+    ...consoleSpy.mock.calls.flat().map(String),
+    ...consoleErrorSpy.mock.calls.flat().map(String),
+  ].join("\n");
+}
 
 describe("sendEmail", () => {
   it("returns true", async () => {
@@ -61,14 +96,24 @@ describe("sendPasswordResetEmail", () => {
     expect(result).toBe(true);
   });
 
-  it("logs email and token", async () => {
+  it("logs redacted metadata without the raw token", async () => {
     await sendPasswordResetEmail("user@example.com", "tok-abc");
+    const output = loggedOutput();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("user@example.com"),
+      expect.stringContaining("Password reset"),
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("tok-abc"),
-    );
+    expect(output).toContain("us**@example.com");
+    expect(output).toContain("token [redacted]");
+    expect(output).not.toContain("tok-abc");
+  });
+
+  it("fails safe in production when no provider is configured", async () => {
+    process.env.NODE_ENV = "production";
+    const result = await sendPasswordResetEmail("user@example.com", "prod-reset-token");
+    const output = loggedOutput();
+    expect(result).toBe(false);
+    expect(output).toContain("RESEND_API_KEY is not configured");
+    expect(output).not.toContain("prod-reset-token");
   });
 });
 
@@ -78,14 +123,24 @@ describe("sendVerificationEmail", () => {
     expect(result).toBe(true);
   });
 
-  it("logs email and token", async () => {
+  it("logs redacted metadata without the raw token", async () => {
     await sendVerificationEmail("new@example.com", "vrf-123");
+    const output = loggedOutput();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("new@example.com"),
+      expect.stringContaining("Verification"),
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("vrf-123"),
-    );
+    expect(output).toContain("ne*@example.com");
+    expect(output).toContain("token [redacted]");
+    expect(output).not.toContain("vrf-123");
+  });
+
+  it("fails safe in production when no provider is configured", async () => {
+    process.env.NODE_ENV = "production";
+    const result = await sendVerificationEmail("new@example.com", "prod-verify-token");
+    const output = loggedOutput();
+    expect(result).toBe(false);
+    expect(output).toContain("RESEND_API_KEY is not configured");
+    expect(output).not.toContain("prod-verify-token");
   });
 });
 
