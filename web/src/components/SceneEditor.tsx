@@ -112,6 +112,18 @@ const EDITOR_FONT_SIZE = 13;
 const EDITOR_LINE_HEIGHT = Math.round(EDITOR_FONT_SIZE * 1.7 * 10) / 10;
 const EDITOR_PADDING_TOP = 20;
 
+interface RemoteCursorPeer {
+  clientId: string;
+  name: string;
+  color: string;
+  cursor: {
+    line: number;
+    column: number;
+    selectionStart?: number;
+    selectionEnd?: number;
+  } | null;
+}
+
 /* ── Component ───────────────────────────────────────────────────── */
 export default function SceneEditor({
   sceneJs,
@@ -119,6 +131,8 @@ export default function SceneEditor({
   error,
   errorLine,
   materials,
+  remoteCursors = [],
+  onCursorChange,
 }: {
   sceneJs: string;
   onChange: (code: string) => void;
@@ -127,6 +141,8 @@ export default function SceneEditor({
   /** 1-based line number of the error in the script, or null. */
   errorLine?: number | null;
   materials?: { id: string; name: string }[];
+  remoteCursors?: RemoteCursorPeer[];
+  onCursorChange?: (cursor: { line: number; column: number; selectionStart?: number; selectionEnd?: number }) => void;
 }) {
   const { t } = useTranslation();
 
@@ -144,6 +160,7 @@ export default function SceneEditor({
   const [findQuery, setFindQuery] = useState("");
   const [replaceValue, setReplaceValue] = useState("");
   const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
 
   /* ── Autocomplete state ──────────────────────────────────────── */
   const [acItems, setAcItems] = useState<AutocompleteItem[]>([]);
@@ -262,6 +279,7 @@ export default function SceneEditor({
     if (gutterRef.current) {
       gutterRef.current.scrollTop = ta.scrollTop;
     }
+    setScrollTop(ta.scrollTop);
   }, []);
 
   // Scroll textarea so the current match is visible
@@ -283,9 +301,18 @@ export default function SceneEditor({
     const ta = textareaRef.current;
     if (!ta) return;
     const pos = ta.selectionStart;
-    const lineNum = ta.value.substring(0, pos).split("\n").length - 1;
+    const beforeCursor = ta.value.substring(0, pos);
+    const cursorParts = beforeCursor.split("\n");
+    const lineNum = cursorParts.length - 1;
+    const column = cursorParts[cursorParts.length - 1]?.length ?? 0;
     setCursorLine(lineNum);
-  }, []);
+    onCursorChange?.({
+      line: lineNum + 1,
+      column,
+      selectionStart: ta.selectionStart,
+      selectionEnd: ta.selectionEnd,
+    });
+  }, [onCursorChange]);
 
   /* ── Highlighted HTML ─────────────────────────────────────────── */
   const lines = sceneJs.split("\n");
@@ -730,6 +757,50 @@ export default function SceneEditor({
               dangerouslySetInnerHTML={{ __html: findHighlightHtml }}
             />
           )}
+
+          {/* Remote collaborator cursor lines */}
+          {remoteCursors.map((peer) => {
+            if (!peer.cursor) return null;
+            const top = EDITOR_PADDING_TOP + (peer.cursor.line - 1) * EDITOR_LINE_HEIGHT - scrollTop;
+            if (top < -EDITOR_LINE_HEIGHT || top > 800) return null;
+            return (
+              <div
+                key={peer.clientId}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top,
+                  left: 0,
+                  right: 0,
+                  height: EDITOR_LINE_HEIGHT,
+                  borderTop: `1px solid ${peer.color}`,
+                  pointerEvents: "none",
+                  zIndex: 4,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: -9,
+                    padding: "1px 6px",
+                    borderRadius: 999,
+                    background: peer.color,
+                    color: "#101012",
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 700,
+                    maxWidth: 120,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {peer.name}
+                </span>
+              </div>
+            );
+          })}
 
           {/* Syntax-highlighted overlay */}
           <pre

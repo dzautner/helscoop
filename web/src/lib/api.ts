@@ -387,8 +387,11 @@ export const api = {
     business_id?: string | null;
   }) =>
     apiFetch("/projects", { method: "POST", body: JSON.stringify(data) }),
-  updateProject: (id: string, data: Record<string, unknown>) =>
-    apiFetch(`/projects/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  updateProject: (id: string, data: Record<string, unknown>, collaborationClientId?: string | null) =>
+    apiFetch(`/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(collaborationClientId ? { ...data, collaboration_client_id: collaborationClientId } : data),
+    }),
   publishProject: (id: string, isPublic: boolean): Promise<{
     id: string;
     is_public: boolean;
@@ -700,10 +703,14 @@ export const api = {
     const blob = await res.blob();
     downloadBlob(blob, `helscoop_${projectName.replace(/\s+/g, '_')}.pdf`);
   },
-  saveBOM: (projectId: string, items: { material_id: string; quantity: number; unit: string }[]) =>
+  saveBOM: (
+    projectId: string,
+    items: { material_id: string; quantity: number; unit: string }[],
+    collaborationClientId?: string | null,
+  ) =>
     apiFetch(`/projects/${projectId}/bom`, {
       method: "PUT",
-      body: JSON.stringify({ items }),
+      body: JSON.stringify(collaborationClientId ? { items, collaboration_client_id: collaborationClientId } : { items }),
     }),
   substituteBomMaterial: (
     projectId: string,

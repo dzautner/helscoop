@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/node";
+import http from "http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -45,6 +46,7 @@ import logger from "./logger";
 import { logAuditEvent } from "./audit";
 import { sendEmail } from "./email";
 import { hashViewerIp, logProjectView } from "./notifications";
+import { installCollaborationServer } from "./collaboration";
 
 // ---------------------------------------------------------------------------
 // Sentry — initialize before anything else so it can instrument the app
@@ -1582,7 +1584,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Only start listening when run directly. Playwright runs the real server with
 // NODE_ENV=test for deterministic limits, so it opts in via E2E=1.
 if (!IS_TEST || IS_E2E) {
-  app.listen(PORT, () => {
+  const server = http.createServer(app);
+  installCollaborationServer(server);
+  server.listen(PORT, () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Helscoop API running");
   });
 }
