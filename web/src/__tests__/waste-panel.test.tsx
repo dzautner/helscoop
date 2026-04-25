@@ -64,7 +64,7 @@ beforeEach(() => {
 
 describe("WasteEstimatePanel", () => {
   it("shows title and subtitle", () => {
-    render(<WasteEstimatePanel projectId="p1" bomCount={3} />);
+    render(<WasteEstimatePanel bomCount={0} />);
     expect(screen.getByText("waste.title")).toBeInTheDocument();
     expect(screen.getByText("waste.subtitle")).toBeInTheDocument();
   });

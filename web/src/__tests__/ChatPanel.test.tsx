@@ -203,6 +203,7 @@ describe("ChatPanel — sending messages", () => {
     fireEvent.change(input, { target: { value: "hello" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(input.value).toBe("");
+    await screen.findByText("ok");
   });
 
   it("tracks chat_message_sent event", async () => {
@@ -212,6 +213,7 @@ describe("ChatPanel — sending messages", () => {
     fireEvent.change(input, { target: { value: "test" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(mockTrack).toHaveBeenCalledWith("chat_message_sent", expect.any(Object));
+    await screen.findByText("ok");
   });
 
   it("shows error message on API failure", async () => {

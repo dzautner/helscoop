@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type { Project, Template } from "@/types";
 
@@ -215,6 +215,10 @@ beforeEach(() => {
   });
 });
 
+async function waitForDefaultProjects() {
+  await screen.findByText("Sauna Reno");
+}
+
 describe("ProjectList", () => {
   it("shows skeleton cards while loading", () => {
     mockGetProjects.mockReturnValue(new Promise(() => {}));
@@ -235,6 +239,7 @@ describe("ProjectList", () => {
     render(<ProjectList />);
     expect(screen.getByText("Hel")).toBeInTheDocument();
     expect(screen.getByText("scoop")).toBeInTheDocument();
+    await waitForDefaultProjects();
   });
 
   it("renders nav items", async () => {
@@ -242,6 +247,7 @@ describe("ProjectList", () => {
     expect(screen.getByText("nav.projects")).toBeInTheDocument();
     expect(screen.getAllByText("nav.settings").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("nav.logout").length).toBeGreaterThanOrEqual(1);
+    await waitForDefaultProjects();
   });
 
   it("renders project count text", async () => {
@@ -254,6 +260,7 @@ describe("ProjectList", () => {
   it("renders new project input", async () => {
     render(<ProjectList />);
     expect(screen.getByLabelText("project.newProjectPlaceholder")).toBeInTheDocument();
+    await waitForDefaultProjects();
   });
 
   it("creates project on button click", async () => {
@@ -319,7 +326,9 @@ describe("ProjectList", () => {
     await waitFor(() => { expect(screen.getByText("Sauna Reno")).toBeInTheDocument(); });
 
     const search = screen.getByLabelText("project.searchPlaceholder");
-    fireEvent.change(search, { target: { value: "Kitchen" } });
+    await act(async () => {
+      fireEvent.change(search, { target: { value: "Kitchen" } });
+    });
 
     expect(screen.queryByText("Sauna Reno")).not.toBeInTheDocument();
     expect(screen.getByText("Kitchen Update")).toBeInTheDocument();
@@ -385,6 +394,7 @@ describe("ProjectList", () => {
   it("renders trash toggle button", async () => {
     render(<ProjectList />);
     expect(screen.getByText("project.showTrash")).toBeInTheDocument();
+    await waitForDefaultProjects();
   });
 
   it("shows confirm dialog when deleting project", async () => {
@@ -392,7 +402,9 @@ describe("ProjectList", () => {
     await waitFor(() => { expect(screen.getByText("Sauna Reno")).toBeInTheDocument(); });
 
     const deleteButtons = screen.getAllByText("Delete");
-    fireEvent.click(deleteButtons[0]);
+    await act(async () => {
+      fireEvent.click(deleteButtons[0]);
+    });
 
     expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
     expect(screen.getByText("dialog.deleteProjectTitle")).toBeInTheDocument();
@@ -402,11 +414,13 @@ describe("ProjectList", () => {
     render(<ProjectList />);
     const importEls = screen.getAllByLabelText("project.importProject");
     expect(importEls.length).toBeGreaterThanOrEqual(1);
+    await waitForDefaultProjects();
   });
 
   it("renders mobile menu hamburger", async () => {
     render(<ProjectList />);
     expect(screen.getByLabelText("projectList.menuAriaLabel")).toBeInTheDocument();
+    await waitForDefaultProjects();
   });
 
   it("renders no search results message", async () => {
@@ -414,7 +428,9 @@ describe("ProjectList", () => {
     await waitFor(() => { expect(screen.getByText("Sauna Reno")).toBeInTheDocument(); });
 
     const search = screen.getByLabelText("project.searchPlaceholder");
-    fireEvent.change(search, { target: { value: "xyznonexistent" } });
+    await act(async () => {
+      fireEvent.change(search, { target: { value: "xyznonexistent" } });
+    });
 
     expect(screen.getByText("project.noSearchResults")).toBeInTheDocument();
   });

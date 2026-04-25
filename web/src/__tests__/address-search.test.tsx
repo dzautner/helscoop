@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 const mockGetBuilding = vi.fn();
@@ -101,7 +101,10 @@ describe("AddressSearch compact mode", () => {
     fireEvent.change(screen.getByLabelText("search.placeholder"), { target: { value: "Helsinki" } });
     fireEvent.click(screen.getByLabelText("search.searchButton"));
     expect(screen.getByText("search.searching")).toBeInTheDocument();
-    resolveSearch!(mockBuilding);
+    await act(async () => {
+      resolveSearch!(mockBuilding);
+    });
+    await screen.findByText("Mannerheimintie 1, Helsinki");
   });
 
   it("displays building result after search", async () => {
