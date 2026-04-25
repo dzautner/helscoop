@@ -65,9 +65,9 @@ describe("calculateQuote", () => {
     const bom = [{ material_id: "m1", quantity: 10, unit: "kpl" }];
     const quote = calculateQuote(bom, [baseMaterial as any], baseConfig);
     const line = quote.lines[0];
-    // lumber = 0.5 hours/unit * 11 units = 5.5 hours * 45€/h = 247.50
-    expect(line.labourHours).toBe(5.5);
-    expect(line.labourCost).toBe(247.5);
+    // lumber = 0.5 hours/unit * 10 design units = 5 hours * 45€/h = 225
+    expect(line.labourHours).toBe(5);
+    expect(line.labourCost).toBe(225);
   });
 
   it("computes VAT at configured rate", () => {
@@ -128,8 +128,8 @@ describe("calculateQuote", () => {
     const unknownMat = { ...baseMaterial, id: "mx", category_name: "exotic", pricing: [{ unit_price: 10, unit: "kpl", is_primary: true }] };
     const bom = [{ material_id: "mx", quantity: 5, unit: "kpl" }];
     const quote = calculateQuote(bom, [unknownMat as any], baseConfig);
-    // default = 0.2h/unit, 5.5 units * 0.2 = 1.1h
-    expect(quote.lines[0].labourHours).toBe(1.1);
+    // default = 0.2h/unit, 5 design units * 0.2 = 1h
+    expect(quote.lines[0].labourHours).toBe(1);
   });
 
   it("handles missing material gracefully", () => {
@@ -153,16 +153,16 @@ describe("calculateQuote", () => {
     const mat = { ...baseMaterial, id: "ins", category_name: "eristys", pricing: [{ unit_price: 3, unit: "m2", is_primary: true }] };
     const bom = [{ material_id: "ins", quantity: 10, unit: "m2" }];
     const quote = calculateQuote(bom, [mat as any], baseConfig);
-    // eristys = 0.3h/unit, 11 units * 0.3 = 3.3h
-    expect(quote.lines[0].labourHours).toBe(3.3);
+    // eristys = 0.3h/unit, 10 design units * 0.3 = 3h
+    expect(quote.lines[0].labourHours).toBe(3);
   });
 
   it("uses foundation category labour rate", () => {
     const mat = { ...baseMaterial, id: "fnd", category_name: "perustus", pricing: [{ unit_price: 20, unit: "m3", is_primary: true }] };
     const bom = [{ material_id: "fnd", quantity: 5, unit: "m3" }];
     const quote = calculateQuote(bom, [mat as any], baseConfig);
-    // perustus = 1.0h/unit, 5.5 units * 1.0 = 5.5h
-    expect(quote.lines[0].labourHours).toBe(5.5);
+    // perustus = 1.0h/unit, 5 design units * 1.0 = 5h
+    expect(quote.lines[0].labourHours).toBe(5);
   });
 
   it("zero quantity produces zero costs", () => {

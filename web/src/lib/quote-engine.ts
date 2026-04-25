@@ -15,7 +15,7 @@ export interface QuoteConfig {
   labourRatePerHour: number;
   /** Wastage as a decimal, e.g. 0.10 for 10% */
   wastagePercent: number;
-  /** Applied after VAT in contractor mode only */
+  /** Applied before VAT in contractor mode only (Finnish AVL: VAT on full taxable amount) */
   contractorMarginPercent?: number;
 }
 
@@ -155,7 +155,9 @@ export function calculateQuote(
     const materialCost = round2(totalQty * unitPrice);
 
     const labourHoursPerUnit = getLabourHoursPerUnit(material);
-    const labourHours = round2(totalQty * labourHoursPerUnit);
+    // Labour is performed on the design quantity only — wastage material is
+    // purchased but not installed, so it should not add labour hours.
+    const labourHours = round2(designQty * labourHoursPerUnit);
     const labourCost = round2(labourHours * config.labourRatePerHour);
 
     const subtotal = round2(materialCost + labourCost);
@@ -191,14 +193,19 @@ export function calculateQuote(
   );
 
   const subtotalExVat = round2(materialSubtotal + labourSubtotal);
-  const vatTotal = round2(subtotalExVat * config.vatRate);
-  let grandTotal = round2(subtotalExVat + vatTotal);
 
+  // Finnish AVL (arvonlisaverolaki) requires VAT on the full taxable amount
+  // including the contractor's margin. The margin is part of the service price,
+  // so the correct order is: subtotal + margin, then VAT on that sum.
   let contractorMargin: number | undefined;
+  let taxableBase = subtotalExVat;
   if (config.mode === "contractor" && config.contractorMarginPercent != null) {
-    contractorMargin = round2(grandTotal * config.contractorMarginPercent);
-    grandTotal = round2(grandTotal + contractorMargin);
+    contractorMargin = round2(subtotalExVat * config.contractorMarginPercent);
+    taxableBase = round2(subtotalExVat + contractorMargin);
   }
+
+  const vatTotal = round2(taxableBase * config.vatRate);
+  const grandTotal = round2(taxableBase + vatTotal);
 
   return {
     lines,

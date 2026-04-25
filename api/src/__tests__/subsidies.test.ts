@@ -141,6 +141,80 @@ describe("estimateEnergySubsidy", () => {
     expect(result.programs[0].warnings).toContain("ELY application deadline has passed.");
   });
 
+  it("returns not_eligible when switching from oil to oil", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 12400,
+      currentHeating: "oil",
+      targetHeating: "oil",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, now);
+
+    expect(result.programs[0].status).toBe("not_eligible");
+    expect(result.bestAmount).toBe(0);
+    expect(result.programs[0].reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining("non-fossil")]),
+    );
+  });
+
+  it("returns not_eligible when switching from natural_gas to natural_gas", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 10000,
+      currentHeating: "natural_gas",
+      targetHeating: "natural_gas",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, now);
+
+    expect(result.programs[0].status).toBe("not_eligible");
+    expect(result.bestAmount).toBe(0);
+  });
+
+  it("warns when applicantAgeGroup is unknown", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 12000,
+      currentHeating: "oil",
+      targetHeating: "ground_source_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+      applicantAgeGroup: "unknown",
+    }, now);
+
+    const ara = result.programs.find((p) => p.program === "ara_repair_elderly_disabled");
+    expect(ara?.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining("age group is unknown")]),
+    );
+  });
+
+  it("does not warn about age when applicantAgeGroup is provided", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 12000,
+      currentHeating: "oil",
+      targetHeating: "ground_source_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+      applicantAgeGroup: "under_65",
+    }, now);
+
+    const ara = result.programs.find((p) => p.program === "ara_repair_elderly_disabled");
+    const ageWarnings = (ara?.warnings || []).filter(w => w.includes("age group is unknown"));
+    expect(ageWarnings).toHaveLength(0);
+  });
+
+  it("calculates application deadline days against the official Helsinki timestamp", () => {
+    const utcNow = new Date("2026-04-21T00:00:00.000Z");
+    const result = estimateEnergySubsidy({
+      totalCost: 10000,
+      currentHeating: "oil",
+      targetHeating: "ground_source_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, utcNow);
+
+    expect(result.daysUntilApplicationDeadline).toBe(35);
+    expect(result.daysUntilDeadline).toBe(35);
+  });
+
   it("does not deduct ARA/Varke discretionary support from net cost", () => {
     const result = estimateEnergySubsidy({
       totalCost: 12000,

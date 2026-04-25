@@ -103,6 +103,11 @@ function normalizeEnum<T extends string>(value: unknown, allowed: readonly T[], 
 
 function daysUntilDate(date: string, now = new Date()): number {
   const target = new Date(`${date}T23:59:59+03:00`);
+  // Convert `now` to Helsinki time for consistent date-based comparison.
+  // Finland is UTC+2 (EET) or UTC+3 (EEST). Using +03:00 for the target
+  // already accounts for summer time on the deadline side. For the diff
+  // we just need the millisecond delta, which is timezone-neutral once
+  // both Date objects are constructed.
   const ms = target.getTime() - now.getTime();
   const days = ms / (24 * 60 * 60 * 1000);
   return ms < 0 ? Math.floor(days) : Math.ceil(days);
@@ -181,7 +186,10 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
     elyReasons.push("Building must be in year-round residential use.");
   }
 
-  if (HIGH_SUPPORT_TARGETS.has(targetHeating)) {
+  if (FOSSIL_SOURCE_HEATING.has(targetHeating)) {
+    elyStatus = "not_eligible";
+    elyReasons.push("Target heating must be a non-fossil heating system; switching to oil or natural gas is not supported.");
+  } else if (HIGH_SUPPORT_TARGETS.has(targetHeating)) {
     elyAmount = grantConfig.highSupportAmount;
     elyReasons.push("Target heating qualifies for the 4,000 EUR fixed grant.");
   } else if (NON_FOSSIL_TARGETS.has(targetHeating)) {
@@ -208,6 +216,10 @@ export function estimateEnergySubsidy(input: EnergySubsidyRequest, now = new Dat
     "ARA/Varke repair support is discretionary and requires official review; Helscoop does not deduct it from net cost.",
   ];
   let araStatus: SubsidyStatus = "not_eligible";
+
+  if (applicantAgeGroup === "unknown") {
+    araWarnings.push("Applicant age group is unknown. ARA/Varke eligibility depends on age (65+) or disability status. Please provide age group for an accurate estimate.");
+  }
 
   if (applicantAgeGroup === "65_plus" || applicantDisabled) {
     araReasons.push("Applicant may fit the elderly or disabled-person repair grant group.");
