@@ -755,7 +755,8 @@ describe("Security Headers", () => {
     );
 
     expect(content).toContain('import helmet from "helmet"');
-    expect(content).toContain("app.use(helmet())");
+    // Helmet is now configured with options (crossOriginResourcePolicy, etc.)
+    expect(content).toMatch(/app\.use\(\s*helmet\(/);
   });
 
   it("request body size is limited to 8MB", async () => {
