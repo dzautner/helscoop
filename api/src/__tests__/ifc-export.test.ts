@@ -309,9 +309,9 @@ describe("classifyElement", () => {
     expect(classifyElement("base", "foundation")).toBe("slab");
   });
 
-  it("defaults to wall for unclassified elements", () => {
-    expect(classifyElement("beam1")).toBe("wall");
-    expect(classifyElement("post1")).toBe("wall");
+  it("defaults to generic for unclassified elements", () => {
+    expect(classifyElement("beam1")).toBe("generic");
+    expect(classifyElement("post1")).toBe("generic");
   });
 });
 

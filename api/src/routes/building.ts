@@ -179,7 +179,10 @@ function normalizeAddress(addr: string): string {
 
 /**
  * Check whether a query address matches a demo address.
- * Matches if the normalized query contains the street name and number.
+ * Uses strict matching: the street name and house number must match exactly
+ * (after normalization). Falls back to false when either address cannot be
+ * parsed into a street + number pair — substring matching produced false
+ * positives (e.g. "Katu 1" matching "Katukatu 10").
  */
 function matchesDemoAddress(query: string, demoAddress: string): boolean {
   const normQ = normalizeAddress(query);
@@ -187,13 +190,13 @@ function matchesDemoAddress(query: string, demoAddress: string): boolean {
 
   const queryKey = parseStreetAddressKey(normQ);
   const demoKey = parseStreetAddressKey(normD);
-  if (!queryKey || !demoKey) return normQ.includes(normD) || normD.includes(normQ);
 
-  if (queryKey.streetName === demoKey.streetName && queryKey.houseNumber === demoKey.houseNumber) {
-    return true;
-  }
+  // If we cannot parse either address into a structured street + number,
+  // refuse to match rather than using substring matching which produces
+  // false positives.
+  if (!queryKey || !demoKey) return false;
 
-  return false;
+  return queryKey.streetName === demoKey.streetName && queryKey.houseNumber === demoKey.houseNumber;
 }
 
 function parseStreetAddressKey(normalizedAddress: string): { streetName: string; houseNumber: string } | null {

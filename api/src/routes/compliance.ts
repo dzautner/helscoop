@@ -40,14 +40,46 @@ interface ParsedMesh {
   isSubtract?: boolean;
 }
 
-function parseMeshes(sceneJs: string): ParsedMesh[] {
+/** Reusable pattern fragment that matches both integer and float numbers. */
+const NUM = `[\\d]+(?:\\.[\\d]+)?`;
+const SIGNED_NUM = `-?${NUM}`;
+
+/**
+ * Pre-process scene source before regex parsing:
+ * 1. Strip single-line comments (// ...)
+ * 2. Strip block comments (/* ... *​/)
+ * 3. Collapse newlines so multiline box() / translate() calls become single-line
+ */
+function preprocessScene(sceneJs: string): string {
+  // Strip single-line comments
+  let cleaned = sceneJs.replace(/\/\/.*$/gm, "");
+  // Strip block comments
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, "");
+  // Collapse newlines into spaces so multiline calls become parseable
+  cleaned = cleaned.replace(/\n/g, " ");
+  // Collapse multiple spaces
+  cleaned = cleaned.replace(/\s+/g, " ");
+  return cleaned;
+}
+
+export interface ParseWarning {
+  type: "unparsed_box" | "unparsed_translate";
+  lineFragment: string;
+}
+
+function parseMeshes(sceneJs: string, parseWarnings?: ParseWarning[]): ParsedMesh[] {
   const meshes: ParsedMesh[] = [];
   const meshMap = new Map<string, ParsedMesh>();
 
-  const boxRe = /(?:const|let|var)\s+(\w+)\s*=\s*box\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/g;
+  const cleaned = preprocessScene(sceneJs);
+
+  const boxRe = new RegExp(
+    `(?:const|let|var)\\s+(\\w+)\\s*=\\s*box\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)`,
+    "g"
+  );
   let m: RegExpExecArray | null;
 
-  while ((m = boxRe.exec(sceneJs)) !== null) {
+  while ((m = boxRe.exec(cleaned)) !== null) {
     const mesh: ParsedMesh = {
       name: m[1],
       w: parseFloat(m[2]),
@@ -59,9 +91,12 @@ function parseMeshes(sceneJs: string): ParsedMesh[] {
     meshes.push(mesh);
   }
 
-  const translateBoxRe = /(?:const|let|var)\s+(\w+)\s*=\s*translate\(\s*box\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/g;
+  const translateBoxRe = new RegExp(
+    `(?:const|let|var)\\s+(\\w+)\\s*=\\s*translate\\(\\s*box\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)\\s*,\\s*(${SIGNED_NUM})\\s*,\\s*(${SIGNED_NUM})\\s*,\\s*(${SIGNED_NUM})\\s*\\)`,
+    "g"
+  );
 
-  while ((m = translateBoxRe.exec(sceneJs)) !== null) {
+  while ((m = translateBoxRe.exec(cleaned)) !== null) {
     const mesh: ParsedMesh = {
       name: m[1],
       w: parseFloat(m[2]),
@@ -77,7 +112,7 @@ function parseMeshes(sceneJs: string): ParsedMesh[] {
 
   const subtractRe = /(?:const|let|var)\s+(\w+)\s*=\s*subtract\(\s*(\w+)\s*,\s*(\w+)\s*\)/g;
 
-  while ((m = subtractRe.exec(sceneJs)) !== null) {
+  while ((m = subtractRe.exec(cleaned)) !== null) {
     const cutterName = m[3];
     const cutter = meshMap.get(cutterName);
     if (cutter) {
@@ -87,10 +122,33 @@ function parseMeshes(sceneJs: string): ParsedMesh[] {
 
   const addRe = /scene\.add\(\s*(\w+)\s*,\s*\{[^}]*material:\s*["'](\w+)["'][^}]*\}/g;
 
-  while ((m = addRe.exec(sceneJs)) !== null) {
+  while ((m = addRe.exec(cleaned)) !== null) {
     const meshRef = meshMap.get(m[1]);
     if (meshRef) {
       meshRef.material = m[2];
+    }
+  }
+
+  // Emit warnings for box()/translate(box()) calls that contain variable
+  // references or other non-numeric arguments we could not parse.
+  if (parseWarnings) {
+    const anyBoxRe = /(?:const|let|var)\s+(\w+)\s*=\s*box\s*\(/g;
+    while ((m = anyBoxRe.exec(cleaned)) !== null) {
+      if (!meshMap.has(m[1])) {
+        parseWarnings.push({
+          type: "unparsed_box",
+          lineFragment: cleaned.slice(m.index, m.index + 80).trim(),
+        });
+      }
+    }
+    const anyTranslateBoxRe = /(?:const|let|var)\s+(\w+)\s*=\s*translate\s*\(\s*box\s*\(/g;
+    while ((m = anyTranslateBoxRe.exec(cleaned)) !== null) {
+      if (!meshMap.has(m[1])) {
+        parseWarnings.push({
+          type: "unparsed_translate",
+          lineFragment: cleaned.slice(m.index, m.index + 100).trim(),
+        });
+      }
     }
   }
 
@@ -258,10 +316,22 @@ export function checkCompliance(
 ): ComplianceWarning[] {
   if (!sceneJs || sceneJs.trim().length === 0) return [];
 
-  const meshes = parseMeshes(sceneJs);
-  if (meshes.length === 0) return [];
+  const parseWarnings: ParseWarning[] = [];
+  const meshes = parseMeshes(sceneJs, parseWarnings);
 
+  // Emit compliance warnings for geometry that could not be parsed
   const warnings: ComplianceWarning[] = [];
+  for (const pw of parseWarnings) {
+    warnings.push({
+      ruleId: "PARSE-WARN",
+      severity: "warning",
+      messageKey: "compliance.unparsedGeometry",
+      params: { fragment: pw.lineFragment.slice(0, 120) },
+    });
+  }
+
+  if (meshes.length === 0) return warnings;
+
   for (const rule of ALL_RULES) {
     warnings.push(...rule.check(meshes, buildingInfo));
   }

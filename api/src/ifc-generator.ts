@@ -125,51 +125,94 @@ export function classifyElement(name: string, material?: string): IFCSceneObject
   if (m.includes("roofing") || m.includes("katto")) return "roof";
   if (m.includes("foundation") || m.includes("concrete") || m.includes("betoni")) return "slab";
 
-  return "wall"; // default to wall for unclassified structural elements
+  // Use "generic" instead of "wall" so unclassified elements map to
+  // IfcBuildingElementProxy, which is the correct IFC representation for
+  // elements whose type is unknown. Defaulting to "wall" could cause
+  // building permit validation failures when the geometry clearly is not a wall.
+  return "generic";
+}
+
+/** Reusable pattern fragment matching both integer and float numbers. */
+const NUM = `[\\d]+(?:\\.[\\d]+)?`;
+const SIGNED_NUM = `-?${NUM}`;
+
+/**
+ * Pre-process scene source before regex parsing:
+ * 1. Strip single-line comments (// ...)
+ * 2. Strip block comments
+ * 3. Collapse newlines so multiline box() / translate() calls become single-line
+ */
+function preprocessScene(sceneJs: string): string {
+  let cleaned = sceneJs.replace(/\/\/.*$/gm, "");
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, "");
+  cleaned = cleaned.replace(/\n/g, " ");
+  cleaned = cleaned.replace(/\s+/g, " ");
+  return cleaned;
 }
 
 /**
  * Parse scene.js source to extract scene objects with their names, dimensions,
  * positions, and material assignments.
+ *
+ * Handles integer and float args (e.g. box(4, 2, 1) and box(4.0, 2.5, 0.12)),
+ * multiline formatting, and comments.
  */
 export function parseSceneObjects(sceneJs: string): IFCSceneObject[] {
   const objects: IFCSceneObject[] = [];
 
-  // Match variable assignments: const <name> = translate(box(...), x, y, z)
-  // or const <name> = box(w, h, d)
-  // Also handles rotate(box(...), ...) wrapped in translate
-  const lines = sceneJs.split("\n");
+  const cleaned = preprocessScene(sceneJs);
+
   const varDims: Map<string, { w: number; h: number; d: number; x: number; y: number; z: number }> = new Map();
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  let match: RegExpExecArray | null;
 
-    // Match: const <name> = translate(box(w,h,d), x, y, z)
-    // Also: const <name> = translate(rotate(box(w,h,d), ...), x, y, z)
-    const translateMatch = trimmed.match(
-      /const\s+(\w+)\s*=\s*translate\s*\((?:rotate\s*\()?box\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)(?:\s*,\s*[\d.,-]+\s*\))?\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/
-    );
-    if (translateMatch) {
-      varDims.set(translateMatch[1], {
-        w: parseFloat(translateMatch[2]),
-        h: parseFloat(translateMatch[3]),
-        d: parseFloat(translateMatch[4]),
-        x: parseFloat(translateMatch[5]),
-        y: parseFloat(translateMatch[6]),
-        z: parseFloat(translateMatch[7]),
-      });
-      continue;
-    }
+  // Match: const <name> = translate(box(w,h,d), x, y, z)
+  const translateBoxRe = new RegExp(
+    `const\\s+(\\w+)\\s*=\\s*translate\\s*\\(\\s*box\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)\\s*,\\s*(${SIGNED_NUM})\\s*,\\s*(${SIGNED_NUM})\\s*,\\s*(${SIGNED_NUM})\\s*\\)`,
+    "g"
+  );
 
-    // Match: const <name> = box(w, h, d)
-    const boxMatch = trimmed.match(
-      /const\s+(\w+)\s*=\s*box\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/
-    );
-    if (boxMatch) {
-      varDims.set(boxMatch[1], {
-        w: parseFloat(boxMatch[2]),
-        h: parseFloat(boxMatch[3]),
-        d: parseFloat(boxMatch[4]),
+  while ((match = translateBoxRe.exec(cleaned)) !== null) {
+    varDims.set(match[1], {
+      w: parseFloat(match[2]),
+      h: parseFloat(match[3]),
+      d: parseFloat(match[4]),
+      x: parseFloat(match[5]),
+      y: parseFloat(match[6]),
+      z: parseFloat(match[7]),
+    });
+  }
+
+  // Match: const <name> = translate(rotate(box(w,h,d), rx, ry, rz), x, y, z)
+  const translateRotateBoxRe = new RegExp(
+    `const\\s+(\\w+)\\s*=\\s*translate\\s*\\(\\s*rotate\\s*\\(\\s*box\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)\\s*,\\s*${SIGNED_NUM}\\s*,\\s*${SIGNED_NUM}\\s*,\\s*${SIGNED_NUM}\\s*\\)\\s*,\\s*(${SIGNED_NUM})\\s*,\\s*(${SIGNED_NUM})\\s*,\\s*(${SIGNED_NUM})\\s*\\)`,
+    "g"
+  );
+
+  while ((match = translateRotateBoxRe.exec(cleaned)) !== null) {
+    varDims.set(match[1], {
+      w: parseFloat(match[2]),
+      h: parseFloat(match[3]),
+      d: parseFloat(match[4]),
+      x: parseFloat(match[5]),
+      y: parseFloat(match[6]),
+      z: parseFloat(match[7]),
+    });
+  }
+
+  // Match: const <name> = box(w, h, d)
+  const boxRe = new RegExp(
+    `const\\s+(\\w+)\\s*=\\s*box\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)`,
+    "g"
+  );
+
+  while ((match = boxRe.exec(cleaned)) !== null) {
+    // Only register if not already registered by translate pattern
+    if (!varDims.has(match[1])) {
+      varDims.set(match[1], {
+        w: parseFloat(match[2]),
+        h: parseFloat(match[3]),
+        d: parseFloat(match[4]),
         x: 0,
         y: 0,
         z: 0,
@@ -179,8 +222,7 @@ export function parseSceneObjects(sceneJs: string): IFCSceneObject[] {
 
   // Match scene.add calls to pick up material assignments
   const addRegex = /scene\.add\s*\(\s*(\w+)\s*(?:,\s*\{([^}]*)\})?\s*\)/g;
-  let match;
-  while ((match = addRegex.exec(sceneJs)) !== null) {
+  while ((match = addRegex.exec(cleaned)) !== null) {
     const varName = match[1];
     const optsStr = match[2] || "";
     const dims = varDims.get(varName);
