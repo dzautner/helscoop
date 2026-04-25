@@ -32,6 +32,11 @@ import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
 import TaloyhtioPanel from "@/components/TaloyhtioPanel";
 import { parseSceneParams, applyParamToScript } from "@/lib/scene-interpreter";
 import {
+  getAssemblyProgressStorageKey,
+  readAssemblyProgressFromStorage,
+  writeAssemblyProgressToStorage,
+} from "@/lib/assembly-progress-storage";
+import {
   analyzeSceneGeometry,
   suggestGeometryBomUpdates,
   type GeometryBomSuggestion,
@@ -1328,21 +1333,15 @@ export default function ProjectPage() {
     setAssemblyProgressLoaded(false);
     if (typeof window === "undefined") return;
     const validIds = new Set(assemblyGuide.steps.map((step) => step.id));
-    const storageKey = `helscoop_assembly_progress_${projectId}`;
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as string[];
-      setAssemblyCompletedStepIds(new Set(saved.filter((id) => validIds.has(id))));
-    } catch {
-      setAssemblyCompletedStepIds(new Set());
-    } finally {
-      setAssemblyProgressLoaded(true);
-    }
+    const storageKey = getAssemblyProgressStorageKey(projectId);
+    setAssemblyCompletedStepIds(readAssemblyProgressFromStorage(window.localStorage, storageKey, validIds));
+    setAssemblyProgressLoaded(true);
   }, [assemblyStepSignature, assemblyGuide.steps, projectId]);
 
   useEffect(() => {
     if (!assemblyProgressLoaded || typeof window === "undefined") return;
-    const storageKey = `helscoop_assembly_progress_${projectId}`;
-    window.localStorage.setItem(storageKey, JSON.stringify(Array.from(assemblyCompletedStepIds)));
+    const storageKey = getAssemblyProgressStorageKey(projectId);
+    writeAssemblyProgressToStorage(window.localStorage, storageKey, assemblyCompletedStepIds);
   }, [assemblyCompletedStepIds, assemblyProgressLoaded, projectId]);
 
   useEffect(() => {
