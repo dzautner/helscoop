@@ -48,6 +48,11 @@ export function buildPresentationUrl(origin: string, shareToken: string, presetI
   return `${cleanOrigin}/shared/${encodeURIComponent(shareToken)}?${params.toString()}`;
 }
 
+export function buildBeforeAfterShareUrl(origin: string, shareToken: string): string {
+  const cleanOrigin = origin.replace(/\/$/, "");
+  return `${cleanOrigin}/share/${encodeURIComponent(shareToken)}?compare=1`;
+}
+
 export function sanitizePresentationFilename(projectName: string, presetId: string | null | undefined, extension = "png"): string {
   const safeName = (projectName || "helscoop-project")
     .trim()

@@ -506,6 +506,8 @@ describe("exhaustive i18n key parity", () => {
     "share.linkLabel", "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
     "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
     "share.signUpCta", "share.materials", "share.total", "share.viewCount",
+    "share.beforeAfterTitle", "share.beforeAfterGenerate", "share.beforeAfterCopy",
+    "share.beforeAfterDownload", "share.beforeLabel", "share.afterLabel",
     // presentation
     "presentation.eyebrow", "presentation.title", "presentation.description",
     "presentation.estimate", "presentation.cameraPresets", "presentation.front",

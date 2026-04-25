@@ -7,10 +7,13 @@ import { requirePermission } from "../permissions";
 import { logAuditEvent } from "../audit";
 import { sendEmail, type EmailAttachment } from "../email";
 import { broadcastProjectEvent, getCollaborationClientId } from "../collaboration";
+import { getUserPlan, PLANS } from "../entitlements";
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHOTO_OVERLAY_DATA_URL_RE = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+const SHARE_PREVIEW_DATA_URL_RE = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+const SHARE_PREVIEW_PRESETS = new Set(["front", "side", "aerial", "iso"]);
 
 interface QuoteRequestBomRow {
   material_name: string;
@@ -183,6 +186,52 @@ function normalizePhotoOverlay(value: unknown): Record<string, unknown> | null {
     rotation: clampNumber(raw.rotation, -30, 30, 0),
     updated_at: typeof raw.updated_at === "string" ? raw.updated_at : new Date().toISOString(),
   };
+}
+
+function normalizeSharePreview(value: unknown): Record<string, unknown> | null {
+  if (value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("share_preview must be an object or null");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const afterImage = typeof raw.after_image === "string" ? raw.after_image : "";
+  if (!SHARE_PREVIEW_DATA_URL_RE.test(afterImage)) {
+    throw new Error("share_preview.after_image must be a JPEG, PNG, or WebP data URL");
+  }
+  if (afterImage.length > 7_500_000) {
+    throw new Error("share_preview.after_image is too large");
+  }
+
+  const beforeImage = typeof raw.before_image === "string" && raw.before_image.trim()
+    ? raw.before_image
+    : null;
+  if (beforeImage) {
+    if (!SHARE_PREVIEW_DATA_URL_RE.test(beforeImage)) {
+      throw new Error("share_preview.before_image must be a JPEG, PNG, or WebP data URL");
+    }
+    if (beforeImage.length > 7_500_000) {
+      throw new Error("share_preview.before_image is too large");
+    }
+  }
+
+  const presetId = typeof raw.preset_id === "string" && SHARE_PREVIEW_PRESETS.has(raw.preset_id)
+    ? raw.preset_id
+    : "iso";
+  const normalized = {
+    kind: "before_after",
+    before_image: beforeImage,
+    after_image: afterImage,
+    split: clampNumber(raw.split, 5, 95, 50),
+    preset_id: presetId,
+    watermark: Boolean(raw.watermark),
+    generated_at: typeof raw.generated_at === "string" ? raw.generated_at : new Date().toISOString(),
+  };
+
+  if (JSON.stringify(normalized).length > 15_500_000) {
+    throw new Error("share_preview is too large");
+  }
+  return normalized;
 }
 
 function normalizeMoodBoard(value: unknown): Record<string, unknown> {
@@ -1416,12 +1465,70 @@ router.post("/:id/share", requirePermission("project:share"), async (req, res) =
   res.json({ share_token: shareToken, expires_at: updated.rows[0]?.share_token_expires_at });
 });
 
+router.put("/:id/share-preview", requirePermission("project:share"), async (req, res) => {
+  let preview: Record<string, unknown> | null;
+  try {
+    const body = req.body as Record<string, unknown>;
+    preview = normalizeSharePreview(hasOwn(body, "share_preview") ? body.share_preview : body);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid share_preview" });
+  }
+  if (!preview) {
+    return res.status(400).json({ error: "share_preview is required" });
+  }
+
+  const project = await query(
+    `SELECT id, share_token, share_token_expires_at, is_public
+     FROM projects
+     WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`,
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const tier = await getUserPlan(req.user!.id);
+  preview.watermark = !PLANS[tier].features.premiumExport;
+
+  const row = project.rows[0];
+  const expiresAt = row.share_token_expires_at ? new Date(row.share_token_expires_at) : null;
+  const isExpired = expiresAt ? expiresAt.getTime() <= Date.now() : false;
+  const nextShareToken = !row.share_token || isExpired ? crypto.randomUUID() : row.share_token;
+  const resetExpiry = !row.is_public && (!row.share_token || !expiresAt || isExpired);
+
+  const result = await query(
+    `UPDATE projects
+     SET share_preview = $1::jsonb,
+         share_token = $2,
+         share_token_created_at = CASE
+           WHEN share_token IS NULL OR share_token <> $2 THEN now()
+           ELSE share_token_created_at
+         END,
+         share_token_expires_at = CASE
+           WHEN is_public = true THEN NULL
+           WHEN $3::boolean THEN now() + INTERVAL '30 days'
+           ELSE share_token_expires_at
+         END,
+         updated_at = now()
+     WHERE id = $4 AND user_id = $5
+     RETURNING share_preview, share_token, share_token_expires_at`,
+    [JSON.stringify(preview), nextShareToken, resetExpiry, req.params.id, req.user!.id],
+  );
+
+  res.json({
+    share_preview: result.rows[0]?.share_preview ?? preview,
+    share_token: result.rows[0]?.share_token ?? nextShareToken,
+    share_token_expires_at: result.rows[0]?.share_token_expires_at ?? null,
+  });
+});
+
 router.delete("/:id/share", async (req, res) => {
   const result = await query(
     `UPDATE projects
      SET share_token = NULL,
          share_token_created_at = NULL,
          share_token_expires_at = NULL,
+         share_preview = NULL,
          is_public = false,
          published_at = NULL,
          updated_at = now()

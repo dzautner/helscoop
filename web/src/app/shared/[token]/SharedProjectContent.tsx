@@ -9,6 +9,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getPresentationPreset } from "@/lib/presentation-export";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import BeforeAfterComparison from "@/components/BeforeAfterComparison";
 import type { BomItem, Project, SharedProjectComment } from "@/types";
 
 function escapeCsvField(value: string, sep: string): string {
@@ -198,7 +199,9 @@ export default function SharedProjectContent({ token }: { token: string }) {
 
   const grandTotal = bom.reduce((sum, b) => sum + (b.total || 0), 0);
   const presentationMode = searchParams.get("presentation") === "1";
+  const compareMode = searchParams.get("compare") === "1";
   const presentationPreset = getPresentationPreset(searchParams.get("camera")).id;
+  const sharePreview = project.share_preview?.kind === "before_after" ? project.share_preview : null;
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
   const encodedShareUrl = encodeURIComponent(shareUrl);
   const encodedShareText = encodeURIComponent(`${project.name} - ${shareUrl}`);
@@ -277,29 +280,49 @@ export default function SharedProjectContent({ token }: { token: string }) {
               <span>{t("presentation.pitchModeDesc")}</span>
             </div>
           )}
-          <ErrorBoundary
-            fallback={({ error: err }) => (
-              <div style={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "var(--bg-secondary)",
-                borderRadius: "var(--radius-md)",
-                color: "var(--text-muted)",
-                fontSize: 13,
-              }}>
-                {t('editor.viewportCrashTitle')}: {err.message}
+          {compareMode && sharePreview ? (
+            <div className="shared-before-after-view">
+              <div className="shared-before-after-copy">
+                <div className="label-mono">{t("share.beforeAfterEyebrow")}</div>
+                <h2>{project.name}</h2>
+                <p>{project.description || t("share.beforeAfterViewerDesc")}</p>
               </div>
-            )}
-          >
-            <Viewport3D
-              sceneJs={project.scene_js || ""}
-              wireframe={false}
-              initialPresentationPreset={presentationMode ? presentationPreset : undefined}
-            />
-          </ErrorBoundary>
+              <BeforeAfterComparison
+                beforeImage={sharePreview.before_image}
+                afterImage={sharePreview.after_image}
+                initialSplit={sharePreview.split}
+                watermark={sharePreview.watermark}
+                title={project.name}
+                beforeLabel={t("share.beforeLabel")}
+                afterLabel={t("share.afterLabel")}
+                sliderLabel={t("share.beforeAfterSlider")}
+              />
+            </div>
+          ) : (
+            <ErrorBoundary
+              fallback={({ error: err }) => (
+                <div style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--bg-secondary)",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--text-muted)",
+                  fontSize: 13,
+                }}>
+                  {t('editor.viewportCrashTitle')}: {err.message}
+                </div>
+              )}
+            >
+              <Viewport3D
+                sceneJs={project.scene_js || ""}
+                wireframe={false}
+                initialPresentationPreset={presentationMode ? presentationPreset : undefined}
+              />
+            </ErrorBoundary>
+          )}
         </div>
 
         {/* Contractor sidebar */}

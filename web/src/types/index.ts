@@ -61,6 +61,7 @@ export interface Project {
   mood_board?: MoodBoardState | null;
   permit_metadata?: RyhtiPermitMetadata | null;
   photo_overlay?: PhotoOverlayState | null;
+  share_preview?: SharePreviewState | null;
   share_token?: string | null;
   share_token_expires_at?: string | null;
   view_count?: number;
@@ -137,6 +138,16 @@ export interface PhotoOverlayState {
   scale: number;
   rotation: number;
   updated_at?: string;
+}
+
+export interface SharePreviewState {
+  kind: "before_after";
+  before_image?: string | null;
+  after_image: string;
+  split: number;
+  preset_id?: "front" | "side" | "aerial" | "iso";
+  watermark: boolean;
+  generated_at?: string;
 }
 
 export type MoodBoardItemType = "material" | "photo" | "color" | "note";

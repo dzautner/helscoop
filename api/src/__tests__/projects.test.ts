@@ -1136,6 +1136,106 @@ describe("POST /projects/:id/share", () => {
   });
 });
 
+describe("PUT /projects/:id/share-preview", () => {
+  const validPreview = {
+    kind: "before_after",
+    before_image: "data:image/png;base64,YmVmb3Jl",
+    after_image: "data:image/png;base64,YWZ0ZXI=",
+    split: 58,
+    preset_id: "front",
+    watermark: false,
+  };
+
+  it("saves a before/after share preview and creates a share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: null, share_token_expires_at: null, is_public: false }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ plan_tier: "free", role: "user" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        share_preview: { ...validPreview, watermark: true },
+        share_token: "generated-token",
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/share-preview", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { share_preview: validPreview },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { share_token: string }).share_token).toBe("generated-token");
+    expect(mockQuery.mock.calls[2][0]).toContain("share_preview");
+    expect(JSON.parse(mockQuery.mock.calls[2][1][0] as string)).toMatchObject({
+      kind: "before_after",
+      split: 58,
+      preset_id: "front",
+      watermark: true,
+    });
+  });
+
+  it("stores non-watermarked metadata for Pro users", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: "share-token", share_token_expires_at: "2999-01-01T00:00:00.000Z", is_public: false }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ plan_tier: "pro", role: "user" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        share_preview: { ...validPreview, watermark: false },
+        share_token: "share-token",
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/share-preview", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { share_preview: { ...validPreview, watermark: true } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(mockQuery.mock.calls[2][1][0] as string)).toMatchObject({ watermark: false });
+  });
+
+  it("rejects invalid preview images", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1/share-preview", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { share_preview: { ...validPreview, after_image: "https://example.com/image.png" } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
 // --------------------------------------------------------------------------
 // DELETE /projects/:id/share — revoke share
 // --------------------------------------------------------------------------
@@ -1486,6 +1586,45 @@ describe("GET /shared/:token", () => {
 
     expect(res.status).toBe(410);
     expect((res.body as { code: string }).code).toBe("share_expired");
+  });
+});
+
+describe("GET /shared/:token/og-image", () => {
+  it("serves the saved before/after preview image without auth", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        share_preview: {
+          kind: "before_after",
+          after_image: "data:image/png;base64,aGVsc2Nvb3A=",
+        },
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/shared/valid-share-token-123/og-image");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/png");
+    expect(res.body).toBe("helscoop");
+  });
+
+  it("returns 404 when no saved preview image exists", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_preview: null, share_token_expires_at: null }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/shared/valid-share-token-123/og-image");
+
+    expect(res.status).toBe(404);
   });
 });
 
