@@ -237,7 +237,9 @@ describe("ChatPanel extended: message display ordering", () => {
 // ---------------------------------------------------------------------------
 describe("ChatPanel extended: error handling", () => {
   it("shows insufficient credits message on 402 error", async () => {
-    mockChat.mockRejectedValueOnce(new ApiError("Insufficient credits", 402));
+    mockChat.mockRejectedValueOnce(
+      new ApiError("Insufficient credits", 402, "Payment Required"),
+    );
 
     render(<ChatPanel {...defaultProps} />);
     const input = screen.getByLabelText("editor.chatInputLabel");
@@ -335,21 +337,33 @@ describe("ChatPanel extended: reference images", () => {
         referenceImages={[
           {
             id: "img-1",
+            project_id: "proj-1",
             original_filename: "house.jpg",
+            content_type: "image/jpeg",
+            byte_size: 123_456,
             width: 800,
             height: 600,
             uploaded_at: "2025-01-01",
-            thumbnail_800_key: "thumb-1",
-            project_id: "proj-1",
+            urls: {
+              original: "/photos/img-1/original",
+              thumb_200: "/photos/img-1/thumb-200",
+              thumb_800: "/photos/img-1/thumb-800",
+            },
           },
           {
             id: "img-2",
+            project_id: "proj-1",
             original_filename: "roof.jpg",
+            content_type: "image/jpeg",
+            byte_size: 234_567,
             width: 1024,
             height: 768,
             uploaded_at: "2025-01-02",
-            thumbnail_800_key: "thumb-2",
-            project_id: "proj-1",
+            urls: {
+              original: "/photos/img-2/original",
+              thumb_200: "/photos/img-2/thumb-200",
+              thumb_800: "/photos/img-2/thumb-800",
+            },
           },
         ]}
       />,
