@@ -56,9 +56,9 @@ router.get("/estimate", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Invalid projectId format" });
   }
 
-  // Verify the project exists and belongs to the authenticated user
+  // Verify the project exists, belongs to the authenticated user, and is not soft-deleted
   const projectResult = await query(
-    "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+    "SELECT id FROM projects WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
     [projectId, req.user!.id],
   );
 
