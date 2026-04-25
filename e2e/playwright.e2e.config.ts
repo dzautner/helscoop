@@ -2,7 +2,7 @@
  * Playwright config for running e2e tests against already-running servers.
  * Use this when the API and Web servers are already running externally.
  *
- * Usage: TEST_API_URL=http://localhost:3002 npx playwright test --config=playwright.e2e.config.ts
+ * Usage: TEST_API_URL=http://localhost:3051 npx playwright test --config=playwright.e2e.config.ts
  */
 import { defineConfig, devices } from "@playwright/test";
 
