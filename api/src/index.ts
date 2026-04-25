@@ -74,8 +74,25 @@ const IS_DEV = process.env.NODE_ENV === "development";
 const DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://localhost:3002", "http://localhost:3052"];
 const ALLOWED_CORS_ORIGINS = configuredCorsOrigins(process.env.CORS_ORIGIN, DEFAULT_CORS_ORIGINS);
 
-// Security headers
-app.use(helmet());
+// Security headers — tuned for a cross-origin API that sets httpOnly session
+// cookies.  Helmet's defaults assume a same-origin HTML page, so we relax the
+// policies that would otherwise prevent the browser from processing Set-Cookie
+// headers on cross-origin fetch() responses.
+app.use(
+  helmet({
+    // CORP 'same-origin' causes some browsers to discard cross-origin
+    // responses (including their Set-Cookie headers) when COEP is active.
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    // COEP 'require-corp' is only relevant for document-level embedding;
+    // on a JSON API it adds no security value and can interfere with CORS.
+    crossOriginEmbedderPolicy: false,
+    // CSP is designed for HTML documents.  On an API that only serves JSON
+    // the default policy (upgrade-insecure-requests, script-src 'self', etc.)
+    // adds no protection and the upgrade-insecure-requests directive can
+    // break cookie delivery over plain HTTP in development.
+    contentSecurityPolicy: false,
+  })
+);
 
 // CORS configuration
 app.use(
@@ -515,9 +532,12 @@ app.put("/auth/profile", authenticatedLimiter, requireAuth, async (req, res) => 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-    // Return a fresh token with updated user info
+    // Return a fresh token with updated user info and update the session cookie
     const user = result.rows[0];
-    res.json({ user, token: signToken(user), token_expires_at: tokenExpiresAt() });
+    const token = signToken(user);
+    const expiresAt = tokenExpiresAt();
+    setAuthCookie(res, token, expiresAt);
+    res.json({ user, token, token_expires_at: expiresAt });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Update failed";
     if (msg.includes("duplicate key")) {
