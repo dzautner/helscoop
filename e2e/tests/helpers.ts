@@ -43,7 +43,7 @@ export async function loginUser(
 export async function setAuthToken(page: Page, token: string): Promise<void> {
   await page.goto("/");
   await page.evaluate((t) => {
-    localStorage.setItem("helscoop_token", t);
+    if (t) localStorage.setItem("helscoop_session_active", "true");
     localStorage.setItem("helscoop_onboarding_completed", "true");
   }, token);
   await page.reload();
@@ -62,7 +62,7 @@ export async function setAuthToken(page: Page, token: string): Promise<void> {
       .catch(() => false);
     if (hasLoginForm) {
       await page.evaluate((t) => {
-        localStorage.setItem("helscoop_token", t);
+        if (t) localStorage.setItem("helscoop_session_active", "true");
       }, token);
       await page.reload();
       await page.waitForLoadState("networkidle");

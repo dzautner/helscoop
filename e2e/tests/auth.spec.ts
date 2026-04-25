@@ -114,13 +114,13 @@ test.describe("Authentication", () => {
     const res = await page.request.post(`${API_URL}/auth/register`, {
       data: { email, password: testPassword, name: "Persist Test" },
     });
-    const { token } = await res.json();
+    await res.json();
 
     await page.goto("/");
-    await page.evaluate((t) => {
-      localStorage.setItem("helscoop_token", t);
+    await page.evaluate(() => {
+      localStorage.setItem("helscoop_session_active", "true");
       localStorage.setItem("helscoop_onboarding_completed", "true");
-    }, token);
+    });
     await page.reload();
 
     await expect(

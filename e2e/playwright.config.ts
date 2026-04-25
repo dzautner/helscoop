@@ -2,8 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 const API_PORT = 3051;
 const WEB_PORT = 3052;
+const DEFAULT_E2E_DATABASE_URL = "postgres://helscoop:helscoop_dev@localhost:5433/helscoop";
 
 process.env.TEST_API_URL ??= `http://localhost:${API_PORT}`;
+process.env.E2E_DATABASE_URL ??= DEFAULT_E2E_DATABASE_URL;
 
 export default defineConfig({
   testDir: "./tests",
@@ -39,7 +41,7 @@ export default defineConfig({
         ...process.env,
         PORT: String(API_PORT),
         CORS_ORIGIN: `http://localhost:${WEB_PORT}`,
-        DATABASE_URL: "postgres://dingcad:dingcad_dev@localhost:5433/dingcad",
+        DATABASE_URL: process.env.E2E_DATABASE_URL,
         JWT_SECRET: "helscoop-e2e-test-secret",
         NODE_ENV: "test",
         E2E: "1",
