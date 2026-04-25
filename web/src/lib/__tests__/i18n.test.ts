@@ -142,6 +142,11 @@ describe("getTranslation — Finnish (fi)", () => {
     expect(t("editor.undo")).toBe("Kumoa");
   });
 
+  it("resolves AR preview keys", () => {
+    expect(t("ar.title")).toBe("AR-kameraesikatselu");
+    expect(t("ar.permissionDenied")).toBe("Kameralupa evätty");
+  });
+
   it("resolves settings keys", () => {
     expect(t("settings.title")).toBe("Asetukset");
   });
@@ -177,6 +182,11 @@ describe("getTranslation — English (en)", () => {
   it("resolves layer panel keys", () => {
     expect(t("layers.title")).toBe("Layers");
     expect(t("layers.costApprox")).toBe("Approximate cost");
+  });
+
+  it("resolves AR preview keys", () => {
+    expect(t("ar.title")).toBe("AR camera preview");
+    expect(t("ar.permissionDenied")).toBe("Camera permission denied");
   });
 
   it("resolves toast keys", () => {

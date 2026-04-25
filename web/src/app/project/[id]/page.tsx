@@ -21,6 +21,7 @@ import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
 import BeforeAfterSharePanel from "@/components/BeforeAfterSharePanel";
+import ArCameraOverlay, { type ArModification } from "@/components/ArCameraOverlay";
 import ScenarioRenderPanel from "@/components/ScenarioRenderPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
@@ -421,6 +422,7 @@ export default function ProjectPage() {
   const [lightingPreset, setLightingPreset] = useState<import("@/components/Viewport3D").LightingPresetId>("default");
   const [showLightingMenu, setShowLightingMenu] = useState(false);
   const [showScenarioRenderPanel, setShowScenarioRenderPanel] = useState(false);
+  const [showArOverlay, setShowArOverlay] = useState(false);
   const [scenarioRenderToken, setScenarioRenderToken] = useState(0);
   const lightingMenuRef = useRef<HTMLDivElement>(null);
   const [viewportMeasurementMode, setViewportMeasurementMode] = useState(false);
@@ -1137,6 +1139,36 @@ export default function ProjectPage() {
     for (const m of materials) map[m.id] = m.category_name;
     return map;
   }, [materials]);
+
+  const arModifications = useMemo<ArModification[]>(() => {
+    const groups = new Map<string, ArModification>();
+    const palette: Record<ArModification["kind"], string> = {
+      wall: "rgba(228,182,92,0.34)",
+      roof: "rgba(108,157,120,0.32)",
+      ground: "rgba(92,145,228,0.26)",
+      opening: "rgba(255,255,255,0.36)",
+    };
+    const classify = (text: string): ArModification["kind"] => {
+      const lower = text.toLowerCase();
+      if (/roof|katto|tak|tiili|pelti/.test(lower)) return "roof";
+      if (/window|door|ikkuna|ovi/.test(lower)) return "opening";
+      if (/terrace|deck|ground|piha|terassi|perustus/.test(lower)) return "ground";
+      return "wall";
+    };
+
+    for (const item of bom) {
+      const labelSource = item.category_name || item.material_name || item.material_id;
+      const kind = classify(`${item.category_name || ""} ${item.material_name || ""} ${item.material_id}`);
+      if (groups.has(kind)) continue;
+      groups.set(kind, {
+        id: kind,
+        kind,
+        color: palette[kind],
+        label: labelSource,
+      });
+    }
+    return Array.from(groups.values()).slice(0, 6);
+  }, [bom]);
 
   const sceneParams = useMemo(() => parseSceneParams(sceneJs), [sceneJs]);
 
@@ -4317,6 +4349,25 @@ export default function ProjectPage() {
               </svg>
               {t("editor.renderScenario")}
             </button>
+            {isMobileEditor && (
+              <button
+                className="viewport-toolbar-btn"
+                data-active={showArOverlay}
+                onClick={() => {
+                  setShowArOverlay(true);
+                  track("ar_camera_opened", { project_id: projectId, has_render: Boolean(presentationRef.current) });
+                }}
+                aria-pressed={showArOverlay}
+                title={t("ar.title")}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                  <path d="M4 18h4M16 18h4" />
+                </svg>
+                {t("ar.short")}
+              </button>
+            )}
             <button
               className="viewport-toolbar-btn"
               data-active={thermalView}
@@ -4825,6 +4876,15 @@ export default function ProjectPage() {
               onClose={() => setShowScenarioRenderPanel(false)}
             />
           )}
+
+          <ArCameraOverlay
+            open={showArOverlay}
+            projectName={projectName}
+            modifications={arModifications}
+            captureApiRef={presentationRef}
+            onClose={() => setShowArOverlay(false)}
+            onScreenshot={() => track("ar_screenshot_saved", { project_id: projectId })}
+          />
 
           {/* Scene validation warnings */}
           {sceneWarnings.length > 0 && (
