@@ -54,11 +54,11 @@ router.get("/:materialId", requireAuth, requirePermission("material:read"), asyn
 router.get("/project/:projectId", requireAuth, requirePermission("project:read_own"), async (req, res) => {
   const { projectId } = req.params;
 
-  // Verify project exists and belongs to the authenticated user (not soft-deleted)
-  const projResult = await query(
-    "SELECT id FROM projects WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
-    [projectId, req.user!.id],
-  );
+  // Verify project exists AND belongs to the requesting user (or user is admin), excluding soft-deleted
+  const isAdmin = req.user!.role === "admin";
+  const projResult = isAdmin
+    ? await query("SELECT id FROM projects WHERE id = $1 AND deleted_at IS NULL", [projectId])
+    : await query("SELECT id FROM projects WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL", [projectId, req.user!.id]);
   if (projResult.rows.length === 0) {
     return res.status(404).json({ error: "Project not found" });
   }

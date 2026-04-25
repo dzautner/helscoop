@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import crypto from "crypto";
 
+// Set GOOGLE_CLIENT_ID before importing auth (module reads it at load time)
+process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
+
 // Mock the db module before importing auth
 vi.mock("../db", () => ({
   query: vi.fn(),
@@ -57,7 +60,7 @@ describe("verifyGoogleToken", () => {
             email_verified: "true",
             name: "Test User",
             picture: "https://lh3.googleusercontent.com/photo.jpg",
-            aud: "some-client-id",
+            aud: "test-google-client-id",
           }),
       })
     );
@@ -85,6 +88,7 @@ describe("verifyGoogleToken", () => {
             sub: "google-uid-456",
             email: "matti.meikalainen@gmail.com",
             email_verified: true,
+            aud: "test-google-client-id",
           }),
       })
     );
