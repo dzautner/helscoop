@@ -65,7 +65,7 @@ export default function ProjectList({
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([api.getProjects(), api.getTemplates()])
+    Promise.all([api.getProjects(), api.getTemplates({ lang: locale })])
       .then(([projs, tmpls]) => {
         if (mounted) {
           setProjects(projs);
@@ -80,7 +80,7 @@ export default function ProjectList({
         }
       });
     return () => { mounted = false; };
-  }, [toast, t]);
+  }, [toast, t, locale]);
 
   async function createProject() {
     if (!newName.trim()) return;
@@ -110,7 +110,16 @@ export default function ProjectList({
       if (tmpl.bom.length > 0) {
         await api.saveBOM(p.id, tmpl.bom);
       }
-      setProjects([{ ...p, estimated_cost: tmpl.estimated_cost }, ...projects]);
+      api.recordTemplateUse(tmpl.id)
+        .then((result) => {
+          setTemplates((current) => current.map((item) => (
+            item.id === tmpl.id ? { ...item, use_count: result.use_count } : item
+          )));
+        })
+        .catch(() => {
+          // Usage tracking should never block project creation.
+        });
+      setProjects([{ ...p, estimated_cost: tmpl.estimated_cost ?? p.estimated_cost }, ...projects]);
       toast(t('toast.templateCreated'), "success");
     } catch (err) {
       toast(err instanceof Error ? err.message : t('toast.templateFailed'), "error");

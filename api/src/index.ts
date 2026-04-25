@@ -9,7 +9,6 @@ import crypto from "crypto";
 import { login, register, signToken, tokenExpiresAt, verifyForRefresh, requireAuth, forgotPassword, resetPassword, verifyEmail, resendVerification, verifyGoogleToken, googleLogin, verifyAppleToken, appleLogin, AuthUser } from "./auth";
 import { requirePermission } from "./permissions";
 import { query, pool } from "./db";
-import { kanalaSceneJs } from "./templates/kanala";
 import materialsRouter from "./routes/materials";
 import projectsRouter from "./routes/projects";
 import suppliersRouter from "./routes/suppliers";
@@ -1206,158 +1205,312 @@ app.get("/materials/export/viewer", publicLimiter, async (_req, res) => {
   res.json({ version: 1, materials, categories, suppliers });
 });
 
-app.get("/templates", publicLimiter, (_req, res) => {
-  res.json([
-    {
-      id: "pihasauna",
-      name: "Pihasauna 3x4m",
-      description: "Perinteinen suomalainen pihasauna hirsirunko",
-      icon: "sauna",
-      estimated_cost: 8500,
-      scene_js: `// Pihasauna 3x4m
-const floor = box(4, 0.2, 3);
-const wall1_left = translate(box(0.6, 2.4, 0.12), -1.7, 1.3, -1.44);
-const wall1_right = translate(box(2.2, 2.4, 0.12), 0.9, 1.3, -1.44);
-const wall1_upper = translate(box(0.8, 0.4, 0.12), 1.0, 2.3, -1.44);
-const wall2 = translate(box(4, 2.4, 0.12), 0, 1.3, 1.44);
-const wall3 = translate(box(0.12, 2.4, 3), -1.94, 1.3, 0);
-const wall4 = translate(box(0.12, 2.4, 3), 1.94, 1.3, 0);
-const roof1 = translate(rotate(box(2.3, 0.05, 4.4), 0, 0, 0.52), -1.0, 2.9, 0);
-const roof2 = translate(rotate(box(2.3, 0.05, 4.4), 0, 0, -0.52), 1.0, 2.9, 0);
-const chimney = translate(box(0.3, 0.6, 0.3), -0.8, 2.8, 0.5);
-const bench = translate(box(1.2, 0.06, 0.4), 0, 0.45, -1.0);
-const stove = translate(box(0.5, 0.6, 0.5), -1.5, 0.4, 0.8);
+const TEMPLATE_CATEGORIES = new Set(["sauna", "garage", "shed", "terrace", "other"]);
+const TEMPLATE_DIFFICULTIES = new Set(["beginner", "intermediate", "advanced"]);
+const TEMPLATE_SORTS = new Set(["popular", "newest", "price"]);
 
-scene.add(floor, { material: "foundation", color: [0.65, 0.65, 0.65] });
-scene.add(wall1_left, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(wall1_right, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(wall1_upper, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(wall2, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(wall3, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(wall4, { material: "lumber", color: [0.82, 0.68, 0.47] });
-scene.add(roof1, { material: "roofing", color: [0.35, 0.32, 0.30] });
-scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
-scene.add(chimney, { color: [0.5, 0.48, 0.45] });
-scene.add(bench, { material: "lumber", color: [0.7, 0.55, 0.35] });
-scene.add(stove, { color: [0.3, 0.3, 0.32] });`,
-      bom: [
-        { material_id: "pine_48x148_c24", quantity: 42, unit: "jm" },
-        { material_id: "pine_48x98_c24", quantity: 28, unit: "jm" },
-        { material_id: "osb_9mm", quantity: 12, unit: "m2" },
-        { material_id: "insulation_100mm", quantity: 12, unit: "m2" },
-        { material_id: "concrete_block", quantity: 24, unit: "kpl" },
-        { material_id: "galvanized_roofing", quantity: 16, unit: "m2" },
-      ],
-    },
-    {
-      id: "autotalli",
-      name: "Autotalli 6x4m",
-      description: "Yhden auton autotalli nosto-ovella",
-      icon: "garage",
-      estimated_cost: 12000,
-      scene_js: `// Autotalli 6x4m
-const floor = box(6, 0.15, 4);
-const wall_back = translate(box(6, 2.8, 0.15), 0, 1.55, -1.925);
-const wall_left = translate(box(0.15, 2.8, 4), -2.925, 1.55, 0);
-const wall_right = translate(box(0.15, 2.8, 4), 2.925, 1.55, 0);
-const wall_front = translate(box(6, 0.8, 0.15), 0, 2.55, 1.925);
-const gate = translate(box(2.6, 2.2, 0.15), 0, 1.25, 1.925);
-const roof = translate(box(6.6, 0.05, 4.6), 0, 3.0, 0);
+interface TemplateBomItem {
+  material_id: string;
+  quantity: number;
+  unit: string;
+}
 
-scene.add(floor, { material: "foundation", color: [0.7, 0.7, 0.7] });
-scene.add(wall_back, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(wall_left, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(wall_right, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(wall_front, { material: "lumber", color: [0.85, 0.75, 0.55] });
-scene.add(gate, { material: "lumber", color: [0.5, 0.45, 0.4] });
-scene.add(roof, { material: "roofing", color: [0.3, 0.3, 0.3] });`,
-      bom: [
-        { material_id: "pine_48x148_c24", quantity: 65, unit: "jm" },
-        { material_id: "pine_48x98_c24", quantity: 45, unit: "jm" },
-        { material_id: "osb_9mm", quantity: 24, unit: "m2" },
-        { material_id: "insulation_100mm", quantity: 24, unit: "m2" },
-        { material_id: "concrete_block", quantity: 48, unit: "kpl" },
-        { material_id: "galvanized_roofing", quantity: 28, unit: "m2" },
-      ],
-    },
-    {
-      id: "varasto",
-      name: "Puutarhavarasto 3x2m",
-      description: "Kompakti varastokoppi puutarhaan",
-      icon: "shed",
-      estimated_cost: 3200,
-      scene_js: `// Puutarhavarasto 3x2m
-const floor = box(3, 0.1, 2);
-const wall1 = translate(box(3, 2.2, 0.1), 0, 1.2, -0.95);
-const wall2_left = translate(box(0.7, 2.2, 0.1), -1.05, 1.2, 0.95);
-const wall2_right = translate(box(1.1, 2.2, 0.1), 0.95, 1.2, 0.95);
-const wall2_upper = translate(box(0.8, 0.4, 0.1), 0.6, 2.1, 0.95);
-const wall3 = translate(box(0.1, 2.2, 2), -1.45, 1.2, 0);
-const wall4_upper = translate(box(0.1, 0.6, 2), 1.45, 2.0, 0);
-const roof = translate(rotate(box(3.4, 0.04, 2.4), 0.12, 0, 0), 0, 2.4, 0);
+interface TemplateInsertPayload {
+  id: string;
+  name: string;
+  name_fi: string | null;
+  name_en: string | null;
+  description: string;
+  description_fi: string | null;
+  description_en: string | null;
+  category: string;
+  icon: string | null;
+  scene_js: string;
+  bom: TemplateBomItem[];
+  thumbnail_url: string | null;
+  estimated_cost: number | null;
+  difficulty: string;
+  area_m2: number | null;
+  is_featured: boolean;
+  is_community: boolean;
+  moderation_status: "pending" | "approved";
+  author_id: string | null;
+}
 
-scene.add(floor, { material: "foundation", color: [0.6, 0.6, 0.6] });
-scene.add(wall1, { material: "lumber", color: [0.75, 0.62, 0.42] });
-scene.add(wall2_left, { material: "lumber", color: [0.75, 0.62, 0.42] });
-scene.add(wall2_right, { material: "lumber", color: [0.75, 0.62, 0.42] });
-scene.add(wall2_upper, { material: "lumber", color: [0.75, 0.62, 0.42] });
-scene.add(wall3, { material: "lumber", color: [0.75, 0.62, 0.42] });
-scene.add(wall4_upper, { material: "lumber", color: [0.75, 0.62, 0.42] });
-scene.add(roof, { material: "roofing", color: [0.35, 0.35, 0.3] });`,
-      bom: [
-        { material_id: "pine_48x98_c24", quantity: 24, unit: "jm" },
-        { material_id: "osb_9mm", quantity: 8, unit: "m2" },
-        { material_id: "galvanized_roofing", quantity: 8, unit: "m2" },
-      ],
-    },
-    {
-      id: "katos",
-      name: "Terassi & katos 4x3m",
-      description: "Avoin terassirakenne katteineen",
-      icon: "pergola",
-      estimated_cost: 4800,
-      scene_js: `// Terassi & katos 4x3m
-const deck = translate(box(4, 0.08, 3), 0, 0.4, 0);
-const post1 = translate(box(0.12, 2.6, 0.12), -1.8, 1.5, -1.3);
-const post2 = translate(box(0.12, 2.6, 0.12), 1.8, 1.5, -1.3);
-const post3 = translate(box(0.12, 2.6, 0.12), -1.8, 1.5, 1.3);
-const post4 = translate(box(0.12, 2.6, 0.12), 1.8, 1.5, 1.3);
-const beam1 = translate(box(4.2, 0.18, 0.12), 0, 2.85, -1.3);
-const beam2 = translate(box(4.2, 0.18, 0.12), 0, 2.85, 1.3);
-const roof = translate(rotate(box(4.6, 0.04, 3.4), 0.08, 0, 0), 0, 3.1, 0);
+function queryStringValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return undefined;
+}
 
-scene.add(deck, { material: "lumber", color: [0.78, 0.65, 0.45] });
-scene.add(post1, { material: "lumber", color: [0.7, 0.58, 0.38] });
-scene.add(post2, { material: "lumber", color: [0.7, 0.58, 0.38] });
-scene.add(post3, { material: "lumber", color: [0.7, 0.58, 0.38] });
-scene.add(post4, { material: "lumber", color: [0.7, 0.58, 0.38] });
-scene.add(beam1, { material: "lumber", color: [0.7, 0.58, 0.38] });
-scene.add(beam2, { material: "lumber", color: [0.7, 0.58, 0.38] });
-scene.add(roof, { material: "roofing", color: [0.4, 0.38, 0.35] });`,
-      bom: [
-        { material_id: "pine_48x148_c24", quantity: 30, unit: "jm" },
-        { material_id: "pine_48x98_c24", quantity: 18, unit: "jm" },
-        { material_id: "galvanized_roofing", quantity: 14, unit: "m2" },
-        { material_id: "screws_50mm", quantity: 250, unit: "kpl" },
-      ],
-    },
-    {
-      id: "kanala",
-      name: "Kanala 2x1.5m",
-      description: "Kompakti kanakoppi 4–6 kanalle, pesälaatikolla ja ulkotarhalla",
-      icon: "shed",
-      estimated_cost: 1800,
-      scene_js: kanalaSceneJs,
-      bom: [
-        { material_id: "pine_48x98_c24", quantity: 80, unit: "jm" },
-        { material_id: "pine_48x148_c24", quantity: 35, unit: "jm" },
-        { material_id: "osb_18mm", quantity: 12, unit: "m2" },
-        { material_id: "galvanized_roofing", quantity: 18, unit: "m2" },
-        { material_id: "screws_50mm", quantity: 500, unit: "kpl" },
-        { material_id: "concrete_block", quantity: 8, unit: "kpl" },
-      ],
-    },
-  ]);
+function normalizeTemplateLang(value: unknown): "fi" | "en" {
+  return queryStringValue(value) === "en" ? "en" : "fi";
+}
+
+function normalizeTemplateLimit(value: unknown): number {
+  const parsed = Number(queryStringValue(value) ?? value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return 60;
+  return Math.min(parsed, 100);
+}
+
+function slugifyTemplateId(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 56);
+  return slug || `template-${Date.now()}`;
+}
+
+function readTemplateText(
+  body: Record<string, unknown>,
+  key: string,
+  maxLength: number,
+): string | null {
+  const value = body[key];
+  if (typeof value !== "string") return null;
+  const cleaned = sanitize(value).slice(0, maxLength);
+  return cleaned || null;
+}
+
+function readTemplateRawText(
+  body: Record<string, unknown>,
+  key: string,
+  maxLength: number,
+): string | null {
+  const value = body[key];
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim().slice(0, maxLength);
+  return cleaned || null;
+}
+
+function readTemplateNumber(body: Record<string, unknown>, key: string): number | null {
+  const raw = body[key];
+  if (raw === undefined || raw === null || raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function readTemplateBom(value: unknown): TemplateBomItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 120).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const materialId = typeof row.material_id === "string" ? sanitize(row.material_id).slice(0, 120) : "";
+    const unit = typeof row.unit === "string" ? sanitize(row.unit).slice(0, 24) : "kpl";
+    const quantity = Number(row.quantity);
+    if (!materialId || !Number.isFinite(quantity) || quantity <= 0) return [];
+    return [{ material_id: materialId, quantity, unit: unit || "kpl" }];
+  });
+}
+
+function buildTemplatePayload(
+  body: Record<string, unknown>,
+  options: { community: boolean; authorId: string | null },
+): TemplateInsertPayload | { error: string } {
+  const name = readTemplateText(body, "name", 100);
+  const sceneJs = readTemplateRawText(body, "scene_js", 100_000);
+  if (!name || !sceneJs) {
+    return { error: "Template name and scene_js are required" };
+  }
+
+  const categoryCandidate = readTemplateText(body, "category", 40) || "other";
+  const difficultyCandidate = readTemplateText(body, "difficulty", 20) || "intermediate";
+  const idCandidate = readTemplateText(body, "id", 64);
+  const description = readTemplateText(body, "description", 2000) || "";
+
+  return {
+    id: options.community
+      ? `${slugifyTemplateId(idCandidate || name)}-${crypto.randomBytes(3).toString("hex")}`
+      : slugifyTemplateId(idCandidate || name),
+    name,
+    name_fi: readTemplateText(body, "name_fi", 100),
+    name_en: readTemplateText(body, "name_en", 100),
+    description,
+    description_fi: readTemplateText(body, "description_fi", 2000),
+    description_en: readTemplateText(body, "description_en", 2000),
+    category: TEMPLATE_CATEGORIES.has(categoryCandidate) ? categoryCandidate : "other",
+    icon: readTemplateText(body, "icon", 40),
+    scene_js: sceneJs,
+    bom: readTemplateBom(body.bom),
+    thumbnail_url: readTemplateRawText(body, "thumbnail_url", 250_000),
+    estimated_cost: readTemplateNumber(body, "estimated_cost"),
+    difficulty: TEMPLATE_DIFFICULTIES.has(difficultyCandidate) ? difficultyCandidate : "intermediate",
+    area_m2: readTemplateNumber(body, "area_m2"),
+    is_featured: options.community ? false : body.is_featured === true,
+    is_community: options.community || body.is_community === true,
+    moderation_status: options.community ? "pending" : "approved",
+    author_id: options.authorId,
+  };
+}
+
+function normalizeTemplateRow(row: Record<string, unknown>, lang: "fi" | "en") {
+  const nameFi = typeof row.name_fi === "string" ? row.name_fi : null;
+  const nameEn = typeof row.name_en === "string" ? row.name_en : null;
+  const descriptionFi = typeof row.description_fi === "string" ? row.description_fi : null;
+  const descriptionEn = typeof row.description_en === "string" ? row.description_en : null;
+  const name = typeof row.name === "string" ? row.name : "";
+  const description = typeof row.description === "string" ? row.description : "";
+
+  return {
+    id: row.id,
+    name: (lang === "en" ? nameEn : nameFi) || name,
+    name_fi: nameFi,
+    name_en: nameEn,
+    description: (lang === "en" ? descriptionEn : descriptionFi) || description,
+    description_fi: descriptionFi,
+    description_en: descriptionEn,
+    category: row.category,
+    icon: row.icon,
+    scene_js: row.scene_js,
+    bom: Array.isArray(row.bom) ? row.bom : [],
+    thumbnail_url: row.thumbnail_url,
+    estimated_cost: row.estimated_cost === null || row.estimated_cost === undefined ? null : Number(row.estimated_cost),
+    difficulty: row.difficulty,
+    area_m2: row.area_m2 === null || row.area_m2 === undefined ? null : Number(row.area_m2),
+    is_featured: row.is_featured === true,
+    is_community: row.is_community === true,
+    author_id: row.author_id,
+    author_name: row.author_name,
+    use_count: row.use_count === null || row.use_count === undefined ? 0 : Number(row.use_count),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function insertTemplate(payload: TemplateInsertPayload) {
+  return query(
+    `INSERT INTO templates (
+       id, name, name_fi, name_en, description, description_fi, description_en,
+       category, icon, scene_js, bom, thumbnail_url, estimated_cost, difficulty,
+       area_m2, is_featured, is_community, moderation_status, author_id
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, $18, $19)
+     RETURNING *`,
+    [
+      payload.id,
+      payload.name,
+      payload.name_fi,
+      payload.name_en,
+      payload.description,
+      payload.description_fi,
+      payload.description_en,
+      payload.category,
+      payload.icon,
+      payload.scene_js,
+      JSON.stringify(payload.bom),
+      payload.thumbnail_url,
+      payload.estimated_cost,
+      payload.difficulty,
+      payload.area_m2,
+      payload.is_featured,
+      payload.is_community,
+      payload.moderation_status,
+      payload.author_id,
+    ],
+  );
+}
+
+app.get("/templates", publicLimiter, async (req, res) => {
+  const lang = normalizeTemplateLang(req.query.lang);
+  const category = queryStringValue(req.query.category);
+  const search = queryStringValue(req.query.q);
+  const sortCandidate = queryStringValue(req.query.sort) || "popular";
+  const sort = TEMPLATE_SORTS.has(sortCandidate) ? sortCandidate : "popular";
+  const limit = normalizeTemplateLimit(req.query.limit);
+  const params: unknown[] = [];
+  const filters = ["t.moderation_status = 'approved'"];
+
+  if (category && category !== "all" && TEMPLATE_CATEGORIES.has(category)) {
+    params.push(category);
+    filters.push(`t.category = $${params.length}`);
+  }
+
+  if (search?.trim()) {
+    params.push(`%${search.trim()}%`);
+    filters.push(
+      `(t.name ILIKE $${params.length} OR t.name_fi ILIKE $${params.length} OR t.name_en ILIKE $${params.length} OR t.description ILIKE $${params.length})`,
+    );
+  }
+
+  params.push(limit);
+  const orderBy = sort === "newest"
+    ? "t.created_at DESC, t.name ASC"
+    : sort === "price"
+      ? "COALESCE(t.estimated_cost, 2147483647) ASC, t.name ASC"
+      : "t.is_featured DESC, t.use_count DESC, t.created_at DESC, t.name ASC";
+
+  try {
+    const result = await query(
+      `SELECT t.*, u.name AS author_name
+       FROM templates t
+       LEFT JOIN users u ON u.id = t.author_id
+       WHERE ${filters.join(" AND ")}
+       ORDER BY ${orderBy}
+       LIMIT $${params.length}`,
+      params,
+    );
+    res.json(result.rows.map((row) => normalizeTemplateRow(row, lang)));
+  } catch (e: unknown) {
+    logger.error({ err: e }, "Template list error");
+    Sentry.captureException(e);
+    res.status(500).json({ error: "Failed to load templates" });
+  }
+});
+
+app.post("/templates", authenticatedLimiter, requireAuth, requirePermission("admin:access"), async (req, res) => {
+  const payload = buildTemplatePayload((req.body ?? {}) as Record<string, unknown>, {
+    community: false,
+    authorId: req.user?.id || null,
+  });
+  if ("error" in payload) return res.status(400).json({ error: payload.error });
+
+  try {
+    const result = await insertTemplate(payload);
+    res.status(201).json(normalizeTemplateRow(result.rows[0], "fi"));
+  } catch (e: unknown) {
+    logger.error({ err: e }, "Template create error");
+    Sentry.captureException(e);
+    const message = e instanceof Error ? e.message : "";
+    res.status(message.includes("duplicate key") ? 409 : 500).json({
+      error: message.includes("duplicate key") ? "Template id already exists" : "Failed to create template",
+    });
+  }
+});
+
+app.post("/templates/submit", authenticatedLimiter, requireAuth, async (req, res) => {
+  const payload = buildTemplatePayload((req.body ?? {}) as Record<string, unknown>, {
+    community: true,
+    authorId: req.user?.id || null,
+  });
+  if ("error" in payload) return res.status(400).json({ error: payload.error });
+
+  try {
+    const result = await insertTemplate(payload);
+    res.status(201).json(normalizeTemplateRow(result.rows[0], "fi"));
+  } catch (e: unknown) {
+    logger.error({ err: e }, "Template submission error");
+    Sentry.captureException(e);
+    res.status(500).json({ error: "Failed to submit template" });
+  }
+});
+
+app.put("/templates/:id/use", publicLimiter, async (req, res) => {
+  try {
+    const result = await query(
+      `UPDATE templates
+       SET use_count = use_count + 1, updated_at = now()
+       WHERE id = $1 AND moderation_status = 'approved'
+       RETURNING id, use_count`,
+      [req.params.id],
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "Template not found" });
+    res.json({ ok: true, id: result.rows[0].id, use_count: Number(result.rows[0].use_count) });
+  } catch (e: unknown) {
+    logger.error({ err: e }, "Template use tracking error");
+    Sentry.captureException(e);
+    res.status(500).json({ error: "Failed to track template use" });
+  }
 });
 
 app.get("/categories", publicLimiter, async (_req, res) => {

@@ -41,6 +41,7 @@ import type {
   RenovationCostIndexResponse,
   RyhtiPermitMetadata,
   TerrainGrid,
+  Template,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -569,7 +570,24 @@ export const api = {
     apiFetch("/building/generate", { method: "POST", body: JSON.stringify(payload) }),
 
   getCategories: () => apiFetch("/categories"),
-  getTemplates: () => apiFetch("/templates"),
+  getTemplates: (filters: {
+    category?: string;
+    sort?: "popular" | "newest" | "price";
+    q?: string;
+    lang?: string;
+    limit?: number;
+  } = {}): Promise<Template[]> => {
+    const params = new URLSearchParams();
+    if (filters.category && filters.category !== "all") params.set("category", filters.category);
+    if (filters.sort) params.set("sort", filters.sort);
+    if (filters.q) params.set("q", filters.q);
+    if (filters.lang) params.set("lang", filters.lang);
+    if (filters.limit) params.set("limit", String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch(`/templates${suffix}`);
+  },
+  recordTemplateUse: (templateId: string): Promise<{ ok: boolean; id: string; use_count: number }> =>
+    apiFetch(`/templates/${encodeURIComponent(templateId)}/use`, { method: "PUT" }),
   exportBOM: (projectId: string) => apiFetch(`/bom/export/${projectId}`),
   aggregateBOM: (projectIds: string[]): Promise<BomAggregateResponse> =>
     apiFetch("/bom/aggregate", {
