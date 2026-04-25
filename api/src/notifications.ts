@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { query } from "./db";
 import { sendEmail } from "./email";
+import { getViewerIpHashSalt } from "./secrets";
 
 export interface WeeklyDigestProject {
   id: string;
@@ -32,7 +33,7 @@ const VIEW_DEDUPE_WINDOW = "1 hour";
 const PRICE_CHANGE_THRESHOLD = 0.05;
 
 export function hashViewerIp(ip: string | undefined | null): string {
-  const salt = process.env.VIEW_IP_HASH_SALT || process.env.JWT_SECRET || "helscoop-dev-secret";
+  const salt = getViewerIpHashSalt();
   return crypto
     .createHash("sha256")
     .update(`${salt}:${ip || "unknown"}`)
