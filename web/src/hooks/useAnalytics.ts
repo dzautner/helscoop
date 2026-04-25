@@ -46,6 +46,9 @@ export type AnalyticsEvent =
   | "material_surface_replaced"
   | "presentation_link_copied"
   | "presentation_render_downloaded"
+  | "before_after_share_generated"
+  | "before_after_share_link_copied"
+  | "before_after_share_downloaded"
   | "scenario_render_generated"
   | "scenario_render_downloaded"
   | "gallery_viewed"
@@ -106,6 +109,9 @@ export interface AnalyticsEventProps {
   material_surface_replaced: { from_material_id: string; to_material_id: string; category?: string };
   presentation_link_copied: { preset: string };
   presentation_render_downloaded: { preset: string; watermarked: boolean };
+  before_after_share_generated: { project_id: string; preset: string; has_before_image: boolean; watermarked: boolean };
+  before_after_share_link_copied: { project_id: string };
+  before_after_share_downloaded: { project_id: string; preset: string };
   scenario_render_generated: { project_id: string; view_count: number; lighting_preset: string; has_before_image: boolean; source: "manual" | "toolbar" };
   scenario_render_downloaded: { project_id: string; artifact: "single" | "contact_sheet"; view_count: number; lighting_preset: string };
   gallery_viewed: { result_count: number; has_query: boolean; project_type?: string; cost_range?: string };

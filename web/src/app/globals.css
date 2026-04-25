@@ -10339,7 +10339,251 @@ select:focus {
   font-size: 11px;
 }
 
+.before-after-share-panel {
+  margin: 16px 0 20px;
+  padding: 14px;
+  border: 1px solid rgba(228, 182, 92, 0.28);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top left, rgba(228, 182, 92, 0.16), transparent 42%),
+    linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+}
+
+.before-after-share-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.before-after-share-head h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.before-after-share-head p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.before-after-share-head > span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.before-after-share-eyebrow {
+  margin-bottom: 5px;
+  color: var(--amber);
+}
+
+.before-after-share-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.before-after-share-presets button {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.before-after-share-presets button[data-active="true"] {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(228, 182, 92, 0.1);
+}
+
+.before-after-share-split {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.before-after-share-missing {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.before-after-share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.before-after-share-actions button {
+  justify-content: center;
+  min-height: 36px;
+  font-size: 11px;
+}
+
+.before-after-share-assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.before-after-share-assets span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.before-after-comparison {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.before-after-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+.before-after-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.before-after-image-after[data-has-before="true"] {
+  clip-path: inset(0 calc(100% - var(--before-after-split, 50%)) 0 0);
+}
+
+.before-after-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--before-after-split, 50%);
+  width: 2px;
+  background: var(--amber);
+  box-shadow: 0 0 22px rgba(228, 182, 92, 0.78);
+  transform: translateX(-1px);
+}
+
+.before-after-pill {
+  position: absolute;
+  bottom: 12px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.58);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.before-after-pill-before {
+  right: 12px;
+}
+
+.before-after-pill-after {
+  left: 12px;
+}
+
+.before-after-watermark {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.52);
+  color: rgba(255,255,255,0.84);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.before-after-control {
+  display: grid;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.shared-before-after-view {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(228, 182, 92, 0.18), transparent 38%),
+    linear-gradient(150deg, #101418, #1d211f 55%, #16120e);
+}
+
+.shared-before-after-view .before-after-comparison {
+  width: min(100%, 980px);
+}
+
+.shared-before-after-copy {
+  width: min(100%, 980px);
+  color: var(--text-primary);
+}
+
+.shared-before-after-copy h2 {
+  margin: 5px 0;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 46px);
+  line-height: 1.04;
+}
+
+.shared-before-after-copy p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 @media (max-width: 760px) {
+  .before-after-share-head,
+  .before-after-share-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .before-after-share-head {
+    display: grid;
+  }
+
+  .before-after-share-presets {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .shared-before-after-view {
+    padding: 14px;
+  }
+
   .pro-lead-card {
     grid-template-columns: 1fr !important;
   }

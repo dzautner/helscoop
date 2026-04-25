@@ -44,6 +44,7 @@ import type {
   RyhtiPermitMetadata,
   TerrainGrid,
   Template,
+  SharePreviewState,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -822,6 +823,15 @@ export const api = {
 
   shareProject: (projectId: string) =>
     apiFetch(`/projects/${projectId}/share`, { method: "POST" }),
+  saveSharePreview: (projectId: string, sharePreview: SharePreviewState): Promise<{
+    share_preview: SharePreviewState;
+    share_token: string;
+    share_token_expires_at: string | null;
+  }> =>
+    apiFetch(`/projects/${projectId}/share-preview`, {
+      method: "PUT",
+      body: JSON.stringify({ share_preview: sharePreview }),
+    }),
   unshareProject: (projectId: string) =>
     apiFetch(`/projects/${projectId}/share`, { method: "DELETE" }),
   getSharedProject: (token: string) =>

@@ -20,6 +20,7 @@ import MobileEditorTabs, { type MobileEditorSwipeDirection } from "@/components/
 import SceneParamsPanel from "@/components/SceneParamsPanel";
 import SceneApiReference from "@/components/SceneApiReference";
 import SharePresentationPanel from "@/components/SharePresentationPanel";
+import BeforeAfterSharePanel from "@/components/BeforeAfterSharePanel";
 import ScenarioRenderPanel from "@/components/ScenarioRenderPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
@@ -79,7 +80,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
-import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary, ProjectImage, MoodBoardState } from "@/types";
+import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary, ProjectImage, MoodBoardState, SharePreviewState } from "@/types";
 import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 import type { ViewportAssemblyGuideState, ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
@@ -390,6 +391,7 @@ export default function ProjectPage() {
   const [showAraChecklist, setShowAraChecklist] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+  const [sharePreview, setSharePreview] = useState<SharePreviewState | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [isPublicGalleryProject, setIsPublicGalleryProject] = useState(false);
@@ -642,6 +644,7 @@ export default function ProjectPage() {
           setShareToken(proj.share_token);
           setShareExpiresAt(proj.share_token_expires_at ?? null);
         }
+        setSharePreview(proj.share_preview ?? null);
         const initialPhotoOverlay = normalizePhotoOverlayState(proj.photo_overlay);
         const initialMoodBoard = normalizeMoodBoardState(proj.mood_board);
         setPhotoOverlay(initialPhotoOverlay);
@@ -5276,6 +5279,8 @@ export default function ProjectPage() {
               position: "relative",
               width: "100%",
               maxWidth: 620,
+              maxHeight: "calc(100vh - 48px)",
+              overflowY: "auto",
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-strong)",
               borderRadius: "var(--radius-lg)",
@@ -5377,6 +5382,28 @@ export default function ProjectPage() {
               onCopyError={() => toast(t('toast.copyFailed'), "error")}
             />
 
+            <BeforeAfterSharePanel
+              projectId={projectId}
+              shareToken={shareToken}
+              projectName={projectName}
+              beforeImage={photoOverlayUrl}
+              initialPreview={sharePreview}
+              captureApiRef={presentationRef}
+              onShareSaved={(result) => {
+                setSharePreview(result.share_preview);
+                setShareToken(result.share_token);
+                setShareExpiresAt(result.share_token_expires_at);
+                setProject((current) => current ? {
+                  ...current,
+                  share_preview: result.share_preview,
+                  share_token: result.share_token,
+                  share_token_expires_at: result.share_token_expires_at,
+                } : current);
+              }}
+              onCopySuccess={() => toast(t('toast.linkCopied'), "success")}
+              onCopyError={() => toast(t('toast.copyFailed'), "error")}
+            />
+
             {/* Actions */}
             <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
               <button
@@ -5387,6 +5414,7 @@ export default function ProjectPage() {
                     await api.unshareProject(projectId);
                     setShareToken(null);
                     setShareExpiresAt(null);
+                    setSharePreview(null);
                     setShowShareDialog(false);
                     toast(t('toast.projectUnshared'), "success");
                   } catch (err) {

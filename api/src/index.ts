@@ -1117,6 +1117,55 @@ app.post("/gallery/projects/:id/clone", authenticatedLimiter, requireAuth, requi
   res.status(201).json({ ...clone, cloned_from_project_id: source.id });
 });
 
+function parseSharePreviewImage(value: unknown): { mime: string; bytes: Buffer } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const preview = value as Record<string, unknown>;
+  const candidates = [preview.after_image, preview.before_image];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const match = candidate.match(/^data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+)$/i);
+    if (!match) continue;
+    const subtype = match[1].toLowerCase() === "jpg" ? "jpeg" : match[1].toLowerCase();
+    return {
+      mime: `image/${subtype}`,
+      bytes: Buffer.from(match[2], "base64"),
+    };
+  }
+  return null;
+}
+
+app.get("/shared/:token/og-image", publicLimiter, async (req, res) => {
+  const { token } = req.params;
+  if (!token || typeof token !== "string" || token.length > 64) {
+    return res.status(400).json({ error: "Invalid share token" });
+  }
+
+  const result = await query(
+    `SELECT id, share_preview, share_token_expires_at
+     FROM projects
+     WHERE share_token = $1
+       AND deleted_at IS NULL`,
+    [token],
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Shared project not found" });
+  }
+
+  const project = result.rows[0];
+  if (project.share_token_expires_at && new Date(project.share_token_expires_at).getTime() <= Date.now()) {
+    return res.status(410).json({ error: "Shared project link has expired", code: "share_expired" });
+  }
+
+  const image = parseSharePreviewImage(project.share_preview);
+  if (!image) {
+    return res.status(404).json({ error: "Shared preview image not found" });
+  }
+
+  res.setHeader("Content-Type", image.mime);
+  res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+  res.send(image.bytes);
+});
+
 // Public shared project endpoint — no auth required
 app.get("/shared/:token", publicLimiter, async (req, res) => {
   const { token } = req.params;
@@ -1125,7 +1174,7 @@ app.get("/shared/:token", publicLimiter, async (req, res) => {
   }
 
   const result = await query(
-    `SELECT p.id, p.name, p.description, p.scene_js, p.building_info, p.thumbnail_url,
+    `SELECT p.id, p.name, p.description, p.scene_js, p.building_info, p.thumbnail_url, p.share_preview,
       p.is_public, p.published_at, p.project_type, p.created_at, p.updated_at, p.share_token_expires_at,
       COALESCE(p.gallery_like_count, 0)::int AS heart_count,
       COALESCE(p.gallery_clone_count, 0)::int AS clone_count,

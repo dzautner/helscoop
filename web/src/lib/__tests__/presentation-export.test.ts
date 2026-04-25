@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildBeforeAfterShareUrl,
   buildPresentationUrl,
   formatPresentationCurrency,
   getPresentationPreset,
@@ -10,6 +11,12 @@ describe("presentation-export", () => {
   it("builds a shareable presentation URL with a sanitized preset", () => {
     expect(buildPresentationUrl("https://helscoop.fi/", "token/with/slash", "front")).toBe(
       "https://helscoop.fi/shared/token%2Fwith%2Fslash?presentation=1&camera=front",
+    );
+  });
+
+  it("builds a public before/after share URL", () => {
+    expect(buildBeforeAfterShareUrl("https://helscoop.fi/", "token/with/slash")).toBe(
+      "https://helscoop.fi/share/token%2Fwith%2Fslash?compare=1",
     );
   });
 
