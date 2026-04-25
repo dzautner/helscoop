@@ -5,19 +5,639 @@ import { query } from "../db";
 import { requireAuth } from "../auth";
 import { requirePermission } from "../permissions";
 import { logAuditEvent } from "../audit";
+import { sendEmail, type EmailAttachment } from "../email";
+import { broadcastProjectEvent, getCollaborationClientId } from "../collaboration";
+import { getUserPlan, PLANS } from "../entitlements";
 
 const router = Router();
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHOTO_OVERLAY_DATA_URL_RE = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+const SHARE_PREVIEW_DATA_URL_RE = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+const SHARE_PREVIEW_PRESETS = new Set(["front", "side", "aerial", "iso"]);
+
+interface QuoteRequestBomRow {
+  material_name: string;
+  quantity: string | number;
+  unit: string | null;
+  unit_price: string | number | null;
+  line_cost: string | number | null;
+  supplier_name?: string | null;
+}
+
+interface ProjectVersionBomItem {
+  material_id: string;
+  quantity: number;
+  unit: string;
+}
+
+interface ProjectVersionSnapshot {
+  name: string;
+  description: string;
+  scene_js: string;
+  bom: ProjectVersionBomItem[];
+}
+
+type ProjectVersionEvent = "auto" | "named" | "restore" | "branch";
+type ProjectType = "omakotitalo" | "taloyhtio";
+
+interface ShareholderShare {
+  apartment: string;
+  owner_name: string | null;
+  share_pct: number;
+}
+
+const MAX_AUTO_VERSIONS = 100;
+const VERSION_EVENTS = new Set<ProjectVersionEvent>(["auto", "named", "restore", "branch"]);
+const PROJECT_TYPES = new Set<ProjectType>(["omakotitalo", "taloyhtio"]);
+
+function hasOwn(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
+}
+
+function requiredText(value: unknown, field: string, maxLength: number): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${field} is required`);
+  }
+  const cleaned = value.trim();
+  if (cleaned.length > maxLength) {
+    throw new Error(`${field} must be ${maxLength} characters or fewer`);
+  }
+  return cleaned;
+}
+
+function optionalText(value: unknown, maxLength: number): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  return cleaned.slice(0, maxLength);
+}
+
+function optionalTextStrict(value: unknown, field: string, maxLength: number): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new Error(`${field} must be a string`);
+  }
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  if (cleaned.length > maxLength) {
+    throw new Error(`${field} must be ${maxLength} characters or fewer`);
+  }
+  return cleaned;
+}
+
+function normalizeProjectType(value: unknown): ProjectType {
+  if (value == null || value === "") return "omakotitalo";
+  if (typeof value === "string" && PROJECT_TYPES.has(value as ProjectType)) {
+    return value as ProjectType;
+  }
+  throw new Error("project_type must be omakotitalo or taloyhtio");
+}
+
+function normalizeProjectTypePatch(value: unknown): ProjectType | null {
+  if (value === undefined) return null;
+  return normalizeProjectType(value);
+}
+
+function normalizePositiveInteger(value: unknown, field: string, max: number): number | null {
+  if (value == null || value === "") return null;
+  const next = Number(value);
+  if (!Number.isInteger(next) || next <= 0 || next > max) {
+    throw new Error(`${field} must be an integer between 1 and ${max}`);
+  }
+  return next;
+}
+
+function normalizeBuildingInfo(value: unknown): Record<string, unknown> | null {
+  if (value == null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("building_info must be an object or null");
+  }
+  const json = JSON.stringify(value);
+  if (json.length > 64 * 1024) {
+    throw new Error("building_info is too large");
+  }
+  return value as Record<string, unknown>;
+}
+
+function jsonbParam(value: unknown): string | null {
+  if (value == null) return null;
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function normalizeShareholderShares(value: unknown): ShareholderShare[] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error("shareholder_shares must be an array");
+  }
+  if (value.length > 500) {
+    throw new Error("shareholder_shares must contain at most 500 rows");
+  }
+
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("shareholder_shares rows must be objects");
+    }
+    const raw = item as Record<string, unknown>;
+    const apartment = optionalTextStrict(raw.apartment ?? raw.unit ?? raw.label ?? `Unit ${index + 1}`, "shareholder_shares.apartment", 120);
+    const ownerName = optionalTextStrict(raw.owner_name ?? raw.ownerName ?? null, "shareholder_shares.owner_name", 160);
+    const sharePct = Number(raw.share_pct ?? raw.sharePercent ?? raw.share_percent);
+    if (!Number.isFinite(sharePct) || sharePct < 0 || sharePct > 100) {
+      throw new Error("shareholder_shares.share_pct must be between 0 and 100");
+    }
+    return {
+      apartment: apartment ?? `Unit ${index + 1}`,
+      owner_name: ownerName,
+      share_pct: Math.round(sharePct * 10000) / 10000,
+    };
+  });
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.min(max, Math.max(min, next));
+}
+
+function normalizePhotoOverlay(value: unknown): Record<string, unknown> | null {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") {
+    throw new Error("photo_overlay must be an object or null");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const dataUrl = typeof raw.data_url === "string" ? raw.data_url : "";
+  if (!PHOTO_OVERLAY_DATA_URL_RE.test(dataUrl)) {
+    throw new Error("photo_overlay.data_url must be a JPEG, PNG, or WebP data URL");
+  }
+  if (dataUrl.length > 7_500_000) {
+    throw new Error("photo_overlay.data_url is too large");
+  }
+
+  return {
+    data_url: dataUrl,
+    file_name: typeof raw.file_name === "string" ? raw.file_name.slice(0, 160) : null,
+    opacity: clampNumber(raw.opacity, 0, 1, 0.4),
+    compare_mode: Boolean(raw.compare_mode),
+    compare_position: clampNumber(raw.compare_position, 0, 100, 50),
+    offset_x: clampNumber(raw.offset_x, -50, 50, 0),
+    offset_y: clampNumber(raw.offset_y, -50, 50, 0),
+    scale: clampNumber(raw.scale, 0.5, 2.5, 1),
+    rotation: clampNumber(raw.rotation, -30, 30, 0),
+    updated_at: typeof raw.updated_at === "string" ? raw.updated_at : new Date().toISOString(),
+  };
+}
+
+function normalizeSharePreview(value: unknown): Record<string, unknown> | null {
+  if (value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("share_preview must be an object or null");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const afterImage = typeof raw.after_image === "string" ? raw.after_image : "";
+  if (!SHARE_PREVIEW_DATA_URL_RE.test(afterImage)) {
+    throw new Error("share_preview.after_image must be a JPEG, PNG, or WebP data URL");
+  }
+  if (afterImage.length > 7_500_000) {
+    throw new Error("share_preview.after_image is too large");
+  }
+
+  const beforeImage = typeof raw.before_image === "string" && raw.before_image.trim()
+    ? raw.before_image
+    : null;
+  if (beforeImage) {
+    if (!SHARE_PREVIEW_DATA_URL_RE.test(beforeImage)) {
+      throw new Error("share_preview.before_image must be a JPEG, PNG, or WebP data URL");
+    }
+    if (beforeImage.length > 7_500_000) {
+      throw new Error("share_preview.before_image is too large");
+    }
+  }
+
+  const presetId = typeof raw.preset_id === "string" && SHARE_PREVIEW_PRESETS.has(raw.preset_id)
+    ? raw.preset_id
+    : "iso";
+  const normalized = {
+    kind: "before_after",
+    before_image: beforeImage,
+    after_image: afterImage,
+    split: clampNumber(raw.split, 5, 95, 50),
+    preset_id: presetId,
+    watermark: Boolean(raw.watermark),
+    generated_at: typeof raw.generated_at === "string" ? raw.generated_at : new Date().toISOString(),
+  };
+
+  if (JSON.stringify(normalized).length > 15_500_000) {
+    throw new Error("share_preview is too large");
+  }
+  return normalized;
+}
+
+function normalizeMoodBoard(value: unknown): Record<string, unknown> {
+  if (value == null) return { items: [] };
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("mood_board must be an object");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  if (items.length > 100) {
+    throw new Error("mood_board.items must contain at most 100 cards");
+  }
+
+  const normalizedItems = items.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("mood_board.items rows must be objects");
+    }
+    const card = item as Record<string, unknown>;
+    const type = card.type;
+    if (type !== "material" && type !== "photo" && type !== "color" && type !== "note") {
+      throw new Error("mood_board item type is invalid");
+    }
+    const base = {
+      id: typeof card.id === "string" && card.id ? card.id.slice(0, 80) : `mood-${index + 1}`,
+      type,
+      x: clampNumber(card.x, 0, 5000, 24),
+      y: clampNumber(card.y, 0, 5000, 24),
+      width: clampNumber(card.width, 48, 800, type === "note" ? 180 : 140),
+      height: clampNumber(card.height, 48, 800, type === "note" ? 120 : 140),
+      title: typeof card.title === "string" ? card.title.slice(0, 160) : undefined,
+    };
+
+    if (type === "material") {
+      const materialId = typeof card.material_id === "string" ? card.material_id.slice(0, 120) : "";
+      if (!materialId) throw new Error("mood_board material cards require material_id");
+      return { ...base, material_id: materialId };
+    }
+    if (type === "photo") {
+      const src = typeof card.src === "string" ? card.src : "";
+      if (!/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(src)) {
+        throw new Error("mood_board photo cards require image data URLs");
+      }
+      if (src.length > 1_500_000) {
+        throw new Error("mood_board photo card is too large");
+      }
+      return {
+        ...base,
+        src,
+        file_name: typeof card.file_name === "string" ? card.file_name.slice(0, 160) : undefined,
+      };
+    }
+    if (type === "color") {
+      const color = typeof card.color === "string" && /^#[0-9a-f]{6}$/i.test(card.color) ? card.color : "#d6a15d";
+      return { ...base, color };
+    }
+    return {
+      ...base,
+      text: typeof card.text === "string" ? card.text.slice(0, 2000) : "",
+    };
+  });
+
+  const normalized = {
+    items: normalizedItems,
+    updated_at: typeof raw.updated_at === "string" ? raw.updated_at : new Date().toISOString(),
+  };
+  if (JSON.stringify(normalized).length > 2_000_000) {
+    throw new Error("mood_board is too large");
+  }
+  return normalized;
+}
+
+function formatCurrency(value: number, locale: "fi" | "en"): string {
+  return `${value.toLocaleString(locale === "fi" ? "fi-FI" : "en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} EUR`;
+}
+
+function safeFilename(name: string): string {
+  return name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 80) || "project";
+}
+
+function normalizeVersionSnapshot(value: unknown): ProjectVersionSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as {
+    name?: unknown;
+    description?: unknown;
+    scene_js?: unknown;
+    bom?: unknown;
+  };
+  if (typeof raw.name !== "string" || typeof raw.scene_js !== "string" || !Array.isArray(raw.bom)) {
+    return null;
+  }
+  if (raw.scene_js.length > 512 * 1024) {
+    return null;
+  }
+
+  const bom: ProjectVersionBomItem[] = [];
+  for (const item of raw.bom) {
+    if (!item || typeof item !== "object") return null;
+    const row = item as { material_id?: unknown; quantity?: unknown; unit?: unknown };
+    const quantity = Number(row.quantity);
+    if (typeof row.material_id !== "string" || row.material_id.trim().length === 0) return null;
+    if (!Number.isFinite(quantity) || quantity <= 0) return null;
+    bom.push({
+      material_id: row.material_id,
+      quantity,
+      unit: typeof row.unit === "string" && row.unit.trim() ? row.unit : "kpl",
+    });
+  }
+
+  return {
+    name: raw.name.trim().slice(0, 200),
+    description: typeof raw.description === "string" ? raw.description.slice(0, 5000) : "",
+    scene_js: raw.scene_js,
+    bom,
+  };
+}
+
+function snapshotEquals(a: ProjectVersionSnapshot, b: ProjectVersionSnapshot): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function buildVersionDelta(previous: ProjectVersionSnapshot | null, next: ProjectVersionSnapshot) {
+  const changedFields: string[] = [];
+  if (!previous) {
+    return {
+      changedFields: ["initial"],
+      bom: { added: next.bom.length, removed: 0, quantityChanged: 0, unitChanged: 0 },
+    };
+  }
+
+  if (previous.name !== next.name) changedFields.push("name");
+  if (previous.description !== next.description) changedFields.push("description");
+  if (previous.scene_js !== next.scene_js) changedFields.push("scene_js");
+
+  const previousBom = new Map(previous.bom.map((item) => [item.material_id, item]));
+  const nextBom = new Map(next.bom.map((item) => [item.material_id, item]));
+  let added = 0;
+  let removed = 0;
+  let quantityChanged = 0;
+  let unitChanged = 0;
+
+  for (const item of next.bom) {
+    const old = previousBom.get(item.material_id);
+    if (!old) {
+      added += 1;
+      continue;
+    }
+    if (old.quantity !== item.quantity) quantityChanged += 1;
+    if (old.unit !== item.unit) unitChanged += 1;
+  }
+
+  for (const item of previous.bom) {
+    if (!nextBom.has(item.material_id)) removed += 1;
+  }
+
+  if (added || removed || quantityChanged || unitChanged) changedFields.push("bom");
+  return { changedFields, bom: { added, removed, quantityChanged, unitChanged } };
+}
+
+async function ensureDefaultBranch(projectId: string) {
+  const existing = await query(
+    "SELECT * FROM project_branches WHERE project_id=$1 AND is_default=true LIMIT 1",
+    [projectId],
+  );
+  if (existing.rows.length > 0) return existing.rows[0];
+
+  const created = await query(
+    `INSERT INTO project_branches (project_id, name, is_default)
+     VALUES ($1, 'Main', true)
+     RETURNING *`,
+    [projectId],
+  );
+  return created.rows[0];
+}
+
+async function getOwnedProjectSnapshot(projectId: string, userId: string): Promise<ProjectVersionSnapshot | null> {
+  const projectResult = await query(
+    "SELECT name, description, scene_js FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [projectId, userId],
+  );
+  if (projectResult.rows.length === 0) return null;
+  const bomResult = await query(
+    "SELECT material_id, quantity, unit FROM project_bom WHERE project_id=$1 ORDER BY created_at, material_id",
+    [projectId],
+  );
+  const project = projectResult.rows[0];
+  return {
+    name: project.name || "",
+    description: project.description || "",
+    scene_js: project.scene_js || "",
+    bom: bomResult.rows.map((row: { material_id: string; quantity: string | number; unit: string | null }) => ({
+      material_id: row.material_id,
+      quantity: Number(row.quantity),
+      unit: row.unit || "kpl",
+    })),
+  };
+}
+
+async function getLatestVersion(projectId: string, branchId: string | null) {
+  const result = await query(
+    `SELECT *
+     FROM project_versions
+     WHERE project_id=$1
+       AND (($2::uuid IS NULL AND branch_id IS NULL) OR branch_id=$2)
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [projectId, branchId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function insertProjectVersion(params: {
+  projectId: string;
+  branchId: string | null;
+  snapshot: ProjectVersionSnapshot;
+  name?: string | null;
+  description?: string | null;
+  eventType: ProjectVersionEvent;
+  thumbnailUrl?: string | null;
+  restoredFromVersionId?: string | null;
+}) {
+  const latest = await getLatestVersion(params.projectId, params.branchId);
+  const previousSnapshot = latest?.snapshot ? normalizeVersionSnapshot(latest.snapshot) : null;
+  if (latest && previousSnapshot && snapshotEquals(previousSnapshot, params.snapshot) && params.eventType === "auto" && !params.name) {
+    return latest;
+  }
+
+  const delta = buildVersionDelta(previousSnapshot, params.snapshot);
+  const result = await query(
+    `INSERT INTO project_versions (
+       project_id, branch_id, parent_version_id, restored_from_version_id,
+       name, description, event_type, snapshot, delta, thumbnail_url
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING *`,
+    [
+      params.projectId,
+      params.branchId,
+      latest?.id ?? null,
+      params.restoredFromVersionId ?? null,
+      params.name ?? null,
+      params.description ?? null,
+      params.eventType,
+      JSON.stringify(params.snapshot),
+      JSON.stringify(delta),
+      params.thumbnailUrl ?? null,
+    ],
+  );
+
+  await query(
+    `DELETE FROM project_versions
+     WHERE id IN (
+       SELECT id
+       FROM project_versions
+       WHERE project_id=$1
+         AND (($2::uuid IS NULL AND branch_id IS NULL) OR branch_id=$2)
+         AND event_type='auto'
+         AND name IS NULL
+       ORDER BY created_at DESC
+       OFFSET $3
+     )`,
+    [params.projectId, params.branchId, MAX_AUTO_VERSIONS],
+  );
+
+  return result.rows[0];
+}
+
+async function estimateSnapshotCost(snapshot: ProjectVersionSnapshot): Promise<number> {
+  const materialIds = Array.from(new Set(snapshot.bom.map((item) => item.material_id)));
+  if (materialIds.length === 0) return 0;
+
+  const pricingResult = await query(
+    `SELECT m.id, COALESCE(p.unit_price, 0) AS unit_price, COALESCE(m.waste_factor, 1) AS waste_factor
+     FROM materials m
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE m.id = ANY($1::text[])`,
+    [materialIds],
+  );
+  const priceByMaterial = new Map(
+    pricingResult.rows.map((row: { id: string; unit_price: string | number; waste_factor: string | number }) => [
+      row.id,
+      { unitPrice: Number(row.unit_price), wasteFactor: Number(row.waste_factor) || 1 },
+    ]),
+  );
+
+  return snapshot.bom.reduce((sum, item) => {
+    const pricing = priceByMaterial.get(item.material_id);
+    if (!pricing) return sum;
+    return sum + item.quantity * pricing.unitPrice * pricing.wasteFactor;
+  }, 0);
+}
+
+async function renderQuoteRequestPdf(params: {
+  projectName: string;
+  projectDescription?: string | null;
+  workScope: string;
+  contactName: string;
+  contactEmail: string;
+  postcode: string;
+  bomRows: QuoteRequestBomRow[];
+  estimatedCost: number;
+  locale: "fi" | "en";
+}): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const fi = params.locale === "fi";
+    doc.font("Helvetica-Bold").fontSize(20).text(fi ? "Helscoop - tarjouspyynto" : "Helscoop - quote request");
+    doc.moveDown(0.5);
+    doc.font("Helvetica").fontSize(10).fillColor("#666").text(new Date().toLocaleDateString(fi ? "fi-FI" : "en-GB"));
+    doc.moveDown(1);
+
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(12).text(fi ? "Projektin tiedot" : "Project details");
+    doc.font("Helvetica").fontSize(10);
+    doc.text(`${fi ? "Projekti" : "Project"}: ${params.projectName}`);
+    if (params.projectDescription) doc.text(`${fi ? "Kuvaus" : "Description"}: ${params.projectDescription}`);
+    doc.text(`${fi ? "Työn kuvaus" : "Work scope"}: ${params.workScope}`);
+    doc.text(`${fi ? "Postinumero" : "Postcode"}: ${params.postcode}`);
+    doc.moveDown(1);
+
+    doc.font("Helvetica-Bold").fontSize(12).text(fi ? "Yhteyshenkilo" : "Contact");
+    doc.font("Helvetica").fontSize(10);
+    doc.text(`${params.contactName} <${params.contactEmail}>`);
+    doc.moveDown(1);
+
+    doc.font("Helvetica-Bold").fontSize(12).text(fi ? "Materiaalilista" : "Bill of materials");
+    doc.font("Helvetica").fontSize(9);
+    for (const row of params.bomRows.slice(0, 40)) {
+      const qty = Number(row.quantity || 0).toLocaleString(fi ? "fi-FI" : "en-GB", { maximumFractionDigits: 2 });
+      const cost = Number(row.line_cost || 0);
+      doc.text(
+        `${row.material_name}: ${qty} ${row.unit || ""} - ${formatCurrency(cost, params.locale)}${row.supplier_name ? ` (${row.supplier_name})` : ""}`,
+        { continued: false },
+      );
+    }
+    if (params.bomRows.length > 40) {
+      doc.text(fi ? `...ja ${params.bomRows.length - 40} muuta rivia` : `...and ${params.bomRows.length - 40} more rows`);
+    }
+    doc.moveDown(0.75);
+    doc.font("Helvetica-Bold").fontSize(12).text(`${fi ? "Arvio yhteensa" : "Estimated total"}: ${formatCurrency(params.estimatedCost, params.locale)}`);
+    doc.moveDown(1);
+    doc.font("Helvetica").fontSize(8).fillColor("#777").text(fi ? "Luotu Helscoop.fi-palvelulla." : "Generated with Helscoop.fi.");
+    doc.end();
+  });
+}
+
+function buildQuoteRequestEmail(params: {
+  projectName: string;
+  workScope: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string | null;
+  postcode: string;
+  bomLineCount: number;
+  estimatedCost: number;
+  locale: "fi" | "en";
+}): { subject: string; body: string } {
+  const fi = params.locale === "fi";
+  const subject = fi
+    ? `Helscoop: tarjouspyynto vastaanotettu - ${params.projectName}`
+    : `Helscoop: quote request received - ${params.projectName}`;
+  const body = [
+    fi ? `Hei ${params.contactName},` : `Hi ${params.contactName},`,
+    "",
+    fi
+      ? "Tarjouspyyntosi on tallennettu. Liitteenä on urakoitsijalle jaettava PDF-yhteenveto projektista ja materiaalilistasta."
+      : "Your quote request has been saved. The attached PDF summarizes the project and BOM for contractor sharing.",
+    "",
+    `${fi ? "Projekti" : "Project"}: ${params.projectName}`,
+    `${fi ? "Työn kuvaus" : "Work scope"}: ${params.workScope}`,
+    `${fi ? "Postinumero" : "Postcode"}: ${params.postcode}`,
+    `${fi ? "BOM-rivejä" : "BOM rows"}: ${params.bomLineCount}`,
+    `${fi ? "Arvioitu kustannus" : "Estimated cost"}: ${formatCurrency(params.estimatedCost, params.locale)}`,
+    params.contactPhone ? `${fi ? "Puhelin" : "Phone"}: ${params.contactPhone}` : null,
+    "",
+    fi
+      ? "Seuraava vaihe: Helscoop voi jatkossa välittää tämän Luotettava Kumppani -varmennetuille urakoitsijoille."
+      : "Next step: Helscoop can later forward this to Reliable Partner verified contractors.",
+  ].filter(Boolean).join("\n");
+  return { subject, body };
+}
 
 router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   const result = await query(
-    `SELECT id, name, description, is_public, created_at, updated_at, thumbnail_url,
-      (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
+    `SELECT id, name, description, is_public, published_at, gallery_status,
+      gallery_like_count, gallery_clone_count, created_at, updated_at, thumbnail_url, tags, status,
+      project_type, unit_count, business_id, property_manager_name, property_manager_email,
+      property_manager_phone, shareholder_shares,
+      ((SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
-       WHERE pb.project_id = projects.id) AS estimated_cost
+       WHERE pb.project_id = projects.id)
+       * CASE WHEN projects.project_type = 'taloyhtio' THEN GREATEST(COALESCE(projects.unit_count, 1), 1) ELSE 1 END
+      ) AS estimated_cost,
+      (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count,
+      (SELECT COUNT(*)::int FROM project_share_comments psc WHERE psc.project_id = projects.id) AS contractor_comment_count
      FROM projects WHERE user_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC`,
     [req.user!.id]
   );
@@ -26,37 +646,206 @@ router.get("/", async (req, res) => {
 
 router.get("/trash", async (req, res) => {
   const result = await query(
-    `SELECT id, name, description, is_public, created_at, updated_at, deleted_at, thumbnail_url,
-      (SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
+    `SELECT id, name, description, is_public, published_at, gallery_status,
+      gallery_like_count, gallery_clone_count, created_at, updated_at, deleted_at, thumbnail_url,
+      project_type, unit_count, business_id,
+      ((SELECT COALESCE(SUM(pb.quantity * p.unit_price * m.waste_factor), 0)
        FROM project_bom pb
        JOIN pricing p ON pb.material_id = p.material_id AND p.is_primary = true
        JOIN materials m ON pb.material_id = m.id
-       WHERE pb.project_id = projects.id) AS estimated_cost
+       WHERE pb.project_id = projects.id)
+       * CASE WHEN projects.project_type = 'taloyhtio' THEN GREATEST(COALESCE(projects.unit_count, 1), 1) ELSE 1 END
+      ) AS estimated_cost
      FROM projects WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC`,
     [req.user!.id]
   );
   res.json(result.rows);
 });
 
+router.post("/bulk", async (req, res) => {
+  const { ids, action, status, tags } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) {
+    return res.status(400).json({ error: "ids must be an array of 1-100 project IDs" });
+  }
+  const VALID_ACTIONS = ["archive", "unarchive", "delete", "add_tags", "remove_tags", "set_status"];
+  if (!action || !VALID_ACTIONS.includes(action)) {
+    return res.status(400).json({ error: `action must be one of: ${VALID_ACTIONS.join(", ")}` });
+  }
+  const userId = req.user!.id;
+
+  try {
+    let result;
+    switch (action) {
+      case "archive":
+        result = await query(
+          `UPDATE projects SET status = 'archived', updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId]
+        );
+        break;
+      case "unarchive":
+        result = await query(
+          `UPDATE projects SET status = 'planning', updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL AND status = 'archived' RETURNING id`,
+          [ids, userId]
+        );
+        break;
+      case "delete":
+        result = await query(
+          `UPDATE projects SET deleted_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId]
+        );
+        break;
+      case "add_tags": {
+        if (!Array.isArray(tags) || tags.length === 0) {
+          return res.status(400).json({ error: "tags must be a non-empty array" });
+        }
+        const safeTags = tags.filter((t: unknown) => typeof t === "string" && t.trim()).map((t: string) => t.trim().slice(0, 50));
+        result = await query(
+          `UPDATE projects SET tags = (
+             SELECT ARRAY(SELECT DISTINCT unnest FROM unnest(tags || $3::text[]) LIMIT 20)
+           ), updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId, safeTags]
+        );
+        break;
+      }
+      case "remove_tags": {
+        if (!Array.isArray(tags) || tags.length === 0) {
+          return res.status(400).json({ error: "tags must be a non-empty array" });
+        }
+        const removeTags = tags.filter((t: unknown) => typeof t === "string");
+        result = await query(
+          `UPDATE projects SET tags = (
+             SELECT ARRAY(SELECT unnest(tags) EXCEPT SELECT unnest($3::text[]))
+           ), updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId, removeTags]
+        );
+        break;
+      }
+      case "set_status": {
+        const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
+        if (!status || !VALID_STATUSES.includes(status)) {
+          return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(", ")}` });
+        }
+        result = await query(
+          `UPDATE projects SET status = $3, updated_at = NOW()
+           WHERE id = ANY($1::uuid[]) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [ids, userId, status]
+        );
+        break;
+      }
+    }
+    const affected = result?.rows.length ?? 0;
+    logAuditEvent(userId, `project.bulk_${action}`, { ids, affected, ip: req.ip });
+    res.json({ ok: true, affected });
+  } catch (err) {
+    console.error("Bulk project action failed:", err);
+    res.status(500).json({ error: "Bulk action failed" });
+  }
+});
+
 router.post("/", requirePermission("project:create"), async (req, res) => {
-  const { name, description, scene_js, building_info } = req.body;
+  const {
+    name,
+    description,
+    scene_js,
+    original_scene_js,
+    building_info,
+    tags,
+    status,
+    project_type,
+    unit_count,
+    business_id,
+    property_manager_name,
+    property_manager_email,
+    property_manager_phone,
+    shareholder_shares,
+  } = req.body;
   if (!name || typeof name !== "string") {
     return res.status(400).json({ error: "Project name is required" });
   }
   if (name.length > 200) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
+  if (scene_js !== undefined && scene_js !== null && typeof scene_js !== "string") {
+    return res.status(400).json({ error: "scene_js must be a string" });
+  }
+  if (typeof scene_js === "string" && scene_js.length > 512 * 1024) {
+    return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
+  }
+  if (original_scene_js !== undefined && original_scene_js !== null && typeof original_scene_js !== "string") {
+    return res.status(400).json({ error: "original_scene_js must be a string" });
+  }
+  if (typeof original_scene_js === "string" && original_scene_js.length > 512 * 1024) {
+    return res.status(400).json({ error: "Original scene script exceeds maximum size of 512 KB" });
+  }
+  const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
+  const safeStatus = status && VALID_STATUSES.includes(status) ? status : "planning";
+  const safeTags = Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : [];
+  const baselineSceneJs = original_scene_js !== undefined ? original_scene_js : scene_js;
+  let safeBuildingInfo: Record<string, unknown> | null;
+  let safeProjectType: ProjectType;
+  let safeUnitCount: number | null;
+  let safeBusinessId: string | null;
+  let safePropertyManagerName: string | null;
+  let safePropertyManagerEmail: string | null;
+  let safePropertyManagerPhone: string | null;
+  let safeShareholderShares: ShareholderShare[];
+  try {
+    safeBuildingInfo = normalizeBuildingInfo(building_info);
+    safeProjectType = normalizeProjectType(project_type);
+    const buildingUnitCount = safeBuildingInfo ? normalizePositiveInteger(safeBuildingInfo.units, "building_info.units", 10000) : null;
+    safeUnitCount = normalizePositiveInteger(unit_count ?? buildingUnitCount, "unit_count", 10000);
+    if (safeProjectType === "taloyhtio" && safeUnitCount == null) {
+      safeUnitCount = 1;
+    }
+    safeBusinessId = optionalTextStrict(business_id, "business_id", 32);
+    safePropertyManagerName = optionalTextStrict(property_manager_name, "property_manager_name", 160);
+    safePropertyManagerEmail = optionalTextStrict(property_manager_email, "property_manager_email", 254);
+    if (safePropertyManagerEmail && !EMAIL_RE.test(safePropertyManagerEmail)) {
+      throw new Error("property_manager_email must be a valid email address");
+    }
+    safePropertyManagerPhone = optionalTextStrict(property_manager_phone, "property_manager_phone", 80);
+    safeShareholderShares = normalizeShareholderShares(shareholder_shares);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid project metadata" });
+  }
   const result = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js, building_info)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [req.user!.id, name.trim(), description, scene_js, building_info ? JSON.stringify(building_info) : null]
+    `INSERT INTO projects (
+       user_id, name, description, scene_js, original_scene_js, building_info, tags, status,
+       project_type, unit_count, business_id, property_manager_name, property_manager_email,
+       property_manager_phone, shareholder_shares
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+    [
+      req.user!.id,
+      name.trim(),
+      typeof description === "string" ? description : undefined,
+      typeof scene_js === "string" ? scene_js : undefined,
+      baselineSceneJs ?? null,
+      safeBuildingInfo ? JSON.stringify(safeBuildingInfo) : null,
+      safeTags,
+      safeStatus,
+      safeProjectType,
+      safeUnitCount,
+      safeBusinessId,
+      safePropertyManagerName,
+      safePropertyManagerEmail,
+      safePropertyManagerPhone,
+      JSON.stringify(safeShareholderShares),
+    ]
   );
   res.status(201).json(result.rows[0]);
 });
 
 router.get("/:id", async (req, res) => {
   const result = await query(
-    "SELECT * FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    `SELECT projects.*,
+      (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = projects.id) AS view_count
+     FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`,
     [req.params.id, req.user!.id]
   );
   if (result.rows.length === 0)
@@ -65,8 +854,20 @@ router.get("/:id", async (req, res) => {
   const bom = await query(
     `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
       p.unit_price, p.link, s.name AS supplier_name,
+      p.regular_unit_price, p.campaign_label, p.campaign_ends_at,
+      p.campaign_detected_at,
       p.in_stock, p.stock_level, p.store_location, p.last_checked_at AS stock_last_checked_at,
-      (pb.quantity * p.unit_price * m.waste_factor) AS total
+      (pb.quantity * p.unit_price * m.waste_factor) AS total,
+      CASE
+        WHEN p.regular_unit_price IS NOT NULL AND p.regular_unit_price > p.unit_price
+        THEN (pb.quantity * p.regular_unit_price * m.waste_factor)
+        ELSE NULL
+      END AS regular_total,
+      CASE
+        WHEN p.regular_unit_price IS NOT NULL AND p.regular_unit_price > p.unit_price
+        THEN (pb.quantity * (p.regular_unit_price - p.unit_price) * m.waste_factor)
+        ELSE 0
+      END AS campaign_savings
      FROM project_bom pb
      JOIN materials m ON pb.material_id = m.id
      JOIN categories c ON m.category_id = c.id
@@ -80,19 +881,525 @@ router.get("/:id", async (req, res) => {
   res.json({ ...result.rows[0], bom: bom.rows });
 });
 
+router.get("/:id/versions", async (req, res) => {
+  const project = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  await ensureDefaultBranch(req.params.id);
+  const branches = await query(
+    `SELECT id, project_id, name, forked_from_version_id, is_default, created_at
+     FROM project_branches
+     WHERE project_id=$1
+     ORDER BY is_default DESC, created_at ASC`,
+    [req.params.id],
+  );
+  const versions = await query(
+    `SELECT id, project_id, branch_id, parent_version_id, restored_from_version_id,
+       name, description, event_type, delta, thumbnail_url, created_at
+     FROM project_versions
+     WHERE project_id=$1
+     ORDER BY created_at DESC
+     LIMIT 200`,
+    [req.params.id],
+  );
+
+  res.json({ branches: branches.rows, versions: versions.rows });
+});
+
+router.post("/:id/versions", async (req, res) => {
+  const project = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const snapshot = normalizeVersionSnapshot(req.body.snapshot)
+    ?? await getOwnedProjectSnapshot(req.params.id, req.user!.id);
+  if (!snapshot) {
+    return res.status(400).json({ error: "Valid snapshot is required" });
+  }
+
+  let branchId = typeof req.body.branch_id === "string" ? req.body.branch_id : null;
+  if (branchId) {
+    const branch = await query(
+      "SELECT id FROM project_branches WHERE id=$1 AND project_id=$2",
+      [branchId, req.params.id],
+    );
+    if (branch.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid branch_id" });
+    }
+  } else {
+    const branch = await ensureDefaultBranch(req.params.id);
+    branchId = branch.id;
+  }
+
+  const rawEvent = typeof req.body.event_type === "string" ? req.body.event_type : "auto";
+  const eventType = VERSION_EVENTS.has(rawEvent as ProjectVersionEvent)
+    ? rawEvent as ProjectVersionEvent
+    : "auto";
+  const versionName = optionalText(req.body.name, 200);
+  const version = await insertProjectVersion({
+    projectId: req.params.id,
+    branchId,
+    snapshot,
+    name: versionName,
+    description: optionalText(req.body.description, 1000),
+    eventType: versionName && eventType === "auto" ? "named" : eventType,
+    thumbnailUrl: optionalText(req.body.thumbnail_url, 250000),
+  });
+
+  res.status(201).json({ version });
+});
+
+router.post("/:id/branches", async (req, res) => {
+  const project = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  let name: string;
+  try {
+    name = requiredText(req.body.name ?? "Alternative", "name", 120);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid branch name" });
+  }
+  const snapshot = normalizeVersionSnapshot(req.body.snapshot)
+    ?? await getOwnedProjectSnapshot(req.params.id, req.user!.id);
+  if (!snapshot) {
+    return res.status(400).json({ error: "Valid snapshot is required" });
+  }
+
+  const branchResult = await query(
+    `INSERT INTO project_branches (project_id, name, is_default)
+     VALUES ($1,$2,false)
+     RETURNING *`,
+    [req.params.id, name],
+  );
+  const branch = branchResult.rows[0];
+  const version = await insertProjectVersion({
+    projectId: req.params.id,
+    branchId: branch.id,
+    snapshot,
+    name,
+    description: "Branch fork",
+    eventType: "branch",
+    thumbnailUrl: optionalText(req.body.thumbnail_url, 250000),
+  });
+  await query(
+    "UPDATE project_branches SET forked_from_version_id=$1 WHERE id=$2",
+    [version.id, branch.id],
+  );
+
+  res.status(201).json({ branch: { ...branch, forked_from_version_id: version.id }, version });
+});
+
+router.get("/:id/versions/compare", async (req, res) => {
+  const baseId = typeof req.query.base === "string" ? req.query.base : "";
+  const targetId = typeof req.query.target === "string" ? req.query.target : "";
+  if (!baseId || !targetId) {
+    return res.status(400).json({ error: "base and target query params are required" });
+  }
+
+  const versions = await query(
+    `SELECT v.id, v.name, v.created_at, v.snapshot
+     FROM project_versions v
+     JOIN projects p ON p.id = v.project_id
+     WHERE v.project_id=$1
+       AND v.id = ANY($2::uuid[])
+       AND p.user_id=$3
+       AND p.deleted_at IS NULL`,
+    [req.params.id, [baseId, targetId], req.user!.id],
+  );
+
+  if (versions.rows.length !== 2) {
+    return res.status(404).json({ error: "Versions not found" });
+  }
+
+  const baseRow = versions.rows.find((row: { id: string }) => row.id === baseId);
+  const targetRow = versions.rows.find((row: { id: string }) => row.id === targetId);
+  const baseSnapshot = normalizeVersionSnapshot(baseRow?.snapshot);
+  const targetSnapshot = normalizeVersionSnapshot(targetRow?.snapshot);
+  if (!baseSnapshot || !targetSnapshot) {
+    return res.status(500).json({ error: "Version snapshot is invalid" });
+  }
+
+  const [baseCost, targetCost] = await Promise.all([
+    estimateSnapshotCost(baseSnapshot),
+    estimateSnapshotCost(targetSnapshot),
+  ]);
+
+  res.json({
+    base: { id: baseRow.id, name: baseRow.name, created_at: baseRow.created_at, estimated_cost: baseCost },
+    target: { id: targetRow.id, name: targetRow.name, created_at: targetRow.created_at, estimated_cost: targetCost },
+    delta: buildVersionDelta(baseSnapshot, targetSnapshot),
+    cost_delta: targetCost - baseCost,
+  });
+});
+
+router.post("/:id/versions/:versionId/restore", async (req, res) => {
+  const versionResult = await query(
+    `SELECT v.*
+     FROM project_versions v
+     JOIN projects p ON p.id = v.project_id
+     WHERE v.project_id=$1
+       AND v.id=$2
+       AND p.user_id=$3
+       AND p.deleted_at IS NULL`,
+    [req.params.id, req.params.versionId, req.user!.id],
+  );
+  if (versionResult.rows.length === 0) {
+    return res.status(404).json({ error: "Version not found" });
+  }
+
+  const sourceVersion = versionResult.rows[0];
+  const snapshot = normalizeVersionSnapshot(sourceVersion.snapshot);
+  if (!snapshot) {
+    return res.status(500).json({ error: "Version snapshot is invalid" });
+  }
+
+  const projectResult = await query(
+    `UPDATE projects SET name=$1, description=$2, scene_js=$3, updated_at=now()
+     WHERE id=$4 AND user_id=$5
+     RETURNING *`,
+    [snapshot.name, snapshot.description, snapshot.scene_js, req.params.id, req.user!.id],
+  );
+  await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
+  for (const item of snapshot.bom) {
+    const matExists = await query("SELECT id FROM materials WHERE id=$1", [item.material_id]);
+    if (matExists.rows.length === 0) continue;
+    await query(
+      "INSERT INTO project_bom (project_id, material_id, quantity, unit) VALUES ($1,$2,$3,$4)",
+      [req.params.id, item.material_id, item.quantity, item.unit],
+    );
+  }
+
+  const branchId = sourceVersion.branch_id ?? (await ensureDefaultBranch(req.params.id)).id;
+  const restoredVersion = await insertProjectVersion({
+    projectId: req.params.id,
+    branchId,
+    snapshot,
+    name: sourceVersion.name ? `Restore: ${sourceVersion.name}` : "Restore checkpoint",
+    description: `Restored from ${sourceVersion.id}`,
+    eventType: "restore",
+    thumbnailUrl: sourceVersion.thumbnail_url,
+    restoredFromVersionId: sourceVersion.id,
+  });
+
+  res.json({ project: projectResult.rows[0], snapshot, version: restoredVersion });
+});
+
+router.post("/:id/quote-request", async (req, res) => {
+  let contactName: string;
+  let contactEmail: string;
+  let postcode: string;
+  let workScope: string;
+  try {
+    contactName = requiredText(req.body.contact_name ?? req.body.contactName, "contact_name", 160);
+    contactEmail = requiredText(req.body.contact_email ?? req.body.contactEmail, "contact_email", 254).toLowerCase();
+    postcode = requiredText(req.body.postcode, "postcode", 12);
+    workScope = requiredText(req.body.work_scope ?? req.body.workScope, "work_scope", 3000);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid quote request" });
+  }
+
+  if (!EMAIL_RE.test(contactEmail)) {
+    return res.status(400).json({ error: "contact_email must be a valid email address" });
+  }
+  if (!/^\d{5}$/.test(postcode)) {
+    return res.status(400).json({ error: "postcode must be a Finnish 5-digit postcode" });
+  }
+
+  const contactPhone = optionalText(req.body.contact_phone ?? req.body.contactPhone, 80);
+  const locale = req.body.locale === "en" ? "en" : "fi";
+
+  const projectResult = await query(
+    `SELECT p.id, p.name, p.description, p.building_info, u.email AS user_email, u.name AS user_name
+     FROM projects p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.id = $1 AND p.user_id = $2 AND p.deleted_at IS NULL`,
+    [req.params.id, req.user!.id],
+  );
+  if (projectResult.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+  const project = projectResult.rows[0];
+
+  const bomResult = await query(
+    `SELECT pb.*, m.name AS material_name, m.waste_factor,
+      p.unit_price, p.unit, p.regular_unit_price, p.campaign_label, p.campaign_ends_at,
+      (pb.quantity * p.unit_price * m.waste_factor) AS line_cost,
+      CASE
+        WHEN p.regular_unit_price IS NOT NULL AND p.regular_unit_price > p.unit_price
+        THEN (pb.quantity * (p.regular_unit_price - p.unit_price) * m.waste_factor)
+        ELSE 0
+      END AS campaign_savings,
+      s.name AS supplier_name
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     LEFT JOIN pricing p ON m.id = p.material_id AND p.is_primary = true
+     LEFT JOIN suppliers s ON p.supplier_id = s.id
+     WHERE pb.project_id = $1
+     ORDER BY m.name`,
+    [req.params.id],
+  );
+  const bomRows = bomResult.rows as QuoteRequestBomRow[];
+  if (bomRows.length === 0) {
+    return res.status(400).json({ error: "Cannot request quotes for an empty BOM" });
+  }
+
+  const estimatedCost = bomRows.reduce((sum, row) => sum + Number(row.line_cost || 0), 0);
+  const insertResult = await query(
+    `INSERT INTO quote_requests (
+       project_id, user_id, contact_name, contact_email, contact_phone, postcode,
+       work_scope, bom_line_count, estimated_cost, matched_contractor_count
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING id, status, created_at`,
+    [
+      req.params.id,
+      req.user!.id,
+      contactName,
+      contactEmail,
+      contactPhone,
+      postcode,
+      workScope,
+      bomRows.length,
+      estimatedCost,
+      0,
+    ],
+  );
+
+  const email = buildQuoteRequestEmail({
+    projectName: project.name,
+    workScope,
+    contactName,
+    contactEmail,
+    contactPhone,
+    postcode,
+    bomLineCount: bomRows.length,
+    estimatedCost,
+    locale,
+  });
+  const pdf = await renderQuoteRequestPdf({
+    projectName: project.name,
+    projectDescription: project.description,
+    workScope,
+    contactName,
+    contactEmail,
+    postcode,
+    bomRows,
+    estimatedCost,
+    locale,
+  });
+  const attachments: EmailAttachment[] = [{
+    filename: `helscoop_quote_${safeFilename(project.name)}.pdf`,
+    content: pdf,
+    contentType: "application/pdf",
+  }];
+  const emailSent = await sendEmail(contactEmail, email.subject, email.body, attachments);
+
+  logAuditEvent(req.user!.id, "quote_request.submitted", {
+    targetId: req.params.id,
+    quoteRequestId: insertResult.rows[0].id,
+    bomLineCount: bomRows.length,
+    estimatedCost,
+    ip: req.ip,
+  });
+
+  res.status(201).json({
+    id: insertResult.rows[0].id,
+    status: insertResult.rows[0].status,
+    created_at: insertResult.rows[0].created_at,
+    email_sent: emailSent,
+    bom_line_count: bomRows.length,
+    estimated_cost: estimatedCost,
+    matched_contractor_count: 0,
+  });
+});
+
 router.put("/:id", async (req, res) => {
-  const { name, description, scene_js } = req.body;
+  const body = req.body as Record<string, unknown>;
+  const {
+    name,
+    description,
+    scene_js,
+    household_deduction_joint,
+    tags,
+    status,
+    param_presets,
+    building_info,
+    project_type,
+    unit_count,
+    business_id,
+    property_manager_name,
+    property_manager_email,
+    property_manager_phone,
+    shareholder_shares,
+  } = body;
   if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
     return res.status(400).json({ error: "Project name must be 200 characters or fewer" });
   }
+  if (description !== undefined && description !== null && typeof description !== "string") {
+    return res.status(400).json({ error: "description must be a string" });
+  }
+  if (scene_js !== undefined && typeof scene_js !== "string") {
+    return res.status(400).json({ error: "scene_js must be a string" });
+  }
+  if (scene_js !== undefined && typeof scene_js === "string" && scene_js.length > 512 * 1024) {
+    return res.status(400).json({ error: "Scene script exceeds maximum size of 512 KB" });
+  }
+  if (household_deduction_joint !== undefined && typeof household_deduction_joint !== "boolean") {
+    return res.status(400).json({ error: "household_deduction_joint must be a boolean" });
+  }
+  const VALID_STATUSES = ["planning", "in_progress", "completed", "archived"];
+  if (status !== undefined && (typeof status !== "string" || !VALID_STATUSES.includes(status))) {
+    return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(", ")}` });
+  }
+  if (param_presets !== undefined && (!Array.isArray(param_presets) || param_presets.length > 20)) {
+    return res.status(400).json({ error: "param_presets must be an array of at most 20 presets" });
+  }
+  const safeTags = tags !== undefined
+    ? (Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === "string").slice(0, 20) : null)
+    : null;
+  const safePresets = param_presets !== undefined ? JSON.stringify(param_presets) : null;
+  const photoOverlayProvided = hasOwn(body, "photo_overlay");
+  let safePhotoOverlay: Record<string, unknown> | null = null;
+  if (photoOverlayProvided) {
+    try {
+      safePhotoOverlay = normalizePhotoOverlay(body.photo_overlay);
+    } catch (err) {
+      return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid photo_overlay" });
+    }
+  }
+  const unitCountProvided = hasOwn(body, "unit_count");
+  const businessIdProvided = hasOwn(body, "business_id");
+  const propertyManagerNameProvided = hasOwn(body, "property_manager_name");
+  const propertyManagerEmailProvided = hasOwn(body, "property_manager_email");
+  const propertyManagerPhoneProvided = hasOwn(body, "property_manager_phone");
+  const shareholderSharesProvided = hasOwn(body, "shareholder_shares");
+  const buildingInfoProvided = hasOwn(body, "building_info");
+  let safeProjectType: ProjectType | null;
+  let safeUnitCount: number | null;
+  let safeBusinessId: string | null;
+  let safePropertyManagerName: string | null;
+  let safePropertyManagerEmail: string | null;
+  let safePropertyManagerPhone: string | null;
+  let safeShareholderShares: ShareholderShare[] | null;
+  let safeBuildingInfo: Record<string, unknown> | null;
+  try {
+    safeProjectType = normalizeProjectTypePatch(project_type);
+    safeUnitCount = normalizePositiveInteger(unit_count, "unit_count", 10000);
+    safeBusinessId = optionalTextStrict(business_id, "business_id", 32);
+    safePropertyManagerName = optionalTextStrict(property_manager_name, "property_manager_name", 160);
+    safePropertyManagerEmail = optionalTextStrict(property_manager_email, "property_manager_email", 254);
+    if (safePropertyManagerEmail && !EMAIL_RE.test(safePropertyManagerEmail)) {
+      throw new Error("property_manager_email must be a valid email address");
+    }
+    safePropertyManagerPhone = optionalTextStrict(property_manager_phone, "property_manager_phone", 80);
+    safeShareholderShares = shareholderSharesProvided ? normalizeShareholderShares(shareholder_shares) : null;
+    safeBuildingInfo = buildingInfoProvided ? normalizeBuildingInfo(building_info) : null;
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid project metadata" });
+  }
   const result = await query(
-    `UPDATE projects SET name=COALESCE($1, name), description=COALESCE($2, description), scene_js=COALESCE($3, scene_js), updated_at=now()
-     WHERE id=$4 AND user_id=$5 RETURNING *`,
-    [name?.trim(), description, scene_js, req.params.id, req.user!.id]
+    `UPDATE projects SET
+       name=COALESCE($1, name),
+       description=COALESCE($2, description),
+       scene_js=COALESCE($3, scene_js),
+       household_deduction_joint=COALESCE($4, household_deduction_joint),
+       tags=COALESCE($5, tags),
+       status=COALESCE($6, status),
+       param_presets=COALESCE($7::jsonb, param_presets),
+       photo_overlay=CASE WHEN $8::boolean THEN $9::jsonb ELSE photo_overlay END,
+       project_type=COALESCE($10, project_type),
+       unit_count=CASE WHEN $11::boolean THEN $12::integer ELSE unit_count END,
+       business_id=CASE WHEN $13::boolean THEN $14 ELSE business_id END,
+       property_manager_name=CASE WHEN $15::boolean THEN $16 ELSE property_manager_name END,
+       property_manager_email=CASE WHEN $17::boolean THEN $18 ELSE property_manager_email END,
+       property_manager_phone=CASE WHEN $19::boolean THEN $20 ELSE property_manager_phone END,
+       shareholder_shares=CASE WHEN $21::boolean THEN COALESCE($22::jsonb, '[]'::jsonb) ELSE shareholder_shares END,
+       building_info=CASE WHEN $23::boolean THEN $24::jsonb ELSE building_info END,
+       updated_at=now()
+     WHERE id=$25 AND user_id=$26 RETURNING *`,
+    [
+      typeof name === "string" ? name.trim() : undefined,
+      description,
+      scene_js,
+      household_deduction_joint ?? null,
+      safeTags,
+      typeof status === "string" ? status : null,
+      safePresets,
+      photoOverlayProvided,
+      safePhotoOverlay === null ? null : JSON.stringify(safePhotoOverlay),
+      safeProjectType,
+      unitCountProvided,
+      safeUnitCount,
+      businessIdProvided,
+      safeBusinessId,
+      propertyManagerNameProvided,
+      safePropertyManagerName,
+      propertyManagerEmailProvided,
+      safePropertyManagerEmail,
+      propertyManagerPhoneProvided,
+      safePropertyManagerPhone,
+      shareholderSharesProvided,
+      safeShareholderShares === null ? null : JSON.stringify(safeShareholderShares),
+      buildingInfoProvided,
+      safeBuildingInfo === null ? null : JSON.stringify(safeBuildingInfo),
+      req.params.id,
+      req.user!.id,
+    ]
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "Project not found" });
-  res.json(result.rows[0]);
+  const updatedProject = result.rows[0];
+  const collaborationPatch: Record<string, unknown> = {};
+  if (typeof name === "string") collaborationPatch.name = updatedProject.name;
+  if (description !== undefined) collaborationPatch.description = updatedProject.description;
+  if (typeof scene_js === "string") collaborationPatch.scene_js = updatedProject.scene_js;
+  if (photoOverlayProvided) collaborationPatch.photo_overlay = updatedProject.photo_overlay;
+  if (Object.keys(collaborationPatch).length > 0) {
+    broadcastProjectEvent(req.params.id, {
+      type: "project:update",
+      projectId: req.params.id,
+      patch: collaborationPatch,
+      updated_at: updatedProject.updated_at,
+      sourceClientId: getCollaborationClientId(body.collaboration_client_id),
+      sourceName: req.user?.email?.split("@")[0] || "Collaborator",
+    });
+  }
+  res.json(updatedProject);
+});
+
+router.put("/:id/mood-board", async (req, res) => {
+  let safeMoodBoard: Record<string, unknown>;
+  try {
+    safeMoodBoard = normalizeMoodBoard(req.body?.mood_board);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid mood_board" });
+  }
+
+  const result = await query(
+    `UPDATE projects
+     SET mood_board = $1::jsonb, updated_at = now()
+     WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL
+     RETURNING mood_board, updated_at`,
+    [JSON.stringify(safeMoodBoard), req.params.id, req.user!.id],
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+  res.json({ ok: true, mood_board: result.rows[0].mood_board, updated_at: result.rows[0].updated_at });
 });
 
 router.delete("/:id", async (req, res) => {
@@ -129,7 +1436,7 @@ router.delete("/:id/permanent", async (req, res) => {
 router.post("/:id/share", requirePermission("project:share"), async (req, res) => {
   // Check ownership
   const proj = await query(
-    "SELECT id, share_token FROM projects WHERE id=$1 AND user_id=$2",
+    "SELECT id, share_token, share_token_expires_at FROM projects WHERE id=$1 AND user_id=$2",
     [req.params.id, req.user!.id]
   );
   if (proj.rows.length === 0) {
@@ -137,29 +1444,252 @@ router.post("/:id/share", requirePermission("project:share"), async (req, res) =
   }
 
   // If already shared, return existing token
-  if (proj.rows[0].share_token) {
-    return res.json({ share_token: proj.rows[0].share_token });
+  const existingExpiresAt = proj.rows[0].share_token_expires_at ? new Date(proj.rows[0].share_token_expires_at) : null;
+  if (proj.rows[0].share_token && (!existingExpiresAt || existingExpiresAt.getTime() > Date.now())) {
+    return res.json({ share_token: proj.rows[0].share_token, expires_at: proj.rows[0].share_token_expires_at });
   }
 
   // Generate a new share token (UUID v4)
   const shareToken = crypto.randomUUID();
-  await query(
-    "UPDATE projects SET share_token = $1, updated_at = now() WHERE id = $2",
+  const updated = await query(
+    `UPDATE projects
+     SET share_token = $1,
+         share_token_created_at = now(),
+         share_token_expires_at = now() + INTERVAL '30 days',
+         updated_at = now()
+     WHERE id = $2
+     RETURNING share_token_expires_at`,
     [shareToken, req.params.id]
   );
 
-  res.json({ share_token: shareToken });
+  res.json({ share_token: shareToken, expires_at: updated.rows[0]?.share_token_expires_at });
+});
+
+router.put("/:id/share-preview", requirePermission("project:share"), async (req, res) => {
+  let preview: Record<string, unknown> | null;
+  try {
+    const body = req.body as Record<string, unknown>;
+    preview = normalizeSharePreview(hasOwn(body, "share_preview") ? body.share_preview : body);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Invalid share_preview" });
+  }
+  if (!preview) {
+    return res.status(400).json({ error: "share_preview is required" });
+  }
+
+  const project = await query(
+    `SELECT id, share_token, share_token_expires_at, is_public
+     FROM projects
+     WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`,
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const tier = await getUserPlan(req.user!.id);
+  preview.watermark = !PLANS[tier].features.premiumExport;
+
+  const row = project.rows[0];
+  const expiresAt = row.share_token_expires_at ? new Date(row.share_token_expires_at) : null;
+  const isExpired = expiresAt ? expiresAt.getTime() <= Date.now() : false;
+  const nextShareToken = !row.share_token || isExpired ? crypto.randomUUID() : row.share_token;
+  const resetExpiry = !row.is_public && (!row.share_token || !expiresAt || isExpired);
+
+  const result = await query(
+    `UPDATE projects
+     SET share_preview = $1::jsonb,
+         share_token = $2,
+         share_token_created_at = CASE
+           WHEN share_token IS NULL OR share_token <> $2 THEN now()
+           ELSE share_token_created_at
+         END,
+         share_token_expires_at = CASE
+           WHEN is_public = true THEN NULL
+           WHEN $3::boolean THEN now() + INTERVAL '30 days'
+           ELSE share_token_expires_at
+         END,
+         updated_at = now()
+     WHERE id = $4 AND user_id = $5
+     RETURNING share_preview, share_token, share_token_expires_at`,
+    [JSON.stringify(preview), nextShareToken, resetExpiry, req.params.id, req.user!.id],
+  );
+
+  res.json({
+    share_preview: result.rows[0]?.share_preview ?? preview,
+    share_token: result.rows[0]?.share_token ?? nextShareToken,
+    share_token_expires_at: result.rows[0]?.share_token_expires_at ?? null,
+  });
 });
 
 router.delete("/:id/share", async (req, res) => {
   const result = await query(
-    "UPDATE projects SET share_token = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING id",
+    `UPDATE projects
+     SET share_token = NULL,
+         share_token_created_at = NULL,
+         share_token_expires_at = NULL,
+         share_preview = NULL,
+         is_public = false,
+         published_at = NULL,
+         updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id`,
     [req.params.id, req.user!.id]
   );
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "Project not found" });
   }
   res.json({ ok: true });
+});
+
+router.put("/:id/publish", requirePermission("project:share"), async (req, res) => {
+  if (typeof req.body?.is_public !== "boolean") {
+    return res.status(400).json({ error: "is_public must be a boolean" });
+  }
+
+  const project = await query(
+    "SELECT id, share_token, share_token_expires_at FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (project.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  if (req.body.is_public) {
+    const shareToken = project.rows[0].share_token || crypto.randomUUID();
+    const result = await query(
+      `UPDATE projects
+       SET is_public = true,
+           gallery_status = 'approved',
+           published_at = COALESCE(published_at, now()),
+           share_token = $1,
+           share_token_created_at = COALESCE(share_token_created_at, now()),
+           share_token_expires_at = NULL,
+           updated_at = now()
+       WHERE id = $2 AND user_id = $3
+       RETURNING id, is_public, published_at, gallery_status, share_token, share_token_expires_at`,
+      [shareToken, req.params.id, req.user!.id],
+    );
+    logAuditEvent(req.user!.id, "project.publish", { targetId: req.params.id, ip: req.ip });
+    return res.json(result.rows[0]);
+  }
+
+  const result = await query(
+    `UPDATE projects
+     SET is_public = false,
+         published_at = NULL,
+         gallery_status = 'approved',
+         share_token_expires_at = CASE
+           WHEN share_token IS NOT NULL AND share_token_expires_at IS NULL THEN now() + INTERVAL '30 days'
+           ELSE share_token_expires_at
+         END,
+         updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id, is_public, published_at, gallery_status, share_token, share_token_expires_at`,
+    [req.params.id, req.user!.id],
+  );
+  logAuditEvent(req.user!.id, "project.unpublish", { targetId: req.params.id, ip: req.ip });
+  res.json(result.rows[0]);
+});
+
+router.post("/:id/bom/substitute", async (req, res) => {
+  const fromMaterialId = typeof req.body.from_material_id === "string"
+    ? req.body.from_material_id.trim()
+    : "";
+  const toMaterialId = typeof req.body.to_material_id === "string"
+    ? req.body.to_material_id.trim()
+    : "";
+
+  if (!fromMaterialId || !toMaterialId) {
+    return res.status(400).json({ error: "from_material_id and to_material_id are required" });
+  }
+  if (fromMaterialId === toMaterialId) {
+    return res.status(400).json({ error: "from_material_id and to_material_id must differ" });
+  }
+
+  const proj = await query(
+    "SELECT id FROM projects WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL",
+    [req.params.id, req.user!.id],
+  );
+  if (proj.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const sourceItem = await query(
+    "SELECT material_id, quantity, unit FROM project_bom WHERE project_id=$1 AND material_id=$2",
+    [req.params.id, fromMaterialId],
+  );
+  if (sourceItem.rows.length === 0) {
+    return res.status(404).json({ error: "Source BOM item not found" });
+  }
+
+  const mapping = await query(
+    `SELECT substitution_type, confidence, notes
+     FROM material_substitutions
+     WHERE material_id=$1 AND substitute_id=$2`,
+    [fromMaterialId, toMaterialId],
+  );
+  if (mapping.rows.length === 0) {
+    return res.status(400).json({ error: "Requested material is not a mapped substitute" });
+  }
+
+  const substitute = await query(
+    `SELECT m.id, m.name, p.unit
+     FROM materials m
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE m.id=$1`,
+    [toMaterialId],
+  );
+  if (substitute.rows.length === 0) {
+    return res.status(404).json({ error: "Substitute material not found" });
+  }
+
+  const source = sourceItem.rows[0] as { quantity: number | string; unit: string };
+  const targetUnit = substitute.rows[0].unit || source.unit || "kpl";
+  const existingTarget = await query(
+    "SELECT material_id FROM project_bom WHERE project_id=$1 AND material_id=$2",
+    [req.params.id, toMaterialId],
+  );
+
+  if (existingTarget.rows.length > 0) {
+    await query(
+      "UPDATE project_bom SET quantity = quantity + $1 WHERE project_id=$2 AND material_id=$3",
+      [Number(source.quantity), req.params.id, toMaterialId],
+    );
+    await query(
+      "DELETE FROM project_bom WHERE project_id=$1 AND material_id=$2",
+      [req.params.id, fromMaterialId],
+    );
+  } else {
+    await query(
+      "UPDATE project_bom SET material_id=$1, unit=$2 WHERE project_id=$3 AND material_id=$4",
+      [toMaterialId, targetUnit, req.params.id, fromMaterialId],
+    );
+  }
+
+  const updated = await query(
+    `SELECT pb.*, m.name AS material_name, c.display_name AS category_name,
+      p.unit_price, p.link, s.name AS supplier_name,
+      p.in_stock, p.stock_level, p.store_location, p.last_checked_at AS stock_last_checked_at,
+      (pb.quantity * p.unit_price * m.waste_factor) AS total
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     JOIN categories c ON m.category_id = c.id
+     LEFT JOIN pricing p ON m.id = p.material_id AND p.is_primary = true
+     LEFT JOIN suppliers s ON p.supplier_id = s.id
+     WHERE pb.project_id = $1 AND pb.material_id = $2
+     ORDER BY pb.created_at DESC
+     LIMIT 1`,
+    [req.params.id, toMaterialId],
+  );
+
+  res.json({
+    ok: true,
+    from_material_id: fromMaterialId,
+    to_material_id: toMaterialId,
+    item: updated.rows[0] ?? null,
+    substitution: mapping.rows[0],
+  });
 });
 
 router.put("/:id/bom", async (req, res) => {
@@ -207,16 +1737,30 @@ router.put("/:id/bom", async (req, res) => {
   try {
     await query("DELETE FROM project_bom WHERE project_id=$1", [req.params.id]);
     let inserted = 0;
+    const savedItems: { material_id: string; quantity: number; unit: string }[] = [];
     for (const item of items) {
       const matExists = await query("SELECT id FROM materials WHERE id=$1", [item.material_id]);
       if (matExists.rows.length === 0) continue;
+      const quantity = Number(item.quantity);
+      const unit = typeof item.unit === "string" && item.unit.trim()
+        ? item.unit.trim().slice(0, 24)
+        : "kpl";
       await query(
         `INSERT INTO project_bom (project_id, material_id, quantity, unit)
          VALUES ($1, $2, $3, $4)`,
-        [req.params.id, item.material_id, item.quantity, item.unit || "kpl"]
+        [req.params.id, item.material_id, quantity, unit]
       );
+      savedItems.push({ material_id: item.material_id, quantity, unit });
       inserted++;
     }
+    broadcastProjectEvent(req.params.id, {
+      type: "bom:update",
+      projectId: req.params.id,
+      items: savedItems,
+      count: inserted,
+      sourceClientId: getCollaborationClientId(req.body?.collaboration_client_id),
+      sourceName: req.user?.email?.split("@")[0] || "Collaborator",
+    });
     res.json({ ok: true, count: inserted, skipped: items.length - inserted });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to save BOM", detail: err.message });
@@ -256,9 +1800,28 @@ router.post("/:id/duplicate", requirePermission("project:create"), async (req, r
   const suffix = acceptLang.toLowerCase().startsWith("fi") ? "(kopio)" : "(copy)";
 
   const dup = await query(
-    `INSERT INTO projects (user_id, name, description, scene_js)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.user!.id, `${p.name} ${suffix}`, p.description, p.scene_js]
+    `INSERT INTO projects (
+       user_id, name, description, scene_js, original_scene_js, building_info,
+       project_type, unit_count, business_id, property_manager_name,
+       property_manager_email, property_manager_phone, shareholder_shares, mood_board
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+    [
+      req.user!.id,
+      `${p.name} ${suffix}`,
+      p.description,
+      p.scene_js,
+      p.original_scene_js ?? p.scene_js,
+      jsonbParam(p.building_info),
+      p.project_type ?? "omakotitalo",
+      p.unit_count ?? null,
+      p.business_id ?? null,
+      p.property_manager_name ?? null,
+      p.property_manager_email ?? null,
+      p.property_manager_phone ?? null,
+      jsonbParam(p.shareholder_shares ?? []),
+      jsonbParam(p.mood_board ?? { items: [] }),
+    ]
   );
   const newId = dup.rows[0].id;
 

@@ -10,21 +10,28 @@ import {
 } from "react";
 
 type ThemeChoice = "dark" | "light" | "auto";
+export type DarkMood = "warm" | "cool" | "black";
 
 interface ThemeContextValue {
   theme: ThemeChoice;
   resolved: "dark" | "light";
+  mood: DarkMood;
   toggle: () => void;
   setTheme: (t: ThemeChoice) => void;
+  setMood: (m: DarkMood) => void;
 }
 
 const STORAGE_KEY = "helscoop-theme";
+const MOOD_KEY = "helscoop-mood";
+export const DARK_MOODS: DarkMood[] = ["warm", "cool", "black"];
 
 const ThemeContext = createContext<ThemeContextValue>({
   theme: "dark",
   resolved: "dark",
+  mood: "warm",
   toggle: () => {},
   setTheme: () => {},
+  setMood: () => {},
 });
 
 function resolveTheme(
@@ -39,12 +46,17 @@ const CYCLE: ThemeChoice[] = ["dark", "light", "auto"];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeChoice>("dark");
+  const [mood, setMoodState] = useState<DarkMood>("warm");
   const [prefersDark, setPrefersDark] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as ThemeChoice | null;
     if (stored && CYCLE.includes(stored)) {
       setThemeState(stored);
+    }
+    const storedMood = localStorage.getItem(MOOD_KEY) as DarkMood | null;
+    if (storedMood && DARK_MOODS.includes(storedMood)) {
+      setMoodState(storedMood);
     }
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
     setPrefersDark(mql.matches);
@@ -58,15 +70,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.add("theme-transitioning");
     document.documentElement.setAttribute("data-theme", resolved);
+    document.documentElement.setAttribute("data-mood", resolved === "dark" ? mood : "");
     const id = setTimeout(() => {
       document.documentElement.classList.remove("theme-transitioning");
     }, 350);
     return () => clearTimeout(id);
-  }, [resolved]);
+  }, [resolved, mood]);
 
   const setTheme = useCallback((t: ThemeChoice) => {
     setThemeState(t);
     localStorage.setItem(STORAGE_KEY, t);
+  }, []);
+
+  const setMood = useCallback((m: DarkMood) => {
+    setMoodState(m);
+    localStorage.setItem(MOOD_KEY, m);
   }, []);
 
   const toggle = useCallback(() => {
@@ -79,7 +97,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, resolved, toggle, setTheme }}>
+    <ThemeContext.Provider value={{ theme, resolved, mood, toggle, setTheme, setMood }}>
       {children}
     </ThemeContext.Provider>
   );

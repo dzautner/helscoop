@@ -25,12 +25,12 @@ vi.mock("@/components/LocaleProvider", () => ({
 
 // Mock the api module
 vi.mock("@/lib/api", () => ({
-  getToken: vi.fn(() => "fake-token"),
+  hasAuthSession: vi.fn(() => true),
 }));
 
 // Retrieve the mock so we can control it per test
-import { getToken } from "@/lib/api";
-const mockedGetToken = vi.mocked(getToken);
+import { hasAuthSession } from "@/lib/api";
+const mockedHasAuthSession = vi.mocked(hasAuthSession);
 
 describe("WelcomeModal", () => {
   it("renders welcome title and body", () => {
@@ -185,7 +185,7 @@ describe("TourOverlay", () => {
 describe("OnboardingTour", () => {
   beforeEach(() => {
     localStorage.clear();
-    mockedGetToken.mockReturnValue("fake-token");
+    mockedHasAuthSession.mockReturnValue(true);
   });
 
   it("renders nothing when onboarding is already completed", async () => {
@@ -198,7 +198,7 @@ describe("OnboardingTour", () => {
   });
 
   it("renders nothing when user has no token", async () => {
-    mockedGetToken.mockReturnValue(null);
+    mockedHasAuthSession.mockReturnValue(false);
 
     const { container } = render(<OnboardingTour />);
     await act(async () => {});
@@ -206,7 +206,7 @@ describe("OnboardingTour", () => {
   });
 
   it("shows the welcome modal for first-time users", async () => {
-    mockedGetToken.mockReturnValue("fake-token");
+    mockedHasAuthSession.mockReturnValue(true);
 
     render(<OnboardingTour />);
     await act(async () => {});
@@ -214,7 +214,7 @@ describe("OnboardingTour", () => {
   });
 
   it("transitions to tour when start is clicked", async () => {
-    mockedGetToken.mockReturnValue("fake-token");
+    mockedHasAuthSession.mockReturnValue(true);
 
     // Add at least one tour target so TourOverlay doesn't immediately complete
     const el = document.createElement("div");
@@ -245,7 +245,7 @@ describe("OnboardingTour", () => {
   });
 
   it("marks onboarding complete when skip is clicked", async () => {
-    mockedGetToken.mockReturnValue("fake-token");
+    mockedHasAuthSession.mockReturnValue(true);
 
     render(<OnboardingTour />);
     await act(async () => {});

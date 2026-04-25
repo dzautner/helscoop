@@ -91,6 +91,75 @@ function enrichWithCatalogFields(row: Record<string, unknown>): Record<string, u
 // Routes
 // ---------------------------------------------------------------------------
 
+const STOCK_RISK_LEVELS = new Set(["low_stock", "out_of_stock"]);
+
+function toNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildSubstitutionReasons(row: Record<string, unknown>): string[] {
+  const reasons: string[] = [];
+  const currentPrice = toNumber(row.current_unit_price);
+  const previousPrice = toNumber(row.previous_unit_price);
+  const substitutePrice = toNumber(row.unit_price);
+
+  if (typeof row.current_stock_level === "string" && STOCK_RISK_LEVELS.has(row.current_stock_level)) {
+    reasons.push("current_stock_risk");
+  }
+  if (
+    currentPrice != null &&
+    previousPrice != null &&
+    previousPrice > 0 &&
+    ((currentPrice - previousPrice) / previousPrice) * 100 >= 15
+  ) {
+    reasons.push("price_spike");
+  }
+  if (
+    currentPrice != null &&
+    substitutePrice != null &&
+    currentPrice > 0 &&
+    substitutePrice < currentPrice &&
+    ((currentPrice - substitutePrice) / currentPrice) * 100 >= 10
+  ) {
+    reasons.push("cheaper_equivalent");
+  }
+
+  if (reasons.length === 0) reasons.push("mapped_substitution");
+  return reasons;
+}
+
+function formatSubstitutionSuggestion(row: Record<string, unknown>) {
+  const currentPrice = toNumber(row.current_unit_price);
+  const substitutePrice = toNumber(row.unit_price);
+  const savingsPerUnit =
+    currentPrice != null && substitutePrice != null
+      ? Math.max(0, currentPrice - substitutePrice)
+      : 0;
+  const savingsPercent =
+    currentPrice != null && currentPrice > 0
+      ? (savingsPerUnit / currentPrice) * 100
+      : 0;
+
+  return {
+    material_id: row.substitute_id,
+    material_name: row.substitute_name,
+    category_name: row.category_name,
+    substitution_type: row.substitution_type,
+    confidence: row.confidence,
+    notes: row.notes,
+    unit_price: substitutePrice,
+    unit: row.unit,
+    supplier_id: row.supplier_id,
+    supplier_name: row.supplier_name,
+    link: row.link,
+    stock_level: row.stock_level ?? "unknown",
+    savings_per_unit: savingsPerUnit,
+    savings_percent: savingsPercent,
+    trigger_reasons: buildSubstitutionReasons(row),
+  };
+}
+
 router.get("/", async (_req, res) => {
   const result = await query(`
     SELECT m.*, c.display_name AS category_name, c.display_name_fi AS category_name_fi,
@@ -99,6 +168,10 @@ router.get("/", async (_req, res) => {
         'supplier_name', s.name,
         'unit', p.unit,
         'unit_price', p.unit_price,
+        'regular_unit_price', p.regular_unit_price,
+        'campaign_label', p.campaign_label,
+        'campaign_ends_at', p.campaign_ends_at,
+        'campaign_detected_at', p.campaign_detected_at,
         'currency', p.currency,
         'sku', p.sku,
         'ean', p.ean,
@@ -121,6 +194,72 @@ router.get("/", async (_req, res) => {
     enrichWithCatalogFields(row as Record<string, unknown>),
   );
   res.json(enriched);
+});
+
+router.get("/:id/substitutions", requireAuth, requirePermission("material:read"), async (req, res) => {
+  const material = await query(
+    `SELECT m.id, m.name, p.unit_price AS current_unit_price,
+       p.previous_unit_price, COALESCE(p.stock_level, 'unknown') AS current_stock_level
+     FROM materials m
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE m.id = $1`,
+    [req.params.id],
+  );
+  if (material.rows.length === 0) {
+    return res.status(404).json({ error: "Material not found" });
+  }
+
+  const result = await query(
+    `SELECT
+       ms.material_id,
+       ms.substitute_id,
+       ms.substitution_type,
+       ms.confidence,
+       ms.notes,
+       sub.name AS substitute_name,
+       c.display_name AS category_name,
+       current_p.unit_price AS current_unit_price,
+       current_p.previous_unit_price,
+       COALESCE(current_p.stock_level, 'unknown') AS current_stock_level,
+       p.unit_price,
+       p.unit,
+       p.link,
+       COALESCE(p.stock_level, 'unknown') AS stock_level,
+       p.supplier_id,
+       s.name AS supplier_name
+     FROM material_substitutions ms
+     JOIN materials sub ON sub.id = ms.substitute_id
+     JOIN categories c ON c.id = sub.category_id
+     LEFT JOIN pricing current_p
+       ON current_p.material_id = ms.material_id AND current_p.is_primary = true
+     LEFT JOIN pricing p
+       ON p.material_id = ms.substitute_id AND p.is_primary = true
+     LEFT JOIN suppliers s ON s.id = p.supplier_id
+     WHERE ms.material_id = $1
+     ORDER BY
+       CASE COALESCE(p.stock_level, 'unknown')
+         WHEN 'in_stock' THEN 0
+         WHEN 'low_stock' THEN 1
+         WHEN 'unknown' THEN 2
+         ELSE 3
+       END,
+       p.unit_price ASC NULLS LAST,
+       sub.name ASC`,
+    [req.params.id],
+  );
+
+  res.json({
+    material_id: material.rows[0].id,
+    material_name: material.rows[0].name,
+    current: {
+      unit_price: toNumber(material.rows[0].current_unit_price),
+      previous_unit_price: toNumber(material.rows[0].previous_unit_price),
+      stock_level: material.rows[0].current_stock_level ?? "unknown",
+    },
+    suggestions: result.rows.map((row) =>
+      formatSubstitutionSuggestion(row as Record<string, unknown>),
+    ),
+  });
 });
 
 router.get("/:id", async (req, res) => {

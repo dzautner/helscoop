@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
-import { getToken } from "@/lib/api";
+import { hasAuthSession } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const STORAGE_KEY = "helscoop_onboarding_completed";
 
@@ -270,6 +271,7 @@ export function WelcomeModal({
 /** Step-by-step tooltip tour overlay */
 export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   const { t } = useTranslation();
+  const isMobileTour = useMediaQuery("(max-width: 768px)");
   const [currentStep, setCurrentStep] = useState(0);
   const [displayStep, setDisplayStep] = useState(0);
   const [contentFade, setContentFade] = useState(true);
@@ -288,18 +290,33 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     }
   }, [currentStep, displayStep]);
 
-  // Find visible steps (elements that exist in the DOM)
-  const visibleSteps = TOUR_STEPS.filter(
-    (step) => document.querySelector(step.target) !== null
-  );
+  const [visibleSteps, setVisibleSteps] = useState<TourStep[] | null>(null);
 
-  const step = visibleSteps[currentStep];
+  useEffect(() => {
+    setVisibleSteps(TOUR_STEPS.filter(
+      (s) =>
+        !(isMobileTour && s.target === "[data-tour='viewport']") &&
+        document.querySelector(s.target) !== null
+    ));
+  }, [isMobileTour]);
+
+  const step = visibleSteps?.[currentStep];
 
   const updateRect = useCallback(() => {
     if (!step) return;
     const rect = getElementRect(step.target);
     setTargetRect(rect);
   }, [step]);
+
+  useEffect(() => {
+    if (!visibleSteps) return;
+    if (visibleSteps.length > 0 && currentStep >= visibleSteps.length) {
+      setCurrentStep(visibleSteps.length - 1);
+    }
+    if (visibleSteps.length > 0 && displayStep >= visibleSteps.length) {
+      setDisplayStep(visibleSteps.length - 1);
+    }
+  }, [currentStep, displayStep, visibleSteps]);
 
   useEffect(() => {
     updateRect();
@@ -318,39 +335,6 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     }
   }, [currentStep, targetRect]);
 
-  if (visibleSteps.length === 0 || !step) {
-    onComplete();
-    return null;
-  }
-
-  const padding = 8;
-
-  // Build the spotlight clip-path (inverted rectangle)
-  const spotlightStyle: React.CSSProperties = targetRect
-    ? {
-        boxShadow: `0 0 0 9999px rgba(0,0,0,0.55), 0 0 16px 4px rgba(229,160,75,0.1)`,
-        position: "fixed" as const,
-        top: targetRect.top - padding,
-        left: targetRect.left - padding,
-        width: targetRect.width + padding * 2,
-        height: targetRect.height + padding * 2,
-        borderRadius: "var(--radius-md)",
-        zIndex: 1201,
-        pointerEvents: "none" as const,
-        border: "1.5px solid var(--amber-border)",
-        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-      }
-    : {};
-
-  const tooltipPos = targetRect
-    ? computeTooltipPosition(
-        targetRect,
-        step.placement,
-        tooltipSize.width,
-        tooltipSize.height
-      )
-    : { top: window.innerHeight / 2 - 75, left: window.innerWidth / 2 - 160 };
-
   const handlePrev = useCallback(() => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
@@ -358,18 +342,18 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
   }, [currentStep]);
 
   const handleNext = useCallback(() => {
+    if (!visibleSteps) return;
     if (currentStep < visibleSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       onComplete();
     }
-  }, [currentStep, visibleSteps.length, onComplete]);
+  }, [currentStep, visibleSteps, onComplete]);
 
   const handleSkip = useCallback(() => {
     onComplete();
   }, [onComplete]);
 
-  // Keyboard navigation: Escape to skip, Enter/ArrowRight for next, ArrowLeft for previous
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       switch (e.key) {
@@ -389,15 +373,57 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSkip, handleNext, handlePrev]);
 
-  // Auto-focus tooltip when it appears or step changes
   useEffect(() => {
     if (tooltipRef.current) {
       tooltipRef.current.focus();
     }
   }, [currentStep]);
 
-  const isLast = currentStep === visibleSteps.length - 1;
+  const shouldComplete = visibleSteps !== null && (visibleSteps.length === 0 || !step);
 
+  useEffect(() => {
+    if (shouldComplete) {
+      onComplete();
+    }
+  }, [shouldComplete, onComplete]);
+
+  if (!visibleSteps || visibleSteps.length === 0 || !step) {
+    return null;
+  }
+
+  const padding = 8;
+
+  const spotlightStyle: React.CSSProperties = targetRect
+    ? {
+        boxShadow: `0 0 0 9999px rgba(0,0,0,0.55), 0 0 16px 4px rgba(229,160,75,0.1)`,
+        position: "fixed" as const,
+        top: targetRect.top - padding,
+        left: targetRect.left - padding,
+        width: targetRect.width + padding * 2,
+        height: targetRect.height + padding * 2,
+        borderRadius: "var(--radius-md)",
+        zIndex: 1201,
+        pointerEvents: "none" as const,
+        border: "1.5px solid var(--amber-border)",
+        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+      }
+    : {};
+
+  const tooltipWidth =
+    typeof window === "undefined"
+      ? 320
+      : Math.min(320, Math.max(240, window.innerWidth - 24));
+
+  const tooltipPos = targetRect
+    ? computeTooltipPosition(
+        targetRect,
+        step.placement,
+        Math.min(tooltipSize.width, tooltipWidth),
+        tooltipSize.height
+      )
+    : { top: window.innerHeight / 2 - 75, left: window.innerWidth / 2 - tooltipWidth / 2 };
+
+  const isLast = currentStep === visibleSteps.length - 1;
   return (
     <>
       {/* Backdrop overlay for click-blocking */}
@@ -423,7 +449,7 @@ export function TourOverlay({ onComplete }: { onComplete: () => void }) {
           zIndex: 1202,
           top: tooltipPos.top,
           left: tooltipPos.left,
-          width: 320,
+          width: tooltipWidth,
           background: "var(--surface-float)",
           border: "1px solid var(--surface-border-float)",
           borderRadius: "var(--radius-md)",
@@ -501,7 +527,7 @@ export default function OnboardingTour() {
   );
 
   useEffect(() => {
-    if (!getToken() || isOnboardingCompleted()) {
+    if (!hasAuthSession() || isOnboardingCompleted()) {
       setPhase("done");
     } else {
       setPhase("welcome");

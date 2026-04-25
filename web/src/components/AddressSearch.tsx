@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -8,6 +8,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import type { DataProvenance } from "@/lib/confidence";
 import type { BuildingResult } from "@/types";
+import MapPreview from "@/components/MapPreview";
 
 /** Map a BuildingResult confidence string to a DataProvenance object */
 function buildingResultToProvenance(result: BuildingResult): DataProvenance {
@@ -16,6 +17,9 @@ function buildingResultToProvenance(result: BuildingResult): DataProvenance {
   }
   if (result.confidence === "template") {
     return { confidence: "demo", source: "template" };
+  }
+  if (result.confidence === "manual") {
+    return { confidence: "manual", source: result.data_sources?.[0] ?? "user" };
   }
   return { confidence: "estimated", source: result.data_sources?.[0] ?? "heuristic" };
 }
@@ -55,8 +59,21 @@ const HEATING_I18N: Record<string, string> = {
   kaukolampo: "building.heatingDistrict",
   sahko: "building.heatingElectric",
   maalampopumppu: "building.heatingGroundSource",
+  maalampo: "building.heatingGroundSource",
   oljy: "building.heatingOil",
 };
+
+const ROOF_TYPE_I18N: Record<string, string> = {
+  harjakatto: "building.roofGable",
+  tasakatto: "building.roofFlat",
+  mansardikatto: "building.roofMansard",
+  pulpettikatto: "building.roofShed",
+};
+
+const BUILDING_TYPE_OPTIONS = ["omakotitalo", "rivitalo", "kerrostalo", "paritalo"];
+const MATERIAL_OPTIONS = ["puu", "tiili", "betoni", "hirsi"];
+const HEATING_OPTIONS = ["kaukolampo", "sahko", "maalampopumppu", "oljy"];
+const ROOF_TYPE_OPTIONS = ["harjakatto", "tasakatto", "mansardikatto", "pulpettikatto"];
 
 function DataSourcesSection({ label, sources }: { label: string; sources: string[] }) {
   const [open, setOpen] = useState(false);
@@ -137,19 +154,33 @@ export default function AddressSearch({
   const [createError, setCreateError] = useState(false);
   const [result, setResult] = useState<BuildingResult | null>(null);
   const [searched, setSearched] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const [updatingBuilding, setUpdatingBuilding] = useState(false);
+  const [editError, setEditError] = useState(false);
+  const [revealDone, setRevealDone] = useState(false);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t, locale } = useTranslation();
   const { track } = useAnalytics();
+
+  const handleRevealComplete = useCallback(() => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => setRevealDone(true), 200);
+  }, []);
 
   const search = useCallback(async () => {
     if (!query.trim() || query.trim().length < 3) return;
     setLoading(true);
     setSearched(true);
+    setSearchError(false);
+    setRevealDone(false);
     try {
       const data = await api.getBuilding(query.trim());
       setResult(data);
+      setEditError(false);
       track("address_search", { query_length: query.trim().length, had_result: true });
     } catch {
       setResult(null);
+      setSearchError(true);
       track("address_search", { query_length: query.trim().length, had_result: false });
     }
     setLoading(false);
@@ -158,6 +189,59 @@ export default function AddressSearch({
   const resolveBuildingType = (type: string) => BUILDING_TYPE_I18N[type] ? t(BUILDING_TYPE_I18N[type]) : type;
   const resolveMaterial = (mat: string) => MATERIAL_I18N[mat] ? t(MATERIAL_I18N[mat]) : mat;
   const resolveHeating = (heat: string) => HEATING_I18N[heat] ? t(HEATING_I18N[heat]) : heat;
+  const resolveRoofType = (roof: string) => ROOF_TYPE_I18N[roof] ? t(ROOF_TYPE_I18N[roof]) : roof;
+
+  const updateBuildingDetails = useCallback(async (patch: Partial<BuildingResult["building_info"]>) => {
+    if (!result || result.confidence === "verified") return;
+    const nextInfo = { ...result.building_info, ...patch };
+    setUpdatingBuilding(true);
+    setEditError(false);
+    try {
+      const updated = await api.generateBuilding({
+        address: result.address,
+        coordinates: result.coordinates,
+        building_info: nextInfo,
+      });
+      setResult(updated);
+    } catch {
+      setEditError(true);
+    } finally {
+      setUpdatingBuilding(false);
+    }
+  }, [result]);
+
+  const canEditBuilding = Boolean(result && result.confidence !== "verified");
+  const editControlStyle = {
+    width: "100%",
+    padding: "6px 8px",
+    fontSize: 13,
+    minHeight: 32,
+  };
+  const renderSelect = (
+    value: string,
+    options: string[],
+    resolveLabel: (value: string) => string,
+    onChange: (value: string) => void,
+    label: string,
+  ) => {
+    const selectOptions = options.includes(value) ? options : [value, ...options];
+    return (
+      <select
+        className="input"
+        value={value}
+        disabled={updatingBuilding}
+        aria-label={label}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        style={editControlStyle}
+      >
+        {selectOptions.map((option) => (
+          <option key={option} value={option}>
+            {resolveLabel(option)}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   if (compact) {
     return (
@@ -210,7 +294,7 @@ export default function AddressSearch({
         )}
 
         {result && (
-          <div className="anim-up" style={{ marginTop: 16 }}>
+          <div className="anim-up address-result-glow" style={{ marginTop: 16 }}>
             <div className="card" style={{ padding: "16px 18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div>
@@ -229,7 +313,7 @@ export default function AddressSearch({
                 </div>
               </div>
               {createError && (
-                <div className="inline-error-banner">
+                <div className="inline-error-banner" role="alert">
                   {t('search.createError')}
                 </div>
               )}
@@ -247,7 +331,7 @@ export default function AddressSearch({
                   }
                 }}
                 disabled={creating}
-                style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontWeight: 600 }}
+                style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontWeight: 600, opacity: creating ? 0.7 : 1 }}
               >
                 {creating ? t('search.creatingProject') : t('search.createFromBuilding')}
               </button>
@@ -256,8 +340,8 @@ export default function AddressSearch({
         )}
 
         {searched && !loading && !result && (
-          <div className="anim-fade" style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
-            {t('search.notFound')}
+          <div className="anim-fade" role={searchError ? "alert" : undefined} style={{ marginTop: 16, color: searchError ? "var(--danger)" : "var(--text-muted)", fontSize: 12 }}>
+            {searchError ? t('search.searchError') : t('search.notFound')}
           </div>
         )}
       </div>
@@ -332,7 +416,7 @@ export default function AddressSearch({
         )}
 
         {result && (
-          <div className="anim-up building-result-grid" style={{
+          <div className="anim-up building-result-grid address-result-glow" style={{
             marginTop: 28,
             textAlign: "left",
           }}>
@@ -349,11 +433,18 @@ export default function AddressSearch({
                 wireframe={false}
                 onObjectCount={() => {}}
                 onError={() => {}}
+                onRevealComplete={handleRevealComplete}
               />
             </div>
 
-            {/* Building info + CTA */}
-            <div className="card" style={{ padding: "24px 28px", display: "flex", flexDirection: "column" }}>
+            {/* Building info + CTA — slides in after 3D reveal */}
+            <div className={`card ${revealDone ? "anim-slide-l" : ""}`} style={{
+              padding: "24px 28px",
+              display: "flex",
+              flexDirection: "column",
+              opacity: revealDone ? 1 : 0,
+              transition: "opacity 0.3s ease-out",
+            }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                 <div>
                   <h3 className="heading-display" style={{ fontSize: 20, marginBottom: 6 }}>
@@ -364,6 +455,16 @@ export default function AddressSearch({
                       {resolveBuildingType(result.building_info.type)}
                     </span>
                     <ConfidenceBadge provenance={buildingResultToProvenance(result)} />
+                    {canEditBuilding && (
+                      <span className="badge" style={{ fontSize: 11 }}>
+                        {t('search.editHint')}
+                      </span>
+                    )}
+                    {updatingBuilding && (
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                        {t('search.updatingBuilding')}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{
@@ -376,17 +477,114 @@ export default function AddressSearch({
                 </div>
               </div>
 
-              <div className="building-info-grid" style={{
+              <dl className="building-info-grid" style={{
                 marginBottom: 16,
                 flex: 1,
+                margin: 0,
               }}>
                 {[
-                  { label: t('search.yearBuilt'), value: String(result.building_info.year_built) },
-                  { label: t('search.area'), value: `${result.building_info.area_m2} m\u00B2` },
-                  { label: t('search.floors'), value: String(result.building_info.floors) },
-                  { label: t('search.material'), value: resolveMaterial(result.building_info.material) },
-                  { label: t('search.heating'), value: resolveHeating(result.building_info.heating) },
-                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : 'pcs'}` },
+                  {
+                    label: t('search.type'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.type,
+                        BUILDING_TYPE_OPTIONS,
+                        resolveBuildingType,
+                        (value) => void updateBuildingDetails({ type: value }),
+                        t('search.type'),
+                      )
+                      : resolveBuildingType(result.building_info.type),
+                  },
+                  {
+                    label: t('search.yearBuilt'),
+                    value: canEditBuilding ? (
+                      <input
+                        key={`year-${result.building_info.year_built}`}
+                        className="input"
+                        type="number"
+                        min={1800}
+                        max={new Date().getFullYear() + 1}
+                        defaultValue={result.building_info.year_built}
+                        disabled={updatingBuilding}
+                        aria-label={t('search.yearBuilt')}
+                        onBlur={(event) => void updateBuildingDetails({ year_built: Number(event.currentTarget.value) })}
+                        style={editControlStyle}
+                      />
+                    ) : String(result.building_info.year_built),
+                  },
+                  {
+                    label: t('search.area'),
+                    value: canEditBuilding ? (
+                      <input
+                        key={`area-${result.building_info.area_m2}`}
+                        className="input"
+                        type="number"
+                        min={20}
+                        max={2000}
+                        step={0.5}
+                        defaultValue={result.building_info.area_m2}
+                        disabled={updatingBuilding}
+                        aria-label={t('search.area')}
+                        onBlur={(event) => void updateBuildingDetails({ area_m2: Number(event.currentTarget.value) })}
+                        style={editControlStyle}
+                      />
+                    ) : `${result.building_info.area_m2} m\u00B2`,
+                  },
+                  {
+                    label: t('search.floors'),
+                    value: canEditBuilding ? (
+                      <input
+                        key={`floors-${result.building_info.floors}`}
+                        className="input"
+                        type="number"
+                        min={1}
+                        max={10}
+                        step={1}
+                        defaultValue={result.building_info.floors}
+                        disabled={updatingBuilding}
+                        aria-label={t('search.floors')}
+                        onBlur={(event) => void updateBuildingDetails({ floors: Number(event.currentTarget.value) })}
+                        style={editControlStyle}
+                      />
+                    ) : String(result.building_info.floors),
+                  },
+                  {
+                    label: t('search.material'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.material,
+                        MATERIAL_OPTIONS,
+                        resolveMaterial,
+                        (value) => void updateBuildingDetails({ material: value }),
+                        t('search.material'),
+                      )
+                      : resolveMaterial(result.building_info.material),
+                  },
+                  {
+                    label: t('search.heating'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.heating,
+                        HEATING_OPTIONS,
+                        resolveHeating,
+                        (value) => void updateBuildingDetails({ heating: value }),
+                        t('search.heating'),
+                      )
+                      : resolveHeating(result.building_info.heating),
+                  },
+                  {
+                    label: t('search.roofType'),
+                    value: canEditBuilding
+                      ? renderSelect(
+                        result.building_info.roof_type ?? "harjakatto",
+                        ROOF_TYPE_OPTIONS,
+                        resolveRoofType,
+                        (value) => void updateBuildingDetails({ roof_type: value }),
+                        t('search.roofType'),
+                      )
+                      : resolveRoofType(result.building_info.roof_type ?? "harjakatto"),
+                  },
+                  { label: t('search.bomRows'), value: `${result.bom_suggestion.length} ${locale === 'fi' ? 'kpl' : locale === 'sv' ? 'st' : 'pcs'}` },
                 ].map((item, i) => (
                   <div key={i} style={{
                     padding: "10px 12px",
@@ -394,11 +592,11 @@ export default function AddressSearch({
                     borderRadius: "var(--radius-sm)",
                     border: "1px solid var(--border)",
                   }}>
-                    <div className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{item.value}</div>
+                    <dt className="label-mono" style={{ marginBottom: 4, fontSize: 10 }}>{item.label}</dt>
+                    <dd style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{item.value}</dd>
                   </div>
                 ))}
-              </div>
+              </dl>
 
               {result.data_sources && result.data_sources.length > 0 && (
                 <DataSourcesSection
@@ -409,8 +607,18 @@ export default function AddressSearch({
 
               <DataSourceWarning message={result.data_source_error} />
 
+              {result.coordinates && (
+                <MapPreview lat={result.coordinates.lat} lon={result.coordinates.lon} />
+              )}
+
+              {editError && (
+                <div className="inline-error-banner" role="alert">
+                  {t('search.updateError')}
+                </div>
+              )}
+
               {createError && (
-                <div className="inline-error-banner">
+                <div className="inline-error-banner" role="alert">
                   {t('search.createError')}
                 </div>
               )}
@@ -436,13 +644,13 @@ export default function AddressSearch({
         )}
 
         {searched && !loading && !result && (
-          <div className="anim-fade" style={{
+          <div className="anim-fade" role={searchError ? "alert" : undefined} style={{
             marginTop: 20,
             padding: "16px",
-            color: "var(--text-muted)",
+            color: searchError ? "var(--danger)" : "var(--text-muted)",
             fontSize: 13,
           }}>
-            {t('search.notFound')}
+            {searchError ? t('search.searchError') : t('search.notFound')}
           </div>
         )}
       </div>

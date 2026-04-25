@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div style={{
+    <main id="main-content" tabIndex={-1} style={{
       minHeight: "100vh",
       display: "flex",
       alignItems: "center",
@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
       padding: 24,
       background: "var(--bg-primary)",
     }}>
-      <div style={{
+      <nav aria-label="Utility" style={{
         position: "fixed",
         top: 20,
         right: 20,
@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
       }}>
         <ThemeToggle />
         <LanguageSwitcher />
-      </div>
+      </nav>
 
       <div className="anim-up" style={{ width: "100%", maxWidth: 400 }}>
         <Link href="/" style={{ textDecoration: "none", display: "inline-block", marginBottom: 32 }}>
@@ -92,23 +92,26 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               <div>
-                <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+                <label htmlFor="forgot-password-email" className="label-mono" style={{ display: "block", marginBottom: 8 }}>
                   {t("auth.email")}
                 </label>
                 <input
+                  id="forgot-password-email"
                   className="input"
                   type="email"
                   placeholder={t("auth.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  aria-required="true"
+                  aria-describedby={error ? "forgot-password-error" : undefined}
                   autoComplete="email"
                   autoFocus
                 />
               </div>
 
               {error && (
-                <div style={{
+                <div id="forgot-password-error" role="alert" style={{
                   padding: "10px 14px",
                   borderRadius: "var(--radius-md)",
                   background: "var(--danger-dim)",
@@ -147,6 +150,6 @@ export default function ForgotPasswordPage() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -224,7 +224,7 @@ describe("GET /carbon/calculate — rating", () => {
   it("returns 'green' when CO₂ is well under limit", async () => {
     // Use building area 100 m² → limit = 16 × 100 × 50 = 80000 kg
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", building_info: JSON.stringify({ area: 100 }) }],
+      rows: [{ id: "proj-1", building_info: JSON.stringify({ area_m2: 100 }) }],
     } as never);
     // Total CO₂ = 10 × 1.4 = 14 kg (well under 80% of 80000 = 64000)
     mockQuery.mockResolvedValueOnce({
@@ -245,7 +245,7 @@ describe("GET /carbon/calculate — rating", () => {
     // Small building: area = 1 m² → limit = 16 × 1 × 50 = 800 kg
     // 80% of 800 = 640 → need 640-800 kg CO₂
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", building_info: JSON.stringify({ area: 1 }) }],
+      rows: [{ id: "proj-1", building_info: JSON.stringify({ area_m2: 1 }) }],
     } as never);
     // 90 × 8.0 = 720 kg → between 640 and 800 → amber
     mockQuery.mockResolvedValueOnce({
@@ -266,7 +266,7 @@ describe("GET /carbon/calculate — rating", () => {
   it("returns 'red' when CO₂ exceeds limit", async () => {
     // Small building: area = 1 m² → limit = 800 kg
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", building_info: JSON.stringify({ area: 1 }) }],
+      rows: [{ id: "proj-1", building_info: JSON.stringify({ area_m2: 1 }) }],
     } as never);
     // 150 × 8.0 = 1200 kg → over 800 → red
     mockQuery.mockResolvedValueOnce({
@@ -286,7 +286,7 @@ describe("GET /carbon/calculate — rating", () => {
   it("returns 'amber' when CO₂ equals exactly 80% of limit (boundary)", async () => {
     // area = 1 m² → limit = 800 kg, 80% = 640
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", building_info: JSON.stringify({ area: 1 }) }],
+      rows: [{ id: "proj-1", building_info: JSON.stringify({ area_m2: 1 }) }],
     } as never);
     // 80 × 8.0 = 640 → exactly 80% → amber
     mockQuery.mockResolvedValueOnce({
@@ -324,7 +324,7 @@ describe("GET /carbon/calculate — building area", () => {
 
   it("uses area from building_info when available", async () => {
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", building_info: { area: 200 } }],
+      rows: [{ id: "proj-1", building_info: { area_m2: 200 } }],
     } as never);
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
 
@@ -338,7 +338,7 @@ describe("GET /carbon/calculate — building area", () => {
 
   it("uses area from stringified building_info", async () => {
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", building_info: JSON.stringify({ area: 85 }) }],
+      rows: [{ id: "proj-1", building_info: JSON.stringify({ area_m2: 85 }) }],
     } as never);
     mockQuery.mockResolvedValueOnce({ rows: [] } as never);
 
@@ -348,5 +348,75 @@ describe("GET /carbon/calculate — building area", () => {
     const body = res.body as { limitKg: number };
     // 16 × 85 × 50 = 68000
     expect(body.limitKg).toBe(68000);
+  });
+
+  it("falls back to legacy 'area' field when area_m2 is absent", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: { area: 150 } }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/carbon/calculate?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    const body = res.body as { limitKg: number };
+    // 16 × 150 × 50 = 120000
+    expect(body.limitKg).toBe(120000);
+  });
+
+  it("prefers area_m2 over legacy area field", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: { area_m2: 200, area: 999 } }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/carbon/calculate?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    const body = res.body as { limitKg: number };
+    // 16 × 200 × 50 = 160000 (uses area_m2, not area)
+    expect(body.limitKg).toBe(160000);
+  });
+
+  it("uses default area when area_m2 is zero", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: { area_m2: 0 } }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/carbon/calculate?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    const body = res.body as { limitKg: number };
+    // Zero area should fall back to default 120 m²
+    expect(body.limitKg).toBe(96000);
+  });
+
+  it("uses default area when area_m2 is negative", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: { area_m2: -50 } }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/carbon/calculate?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    const body = res.body as { limitKg: number };
+    // Negative area should fall back to default 120 m²
+    expect(body.limitKg).toBe(96000);
+  });
+
+  it("uses default area when area_m2 is a string", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: { area_m2: "not_a_number" } }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/carbon/calculate?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    const body = res.body as { limitKg: number };
+    // String area should fall back to default 120 m²
+    expect(body.limitKg).toBe(96000);
   });
 });

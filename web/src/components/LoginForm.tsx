@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { api, setToken } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -10,6 +11,44 @@ import HeroIllustration from "@/components/HeroIllustration";
 import TrustLayer from "@/components/TrustLayer";
 import ScrollReveal from "@/components/ScrollReveal";
 import type { BuildingResult } from "@/types";
+
+const HeroViewport = dynamic(() => import("@/components/HeroViewport"), {
+  ssr: false,
+  loading: () => (
+    <div style={{
+      width: "100%",
+      height: 200,
+      borderRadius: "var(--radius-lg)",
+      background: "var(--bg-secondary)",
+    }} />
+  ),
+});
+
+type GoogleIdentity = {
+  accounts: {
+    id: {
+      initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void;
+      prompt: () => void;
+    };
+  };
+};
+
+type AppleSignInResponse = {
+  authorization?: { id_token?: string };
+  user?: unknown;
+};
+
+type AppleIdentity = {
+  auth: {
+    init: (config: {
+      clientId: string;
+      scope: string;
+      redirectURI: string;
+      usePopup: boolean;
+    }) => void;
+    signIn: () => Promise<AppleSignInResponse>;
+  };
+};
 
 export default function LoginForm({
   onLogin,
@@ -27,6 +66,7 @@ export default function LoginForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { t } = useTranslation();
   const { track } = useAnalytics();
@@ -72,17 +112,15 @@ export default function LoginForm({
     setGoogleLoading(true);
     try {
       // Use Google Identity Services popup flow
-      const google = (window as unknown as { google?: { accounts: { id: {
-        initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void;
-        prompt: () => void;
-      } } } }).google;
-      if (!google) {
+      const google = (window as unknown as { google?: GoogleIdentity }).google;
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+      if (!google || !clientId) {
         setError(t("auth.googleSignInError"));
         setGoogleLoading(false);
         return;
       }
       google.accounts.id.initialize({
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
+        client_id: clientId,
         callback: async (response: { credential: string }) => {
           try {
             const result = await api.googleLogin(response.credential);
@@ -100,6 +138,43 @@ export default function LoginForm({
       setError(t("auth.googleSignInError"));
       setGoogleLoading(false);
     }
+  }
+
+  async function handleAppleSignIn() {
+    setError("");
+    setAppleLoading(true);
+    try {
+      const AppleID = (window as unknown as { AppleID?: AppleIdentity }).AppleID;
+      const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID || "";
+      if (!AppleID || !clientId) {
+        setError(t("auth.appleSignInError"));
+        setAppleLoading(false);
+        return;
+      }
+
+      AppleID.auth.init({
+        clientId,
+        scope: "name email",
+        redirectURI: process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI || window.location.origin,
+        usePopup: true,
+      });
+
+      const response = await AppleID.auth.signIn();
+      const identityToken = response.authorization?.id_token;
+      if (!identityToken) {
+        setError(t("auth.appleSignInError"));
+        setAppleLoading(false);
+        return;
+      }
+
+      const result = await api.appleLogin(identityToken, response.user);
+      setToken(result.token, result.token_expires_at);
+      track("auth_apple_login", {} as Record<string, never>);
+      onLogin();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("auth.appleSignInError"));
+    }
+    setAppleLoading(false);
   }
 
   const features = [
@@ -151,6 +226,12 @@ export default function LoginForm({
             </ScrollReveal>
           )}
 
+          <ScrollReveal delay={0.15}>
+            <div style={{ marginBottom: 28 }}>
+              <HeroViewport />
+            </div>
+          </ScrollReveal>
+
           <div style={{ display: "flex", flexDirection: "column", marginBottom: 36 }}>
             {features.map((item, i) => (
               <ScrollReveal key={i} delay={0.15 + i * 0.07}>
@@ -186,7 +267,7 @@ export default function LoginForm({
 
       {/* Right: Login form */}
       <div className="login-form-panel">
-        <div style={{
+        <nav aria-label="Utility" style={{
           position: "absolute",
           top: 20,
           right: 20,
@@ -196,7 +277,7 @@ export default function LoginForm({
         }}>
           <ThemeToggle />
           <LanguageSwitcher />
-        </div>
+        </nav>
         <div className="anim-up delay-1" style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ marginBottom: 32 }}>
             <h2 className="heading-display" style={{ fontSize: 24, marginBottom: 8 }}>
@@ -222,6 +303,7 @@ export default function LoginForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  aria-required="true"
                   autoComplete="name"
                 />
               </div>
@@ -236,6 +318,7 @@ export default function LoginForm({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                aria-required="true"
                 autoComplete="email"
               />
             </div>
@@ -249,6 +332,7 @@ export default function LoginForm({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                aria-required="true"
                 minLength={isRegister ? 8 : undefined}
                 autoComplete={isRegister ? "new-password" : "current-password"}
               />
@@ -376,7 +460,7 @@ export default function LoginForm({
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            disabled={googleLoading}
+            disabled={googleLoading || appleLoading}
             style={{
               width: "100%",
               padding: "12px 16px",
@@ -386,12 +470,12 @@ export default function LoginForm({
               borderRadius: "var(--radius-md)",
               background: "var(--surface)",
               color: "var(--text-primary)",
-              cursor: googleLoading ? "not-allowed" : "pointer",
+              cursor: googleLoading || appleLoading ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 10,
-              opacity: googleLoading ? 0.7 : 1,
+              opacity: googleLoading || appleLoading ? 0.7 : 1,
               transition: "border-color 0.15s ease, background 0.15s ease",
             }}
           >
@@ -406,6 +490,42 @@ export default function LoginForm({
                   <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                 </svg>
                 {t("auth.googleSignIn")}
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAppleSignIn}
+            disabled={googleLoading || appleLoading}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              fontSize: 14,
+              fontWeight: 500,
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--text-primary)",
+              color: "var(--bg)",
+              cursor: googleLoading || appleLoading ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              opacity: googleLoading || appleLoading ? 0.7 : 1,
+              transition: "border-color 0.15s ease, background 0.15s ease",
+              marginTop: 10,
+            }}
+          >
+            {appleLoading ? (
+              <span className="btn-spinner" />
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M16.36 1.43c0 1.05-.42 2.05-1.12 2.82-.76.84-2.02 1.49-3.08 1.4-.14-1.01.39-2.08 1.05-2.83.75-.85 2.06-1.5 3.15-1.39z" />
+                  <path d="M20.27 17.19c-.54 1.24-.8 1.8-1.5 2.9-.98 1.5-2.37 3.38-4.09 3.39-1.53.02-1.93-.99-4.01-.98-2.08.01-2.52 1-4.05.98-1.72-.02-3.03-1.71-4.02-3.21C-.15 16.05-.43 11.1 1.38 8.45c1.28-1.87 3.3-2.96 5.21-2.96 1.95 0 3.17 1.02 4.78 1.02 1.56 0 2.51-1.03 4.77-1.03 1.71 0 3.53.9 4.8 2.45-4.22 2.22-3.54 8.01-.67 9.26z" />
+                </svg>
+                {t("auth.appleSignIn")}
               </>
             )}
           </button>

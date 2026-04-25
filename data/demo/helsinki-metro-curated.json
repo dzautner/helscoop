@@ -1,0 +1,235 @@
+[
+  {
+    "address": "Mannerheimintie 42, 00100 Helsinki",
+    "coordinates": { "lat": 60.1817, "lon": 24.9256 },
+    "building_info": {
+      "type": "kerrostalo",
+      "year_built": 1938,
+      "material": "betoni",
+      "floors": 7,
+      "area_m2": 72,
+      "heating": "kaukolampo",
+      "roof_type": "tasakatto",
+      "roof_material": "bitumi",
+      "units": 42
+    },
+    "scene_js": "// Mannerheimintie 42 - central Helsinki apartment block\nconst base = translate(box(18, 0.4, 11), 0, 0.2, 0);\nscene.add(base, {material: \"concrete\", color: [0.54, 0.54, 0.51]});\nconst tower = translate(box(17, 19, 10), 0, 9.9, 0);\nscene.add(tower, {material: \"concrete\", color: [0.76, 0.75, 0.70]});\nconst stair = translate(box(4, 20, 3), 5.8, 10.2, 3.8);\nscene.add(stair, {material: \"concrete\", color: [0.63, 0.63, 0.60]});\nconst roof = translate(box(18.5, 0.3, 11.5), 0, 19.55, 0);\nscene.add(roof, {material: \"concrete\", color: [0.28, 0.28, 0.27]});\nconst balcony_band = translate(box(16, 0.35, 0.5), 0, 9.5, -5.45);\nscene.add(balcony_band, {material: \"metal\", color: [0.42, 0.48, 0.55]});",
+    "bom_suggestion": [
+      { "material_id": "concrete_c25", "quantity": 18, "unit": "m3" },
+      { "material_id": "gypsum_board_13mm", "quantity": 155, "unit": "m2" },
+      { "material_id": "insulation_100mm", "quantity": 84, "unit": "sqm" },
+      { "material_id": "galvanized_flashing", "quantity": 48, "unit": "jm" },
+      { "material_id": "vapor_barrier", "quantity": 90, "unit": "m2" }
+    ]
+  },
+  {
+    "address": "Hameentie 11, 00530 Helsinki",
+    "coordinates": { "lat": 60.1839, "lon": 24.9582 },
+    "building_info": {
+      "type": "kerrostalo",
+      "year_built": 1964,
+      "material": "betoni",
+      "floors": 6,
+      "area_m2": 68,
+      "heating": "kaukolampo",
+      "roof_type": "tasakatto",
+      "roof_material": "bitumi",
+      "units": 36
+    },
+    "scene_js": "// Hameentie 11 - 1960s urban slab block\nconst podium = translate(box(22, 0.35, 12), 0, 0.18, 0);\nscene.add(podium, {material: \"concrete\", color: [0.50, 0.50, 0.48]});\nconst main_bar = translate(box(21, 16.2, 8), 0, 8.45, 0);\nscene.add(main_bar, {material: \"concrete\", color: [0.72, 0.72, 0.68]});\nconst side_bar = translate(box(7, 16.2, 12), -7, 8.45, 1.8);\nscene.add(side_bar, {material: \"concrete\", color: [0.66, 0.66, 0.62]});\nconst roof = translate(box(22, 0.25, 12.5), 0, 16.75, 0);\nscene.add(roof, {material: \"concrete\", color: [0.24, 0.24, 0.23]});\nconst shopfront = translate(box(19, 2.8, 0.35), 0, 1.75, -4.25);\nscene.add(shopfront, {material: \"glass\", color: [0.35, 0.50, 0.62]});",
+    "bom_suggestion": [
+      { "material_id": "concrete_c25", "quantity": 16, "unit": "m3" },
+      { "material_id": "gypsum_board_13mm", "quantity": 142, "unit": "m2" },
+      { "material_id": "insulation_100mm", "quantity": 76, "unit": "sqm" },
+      { "material_id": "vapor_barrier", "quantity": 82, "unit": "m2" },
+      { "material_id": "wood_screw_5x80", "quantity": 900, "unit": "kpl" }
+    ]
+  },
+  {
+    "address": "Lauttasaarentie 25, 00200 Helsinki",
+    "coordinates": { "lat": 60.1605, "lon": 24.8789 },
+    "building_info": {
+      "type": "kerrostalo",
+      "year_built": 1976,
+      "material": "betoni",
+      "floors": 4,
+      "area_m2": 74,
+      "heating": "kaukolampo",
+      "roof_type": "tasakatto",
+      "roof_material": "bitumi",
+      "units": 24
+    },
+    "scene_js": "// Lauttasaarentie 25 - lower island apartment building with balcony deck\nconst base = translate(box(24, 0.35, 10), 0, 0.18, 0);\nscene.add(base, {material: \"concrete\", color: [0.55, 0.55, 0.52]});\nconst slab = translate(box(23, 11, 8.5), 0, 5.85, 0);\nscene.add(slab, {material: \"concrete\", color: [0.78, 0.76, 0.70]});\nconst balcony_deck = translate(box(22, 0.28, 1.2), 0, 6.2, -4.9);\nscene.add(balcony_deck, {material: \"metal\", color: [0.48, 0.55, 0.60]});\nconst roof = translate(box(24, 0.25, 10.5), 0, 11.45, 0);\nscene.add(roof, {material: \"concrete\", color: [0.26, 0.26, 0.25]});\nconst entry = translate(box(3, 3.2, 1.2), -8, 1.95, -5.1);\nscene.add(entry, {material: \"glass\", color: [0.32, 0.45, 0.55]});",
+    "bom_suggestion": [
+      { "material_id": "concrete_c25", "quantity": 14, "unit": "m3" },
+      { "material_id": "gypsum_board_13mm", "quantity": 150, "unit": "m2" },
+      { "material_id": "insulation_100mm", "quantity": 82, "unit": "sqm" },
+      { "material_id": "galvanized_flashing", "quantity": 42, "unit": "jm" },
+      { "material_id": "vapor_barrier", "quantity": 86, "unit": "m2" }
+    ]
+  },
+  {
+    "address": "Kaskenkaatajantie 9, 02140 Espoo",
+    "coordinates": { "lat": 60.1896, "lon": 24.8128 },
+    "building_info": {
+      "type": "omakotitalo",
+      "year_built": 1989,
+      "material": "puu",
+      "floors": 2,
+      "area_m2": 154,
+      "heating": "maalampo",
+      "roof_type": "harjakatto",
+      "roof_material": "pelti"
+    },
+    "scene_js": "// Kaskenkaatajantie 9 - Espoo detached L-shaped timber house\nconst foundation_a = translate(box(13, 0.3, 8), 0, 0.15, 0);\nscene.add(foundation_a, {material: \"concrete\", color: [0.55, 0.55, 0.52]});\nconst foundation_b = translate(box(7, 0.3, 7), -3, 0.15, 5);\nscene.add(foundation_b, {material: \"concrete\", color: [0.54, 0.54, 0.51]});\nconst volume_a = translate(box(13, 5.4, 8), 0, 3, 0);\nscene.add(volume_a, {material: \"wood\", color: [0.78, 0.63, 0.42]});\nconst volume_b = translate(box(7, 2.9, 7), -3, 1.75, 5);\nscene.add(volume_b, {material: \"wood\", color: [0.72, 0.58, 0.38]});\nconst roof_left = translate(rotate(box(13.6, 0.08, 5), 0.5, 0, 0), 0, 6.5, -2);\nscene.add(roof_left, {material: \"metal\", color: [0.20, 0.22, 0.24]});\nconst roof_right = translate(rotate(box(13.6, 0.08, 5), -0.5, 0, 0), 0, 6.5, 2);\nscene.add(roof_right, {material: \"metal\", color: [0.20, 0.22, 0.24]});",
+    "bom_suggestion": [
+      { "material_id": "pine_48x148_c24", "quantity": 98, "unit": "jm" },
+      { "material_id": "pine_48x98_c24", "quantity": 68, "unit": "jm" },
+      { "material_id": "osb_11mm", "quantity": 58, "unit": "m2" },
+      { "material_id": "mineral_wool_150", "quantity": 120, "unit": "m2" },
+      { "material_id": "metal_roof_ruukki", "quantity": 88, "unit": "m2" },
+      { "material_id": "vapor_barrier", "quantity": 136, "unit": "m2" }
+    ]
+  },
+  {
+    "address": "Kuurinniityntie 7, 02750 Espoo",
+    "coordinates": { "lat": 60.2028, "lon": 24.6667 },
+    "building_info": {
+      "type": "paritalo",
+      "year_built": 2008,
+      "material": "puu",
+      "floors": 2,
+      "area_m2": 126,
+      "heating": "maalampo",
+      "roof_type": "harjakatto",
+      "roof_material": "pelti",
+      "units": 2
+    },
+    "scene_js": "// Kuurinniityntie 7 - paired semi-detached homes\nconst base = translate(box(17, 0.3, 8), 0, 0.15, 0);\nscene.add(base, {material: \"concrete\", color: [0.55, 0.55, 0.52]});\nconst left_home = translate(box(8.2, 5.4, 7.6), -4.3, 3, 0);\nscene.add(left_home, {material: \"wood\", color: [0.82, 0.70, 0.52]});\nconst right_home = translate(box(8.2, 5.4, 7.6), 4.3, 3, 0);\nscene.add(right_home, {material: \"wood\", color: [0.68, 0.72, 0.66]});\nconst party_wall = translate(box(0.25, 5.6, 8), 0, 3.1, 0);\nscene.add(party_wall, {material: \"concrete\", color: [0.58, 0.58, 0.55]});\nconst roof_left = translate(rotate(box(17.6, 0.08, 4.8), 0.52, 0, 0), 0, 6.6, -2);\nscene.add(roof_left, {material: \"metal\", color: [0.18, 0.20, 0.22]});\nconst roof_right = translate(rotate(box(17.6, 0.08, 4.8), -0.52, 0, 0), 0, 6.6, 2);\nscene.add(roof_right, {material: \"metal\", color: [0.18, 0.20, 0.22]});",
+    "bom_suggestion": [
+      { "material_id": "pine_48x148_c24", "quantity": 78, "unit": "jm" },
+      { "material_id": "pine_48x98_c24", "quantity": 52, "unit": "jm" },
+      { "material_id": "osb_11mm", "quantity": 46, "unit": "m2" },
+      { "material_id": "mineral_wool_150", "quantity": 96, "unit": "m2" },
+      { "material_id": "metal_roof_ruukki", "quantity": 70, "unit": "m2" },
+      { "material_id": "gypsum_board_13mm", "quantity": 162, "unit": "m2" }
+    ]
+  },
+  {
+    "address": "Tapiolanranta 4, 02100 Espoo",
+    "coordinates": { "lat": 60.1771, "lon": 24.7999 },
+    "building_info": {
+      "type": "kerrostalo",
+      "year_built": 2017,
+      "material": "betoni",
+      "floors": 5,
+      "area_m2": 80,
+      "heating": "kaukolampo",
+      "roof_type": "tasakatto",
+      "roof_material": "bitumi",
+      "units": 30
+    },
+    "scene_js": "// Tapiolanranta 4 - newer waterfront apartment massing\nconst podium = translate(box(20, 0.35, 13), 0, 0.18, 0);\nscene.add(podium, {material: \"concrete\", color: [0.52, 0.52, 0.50]});\nconst block_a = translate(box(12, 13.5, 12), -3.5, 7, 0);\nscene.add(block_a, {material: \"concrete\", color: [0.82, 0.82, 0.78]});\nconst block_b = translate(box(7, 10.8, 9), 6.2, 5.65, 1.8);\nscene.add(block_b, {material: \"concrete\", color: [0.68, 0.72, 0.76]});\nconst roof_a = translate(box(12.5, 0.25, 12.5), -3.5, 13.9, 0);\nscene.add(roof_a, {material: \"concrete\", color: [0.25, 0.25, 0.24]});\nconst glass_balcony = translate(box(10, 0.28, 0.6), -3.5, 7, -6.35);\nscene.add(glass_balcony, {material: \"glass\", color: [0.45, 0.62, 0.72]});",
+    "bom_suggestion": [
+      { "material_id": "concrete_c25", "quantity": 17, "unit": "m3" },
+      { "material_id": "gypsum_board_13mm", "quantity": 168, "unit": "m2" },
+      { "material_id": "insulation_100mm", "quantity": 90, "unit": "sqm" },
+      { "material_id": "vapor_barrier", "quantity": 94, "unit": "m2" },
+      { "material_id": "galvanized_flashing", "quantity": 50, "unit": "jm" }
+    ]
+  },
+  {
+    "address": "Pahkinarinteentie 18, 01710 Vantaa",
+    "coordinates": { "lat": 60.2718, "lon": 24.7755 },
+    "building_info": {
+      "type": "rivitalo",
+      "year_built": 1983,
+      "material": "tiili",
+      "floors": 2,
+      "area_m2": 168,
+      "heating": "kaukolampo",
+      "roof_type": "harjakatto",
+      "roof_material": "tiili",
+      "units": 5
+    },
+    "scene_js": "// Pahkinarinteentie 18 - Vantaa terraced row house\nconst base = translate(box(32, 0.3, 8), 0, 0.15, 0);\nscene.add(base, {material: \"concrete\", color: [0.55, 0.55, 0.52]});\nconst row = translate(box(32, 5.4, 7.6), 0, 3, 0);\nscene.add(row, {material: \"concrete\", color: [0.64, 0.34, 0.27]});\nconst div1 = translate(box(0.18, 5.5, 8), -9.6, 3.05, 0);\nscene.add(div1, {material: \"concrete\", color: [0.54, 0.28, 0.22]});\nconst div2 = translate(box(0.18, 5.5, 8), -3.2, 3.05, 0);\nscene.add(div2, {material: \"concrete\", color: [0.54, 0.28, 0.22]});\nconst div3 = translate(box(0.18, 5.5, 8), 3.2, 3.05, 0);\nscene.add(div3, {material: \"concrete\", color: [0.54, 0.28, 0.22]});\nconst div4 = translate(box(0.18, 5.5, 8), 9.6, 3.05, 0);\nscene.add(div4, {material: \"concrete\", color: [0.54, 0.28, 0.22]});\nconst roof_left = translate(rotate(box(32.8, 0.1, 5), 0.44, 0, 0), 0, 6.6, -2);\nscene.add(roof_left, {material: \"concrete\", color: [0.45, 0.22, 0.18]});",
+    "bom_suggestion": [
+      { "material_id": "pine_48x148_c24", "quantity": 118, "unit": "jm" },
+      { "material_id": "pine_48x98_c24", "quantity": 78, "unit": "jm" },
+      { "material_id": "osb_11mm", "quantity": 62, "unit": "m2" },
+      { "material_id": "mineral_wool_150", "quantity": 132, "unit": "m2" },
+      { "material_id": "concrete_c25", "quantity": 14, "unit": "m3" },
+      { "material_id": "gypsum_board_13mm", "quantity": 260, "unit": "m2" }
+    ]
+  },
+  {
+    "address": "Leinelantie 8, 01340 Vantaa",
+    "coordinates": { "lat": 60.3235, "lon": 25.0461 },
+    "building_info": {
+      "type": "kerrostalo",
+      "year_built": 2016,
+      "material": "betoni",
+      "floors": 5,
+      "area_m2": 78,
+      "heating": "kaukolampo",
+      "roof_type": "tasakatto",
+      "roof_material": "bitumi",
+      "units": 32
+    },
+    "scene_js": "// Leinelantie 8 - newer Vantaa transit-oriented apartment block\nconst base = translate(box(19, 0.35, 12), 0, 0.18, 0);\nscene.add(base, {material: \"concrete\", color: [0.52, 0.52, 0.50]});\nconst main = translate(box(18, 13.5, 10), 0, 7, 0);\nscene.add(main, {material: \"concrete\", color: [0.80, 0.79, 0.74]});\nconst notch = translate(box(5, 11, 3), -6, 5.9, -5.5);\nscene.add(notch, {material: \"glass\", color: [0.42, 0.58, 0.68]});\nconst roof = translate(box(19.5, 0.25, 12.5), 0, 13.9, 0);\nscene.add(roof, {material: \"concrete\", color: [0.25, 0.25, 0.24]});\nconst service_core = translate(box(3.5, 14.8, 3), 6.4, 7.65, 3.8);\nscene.add(service_core, {material: \"concrete\", color: [0.62, 0.62, 0.60]});",
+    "bom_suggestion": [
+      { "material_id": "concrete_c25", "quantity": 16, "unit": "m3" },
+      { "material_id": "gypsum_board_13mm", "quantity": 164, "unit": "m2" },
+      { "material_id": "insulation_100mm", "quantity": 88, "unit": "sqm" },
+      { "material_id": "vapor_barrier", "quantity": 92, "unit": "m2" },
+      { "material_id": "galvanized_flashing", "quantity": 46, "unit": "jm" }
+    ]
+  },
+  {
+    "address": "Puistolanraitio 6, 00760 Helsinki",
+    "coordinates": { "lat": 60.2769, "lon": 25.0364 },
+    "building_info": {
+      "type": "paritalo",
+      "year_built": 1998,
+      "material": "puu",
+      "floors": 2,
+      "area_m2": 118,
+      "heating": "kaukolampo",
+      "roof_type": "harjakatto",
+      "roof_material": "pelti",
+      "units": 2
+    },
+    "scene_js": "// Puistolanraitio 6 - Helsinki suburban semi-detached timber home\nconst base = translate(box(16, 0.3, 8), 0, 0.15, 0);\nscene.add(base, {material: \"concrete\", color: [0.55, 0.55, 0.52]});\nconst home_a = translate(box(7.8, 5.3, 7.6), -4, 2.95, 0);\nscene.add(home_a, {material: \"wood\", color: [0.84, 0.76, 0.58]});\nconst home_b = translate(box(7.8, 5.3, 7.6), 4, 2.95, 0);\nscene.add(home_b, {material: \"wood\", color: [0.72, 0.58, 0.44]});\nconst porch_a = translate(box(2.2, 2.5, 1.2), -6, 1.55, -4.7);\nscene.add(porch_a, {material: \"wood\", color: [0.65, 0.50, 0.33]});\nconst porch_b = translate(box(2.2, 2.5, 1.2), 6, 1.55, -4.7);\nscene.add(porch_b, {material: \"wood\", color: [0.65, 0.50, 0.33]});\nconst roof_left = translate(rotate(box(16.5, 0.08, 4.8), 0.52, 0, 0), 0, 6.5, -2);\nscene.add(roof_left, {material: \"metal\", color: [0.22, 0.24, 0.25]});",
+    "bom_suggestion": [
+      { "material_id": "pine_48x148_c24", "quantity": 74, "unit": "jm" },
+      { "material_id": "pine_48x98_c24", "quantity": 50, "unit": "jm" },
+      { "material_id": "osb_11mm", "quantity": 42, "unit": "m2" },
+      { "material_id": "mineral_wool_150", "quantity": 92, "unit": "m2" },
+      { "material_id": "metal_roof_ruukki", "quantity": 68, "unit": "m2" },
+      { "material_id": "vapor_barrier", "quantity": 106, "unit": "m2" }
+    ]
+  },
+  {
+    "address": "Rajamaentie 12, 05200 Rajamaki",
+    "coordinates": { "lat": 60.7388, "lon": 24.7594 },
+    "building_info": {
+      "type": "omakotitalo",
+      "year_built": 1992,
+      "material": "hirsi",
+      "floors": 2,
+      "area_m2": 148,
+      "heating": "sahko",
+      "roof_type": "harjakatto",
+      "roof_material": "pelti"
+    },
+    "scene_js": "// Rajamaentie 12 - log house north of the metro area\nconst base = translate(box(12, 0.35, 10), 0, 0.18, 0);\nscene.add(base, {material: \"concrete\", color: [0.55, 0.55, 0.52]});\nconst log_body = translate(box(12, 5.4, 10), 0, 3.05, 0);\nscene.add(log_body, {material: \"wood\", color: [0.62, 0.42, 0.25]});\nconst loft = translate(box(8, 2.6, 7), 0, 7.05, 0);\nscene.add(loft, {material: \"wood\", color: [0.68, 0.48, 0.30]});\nconst veranda = translate(box(9, 0.22, 2.2), 0, 0.55, -6.1);\nscene.add(veranda, {material: \"wood\", color: [0.50, 0.34, 0.20]});\nconst roof_left = translate(rotate(box(12.8, 0.1, 6.2), 0.56, 0, 0), 0, 8.3, -2.5);\nscene.add(roof_left, {material: \"metal\", color: [0.18, 0.20, 0.21]});\nconst roof_right = translate(rotate(box(12.8, 0.1, 6.2), -0.56, 0, 0), 0, 8.3, 2.5);\nscene.add(roof_right, {material: \"metal\", color: [0.18, 0.20, 0.21]});",
+    "bom_suggestion": [
+      { "material_id": "pine_48x148_c24", "quantity": 110, "unit": "jm" },
+      { "material_id": "pressure_treated_48x148", "quantity": 44, "unit": "jm" },
+      { "material_id": "mineral_wool_150", "quantity": 86, "unit": "m2" },
+      { "material_id": "metal_roof_ruukki", "quantity": 84, "unit": "m2" },
+      { "material_id": "exterior_paint_red", "quantity": 24, "unit": "l" },
+      { "material_id": "wood_screw_5x80", "quantity": 1300, "unit": "kpl" }
+    ]
+  }
+]

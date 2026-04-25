@@ -1,7 +1,17 @@
 import { Router } from "express";
 import { readFileSync } from "fs";
+import { readProjectImageObject } from "../project-image-storage";
 import { join } from "path";
 import { requireAuth } from "../auth";
+import { query } from "../db";
+import {
+  CREDIT_COSTS,
+  CREDIT_PACKS,
+  deductCreditsForFeature,
+  ensureMonthlyCreditGrant,
+  getCreditBalance,
+  type InsufficientCreditsBody,
+} from "../entitlements";
 
 const router = Router();
 
@@ -161,6 +171,8 @@ ${MATERIALS_CATALOG_SUMMARY}
 
 Substitution groups mean materials are interchangeable within a group. When suggesting alternatives, stay within the same substitution group unless there is a technical reason to change.
 
+When substitution opportunities are supplied in the current project context, use them when the user asks for cheaper materials, stock replacements, budget reductions, or "onko vaihtoehtoja?". Mention material IDs, substitute IDs, estimated savings, and whether the suggestion is driven by price or stock.
+
 ## Language and response style
 
 - Detect the user's language from their message. If they write in Finnish, respond in Finnish. If in English, respond in English. If mixed, follow the dominant language.
@@ -187,6 +199,17 @@ interface BomSummaryItem {
   total: number;
 }
 
+interface SubstitutionSuggestionSummary {
+  material: string;
+  materialId: string;
+  substitute?: string;
+  substituteId?: string;
+  savings?: number;
+  savingsPercent?: number;
+  reason?: string;
+  stockLevel?: string | null;
+}
+
 interface BuildingInfo {
   address?: string;
   type?: string;
@@ -207,11 +230,27 @@ interface ProjectInfo {
   description?: string;
 }
 
+interface ReferenceImageSummary {
+  id: string;
+  originalFilename: string;
+  width: number | null;
+  height: number | null;
+  uploadedAt: string;
+}
+
+interface ReferenceImageForVision extends ReferenceImageSummary {
+  mediaType: "image/jpeg";
+  base64: string;
+}
+
 function buildContextBlock(
   currentScene: string,
   bomSummary?: BomSummaryItem[],
   buildingInfo?: BuildingInfo,
   projectInfo?: ProjectInfo,
+  renovationRoiSummary?: string,
+  substitutionSuggestions?: SubstitutionSuggestionSummary[],
+  referenceImages?: ReferenceImageSummary[],
 ): string {
   let context = `\n\nCurrent scene script:\n\`\`\`javascript\n${currentScene}\n\`\`\``;
 
@@ -257,7 +296,84 @@ function buildContextBlock(
     context += `\nUse BOM data to give cost-aware suggestions. Reference actual prices when discussing additions or changes.`;
   }
 
+  if (substitutionSuggestions && substitutionSuggestions.length > 0) {
+    const suggestionLines = substitutionSuggestions
+      .slice(0, 8)
+      .map((suggestion) => {
+        const parts = [
+          `${suggestion.material} (${suggestion.materialId})`,
+          suggestion.substitute && suggestion.substituteId
+            ? `-> ${suggestion.substitute} (${suggestion.substituteId})`
+            : "needs substitute review",
+        ];
+        if (typeof suggestion.savings === "number" && suggestion.savings > 0) {
+          parts.push(`saves ${suggestion.savings.toFixed(0)} EUR`);
+        }
+        if (typeof suggestion.savingsPercent === "number" && suggestion.savingsPercent > 0) {
+          parts.push(`${suggestion.savingsPercent.toFixed(0)}%`);
+        }
+        if (suggestion.stockLevel) parts.push(`stock: ${suggestion.stockLevel}`);
+        if (suggestion.reason) parts.push(`reason: ${suggestion.reason}`);
+        return `  ${parts.join(" | ")}`;
+      });
+    context += `\n\nMaterial substitution opportunities:\n${suggestionLines.join("\n")}`;
+    context += `\nIf the user asks about alternatives, stock issues, or saving money, proactively explain these swaps before giving generic advice.`;
+  }
+
+  if (renovationRoiSummary) {
+    context += `\n\nRenovation ROI dashboard:\n${renovationRoiSummary}`;
+    context += `\nWhen the user asks whether the renovation is worth it, use this dashboard summary and clearly separate estimate, assumption, and recommendation.`;
+  }
+
+  if (referenceImages && referenceImages.length > 0) {
+    const imageLines = referenceImages.map((image, index) => {
+      const size = image.width && image.height ? `${image.width}x${image.height}` : "unknown size";
+      return `  ${index + 1}. ${image.originalFilename} (${size}, uploaded ${image.uploadedAt})`;
+    });
+    context += `\n\nHomeowner reference photos (${referenceImages.length}):\n${imageLines.join("\n")}`;
+    context += `\nIf image blocks are attached to the request, inspect them directly. Reference visible roof, facade, material, color, condition, landscaping, and constraints in your answer.`;
+  }
+
   return context;
+}
+
+async function loadReferenceImagesForChat(projectId: string | undefined, userId: string): Promise<ReferenceImageForVision[]> {
+  if (!projectId) return [];
+  const result = await query(
+    `SELECT pi.id, pi.original_filename, pi.width, pi.height, pi.uploaded_at, pi.thumbnail_800_key
+     FROM project_images pi
+     JOIN projects p ON p.id = pi.project_id
+     WHERE pi.project_id=$1 AND p.user_id=$2 AND p.deleted_at IS NULL
+     ORDER BY pi.uploaded_at DESC
+     LIMIT 3`,
+    [projectId, userId],
+  );
+
+  const images: ReferenceImageForVision[] = [];
+  for (const row of result.rows as Array<{
+    id: string;
+    original_filename: string;
+    width: number | null;
+    height: number | null;
+    uploaded_at: string;
+    thumbnail_800_key: string;
+  }>) {
+    try {
+      const bytes = await readProjectImageObject(row.thumbnail_800_key);
+      images.push({
+        id: row.id,
+        originalFilename: row.original_filename,
+        width: row.width,
+        height: row.height,
+        uploadedAt: row.uploaded_at,
+        mediaType: "image/jpeg",
+        base64: bytes.toString("base64"),
+      });
+    } catch {
+      // Missing local objects should not break chat; metadata still exists for cleanup.
+    }
+  }
+  return images;
 }
 
 router.post("/", async (req, res) => {
@@ -267,29 +383,100 @@ router.post("/", async (req, res) => {
     bomSummary,
     buildingInfo,
     projectInfo,
+    renovationRoiSummary,
+    substitutionSuggestions,
+    projectId,
   }: {
     messages: ChatMessage[];
     currentScene: string;
     bomSummary?: BomSummaryItem[];
     buildingInfo?: BuildingInfo;
     projectInfo?: ProjectInfo;
+    renovationRoiSummary?: string;
+    substitutionSuggestions?: SubstitutionSuggestionSummary[];
+    projectId?: string;
   } = req.body;
 
   if (!messages?.length) {
     return res.status(400).json({ error: "Messages required" });
   }
 
-  const contextBlock = buildContextBlock(currentScene, bomSummary, buildingInfo, projectInfo);
+  await ensureMonthlyCreditGrant(req.user!.id);
+  const creditBalance = await getCreditBalance(req.user!.id);
+  const creditCost = CREDIT_COSTS.aiMessages;
+  if (creditBalance < creditCost) {
+    return res.status(402).json({
+      error: "insufficient_credits",
+      feature: "aiMessages",
+      cost: creditCost,
+      balance: creditBalance,
+      packs: CREDIT_PACKS,
+    } satisfies InsufficientCreditsBody);
+  }
+
+  const sendMeteredReply = async (content: string) => {
+    const debit = await deductCreditsForFeature(req.user!.id, "aiMessages", {
+      messageCount: messages.length,
+      fallback: !process.env.ANTHROPIC_API_KEY,
+    });
+    if (!debit.ok) {
+      return res.status(402).json({
+        error: "insufficient_credits",
+        feature: "aiMessages",
+        cost: debit.cost,
+        balance: debit.balance,
+        packs: CREDIT_PACKS,
+      } satisfies InsufficientCreditsBody);
+    }
+    return res.json({
+      role: "assistant",
+      content,
+      credits: {
+        cost: creditCost,
+        balance: debit.entry.balanceAfter,
+      },
+    });
+  };
+
+  const referenceImages = await loadReferenceImagesForChat(projectId, req.user!.id);
+  const referenceImageSummaries = referenceImages.map(({ base64: _base64, mediaType: _mediaType, ...summary }) => summary);
+
+  const contextBlock = buildContextBlock(
+    currentScene,
+    bomSummary,
+    buildingInfo,
+    projectInfo,
+    renovationRoiSummary,
+    substitutionSuggestions,
+    referenceImageSummaries,
+  );
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.json({
-      role: "assistant",
-      content: generateLocalResponse(messages[messages.length - 1].content, currentScene),
-    });
+    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene, substitutionSuggestions, referenceImageSummaries));
   }
 
   try {
+    const anthropicMessages = messages.map((message, index) => {
+      if (index !== messages.length - 1 || message.role !== "user" || referenceImages.length === 0) {
+        return { role: message.role, content: message.content };
+      }
+      return {
+        role: message.role,
+        content: [
+          { type: "text", text: message.content },
+          ...referenceImages.map((image) => ({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: image.mediaType,
+              data: image.base64,
+            },
+          })),
+        ],
+      };
+    });
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -301,7 +488,7 @@ router.post("/", async (req, res) => {
         model: "claude-sonnet-4-20250514",
         max_tokens: 2048,
         system: SYSTEM_PROMPT + contextBlock,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: anthropicMessages,
       }),
     });
 
@@ -310,21 +497,51 @@ router.post("/", async (req, res) => {
     }
 
     const data = (await response.json()) as { content: { text: string }[] };
-    res.json({
-      role: "assistant",
-      content: data.content[0].text,
-    });
+    return sendMeteredReply(data.content[0].text);
   } catch (err) {
     console.error("Chat API error:", err);
-    res.json({
-      role: "assistant",
-      content: generateLocalResponse(messages[messages.length - 1].content, currentScene),
-    });
+    return sendMeteredReply(generateLocalResponse(messages[messages.length - 1].content, currentScene, substitutionSuggestions, referenceImageSummaries));
   }
 });
 
-function generateLocalResponse(userMessage: string, currentScene: string): string {
+function asksForAlternatives(message: string): boolean {
+  return /alternative|substitut|cheaper|budget|saving|save|stock|unavailable|vaihtoehto|halvempi|saast|sääst|budjet|varasto|loppu/.test(message);
+}
+
+function generateSubstitutionResponse(suggestions: SubstitutionSuggestionSummary[]): string {
+  const lines = suggestions.slice(0, 5).map((suggestion) => {
+    const target = suggestion.substitute && suggestion.substituteId
+      ? `${suggestion.substitute} (${suggestion.substituteId})`
+      : "manual substitute review";
+    const savings = typeof suggestion.savings === "number" && suggestion.savings > 0
+      ? `, estimated saving ${suggestion.savings.toFixed(0)} EUR`
+      : "";
+    const pct = typeof suggestion.savingsPercent === "number" && suggestion.savingsPercent > 0
+      ? ` (${suggestion.savingsPercent.toFixed(0)}%)`
+      : "";
+    const reason = suggestion.reason ? `, reason: ${suggestion.reason}` : "";
+    return `- ${suggestion.material} (${suggestion.materialId}) -> ${target}${savings}${pct}${reason}`;
+  });
+
+  return `I found substitution opportunities in the current BOM:\n${lines.join("\n")}\n\nVerify technical compatibility before ordering, especially for structural or moisture-critical materials.`;
+}
+
+function generateLocalResponse(
+  userMessage: string,
+  currentScene: string,
+  substitutionSuggestions: SubstitutionSuggestionSummary[] = [],
+  referenceImages: ReferenceImageSummary[] = [],
+): string {
   const lower = userMessage.toLowerCase();
+
+  if (referenceImages.length > 0 && /photo|image|picture|kuva|valokuva|facade|roof|katto|julkisivu/.test(lower)) {
+    const filenames = referenceImages.map((image) => image.originalFilename).join(", ");
+    return `This project has ${referenceImages.length} uploaded reference photo(s): ${filenames}. With a vision-capable model enabled, Helscoop sends the resized private thumbnails with your question so I can inspect visible roof, facade, material colours, and condition. In local fallback mode I can only see the photo metadata, not pixels.`;
+  }
+
+  if (substitutionSuggestions.length > 0 && asksForAlternatives(lower)) {
+    return generateSubstitutionResponse(substitutionSuggestions);
+  }
 
   if (lower.includes("add") && lower.includes("roof")) {
     const roofCode = `\n// Roof\nconst roofLeft = translate(rotate(box(4.3, 0.1, 4.2), 0, 0, 30), -1.1, 3.5, 0);\nconst roofRight = translate(rotate(box(4.3, 0.1, 4.2), 0, 0, -30), 1.1, 3.5, 0);\nscene.add(roofLeft, { material: "roofing", color: [0.55, 0.27, 0.07] });\nscene.add(roofRight, { material: "roofing", color: [0.55, 0.27, 0.07] });`;

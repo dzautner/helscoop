@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import crypto from "crypto";
 
 // Mock the db module before importing auth
 vi.mock("../db", () => ({
@@ -12,7 +13,7 @@ vi.mock("../email", () => ({
   sendVerificationEmail: vi.fn(),
 }));
 
-import { verifyGoogleToken, googleLogin } from "../auth";
+import { verifyGoogleToken, verifyAppleToken, googleLogin, appleLogin } from "../auth";
 import { query } from "../db";
 
 const mockedQuery = vi.mocked(query);
@@ -112,53 +113,134 @@ describe("googleLogin", () => {
 
   it("returns existing user when google_id matches", async () => {
     const existingUser = { id: "user-1", email: "test@gmail.com", name: "Test User", role: "homeowner" };
-    mockedQuery.mockResolvedValueOnce({ rows: [existingUser], command: "", rowCount: 1, oid: 0, fields: [] });
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [existingUser], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] });
 
     const result = await googleLogin(payload);
     expect(result).toEqual(existingUser);
-    // Should only query once (by google_id)
-    expect(mockedQuery).toHaveBeenCalledTimes(1);
     expect(mockedQuery).toHaveBeenCalledWith(
-      "SELECT id, email, name, role FROM users WHERE google_id = $1",
-      ["google-uid-789"]
+      expect.stringContaining("FROM user_oauth_providers"),
+      ["google", "google-uid-789"]
     );
   });
 
   it("links Google account to existing email user", async () => {
     const existingUser = { id: "user-2", email: "test@gmail.com", name: "Existing User", role: "homeowner" };
-    // First query (by google_id) returns empty
-    mockedQuery.mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] });
-    // Second query (by email) returns existing user
-    mockedQuery.mockResolvedValueOnce({ rows: [existingUser], command: "", rowCount: 1, oid: 0, fields: [] });
-    // Third query (UPDATE to link google_id)
-    mockedQuery.mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] });
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [existingUser], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] });
 
     const result = await googleLogin(payload);
     expect(result).toEqual(existingUser);
-    expect(mockedQuery).toHaveBeenCalledTimes(3);
-    // Verify the UPDATE was called to link google_id
     expect(mockedQuery).toHaveBeenCalledWith(
-      "UPDATE users SET google_id = $1, email_verified = true WHERE id = $2",
-      ["google-uid-789", "user-2"]
+      expect.stringContaining("UPDATE users"),
+      ["google-uid-789", true, null, "google", "user-2"]
+    );
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO user_oauth_providers"),
+      ["user-2", "google", "google-uid-789", "test@gmail.com", true, "Test User", null]
     );
   });
 
   it("creates a new user when no match exists", async () => {
     const newUser = { id: "user-new", email: "test@gmail.com", name: "Test User", role: "homeowner" };
-    // First query (by google_id) returns empty
-    mockedQuery.mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] });
-    // Second query (by email) returns empty
-    mockedQuery.mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] });
-    // Third query (INSERT) returns new user
-    mockedQuery.mockResolvedValueOnce({ rows: [newUser], command: "", rowCount: 1, oid: 0, fields: [] });
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [newUser], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] });
 
     const result = await googleLogin(payload);
     expect(result).toEqual(newUser);
-    expect(mockedQuery).toHaveBeenCalledTimes(3);
-    // Verify the INSERT was called with correct values
     expect(mockedQuery).toHaveBeenCalledWith(
       expect.stringContaining("INSERT INTO users"),
-      ["test@gmail.com", "Test User", "google-uid-789"]
+      ["test@gmail.com", "Test User", "google", null, "google-uid-789"]
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Apple Sign In
+// ---------------------------------------------------------------------------
+
+function b64url(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+describe("verifyAppleToken", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns null for malformed identity tokens", async () => {
+    const result = await verifyAppleToken("not-a-jwt");
+    expect(result).toBeNull();
+  });
+
+  it("verifies a signed Apple identity token with JWKS", async () => {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const jwk = publicKey.export({ format: "jwk" }) as Record<string, unknown>;
+    const header = { alg: "RS256", kid: "apple-test-key" };
+    const payload = {
+      iss: "https://appleid.apple.com",
+      aud: "fi.helscoop.web",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      sub: "apple-user-123",
+      email: "user@privaterelay.appleid.com",
+      email_verified: "true",
+    };
+    const signingInput = `${b64url(header)}.${b64url(payload)}`;
+    const signature = crypto.sign("RSA-SHA256", Buffer.from(signingInput), privateKey).toString("base64url");
+    const token = `${signingInput}.${signature}`;
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ keys: [{ ...jwk, kid: "apple-test-key", alg: "RS256", use: "sig" }] }),
+    }));
+
+    const result = await verifyAppleToken(token, { name: "Apple User" });
+    expect(result).toEqual({
+      sub: "apple-user-123",
+      email: "user@privaterelay.appleid.com",
+      email_verified: true,
+      name: "Apple User",
+    });
+  });
+});
+
+describe("appleLogin", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mockedQuery.mockReset();
+  });
+
+  it("links Apple account to an existing user with the same verified email", async () => {
+    const existingUser = { id: "user-apple", email: "test@example.com", name: "Existing User", role: "homeowner" };
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [existingUser], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] })
+      .mockResolvedValueOnce({ rows: [], command: "", rowCount: 1, oid: 0, fields: [] });
+
+    const result = await appleLogin({
+      sub: "apple-sub-1",
+      email: "test@example.com",
+      email_verified: true,
+      name: "Apple User",
+    });
+
+    expect(result).toEqual(existingUser);
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO user_oauth_providers"),
+      ["user-apple", "apple", "apple-sub-1", "test@example.com", true, "Apple User", null],
     );
   });
 });

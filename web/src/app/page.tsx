@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken, getToken } from "@/lib/api";
+import { api, setToken, hasAuthSession } from "@/lib/api";
 import LoginForm from "@/components/LoginForm";
 import AddressSearch from "@/components/AddressSearch";
 import FeatureHighlights from "@/components/FeatureHighlights";
@@ -20,7 +20,7 @@ export default function Home() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (getToken()) {
+    if (hasAuthSession()) {
       api.me().then(() => setLoggedIn(true)).catch(() => setToken(null));
     }
   }, []);
@@ -35,12 +35,18 @@ export default function Home() {
 
   async function createProjectFromBuilding(building: BuildingResult) {
     track("project_created", { source: "address", building_type: building.building_info.type });
+    const inferredProjectType = Number(building.building_info.units || 0) > 1
+      || ["kerrostalo", "rivitalo", "taloyhtio"].includes(String(building.building_info.type))
+      ? "taloyhtio"
+      : "omakotitalo";
     const buildingTypeLabel = t(`building.${building.building_info.type}`) || building.building_info.type;
     const materialLabel = t(`building.material.${building.building_info.material}`) || building.building_info.material;
     const project = await api.createProject({
       name: building.address,
       description: `${buildingTypeLabel}, ${materialLabel}, ${building.building_info.year_built}, ${building.building_info.area_m2} m²`,
       scene_js: building.scene_js,
+      project_type: inferredProjectType,
+      unit_count: inferredProjectType === "taloyhtio" ? Number(building.building_info.units || 1) : null,
       building_info: {
         address: building.address,
         ...building.building_info,
@@ -67,7 +73,8 @@ export default function Home() {
 
   if (!loggedIn) {
     return (
-      <>
+      <main id="main-content" tabIndex={-1}>
+        <div className="scroll-progress" aria-hidden="true" />
         <LoginForm
           onLogin={handleLogin}
           pendingBuilding={pendingBuilding}
@@ -77,13 +84,13 @@ export default function Home() {
         />
         <FeatureHighlights />
         <LandingFooter />
-      </>
+      </main>
     );
   }
 
   return (
-    <div>
+    <main id="main-content" tabIndex={-1}>
       <ProjectList onCreateFromBuilding={handleCreateFromBuilding} />
-    </div>
+    </main>
   );
 }

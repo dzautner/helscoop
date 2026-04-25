@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { setToken } from "@/lib/api";
+import { logout } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import Link from "next/link";
 
@@ -166,12 +166,21 @@ export default function UserMenu({ userName }: { userName: string }) {
             >
               {t("nav.settings")}
             </Link>
+            <Link
+              href="/pro"
+              className="menu-item"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => setOpen(false)}
+            >
+              Helscoop Pro
+            </Link>
             <button
               className="menu-item"
               role="menuitem"
               tabIndex={-1}
-              onClick={() => {
-                setToken(null);
+              onClick={async () => {
+                await logout();
                 window.location.reload();
               }}
             >

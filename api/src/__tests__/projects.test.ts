@@ -36,7 +36,9 @@ vi.mock("../email", () => ({
 
 // Import after mocks are set up
 import { query } from "../db";
+import { sendEmail } from "../email";
 const mockQuery = vi.mocked(query);
+const mockSendEmail = vi.mocked(sendEmail);
 
 // Import the express app
 import app from "../index";
@@ -105,6 +107,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Reset default mock to return empty results
   mockQuery.mockResolvedValue({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] });
+  mockSendEmail.mockResolvedValue(true);
 });
 
 // --------------------------------------------------------------------------
@@ -154,12 +157,132 @@ describe("POST /projects", () => {
     expect((res.body as { name: string }).name).toBe("My House");
   });
 
+  it("captures the initial scene as the renovation comparison baseline", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Roof plan", user_id: "user-1" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const scene = "scene.add(box(1,1,1));";
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { name: "Roof plan", scene_js: scene },
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[0][0]).toContain("original_scene_js");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      "user-1",
+      "Roof plan",
+      undefined,
+      scene,
+      scene,
+      null,
+      [],
+      "planning",
+      "omakotitalo",
+      null,
+      null,
+      null,
+      null,
+      null,
+      "[]",
+    ]);
+  });
+
+  it("accepts an explicit original_scene_js baseline on import", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Imported plan", user_id: "user-1" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: {
+        name: "Imported plan",
+        scene_js: "scene.add(box(2,1,1));",
+        original_scene_js: "scene.add(box(1,1,1));",
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[0][1]?.[4]).toBe("scene.add(box(1,1,1));");
+  });
+
+  it("rejects oversized original_scene_js baselines", async () => {
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { name: "Too large", scene_js: "", original_scene_js: "x".repeat(512 * 1024 + 1) },
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("Original scene script");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("rejects non-string project name", async () => {
     const res = await makeRequest("POST", "/projects", {
       headers: { Authorization: `Bearer ${authToken()}` },
       body: { name: 12345 },
     });
     expect(res.status).toBe(400);
+  });
+
+  it("creates a taloyhtio project with cooperative metadata", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", project_type: "taloyhtio", unit_count: 24 }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: {
+        name: "Pipe renovation",
+        project_type: "taloyhtio",
+        unit_count: 24,
+        business_id: "1234567-8",
+        property_manager_email: "manager@example.com",
+        shareholder_shares: [{ apartment: "A1", share_pct: 2.5 }],
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      "user-1",
+      "Pipe renovation",
+      undefined,
+      undefined,
+      null,
+      null,
+      [],
+      "planning",
+      "taloyhtio",
+      24,
+      "1234567-8",
+      null,
+      "manager@example.com",
+      null,
+      JSON.stringify([{ apartment: "A1", owner_name: null, share_pct: 2.5 }]),
+    ]);
+  });
+
+  it("rejects invalid taloyhtio metadata", async () => {
+    const res = await makeRequest("POST", "/projects", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { name: "Bad co-op", project_type: "taloyhtio", unit_count: 0 },
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("unit_count");
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -234,6 +357,223 @@ describe("GET /projects/:id", () => {
 });
 
 // --------------------------------------------------------------------------
+// Project version history
+// --------------------------------------------------------------------------
+
+describe("project version history", () => {
+  const snapshot = {
+    name: "Roof option",
+    description: "New roof",
+    scene_js: "scene.add(box(1,1,1));",
+    bom: [{ material_id: "roof_tile", quantity: 12, unit: "m2" }],
+  };
+
+  it("creates a named project version on the default branch", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "11111111-1111-1111-1111-111111111111", name: "Main", is_default: true }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "22222222-2222-2222-2222-222222222222",
+          branch_id: "11111111-1111-1111-1111-111111111111",
+          name: "Option A",
+          event_type: "named",
+          snapshot,
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/versions", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { snapshot, name: "Option A", event_type: "named" },
+    });
+
+    expect(res.status).toBe(201);
+    const body = res.body as { version: { name: string; event_type: string } };
+    expect(body.version.name).toBe("Option A");
+    expect(body.version.event_type).toBe("named");
+  });
+
+  it("lists branches and versions for an owned project", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "branch-1", name: "Main", is_default: true }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "branch-1", name: "Main", is_default: true }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "v1", branch_id: "branch-1", event_type: "auto", delta: {} }] } as never);
+
+    const res = await makeRequest("GET", "/projects/proj-1/versions", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { branches: unknown[]; versions: unknown[] };
+    expect(body.branches).toHaveLength(1);
+    expect(body.versions).toHaveLength(1);
+  });
+
+  it("restores a version and records the restore as a new version", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "22222222-2222-2222-2222-222222222222",
+          branch_id: "11111111-1111-1111-1111-111111111111",
+          name: "Option A",
+          snapshot,
+          thumbnail_url: null,
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "proj-1", name: snapshot.name }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "roof_tile" }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "latest", snapshot: { ...snapshot, name: "Before" } }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "restore-1", event_type: "restore", snapshot }] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/versions/22222222-2222-2222-2222-222222222222/restore", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { snapshot: typeof snapshot; version: { event_type: string } };
+    expect(body.snapshot.name).toBe("Roof option");
+    expect(body.version.event_type).toBe("restore");
+  });
+
+  it("compares two versions with material and cost deltas", async () => {
+    const base = { ...snapshot, bom: [{ material_id: "roof_tile", quantity: 10, unit: "m2" }] };
+    const target = { ...snapshot, scene_js: "scene.add(box(2,1,1));", bom: [{ material_id: "roof_tile", quantity: 14, unit: "m2" }] };
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          { id: "11111111-1111-1111-1111-111111111111", name: "Base", created_at: "2026-04-22T00:00:00.000Z", snapshot: base },
+          { id: "22222222-2222-2222-2222-222222222222", name: "Target", created_at: "2026-04-22T00:01:00.000Z", snapshot: target },
+        ],
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "roof_tile", unit_price: 20, waste_factor: 1.05 }] } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "roof_tile", unit_price: 20, waste_factor: 1.05 }] } as never);
+
+    const res = await makeRequest(
+      "GET",
+      "/projects/proj-1/versions/compare?base=11111111-1111-1111-1111-111111111111&target=22222222-2222-2222-2222-222222222222",
+      { headers: { Authorization: `Bearer ${authToken("user-1")}` } },
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as { delta: { changedFields: string[]; bom: { quantityChanged: number } }; cost_delta: number };
+    expect(body.delta.changedFields).toContain("scene_js");
+    expect(body.delta.changedFields).toContain("bom");
+    expect(body.delta.bom.quantityChanged).toBe(1);
+    expect(body.cost_delta).toBe(84);
+  });
+});
+
+// --------------------------------------------------------------------------
+// POST /projects/:id/quote-request — homeowner contractor lead
+// --------------------------------------------------------------------------
+
+describe("POST /projects/:id/quote-request", () => {
+  it("stores the request and emails the homeowner a PDF BOM summary", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: "proj-1", name: "Kitchen Reno", description: "Helsinki kitchen", user_id: "user-1" }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          material_id: "pine_48x98_c24",
+          material_name: "Pine 48x98",
+          quantity: 10,
+          unit: "jm",
+          unit_price: 3.2,
+          line_cost: 32,
+          supplier_name: "K-Rauta",
+        }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: "quote-1", status: "submitted", created_at: "2026-04-21T10:00:00Z" }],
+        command: "INSERT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      });
+
+    const res = await makeRequest("POST", "/projects/proj-1/quote-request", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: {
+        contact_name: "Matti Meikalainen",
+        contact_email: "matti@example.com",
+        contact_phone: "+358401234567",
+        postcode: "00100",
+        work_scope: "Kitchen renovation and cabinet installation",
+        locale: "en",
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect((res.body as { id: string; bom_line_count: number }).id).toBe("quote-1");
+    expect((res.body as { bom_line_count: number }).bom_line_count).toBe(1);
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO quote_requests");
+    expect(mockQuery.mock.calls[2][1]).toEqual(expect.arrayContaining([
+      "proj-1",
+      "user-1",
+      "Matti Meikalainen",
+      "matti@example.com",
+      "00100",
+    ]));
+    expect(mockSendEmail).toHaveBeenCalledOnce();
+    const emailArgs = mockSendEmail.mock.calls[0];
+    expect(emailArgs[0]).toBe("matti@example.com");
+    expect(emailArgs[1]).toContain("quote request");
+    expect(emailArgs[3]?.[0]).toMatchObject({
+      filename: expect.stringContaining("helscoop_quote_Kitchen_Reno"),
+      contentType: "application/pdf",
+    });
+  });
+
+  it("rejects quote requests for empty BOMs", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: "proj-1", name: "Empty Project", user_id: "user-1" }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      })
+      .mockResolvedValueOnce({
+        rows: [],
+        command: "SELECT",
+        rowCount: 0,
+        oid: 0,
+        fields: [],
+      });
+
+    const res = await makeRequest("POST", "/projects/proj-1/quote-request", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: {
+        contact_name: "Matti Meikalainen",
+        contact_email: "matti@example.com",
+        postcode: "00100",
+        work_scope: "Please quote this work",
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("empty BOM");
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+// --------------------------------------------------------------------------
 // PUT /projects/:id — update
 // --------------------------------------------------------------------------
 
@@ -268,6 +608,273 @@ describe("PUT /projects/:id", () => {
       body: { name: "Hacked", description: "", scene_js: "" },
     });
     expect(res.status).toBe(404);
+  });
+
+  it("persists household deduction couple mode", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", household_deduction_joint: true }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { household_deduction_joint: true },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { household_deduction_joint: boolean }).household_deduction_joint).toBe(true);
+    expect(mockQuery.mock.calls[0][0]).toContain("household_deduction_joint=COALESCE");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      true,
+      null,
+      null,
+      null,
+      false,
+      null,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      "proj-1",
+      "user-1",
+    ]);
+  });
+
+  it("persists scene parameter presets", async () => {
+    const param_presets = [
+      { name: "Budget", values: { roofPitch: 22, insulationDepth: 250 } },
+      { name: "Premium", values: { roofPitch: 30, insulationDepth: 350 } },
+    ];
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", param_presets }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { param_presets },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { param_presets: typeof param_presets }).param_presets).toEqual(param_presets);
+    expect(mockQuery.mock.calls[0][0]).toContain("param_presets=COALESCE");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      null,
+      JSON.stringify(param_presets),
+      false,
+      null,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      false,
+      null,
+      "proj-1",
+      "user-1",
+    ]);
+  });
+
+  it("persists taloyhtio metadata and shareholder shares", async () => {
+    const shareholder_shares = [{ apartment: "A1", share_pct: 4.25, owner_name: "Owner" }];
+    const building_info = { address: "Testikatu 1", year_built: 1975, units: 18 };
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", project_type: "taloyhtio", unit_count: 18, shareholder_shares }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: {
+        project_type: "taloyhtio",
+        unit_count: 18,
+        business_id: "1234567-8",
+        property_manager_name: "Manager",
+        property_manager_email: "manager@example.com",
+        property_manager_phone: "+358 40 123",
+        shareholder_shares,
+        building_info,
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][0]).toContain("project_type=COALESCE");
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      false,
+      null,
+      "taloyhtio",
+      true,
+      18,
+      true,
+      "1234567-8",
+      true,
+      "Manager",
+      true,
+      "manager@example.com",
+      true,
+      "+358 40 123",
+      true,
+      JSON.stringify([{ apartment: "A1", owner_name: "Owner", share_pct: 4.25 }]),
+      true,
+      JSON.stringify(building_info),
+      "proj-1",
+      "user-1",
+    ]);
+  });
+
+  it("persists photo overlay metadata for before/after alignment", async () => {
+    const photo_overlay = {
+      data_url: "data:image/jpeg;base64,abc123",
+      file_name: "house.jpg",
+      opacity: 0.72,
+      compare_mode: true,
+      compare_position: 62,
+      offset_x: 12,
+      offset_y: -8,
+      scale: 1.24,
+      rotation: 4,
+      updated_at: "2026-04-23T00:00:00.000Z",
+    };
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", photo_overlay }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { photo_overlay },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][0]).toContain("photo_overlay=CASE WHEN");
+    expect(mockQuery.mock.calls[0][1][7]).toBe(true);
+    expect(JSON.parse(mockQuery.mock.calls[0][1][8] as string)).toMatchObject({
+      data_url: photo_overlay.data_url,
+      opacity: 0.72,
+      compare_mode: true,
+      compare_position: 62,
+      offset_x: 12,
+      offset_y: -8,
+      scale: 1.24,
+      rotation: 4,
+    });
+  });
+
+  it("clears photo overlay metadata when explicitly set to null", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", photo_overlay: null }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { photo_overlay: null },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery.mock.calls[0][1][7]).toBe(true);
+    expect(mockQuery.mock.calls[0][1][8]).toBeNull();
+  });
+
+  it("rejects invalid photo overlay payloads", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { photo_overlay: { data_url: "https://example.com/house.jpg" } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("PUT /projects/:id/mood-board", () => {
+  it("persists a normalized mood board", async () => {
+    const mood_board = {
+      items: [
+        { id: "note-1", type: "note", x: 24, y: 32, width: 200, height: 120, text: "Warm timber" },
+        { id: "mat-1", type: "material", x: 80, y: 90, material_id: "material-1" },
+      ],
+    };
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ mood_board, updated_at: "2026-04-25T00:00:00.000Z" }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/mood-board", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { mood_board },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { ok: boolean }).ok).toBe(true);
+    expect(mockQuery.mock.calls[0][0]).toContain("mood_board = $1::jsonb");
+    const saved = JSON.parse(mockQuery.mock.calls[0][1][0] as string);
+    expect(saved.items).toHaveLength(2);
+    expect(saved.items[0]).toMatchObject({ type: "note", text: "Warm timber" });
+    expect(mockQuery.mock.calls[0][1][1]).toBe("proj-1");
+    expect(mockQuery.mock.calls[0][1][2]).toBe("user-1");
+  });
+
+  it("rejects invalid mood board payloads", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1/mood-board", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { mood_board: { items: [{ id: "bad", type: "video", x: 0, y: 0 }] } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -375,6 +982,68 @@ describe("PUT /projects/:id/bom", () => {
 });
 
 // --------------------------------------------------------------------------
+// POST /projects/:id/bom/substitute — mapped BOM material swaps
+// --------------------------------------------------------------------------
+
+describe("POST /projects/:id/bom/substitute", () => {
+  it("rejects missing material ids", async () => {
+    const res = await makeRequest("POST", "/projects/proj-1/bom/substitute", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { from_material_id: "pine_48x148_c24" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects unmapped substitutions", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [{ material_id: "pine_48x148_c24", quantity: 10, unit: "jm" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/bom/substitute", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { from_material_id: "pine_48x148_c24", to_material_id: "osb_9mm" },
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as { error: string }).error).toContain("mapped substitute");
+  });
+
+  it("updates a BOM row to the mapped substitute", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proj-1" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [{ material_id: "pine_48x148_c24", quantity: 10, unit: "jm" }] } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ substitution_type: "budget", confidence: "verified", notes: "Cheaper dry-location option" }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "pressure_treated_48x148", name: "Kestopuu 48x148", unit: "jm" }] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        material_id: "pressure_treated_48x148",
+        material_name: "Kestopuu 48x148",
+        quantity: 10,
+        unit: "jm",
+        unit_price: "3.80",
+        total: "38.00",
+      }],
+    } as never);
+
+    const res = await makeRequest("POST", "/projects/proj-1/bom/substitute", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { from_material_id: "pine_48x148_c24", to_material_id: "pressure_treated_48x148" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as { ok: boolean; item: { material_id: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.material_id).toBe("pressure_treated_48x148");
+    expect(mockQuery).toHaveBeenCalledWith(
+      "UPDATE project_bom SET material_id=$1, unit=$2 WHERE project_id=$3 AND material_id=$4",
+      ["pressure_treated_48x148", "jm", "proj-1", "pine_48x148_c24"],
+    );
+  });
+});
+
+// --------------------------------------------------------------------------
 // POST /projects/:id/share — share token
 // --------------------------------------------------------------------------
 
@@ -401,7 +1070,7 @@ describe("POST /projects/:id/share", () => {
 
   it("returns existing share token if already shared (idempotent)", async () => {
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", share_token: "existing-token-123" }],
+      rows: [{ id: "proj-1", share_token: "existing-token-123", share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
       command: "SELECT",
       rowCount: 1,
       oid: 0,
@@ -413,12 +1082,13 @@ describe("POST /projects/:id/share", () => {
     });
     expect(res.status).toBe(200);
     expect((res.body as { share_token: string }).share_token).toBe("existing-token-123");
+    expect((res.body as { expires_at: string }).expires_at).toBe("2999-01-01T00:00:00.000Z");
   });
 
   it("generates a new share token when not already shared", async () => {
     // Project lookup — no existing token
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", share_token: null }],
+      rows: [{ id: "proj-1", share_token: null, share_token_expires_at: null }],
       command: "SELECT",
       rowCount: 1,
       oid: 0,
@@ -426,7 +1096,7 @@ describe("POST /projects/:id/share", () => {
     });
     // UPDATE to set token
     mockQuery.mockResolvedValueOnce({
-      rows: [],
+      rows: [{ share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
       command: "UPDATE",
       rowCount: 1,
       oid: 0,
@@ -438,6 +1108,131 @@ describe("POST /projects/:id/share", () => {
     });
     expect(res.status).toBe(200);
     expect((res.body as { share_token: string }).share_token).toBeTruthy();
+    expect((res.body as { expires_at: string }).expires_at).toBe("2999-01-01T00:00:00.000Z");
+  });
+
+  it("regenerates an expired existing share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: "old-token", share_token_expires_at: "2000-01-01T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/projects/proj-1/share", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { share_token: string }).share_token).not.toBe("old-token");
+  });
+});
+
+describe("PUT /projects/:id/share-preview", () => {
+  const validPreview = {
+    kind: "before_after",
+    before_image: "data:image/png;base64,YmVmb3Jl",
+    after_image: "data:image/png;base64,YWZ0ZXI=",
+    split: 58,
+    preset_id: "front",
+    watermark: false,
+  };
+
+  it("saves a before/after share preview and creates a share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: null, share_token_expires_at: null, is_public: false }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ plan_tier: "free", role: "user" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        share_preview: { ...validPreview, watermark: true },
+        share_token: "generated-token",
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/share-preview", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { share_preview: validPreview },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { share_token: string }).share_token).toBe("generated-token");
+    expect(mockQuery.mock.calls[2][0]).toContain("share_preview");
+    expect(JSON.parse(mockQuery.mock.calls[2][1][0] as string)).toMatchObject({
+      kind: "before_after",
+      split: 58,
+      preset_id: "front",
+      watermark: true,
+    });
+  });
+
+  it("stores non-watermarked metadata for Pro users", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: "share-token", share_token_expires_at: "2999-01-01T00:00:00.000Z", is_public: false }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ plan_tier: "pro", role: "user" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        share_preview: { ...validPreview, watermark: false },
+        share_token: "share-token",
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/share-preview", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { share_preview: { ...validPreview, watermark: true } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(mockQuery.mock.calls[2][1][0] as string)).toMatchObject({ watermark: false });
+  });
+
+  it("rejects invalid preview images", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1/share-preview", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { share_preview: { ...validPreview, after_image: "https://example.com/image.png" } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -475,6 +1270,189 @@ describe("DELETE /projects/:id/share", () => {
     });
     expect(res.status).toBe(200);
     expect((res.body as { ok: boolean }).ok).toBe(true);
+  });
+});
+
+// --------------------------------------------------------------------------
+// Public inspiration gallery
+// --------------------------------------------------------------------------
+
+describe("PUT /projects/:id/publish", () => {
+  it("publishes an owned project with a permanent gallery share token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_token: null, share_token_expires_at: null }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        is_public: true,
+        published_at: "2026-04-24T00:00:00.000Z",
+        gallery_status: "approved",
+        share_token: "public-token",
+        share_token_expires_at: null,
+      }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/publish", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { is_public: true },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { is_public: boolean }).is_public).toBe(true);
+    expect(mockQuery.mock.calls[1][0]).toContain("share_token_expires_at = NULL");
+  });
+
+  it("rejects invalid publish payloads", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1/publish", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { is_public: "yes" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /gallery/projects", () => {
+  it("returns public gallery cards without authentication", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        name: "Sauna inspiration",
+        share_token: "public-token",
+        is_public: true,
+        estimated_cost: "8500",
+        material_highlights: ["Lumber", "Insulation"],
+        view_count: 3,
+        heart_count: 0,
+        clone_count: 1,
+      }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/gallery/projects?q=sauna&cost_range=5k-15k");
+
+    expect(res.status).toBe(200);
+    expect((res.body as { projects: Array<{ name: string }> }).projects[0].name).toBe("Sauna inspiration");
+    expect(mockQuery.mock.calls[0][0]).toContain("p.is_public = true");
+    expect(mockQuery.mock.calls[0][1]).toContain("%sauna%");
+  });
+
+  it("filters public gallery cards by postal code and renovation type", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "00330 roof plan", postal_code_area: "00330", material_highlights: [] }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/gallery/projects?postal_code=00330&renovation_type=roof");
+
+    expect(res.status).toBe(200);
+    expect((res.body as { projects: Array<{ postal_code_area: string }> }).projects[0].postal_code_area).toBe("00330");
+    expect(mockQuery.mock.calls[0][0]).toContain("postal_code");
+    expect(mockQuery.mock.calls[0][1]).toContain("00330");
+    expect(mockQuery.mock.calls[0][1]).toContain("%roof%");
+  });
+});
+
+describe("GET /gallery/neighborhood-insights", () => {
+  it("requires a Finnish postal code", async () => {
+    const res = await makeRequest("GET", "/gallery/neighborhood-insights?postal_code=helsinki");
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns aggregate neighborhood insights from published projects", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ project_count: 4, projects_this_year: 2, average_cost: 8400 }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ type: "roof", count: 3 }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ name: "Peltikatto", project_count: 3 }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "gallery-1", name: "Similar roof", postal_code_area: "00330", material_highlights: [] }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/gallery/neighborhood-insights?postal_code=00330&project_type=omakotitalo&limit=3");
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      postal_code_area: string;
+      project_count: number;
+      popular_materials: Array<{ name: string; share_pct: number }>;
+      similar_projects: Array<{ name: string }>;
+    };
+    expect(body.postal_code_area).toBe("00330");
+    expect(body.project_count).toBe(4);
+    expect(body.popular_materials[0]).toMatchObject({ name: "Peltikatto", share_pct: 75 });
+    expect(body.similar_projects[0].name).toBe("Similar roof");
+    expect(mockQuery).toHaveBeenCalledTimes(4);
+    expect(mockQuery.mock.calls[0][1]).toContain("00330");
+  });
+});
+
+describe("POST /gallery/projects/:id/clone", () => {
+  it("clones a public project's material list into a blank owned project", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "source-1", name: "Published Sauna", project_type: "omakotitalo", unit_count: null, tags: ["sauna"] }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "clone-1", name: "Inspired by Published Sauna", user_id: "user-1" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], command: "INSERT", rowCount: 2, oid: 0, fields: [] });
+    mockQuery.mockResolvedValueOnce({ rows: [], command: "UPDATE", rowCount: 1, oid: 0, fields: [] });
+
+    const res = await makeRequest("POST", "/gallery/projects/source-1/clone", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+    });
+
+    expect(res.status).toBe(201);
+    expect((res.body as { id: string; cloned_from_project_id: string }).id).toBe("clone-1");
+    expect((res.body as { cloned_from_project_id: string }).cloned_from_project_id).toBe("source-1");
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO project_bom");
+    expect(mockQuery.mock.calls[2][0]).toContain("SELECT $1, material_id, quantity, unit");
   });
 });
 
@@ -553,8 +1531,16 @@ describe("GET /shared/:token", () => {
   it("returns project data without auth for valid token", async () => {
     // Project by share token
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "proj-1", name: "Shared House", scene_js: "box(1,1,1);" }],
+      rows: [{ id: "proj-1", name: "Shared House", scene_js: "box(1,1,1);", view_count: 2, share_token_expires_at: "2999-01-01T00:00:00.000Z" }],
       command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    // Shared view insert
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1" }],
+      command: "INSERT",
       rowCount: 1,
       oid: 0,
       fields: [],
@@ -567,10 +1553,173 @@ describe("GET /shared/:token", () => {
       oid: 0,
       fields: [],
     });
+    // Comments for shared project
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "comment-1", commenter_name: "Builder", message: "Can quote", created_at: "2026-04-23T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
 
-    const res = await makeRequest("GET", "/shared/valid-share-token-123");
+    const res = await makeRequest("GET", "/shared/valid-share-token-123", {
+      headers: { referer: "https://contractor.example/link" },
+    });
     expect(res.status).toBe(200);
     expect((res.body as { name: string }).name).toBe("Shared House");
+    expect((res.body as { comments: unknown[] }).comments).toHaveLength(1);
+    expect(mockQuery.mock.calls[1][0]).toContain("INSERT INTO project_views");
+    expect(mockQuery.mock.calls[1][0]).toContain("NOT EXISTS");
+    expect(mockQuery.mock.calls[1][1]).toEqual(expect.arrayContaining(["proj-1", "https://contractor.example/link"]));
+  });
+
+  it("returns 410 for expired shared links", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Shared House", share_token_expires_at: "2000-01-01T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/shared/expired-token");
+
+    expect(res.status).toBe(410);
+    expect((res.body as { code: string }).code).toBe("share_expired");
+  });
+});
+
+describe("GET /shared/:token/og-image", () => {
+  it("serves the saved before/after preview image without auth", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        share_preview: {
+          kind: "before_after",
+          after_image: "data:image/png;base64,aGVsc2Nvb3A=",
+        },
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/shared/valid-share-token-123/og-image");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/png");
+    expect(res.body).toBe("helscoop");
+  });
+
+  it("returns 404 when no saved preview image exists", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", share_preview: null, share_token_expires_at: null }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/shared/valid-share-token-123/og-image");
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /shared/:token/comments", () => {
+  it("creates a contractor comment, notification, and owner email", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proj-1",
+        name: "Shared House",
+        user_id: "user-1",
+        owner_email: "owner@example.com",
+        owner_name: "Owner",
+        email_notifications: true,
+        share_token_expires_at: "2999-01-01T00:00:00.000Z",
+      }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "comment-1", commenter_name: "Builder", message: "Available in June", created_at: "2026-04-23T00:00:00.000Z" }],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [],
+      command: "INSERT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/shared/valid-share-token-123/comments", {
+      body: { name: "Builder", message: "Available in June" },
+    });
+
+    expect(res.status).toBe(201);
+    expect((res.body as { id: string }).id).toBe("comment-1");
+    expect(mockQuery.mock.calls[1][0]).toContain("INSERT INTO project_share_comments");
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO notifications");
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      "owner@example.com",
+      "Helscoop: contractor comment on Shared House",
+      expect.stringContaining("Available in June"),
+    );
+  });
+
+  it("rejects empty contractor comments", async () => {
+    const res = await makeRequest("POST", "/shared/valid-share-token-123/comments", {
+      body: { name: "", message: "" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns 410 when commenting through an expired link", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "Shared House", share_token_expires_at: "2000-01-01T00:00:00.000Z" }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("POST", "/shared/expired-token/comments", {
+      body: { name: "Builder", message: "Available in June" },
+    });
+
+    expect(res.status).toBe(410);
+  });
+});
+
+// --------------------------------------------------------------------------
+// GET /auth/unsubscribe/:token — public digest opt-out
+// --------------------------------------------------------------------------
+
+describe("GET /auth/unsubscribe/:token", () => {
+  it("turns off activity digest emails for a valid token", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "user-1" }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/auth/unsubscribe/unsub-token-123");
+    expect(res.status).toBe(200);
+    expect(String(res.body)).toContain("unsubscribed");
+    expect(mockQuery.mock.calls[0][0]).toContain("email_notifications = false");
+    expect(mockQuery.mock.calls[0][1]).toEqual(["unsub-token-123"]);
   });
 });
 

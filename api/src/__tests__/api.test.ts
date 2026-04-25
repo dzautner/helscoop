@@ -7,13 +7,17 @@ describe("API structure", () => {
     const suppliers = await import("../routes/suppliers");
     const pricing = await import("../routes/pricing");
     const chat = await import("../routes/chat");
+    const bom = await import("../routes/bom");
     const kesko = await import("../routes/kesko");
+    const ryhti = await import("../routes/ryhti");
     expect(materials.default).toBeDefined();
     expect(projects.default).toBeDefined();
     expect(suppliers.default).toBeDefined();
     expect(pricing.default).toBeDefined();
     expect(chat.default).toBeDefined();
+    expect(bom.default).toBeDefined();
     expect(kesko.default).toBeDefined();
+    expect(ryhti.default).toBeDefined();
   });
 
   it("auth module exports required functions", async () => {
@@ -229,6 +233,7 @@ describe("Web app", () => {
       "getProjects", "getProject", "createProject",
       "updateProject", "deleteProject", "duplicateProject",
       "getMaterials", "getSuppliers", "getStalePrices",
+      "getAdminStats", "requestSupplierRescrape",
       "searchKeskoProducts", "importKeskoProduct",
       "exportBOM", "chat",
       "verifyEmail", "resendVerification",

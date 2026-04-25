@@ -1,7 +1,14 @@
 import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
-import { requirePermission } from "../permissions";
+import { normalizeRole, requirePermission } from "../permissions";
+import { buildMaterialTrend, buildProjectTrendSummary, type PriceHistoryInput } from "../material-trends";
+import { notifyPriceWatchers } from "../price-alerts";
+import {
+  estimateRenovationCost,
+  getRenovationCostIndexCatalog,
+  isRenovationCostCategoryId,
+} from "../statfin-cost-index";
 
 const router = Router();
 
@@ -10,6 +17,18 @@ type StockLevel = typeof STOCK_LEVELS[number];
 
 function isStockLevel(value: unknown): value is StockLevel {
   return typeof value === "string" && STOCK_LEVELS.includes(value as StockLevel);
+}
+
+function toOptionalPositiveNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : null;
+}
+
+function toOptionalTimestamp(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 // GET /pricing/compare/:materialId — price comparison (anyone with pricing:read)
@@ -65,6 +84,121 @@ router.get("/stock/:materialId", requireAuth, requirePermission("pricing:read"),
   });
 });
 
+// GET /pricing/trends/project/:projectId — BOM-level material cost trends and timing hints
+router.get("/trends/project/:projectId", requireAuth, requirePermission("pricing:read"), async (req, res) => {
+  const { projectId } = req.params;
+  const user = req.user;
+
+  if (!user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  const isAdmin = normalizeRole(user.role) === "admin";
+  const projectResult = await query(
+    `SELECT id
+     FROM projects
+     WHERE id = $1
+       AND ($2::boolean OR user_id = $3)
+       AND deleted_at IS NULL`,
+    [projectId, isAdmin, user.id],
+  );
+
+  if (projectResult.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+
+  const bomResult = await query(
+    `SELECT
+       pb.material_id,
+       pb.quantity,
+       pb.unit,
+       m.name AS material_name,
+       c.display_name AS category_name,
+       p.id AS pricing_id,
+       COALESCE(p.unit_price, 0) AS unit_price,
+       (pb.quantity * COALESCE(p.unit_price, 0) * COALESCE(m.waste_factor, 1)) AS line_cost
+     FROM project_bom pb
+     JOIN materials m ON pb.material_id = m.id
+     JOIN categories c ON m.category_id = c.id
+     LEFT JOIN pricing p ON p.material_id = m.id AND p.is_primary = true
+     WHERE pb.project_id = $1
+     ORDER BY c.sort_order, m.name`,
+    [projectId],
+  );
+
+  const pricingIds = bomResult.rows
+    .map((row: { pricing_id?: string | null }) => row.pricing_id)
+    .filter((id: string | null | undefined): id is string => Boolean(id));
+
+  const historyByPricingId = new Map<string, PriceHistoryInput[]>();
+  if (pricingIds.length > 0) {
+    const historyResult = await query(
+      `SELECT pricing_id, unit_price, scraped_at
+       FROM pricing_history
+       WHERE pricing_id = ANY($1::uuid[])
+         AND scraped_at >= now() - interval '18 months'
+       ORDER BY scraped_at ASC`,
+      [pricingIds],
+    );
+
+    for (const row of historyResult.rows as { pricing_id: string; unit_price: string | number; scraped_at: string | Date }[]) {
+      const values = historyByPricingId.get(row.pricing_id) ?? [];
+      values.push({ unitPrice: Number(row.unit_price), scrapedAt: row.scraped_at });
+      historyByPricingId.set(row.pricing_id, values);
+    }
+  }
+
+  const items = bomResult.rows.map((row: {
+    material_id: string;
+    material_name: string;
+    category_name: string | null;
+    quantity: string | number;
+    unit: string;
+    pricing_id?: string | null;
+    unit_price: string | number;
+    line_cost: string | number;
+  }) => buildMaterialTrend({
+    materialId: row.material_id,
+    materialName: row.material_name,
+    categoryName: row.category_name,
+    quantity: Number(row.quantity),
+    unit: row.unit,
+    unitPrice: Number(row.unit_price),
+    lineCost: Number(row.line_cost),
+    history: row.pricing_id ? historyByPricingId.get(row.pricing_id) : [],
+  }));
+
+  res.json({
+    projectId,
+    generatedAt: new Date().toISOString(),
+    dataSources: Array.from(new Set(items.map((item) => item.source))),
+    ...buildProjectTrendSummary(items),
+  });
+});
+
+// GET /pricing/renovation-cost-index — StatFin-indexed detached-house renovation baselines
+router.get("/renovation-cost-index", requireAuth, requirePermission("pricing:read"), async (_req, res) => {
+  const catalog = await getRenovationCostIndexCatalog();
+  res.json(catalog);
+});
+
+// POST /pricing/renovation-cost-estimate — base_cost x quantity x StatFin multiplier x ALV
+router.post("/renovation-cost-estimate", requireAuth, requirePermission("pricing:read"), async (req, res) => {
+  const { categoryId, quantity } = req.body as { categoryId?: unknown; quantity?: unknown };
+  const numericQuantity = Number(quantity);
+
+  if (!isRenovationCostCategoryId(categoryId)) {
+    return res.status(400).json({ error: "Unknown renovation cost category" });
+  }
+
+  if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+    return res.status(400).json({ error: "quantity must be a positive number" });
+  }
+
+  const catalog = await getRenovationCostIndexCatalog();
+  res.json(estimateRenovationCost(catalog, categoryId, numericQuantity));
+});
+
 // PUT /pricing/:materialId/:supplierId — update pricing (admin or partner with pricing:update)
 router.put(
   "/:materialId/:supplierId",
@@ -82,6 +216,9 @@ router.put(
       stock_level,
       store_location,
       last_checked_at,
+      regular_unit_price,
+      campaign_label,
+      campaign_ends_at,
     } = req.body;
     const { materialId, supplierId } = req.params;
     const normalizedStockLevel = stock_level === undefined ? undefined : stock_level;
@@ -109,20 +246,49 @@ router.put(
       store_location !== undefined ||
       last_checked_at !== undefined;
     const checkedAt = stockWasProvided ? (last_checked_at ?? new Date().toISOString()) : null;
+    const currentUnitPrice = Number(unit_price);
+    const regularUnitPrice = toOptionalPositiveNumber(regular_unit_price);
+    const hasCampaignPrice = regularUnitPrice !== null && Number.isFinite(currentUnitPrice) && regularUnitPrice > currentUnitPrice;
+    const normalizedCampaignLabel = hasCampaignPrice
+      ? (typeof campaign_label === "string" && campaign_label.trim() ? campaign_label.trim().slice(0, 160) : "Campaign price")
+      : null;
+    const normalizedCampaignEndsAt = hasCampaignPrice ? toOptionalTimestamp(campaign_ends_at) : null;
 
     const result = await query(
       `INSERT INTO pricing (
          material_id, supplier_id, unit, unit_price, sku, ean, link, is_primary,
-         stock_level, in_stock, store_location, last_checked_at, last_verified_at
+         stock_level, in_stock, store_location, last_checked_at,
+         regular_unit_price, campaign_label, campaign_ends_at, campaign_detected_at,
+         last_verified_at
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, 'unknown'),$10,$11,$12,now())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, 'unknown'),$10,$11,$12,$13,$14,$15,
+         CASE WHEN $14::text IS NULL THEN NULL ELSE now() END,
+         now())
        ON CONFLICT (material_id, supplier_id) DO UPDATE SET
-         unit=$3, unit_price=$4, sku=$5, ean=$6, link=$7,
+         unit=$3,
+         previous_unit_price=CASE
+           WHEN pricing.unit_price IS DISTINCT FROM $4 THEN pricing.unit_price
+           ELSE pricing.previous_unit_price
+         END,
+         unit_price=$4, sku=$5, ean=$6, link=$7,
          is_primary=COALESCE($8, pricing.is_primary),
          stock_level=COALESCE($9, pricing.stock_level),
          in_stock=COALESCE($10, pricing.in_stock),
          store_location=COALESCE($11, pricing.store_location),
          last_checked_at=COALESCE($12, pricing.last_checked_at),
+         regular_unit_price=$13,
+         campaign_label=$14,
+         campaign_ends_at=$15,
+         campaign_detected_at=CASE
+           WHEN $14::text IS NOT NULL
+            AND (
+              pricing.campaign_label IS DISTINCT FROM $14
+              OR pricing.regular_unit_price IS DISTINCT FROM $13
+              OR pricing.campaign_ends_at IS DISTINCT FROM $15
+            )
+           THEN now()
+           ELSE pricing.campaign_detected_at
+         END,
          last_verified_at=now(), updated_at=now()
        RETURNING *`,
       [
@@ -138,6 +304,9 @@ router.put(
         in_stock,
         store_location,
         checkedAt,
+        hasCampaignPrice ? regularUnitPrice : null,
+        normalizedCampaignLabel,
+        normalizedCampaignEndsAt,
       ]
     );
 
@@ -146,6 +315,17 @@ router.put(
        VALUES ($1, $2, 'manual')`,
       [result.rows[0].id, unit_price]
     );
+
+    await notifyPriceWatchers({
+      materialId,
+      supplierId,
+      previousUnitPrice: result.rows[0].previous_unit_price,
+      unitPrice: result.rows[0].unit_price,
+      regularUnitPrice: result.rows[0].regular_unit_price,
+      campaignLabel: result.rows[0].campaign_label,
+      campaignEndsAt: result.rows[0].campaign_ends_at,
+      source: "manual",
+    });
 
     res.json(result.rows[0]);
   }

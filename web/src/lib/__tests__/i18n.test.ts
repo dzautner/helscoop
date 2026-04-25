@@ -142,6 +142,11 @@ describe("getTranslation — Finnish (fi)", () => {
     expect(t("editor.undo")).toBe("Kumoa");
   });
 
+  it("resolves AR preview keys", () => {
+    expect(t("ar.title")).toBe("AR-kameraesikatselu");
+    expect(t("ar.permissionDenied")).toBe("Kameralupa evätty");
+  });
+
   it("resolves settings keys", () => {
     expect(t("settings.title")).toBe("Asetukset");
   });
@@ -172,6 +177,16 @@ describe("getTranslation — English (en)", () => {
   it("resolves editor keys", () => {
     expect(t("editor.save")).toBe("Save");
     expect(t("editor.redo")).toBe("Redo");
+  });
+
+  it("resolves layer panel keys", () => {
+    expect(t("layers.title")).toBe("Layers");
+    expect(t("layers.costApprox")).toBe("Approximate cost");
+  });
+
+  it("resolves AR preview keys", () => {
+    expect(t("ar.title")).toBe("AR camera preview");
+    expect(t("ar.permissionDenied")).toBe("Camera permission denied");
   });
 
   it("resolves toast keys", () => {
@@ -395,12 +410,13 @@ describe("exhaustive i18n key parity", () => {
     "search.sectionLabel", "search.title", "search.subtitle", "search.placeholder",
     "search.searching", "search.searchButton", "search.createFromBuilding",
     "search.creatingProject", "search.createError", "search.notFound",
-    "search.yearBuilt", "search.area", "search.floors", "search.material",
-    "search.heating", "search.bomRows", "search.verified", "search.estimated",
+    "search.type", "search.yearBuilt", "search.area", "search.floors", "search.material",
+    "search.heating", "search.roofType", "search.bomRows", "search.editHint",
+    "search.updatingBuilding", "search.updateError", "search.verified", "search.estimated",
     "search.dataSources",
     // project
     "project.myProjects", "project.projectCount", "project.startFirst",
-    "project.loadingProjects", "project.newProjectPlaceholder", "project.create",
+    "project.loadingProjects", "project.newProjectPlaceholder", "project.nameField", "project.create",
     "project.open", "project.copy", "project.delete", "project.deleteConfirm",
     "project.noProjects", "project.noProjectsDesc", "project.emptyDescription",
     "project.descriptionPlaceholder", "project.orStartFromTemplate",
@@ -409,6 +425,31 @@ describe("exhaustive i18n key parity", () => {
     "project.noSearchResultsDesc", "project.emptyTitle", "project.emptyHint",
     "project.emptyCta", "project.noSearchResultsCta", "project.useTemplate",
     "project.openAriaLabel", "project.copyAriaLabel", "project.deleteAriaLabel",
+    "project.viewCount",
+    // BOM aggregate
+    "bomAggregate.eyebrow", "bomAggregate.title", "bomAggregate.subtitle",
+    "bomAggregate.selectProject", "bomAggregate.selectShort",
+    "bomAggregate.selectedCount", "bomAggregate.combine", "bomAggregate.clear",
+    "bomAggregate.selectHint", "bomAggregate.error", "bomAggregate.projects",
+    "bomAggregate.mergedRows", "bomAggregate.totalCost", "bomAggregate.bulkCandidates",
+    "bomAggregate.tableHint", "bomAggregate.empty", "bomAggregate.exportCsv",
+    "bomAggregate.exported", "bomAggregate.material", "bomAggregate.quantity",
+    "bomAggregate.cost", "bomAggregate.bulk", "bomAggregate.projectBreakdown",
+    "bomAggregate.bulkCandidate", "bomAggregate.compareTitle",
+    "bomAggregate.compareSubtitle", "bomAggregate.compareLimit",
+    "bomAggregate.costPerM2", "bomAggregate.costPerM2Missing",
+    "bomAggregate.sharedMaterials", "bomAggregate.noSharedMaterials",
+    "bomAggregate.uncategorized", "bomAggregate.noBulk",
+    // photo estimate
+    "photoEstimate.eyebrow", "photoEstimate.title", "photoEstimate.subtitle",
+    "photoEstimate.creditCost", "photoEstimate.creditTooltip",
+    "photoEstimate.dropHint", "photoEstimate.fileInput", "photoEstimate.selected",
+    "photoEstimate.analyze", "photoEstimate.analyzing", "photoEstimate.error",
+    "photoEstimate.insufficientCredits", "photoEstimate.rangeLabel",
+    "photoEstimate.context", "photoEstimate.confidence", "photoEstimate.subsidyFlag",
+    "photoEstimate.addToBom", "photoEstimate.imported", "photoEstimate.importedShort",
+    "photoEstimate.scope.roof", "photoEstimate.scope.facade", "photoEstimate.scope.windows",
+    "photoEstimate.scope.insulation", "photoEstimate.scope.heating", "photoEstimate.scope.terrace",
     // toast
     "toast.projectCreated", "toast.projectDeleted", "toast.projectDuplicated",
     "toast.templateCreated", "toast.saved", "toast.bomExported", "toast.exportingBom",
@@ -420,6 +461,12 @@ describe("exhaustive i18n key parity", () => {
     "toast.loadPricingFailed", "toast.materialRemoved", "toast.undo",
     "toast.overflowMore", "toast.dismiss",
     "toast.copyFailed",
+    // credits
+    "credits.shortLabel", "credits.balanceAria", "credits.eyebrow",
+    "credits.title", "credits.subtitle", "credits.currentBalance",
+    "credits.credits", "credits.unitPrice", "credits.savings",
+    "credits.lowBadge", "credits.lowToast", "credits.neverExpire",
+    "credits.insufficient", "credits.checkoutFailed", "credits.purchaseSimulated",
     // editor
     "editor.scene", "editor.materialList", "editor.save", "editor.saved",
     "editor.saving", "editor.unsaved", "editor.export", "editor.exportPdf",
@@ -431,17 +478,29 @@ describe("exhaustive i18n key parity", () => {
     "editor.applyToScene", "editor.thinking",
     "editor.message", "editor.messages",
     "editor.objectSingular", "editor.objectPlural",
+    "editor.bomItemSingular", "editor.bomItemPlural",
+    "editor.bomTotalAnnouncement",
+    "editor.sceneChangeAnnouncement", "editor.sceneAppliedFromChat",
+    "editor.sceneUpdatedFromEditor", "editor.sceneParameterChanged",
+    "editor.sceneDraftRestored", "editor.sceneResetAnnounced",
+    "editor.sceneMaterialChanged", "editor.sceneUndoAnnounced",
+    "editor.sceneRedoAnnounced", "editor.sceneVersionRestored",
+    "editor.sceneSnippetInserted",
     "editor.chatMinimize", "editor.chatExpand", "editor.chatInputLabel", "editor.chatSendLabel",
     "editor.addMaterial", "editor.add",
     "editor.noMaterials", "editor.noMaterialsHint", "editor.noMaterialsCta",
     "editor.error", "editor.errorLoadProject", "editor.backToProjects",
     "editor.loadingProject", "editor.chatError",
+    "editor.viewportA11yLabel", "editor.viewportA11yDescription", "editor.viewportA11yKeyboardHelp",
     "editor.viewportCrashTitle", "editor.viewportCrashMessage", "editor.resetScene",
     "editor.loading3D", "editor.showCode", "editor.hideCode", "editor.wireframe",
     "editor.params", "editor.resetCamera",
     "editor.cameraFront", "editor.cameraSide", "editor.cameraTop", "editor.cameraIso",
     "editor.screenshot", "editor.screenshotAriaLabel",
     "editor.ruler", "editor.rulerTooltip",
+    "editor.measurePickFirst", "editor.measurePickSecond",
+    "editor.measureClear", "editor.measureClearShort", "editor.measureUnit",
+    "editor.dimensions", "editor.gridScale",
     "editor.measureWidth", "editor.measureHeight", "editor.measureDepth",
     "editor.measureRadius", "editor.measureDiameter",
     "editor.sceneErrorPrefix", "editor.objectCount", "editor.bomRowCount",
@@ -451,12 +510,23 @@ describe("exhaustive i18n key parity", () => {
     "editor.docs", "editor.share", "editor.duplicateProject", "editor.parameters",
     "editor.unsavedWarning", "editor.quantityFor",
     "editor.removeMaterial", "editor.confirmRemoveItem", "editor.bomItemRow",
-    "editor.sceneMaterialsDetected", "editor.syncFromScene",
+    "editor.sceneMaterialsDetected", "editor.syncFromScene", "editor.materialConfiguratorHint",
     // share
     "share.title", "share.description", "share.generating", "share.copyLink",
-    "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
+    "share.linkLabel", "share.copied", "share.unshare", "share.unshareConfirm", "share.poweredBy",
     "share.viewerTitle", "share.notFound", "share.notFoundDesc", "share.readOnly",
-    "share.signUpCta", "share.materials", "share.total",
+    "share.signUpCta", "share.materials", "share.total", "share.viewCount",
+    "share.beforeAfterTitle", "share.beforeAfterGenerate", "share.beforeAfterCopy",
+    "share.beforeAfterDownload", "share.beforeLabel", "share.afterLabel",
+    // presentation
+    "presentation.eyebrow", "presentation.title", "presentation.description",
+    "presentation.estimate", "presentation.cameraPresets", "presentation.front",
+    "presentation.frontDesc", "presentation.side", "presentation.sideDesc",
+    "presentation.aerial", "presentation.aerialDesc", "presentation.iso",
+    "presentation.isoDesc", "presentation.copyPresentation", "presentation.copied",
+    "presentation.downloadWatermarked", "presentation.rendering", "presentation.assetViewer",
+    "presentation.assetBom", "presentation.viewerBadge", "presentation.pitchMode",
+    "presentation.pitchModeDesc",
     // shortcuts
     "shortcuts.title", "shortcuts.close", "shortcuts.save", "shortcuts.toggleBom", "shortcuts.applyCode",
     "shortcuts.closePanel", "shortcuts.showShortcuts", "shortcuts.undo", "shortcuts.redo",
@@ -472,6 +542,8 @@ describe("exhaustive i18n key parity", () => {
     "settings.passwordChanged", "settings.passwordChangeFailed",
     "settings.accountDeleted", "settings.accountDeleteFailed",
     "settings.dataExported", "settings.dataExportFailed", "settings.backToProjects",
+    "settings.notifications", "settings.notificationsDesc", "settings.weeklyDigest",
+    "settings.notificationsSaved", "settings.notificationsSaveFailed",
     // pricing
     "pricing.compareTitle", "pricing.supplier", "pricing.unitPrice", "pricing.buyLink",
     "pricing.cheapest", "pricing.primary", "pricing.noSuppliers", "pricing.loading",
@@ -480,22 +552,47 @@ describe("exhaustive i18n key parity", () => {
     "pricing.allCategories", "pricing.noResults", "pricing.browseMaterials",
     "pricing.setQuantity", "pricing.showHistory", "pricing.hideHistory",
     "pricing.showTrend", "pricing.limitedHistory",
+    // material picker
+    "materialPicker.eyebrow", "materialPicker.title", "materialPicker.subtitle",
+    "materialPicker.current", "materialPicker.openFor", "materialPicker.search",
+    "materialPicker.searchPlaceholder", "materialPicker.sort", "materialPicker.sortPriceAsc",
+    "materialPicker.sortPriceDesc", "materialPicker.sortThermal", "materialPicker.sortAvailability",
+    "materialPicker.maxPrice", "materialPicker.maxConductivity", "materialPicker.any",
+    "materialPicker.category", "materialPicker.allMaterials", "materialPicker.reset",
+    "materialPicker.noResults", "materialPicker.unknownSupplier", "materialPicker.quantityNeeded",
+    "materialPicker.thermal", "materialPicker.fireRating", "materialPicker.supplier",
+    "materialPicker.deltaEach", "materialPicker.deltaTotal", "materialPicker.compare",
+    "materialPicker.comparing", "materialPicker.compareLimit", "materialPicker.compareHint",
+    "materialPicker.comparisonTitle", "materialPicker.feature", "materialPicker.bestValue",
+    "materialPicker.totalCost", "materialPicker.viewAtRetailer", "materialPicker.noRetailerLink",
+    "materialPicker.affiliateDisclosure", "materialPicker.surfaceApplied", "materialPicker.surfaceNoMatch",
+    "materialPicker.select", "materialPicker.currentSelected", "materialPicker.alreadyInBom",
     // units
     "units.jm", "units.sqm", "units.m2", "units.m3", "units.kpl",
     "units.sheet", "units.box", "units.liter", "units.sakki",
     "units.jmLong", "units.sqmLong", "units.m2Long", "units.m3Long",
     "units.kplLong", "units.sheetLong", "units.boxLong", "units.literLong", "units.sakkiLong",
     // dialog
-    "dialog.confirm", "dialog.cancel", "dialog.deleteProjectTitle",
+    "dialog.confirm", "dialog.cancel", "dialog.close", "dialog.deleteProjectTitle",
     "dialog.deleteProjectMessage", "dialog.deleteAccountTitle", "dialog.deleteAccountMessage",
     "dialog.deleteBomItemTitle", "dialog.deleteBomItemMessage",
     // admin
-    "admin.adminPanel", "admin.adminDesc", "admin.materials", "admin.suppliers",
+    "admin.adminPanel", "admin.adminDesc", "admin.dashboard", "admin.materials", "admin.suppliers",
     "admin.pricing", "admin.search", "admin.name", "admin.category",
     "admin.wasteFactor", "admin.price", "admin.supplier", "admin.others",
     "admin.noPrice", "admin.stalePrices", "admin.staleThreshold", "admin.allUpToDate",
     "admin.website", "admin.products", "admin.oldestPrice", "admin.material",
-    "admin.lastUpdated", "admin.age", "admin.checkingAccess",
+    "admin.lastUpdated", "admin.age", "admin.action", "admin.never",
+    "admin.markRescrape", "admin.rescrapeQueued", "admin.rescrapeFailed",
+    "admin.queueing", "admin.apiUptime", "admin.healthChecked",
+    "admin.activeUsers", "admin.activeUsersWindow", "admin.totalProjects",
+    "admin.totalUsers", "admin.totalBomValue", "admin.newUsers30d",
+    "admin.priceFreshness", "admin.primaryPricesTracked", "admin.staleAlert",
+    "admin.staleHealthy", "admin.fresh", "admin.aging", "admin.stale",
+    "admin.staleShare", "admin.mostStalePrices", "admin.recentProjects",
+    "admin.projectSourceAddress", "admin.projectSourceTemplate", "admin.projectSourceBlank",
+    "admin.recentRegistrations", "admin.noRecentActivity", "admin.userRegistered",
+    "admin.checkingAccess",
     // onboarding
     "onboarding.welcomeTitle", "onboarding.welcomeBody", "onboarding.welcomeStart",
     "onboarding.welcomeSkip", "onboarding.stepAddress", "onboarding.stepViewport",
@@ -517,11 +614,16 @@ describe("exhaustive i18n key parity", () => {
     "legal.termsChangesBody",
     // screenshot
     "screenshot.dialogTitle", "screenshot.popoverLabel", "screenshot.download", "screenshot.copy", "screenshot.copied",
+    // layers
+    "layers.eyebrow", "layers.title", "layers.empty", "layers.layerCount",
+    "layers.showLayer", "layers.hideLayer", "layers.lockLayer", "layers.unlockLayer",
+    "layers.openMaterial", "layers.costApprox", "layers.noCost", "layers.viewportHint",
     // commandPalette
     "commandPalette.title", "commandPalette.placeholder", "commandPalette.noResults",
     "commandPalette.navigate", "commandPalette.execute", "commandPalette.close",
     "commandPalette.toggleWireframe", "commandPalette.toggleWireframeEn",
     "commandPalette.resetCamera", "commandPalette.resetCameraEn",
+    "commandPalette.toggleRuler", "commandPalette.toggleRulerEn",
     "commandPalette.toggleCodeEditor", "commandPalette.toggleCodeEditorEn",
     "commandPalette.toggleBom", "commandPalette.toggleBomEn",
     "commandPalette.exportPdf", "commandPalette.exportPdfEn",
@@ -555,22 +657,92 @@ describe("exhaustive i18n key parity", () => {
     "landing.feature3Title", "landing.feature3Desc",
     // building
     "building.omakotitalo", "building.rivitalo", "building.kerrostalo", "building.paritalo",
+    "building.roofGable", "building.roofFlat", "building.roofMansard", "building.roofShed",
     // bom
-    "bom.donutChartAriaLabel", "bom.exportCsv",
+    "bom.donutChartAriaLabel", "bom.exportCsv", "bom.importBom",
+    "bom.importNoRows", "bom.importFailed", "bom.importDrop",
+    "bom.importPreview", "bom.importMatched", "bom.importMerge",
+    "bom.importReplace", "bom.importUnmatched", "bom.importedRow",
+    "bom.quantity", "bom.matchedMaterial", "bom.confidence", "bom.row",
+    "bom.chooseMaterial", "bom.unmatched", "bom.importApply", "bom.importSuccess",
     "bom.csvMaterial", "bom.csvQuantity", "bom.csvUnit",
     "bom.csvUnitPrice", "bom.csvTotal", "bom.csvSupplier", "bom.csvCategory",
     "bom.inStock", "bom.lowStock", "bom.outOfStock", "bom.stockUnknown",
     "bom.stockSummary", "bom.outOfStockCount", "bom.stockWarning",
-    "bom.alternativeAvailable", "bom.lastChecked",
+    "bom.alternativeAvailable", "bom.substituteAvailable", "bom.swapMaterial",
+    "bom.dismiss", "bom.savingsWithSwap", "bom.priceIncreased", "bom.lastChecked",
+    "bom.packageSwitcher", "bom.packageSwitcherDesc", "bom.packageNoAlternatives",
+    "bom.packageBasic", "bom.packageStandard", "bom.packagePremium",
+    "bom.packageCurrent", "bom.packageChanges", "bom.packageLocked",
+    "bom.packageLock", "bom.packageUnlock",
+    // BOM trends
+    "bomTrends.eyebrow", "bomTrends.title", "bomTrends.loading",
+    "bomTrends.noAverage", "bomTrends.aboveAverage", "bomTrends.belowAverage",
+    "bomTrends.nearAverage", "bomTrends.waitSavings", "bomTrends.bestMonth",
+    "bomTrends.nowVs12m", "bomTrends.buyNowCount", "bomTrends.waitCount",
+    "bomTrends.watchCount", "bomTrends.modelNote",
+    "bomTrends.source.retailer_history", "bomTrends.source.seasonal_model",
+    "bomTrends.recommendation.buy_now", "bomTrends.recommendation.wait",
+    "bomTrends.recommendation.watch",
+    // Versions
+    "versions.eyebrow", "versions.title", "versions.subtitle",
+    "versions.branches", "versions.branchPlaceholder", "versions.createBranch",
+    "versions.defaultBranchName", "versions.checkpointPlaceholder",
+    "versions.saveCheckpoint", "versions.saving", "versions.loading",
+    "versions.empty", "versions.compareTitle", "versions.costDelta",
+    "versions.compare", "versions.uncompare", "versions.restore",
+    "versions.restoring", "versions.restoreConfirm", "versions.restoreSuccess",
+    "versions.fieldName", "versions.fieldDescription", "versions.fieldScene",
+    "versions.initialSnapshot", "versions.bomChanges", "versions.noMaterialChanges",
+    "versions.event.auto", "versions.event.named", "versions.event.restore",
+    "versions.event.branch",
+    // quote request
+    "quoteRequest.eyebrow", "quoteRequest.title", "quoteRequest.subtitle",
+    "quoteRequest.open", "quoteRequest.emptyDisabled", "quoteRequest.summaryProject",
+    "quoteRequest.summaryAddress", "quoteRequest.summaryNoAddress", "quoteRequest.summaryRows",
+    "quoteRequest.summaryTotal", "quoteRequest.workScope", "quoteRequest.workScopePlaceholder",
+    "quoteRequest.contactName", "quoteRequest.contactEmail", "quoteRequest.contactPhone",
+    "quoteRequest.postcode", "quoteRequest.partnerNote", "quoteRequest.submit",
+    "quoteRequest.submittedToast", "quoteRequest.submitFailed", "quoteRequest.successTitle",
+    "quoteRequest.successDesc", "quoteRequest.done",
+    // household deduction
+    "householdDeduction.eyebrow", "householdDeduction.title", "householdDeduction.coupleMode",
+    "householdDeduction.labourBasis", "householdDeduction.credit", "householdDeduction.netCost",
+    "householdDeduction.capNote", "householdDeduction.thresholdNote",
+    "householdDeduction.registerWarning", "householdDeduction.veroLink", "householdDeduction.proCta",
+    // renovation ROI
+    "renovationRoi.eyebrow", "renovationRoi.title", "renovationRoi.grossCost",
+    "renovationRoi.netCost", "renovationRoi.materialCost", "renovationRoi.labourCost",
+    "renovationRoi.bestSubsidy", "renovationRoi.valueImpact",
+    "renovationRoi.energyPayback", "renovationRoi.tenYearRoi", "renovationRoi.assumptionNote",
+    "renovationRoi.category.energy", "renovationRoi.category.roof", "renovationRoi.category.kitchen",
+    "renovationRoi.category.bathroom", "renovationRoi.category.facade", "renovationRoi.category.windows",
+    "renovationRoi.category.outdoor", "renovationRoi.category.general",
+    // renovation cost index
+    "renovationCostIndex.eyebrow", "renovationCostIndex.title", "renovationCostIndex.loading",
+    "renovationCostIndex.loadFailed", "renovationCostIndex.summary",
+    "renovationCostIndex.updated", "renovationCostIndex.fallback",
+    // BOM savings
+    "bomSavings.eyebrow", "bomSavings.title", "bomSavings.totalAvailable",
+    "bomSavings.noSavings", "bomSavings.supplier_switch", "bomSavings.material_substitution",
+    "bomSavings.bulk_discount", "bomSavings.seasonal_stock", "bomSavings.supplier_switchEmpty",
+    "bomSavings.material_substitutionEmpty", "bomSavings.bulk_discountEmpty", "bomSavings.seasonal_stockEmpty",
+    "bomSavings.supplierSwitchText", "bomSavings.substitutionText", "bomSavings.bulkText",
+    "bomSavings.stockText", "bomSavings.stockOnly", "bomSavings.applySupplier",
+    "bomSavings.applySwap", "bomSavings.applyBulk", "bomSavings.seeAlternatives",
+    "bomSavings.compare", "bomSavings.priceApplied", "bomSavings.swapApplied",
     // subsidy
-    "subsidy.sectionLabel", "subsidy.eligibleTitle", "subsidy.maybeTitle",
-    "subsidy.checkTitle", "subsidy.deadlineCountdown", "subsidy.deadlineTooltip",
+    "subsidy.sectionLabel", "subsidy.opportunityLabel", "subsidy.sceneTriggeredTitle",
+    "subsidy.sceneTriggeredBody", "subsidy.eligibleTitle", "subsidy.maybeTitle",
+    "subsidy.checkTitle", "subsidy.deadlineCountdown", "subsidy.applicationDeadlineCountdown",
+    "subsidy.deadlineTooltip",
     "subsidy.currentHeating", "subsidy.targetHeating", "subsidy.household",
     "subsidy.householdUnder65", "subsidy.household65Plus", "subsidy.householdDisabled",
     "subsidy.systemCondition", "subsidy.conditionUnknown", "subsidy.conditionOk",
     "subsidy.conditionBroken", "subsidy.conditionHard", "subsidy.yearRoundResidential",
     "subsidy.netCost", "subsidy.elyDeduction", "subsidy.notEligible",
-    "subsidy.araMaybe", "subsidy.applyEly", "subsidy.readAra",
+    "subsidy.araMaybe", "subsidy.deadlineDatesWithApplication", "subsidy.deadlineDates",
+    "subsidy.mutualExclusion", "subsidy.applyEly", "subsidy.readAra",
     "subsidy.loading", "subsidy.error", "subsidy.heating.unknown",
     "subsidy.heating.oil", "subsidy.heating.naturalGas",
     "subsidy.heating.directElectric", "subsidy.heating.wood",

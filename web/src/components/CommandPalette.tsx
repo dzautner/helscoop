@@ -35,6 +35,7 @@ const CATEGORY_ORDER: CommandCategory[] = ["scene", "project", "preferences"];
 function inferCategory(id: string): CommandCategory {
   if (
     id === "toggle-wireframe" ||
+    id === "toggle-ruler" ||
     id === "reset-camera" ||
     id === "toggle-code-editor" ||
     id === "show-docs"
@@ -44,6 +45,7 @@ function inferCategory(id: string): CommandCategory {
     id === "share-project" ||
     id === "export-pdf" ||
     id === "export-ara-grant" ||
+    id === "export-ifc-permit" ||
     id === "export-project" ||
     id === "toggle-bom"
   ) return "project";

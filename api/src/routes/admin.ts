@@ -9,6 +9,16 @@ const router = Router();
 // All admin routes require authentication + admin:access permission
 router.use(requireAuth);
 
+function parseIntMetric(value: unknown): number {
+  const parsed = parseInt(String(value ?? "0"), 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseNumberMetric(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 // ---------------------------------------------------------------------------
 // GET /admin/users — list users (paginated, admin only)
 // ---------------------------------------------------------------------------
@@ -162,18 +172,83 @@ router.patch(
 );
 
 // ---------------------------------------------------------------------------
-// GET /admin/stats — dashboard stats (user count, project count, recent signups)
+// GET /admin/stats — dashboard stats and operational health signals
 // ---------------------------------------------------------------------------
 router.get("/stats", requirePermission("admin:access"), async (_req, res) => {
   try {
-    const [userCountResult, projectCountResult, recentSignupsResult, roleDistributionResult] =
+    const [
+      userMetricsResult,
+      projectMetricsResult,
+      bomValueResult,
+      priceFreshnessResult,
+      stalePricesResult,
+      recentProjectsResult,
+      recentSignupsResult,
+      roleDistributionResult,
+    ] =
       await Promise.all([
-        query("SELECT COUNT(*) AS total FROM users"),
-        query("SELECT COUNT(*) AS total FROM projects"),
         query(
-          `SELECT id, email, name, role, created_at
+          `SELECT
+             COUNT(*) AS users_total,
+             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS users_new_30d
+           FROM users`
+        ),
+        query(
+          `SELECT
+             COUNT(*) AS projects_total,
+             COUNT(DISTINCT user_id) FILTER (WHERE updated_at >= NOW() - INTERVAL '24 hours') AS users_active_24h,
+             COUNT(DISTINCT user_id) FILTER (WHERE updated_at >= NOW() - INTERVAL '7 days') AS users_active_7d,
+             COUNT(DISTINCT user_id) FILTER (WHERE updated_at >= NOW() - INTERVAL '30 days') AS users_active_30d
+           FROM projects`
+        ),
+        query(
+          `SELECT COALESCE(SUM(pb.quantity * COALESCE(p.unit_price, 0) * COALESCE(m.waste_factor, 1)), 0) AS bom_total_value
+           FROM project_bom pb
+           JOIN materials m ON pb.material_id = m.id
+           LEFT JOIN pricing p ON p.material_id = pb.material_id AND p.is_primary = true`
+        ),
+        query(
+          `SELECT
+             COUNT(*) AS total,
+             COUNT(*) FILTER (WHERE last_scraped_at >= NOW() - INTERVAL '7 days') AS fresh,
+             COUNT(*) FILTER (
+               WHERE last_scraped_at < NOW() - INTERVAL '7 days'
+                 AND last_scraped_at >= NOW() - INTERVAL '30 days'
+             ) AS aging,
+             COUNT(*) FILTER (WHERE last_scraped_at < NOW() - INTERVAL '30 days') AS stale,
+             COUNT(*) FILTER (WHERE last_scraped_at IS NULL) AS never
+           FROM pricing
+           WHERE is_primary = true`
+        ),
+        query(
+          `SELECT m.id AS material_id, m.name AS material_name, p.supplier_id, s.name AS supplier_name,
+             p.unit_price, p.last_scraped_at,
+             CASE
+               WHEN p.last_scraped_at IS NULL THEN NULL
+               ELSE FLOOR(EXTRACT(EPOCH FROM (now() - p.last_scraped_at))/86400)::int
+             END AS days_stale
+           FROM pricing p
+           JOIN materials m ON p.material_id = m.id
+           JOIN suppliers s ON p.supplier_id = s.id
+           WHERE p.is_primary = true
+             AND (p.last_scraped_at IS NULL OR p.last_scraped_at < now() - interval '30 days')
+           ORDER BY p.last_scraped_at ASC NULLS FIRST
+           LIMIT 10`
+        ),
+        query(
+          `SELECT id, name, created_at, updated_at,
+             CASE
+               WHEN building_info->>'address' IS NOT NULL AND building_info->>'address' <> '' THEN 'address'
+               WHEN scene_js IS NULL OR btrim(scene_js) = '' THEN 'blank'
+               ELSE 'template'
+             END AS source
+           FROM projects
+           ORDER BY created_at DESC
+           LIMIT 10`
+        ),
+        query(
+          `SELECT id, role, created_at
            FROM users
-           WHERE created_at >= NOW() - INTERVAL '30 days'
            ORDER BY created_at DESC
            LIMIT 10`
         ),
@@ -181,13 +256,56 @@ router.get("/stats", requirePermission("admin:access"), async (_req, res) => {
           `SELECT role, COUNT(*) AS count
            FROM users
            GROUP BY role
-           ORDER BY count DESC`
+          ORDER BY count DESC`
         ),
       ]);
 
+    const userMetrics = userMetricsResult.rows[0] ?? {};
+    const projectMetrics = projectMetricsResult.rows[0] ?? {};
+    const priceFreshnessRow = priceFreshnessResult.rows[0] ?? {};
+    const priceFreshness = {
+      total: parseIntMetric(priceFreshnessRow.total),
+      fresh: parseIntMetric(priceFreshnessRow.fresh),
+      aging: parseIntMetric(priceFreshnessRow.aging),
+      stale: parseIntMetric(priceFreshnessRow.stale),
+      never: parseIntMetric(priceFreshnessRow.never),
+    };
+    const staleOrMissing = priceFreshness.stale + priceFreshness.never;
+    const stalePercent = priceFreshness.total > 0
+      ? Math.round((staleOrMissing / priceFreshness.total) * 100)
+      : 0;
+    const usersTotal = parseIntMetric(userMetrics.users_total);
+    const projectsTotal = parseIntMetric(projectMetrics.projects_total);
+
     res.json({
-      user_count: parseInt(userCountResult.rows[0].total),
-      project_count: parseInt(projectCountResult.rows[0].total),
+      api_health: {
+        status: "ok",
+        uptime_seconds: Math.round(process.uptime()),
+        checked_at: new Date().toISOString(),
+      },
+      users_total: usersTotal,
+      user_count: usersTotal,
+      users_new_30d: parseIntMetric(userMetrics.users_new_30d),
+      users_active_24h: parseIntMetric(projectMetrics.users_active_24h),
+      users_active_7d: parseIntMetric(projectMetrics.users_active_7d),
+      users_active_30d: parseIntMetric(projectMetrics.users_active_30d),
+      projects_total: projectsTotal,
+      project_count: projectsTotal,
+      bom_total_value: parseNumberMetric(bomValueResult.rows[0]?.bom_total_value),
+      price_freshness: {
+        ...priceFreshness,
+        stale_percent: stalePercent,
+        alert: priceFreshness.total > 0 && stalePercent > 20,
+      },
+      stale_prices: stalePricesResult.rows.map((row) => ({
+        ...row,
+        unit_price: parseNumberMetric(row.unit_price),
+        days_stale: row.days_stale === null ? null : parseIntMetric(row.days_stale),
+      })),
+      recent_projects: recentProjectsResult.rows.map((project) => ({
+        ...project,
+        source: ["address", "template", "blank"].includes(project.source) ? project.source : "blank",
+      })),
       recent_signups: recentSignupsResult.rows.map((u) => ({
         ...u,
         role: normalizeRole(u.role),
@@ -201,5 +319,39 @@ router.get("/stats", requirePermission("admin:access"), async (_req, res) => {
     res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
+
+// ---------------------------------------------------------------------------
+// POST /admin/suppliers/:id/rescrape — flag a supplier for the scraping queue
+// ---------------------------------------------------------------------------
+router.post(
+  "/suppliers/:id/rescrape",
+  requirePermission("admin:access", "pricing:update"),
+  async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const result = await query(
+        `UPDATE suppliers
+         SET rescrape_requested_at = now(), updated_at = now()
+         WHERE id = $1
+         RETURNING id, name, rescrape_requested_at`,
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Supplier not found" });
+      }
+
+      logAuditEvent(req.user!.id, "admin.supplier.rescrape_requested", {
+        supplierId: id,
+        ip: req.ip,
+      });
+
+      res.json({ ok: true, supplier: result.rows[0] });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to request supplier re-scrape" });
+    }
+  }
+);
 
 export default router;

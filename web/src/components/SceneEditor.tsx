@@ -2,6 +2,11 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import SceneAutocomplete, {
+  type AutocompleteItem,
+  getAutocompleteContext,
+  filterCompletions,
+} from "@/components/SceneAutocomplete";
 
 /* ── Find / Replace helpers ──────────────────────────────────────── */
 interface FindMatch {
@@ -103,12 +108,31 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
+const EDITOR_FONT_SIZE = 13;
+const EDITOR_LINE_HEIGHT = Math.round(EDITOR_FONT_SIZE * 1.7 * 10) / 10;
+const EDITOR_PADDING_TOP = 20;
+
+interface RemoteCursorPeer {
+  clientId: string;
+  name: string;
+  color: string;
+  cursor: {
+    line: number;
+    column: number;
+    selectionStart?: number;
+    selectionEnd?: number;
+  } | null;
+}
+
 /* ── Component ───────────────────────────────────────────────────── */
 export default function SceneEditor({
   sceneJs,
   onChange,
   error,
   errorLine,
+  materials,
+  remoteCursors = [],
+  onCursorChange,
 }: {
   sceneJs: string;
   onChange: (code: string) => void;
@@ -116,6 +140,9 @@ export default function SceneEditor({
   error?: string | null;
   /** 1-based line number of the error in the script, or null. */
   errorLine?: number | null;
+  materials?: { id: string; name: string }[];
+  remoteCursors?: RemoteCursorPeer[];
+  onCursorChange?: (cursor: { line: number; column: number; selectionStart?: number; selectionEnd?: number }) => void;
 }) {
   const { t } = useTranslation();
 
@@ -133,6 +160,59 @@ export default function SceneEditor({
   const [findQuery, setFindQuery] = useState("");
   const [replaceValue, setReplaceValue] = useState("");
   const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  /* ── Autocomplete state ──────────────────────────────────────── */
+  const [acItems, setAcItems] = useState<AutocompleteItem[]>([]);
+  const [acIndex, setAcIndex] = useState(0);
+  const [acPosition, setAcPosition] = useState({ top: 0, left: 0 });
+  const acVisible = acItems.length > 0;
+
+  const dismissAutocomplete = useCallback(() => {
+    setAcItems([]);
+    setAcIndex(0);
+  }, []);
+
+  const updateAutocomplete = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta || !document.activeElement || document.activeElement !== ta) {
+      dismissAutocomplete();
+      return;
+    }
+    const cursor = ta.selectionStart;
+    const ctx = getAutocompleteContext(ta.value, cursor);
+    const items = filterCompletions(ctx, materials);
+    if (items.length === 0) {
+      dismissAutocomplete();
+      return;
+    }
+    const before = ta.value.slice(0, cursor);
+    const linesBefore = before.split("\n");
+    const line = linesBefore.length - 1;
+    const col = linesBefore[linesBefore.length - 1].length;
+    const charWidth = 7.8;
+    setAcPosition({
+      top: (line + 1) * EDITOR_LINE_HEIGHT + EDITOR_PADDING_TOP - ta.scrollTop,
+      left: col * charWidth + 20,
+    });
+    setAcItems(items);
+    setAcIndex((prev) => Math.min(prev, items.length - 1));
+  }, [materials, dismissAutocomplete]);
+
+  const acceptCompletion = useCallback((item: AutocompleteItem) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart;
+    const ctx = getAutocompleteContext(ta.value, cursor);
+    const newValue = ta.value.slice(0, ctx.startPos) + item.insertText + ta.value.slice(cursor);
+    onChange(newValue);
+    const newCursor = ctx.startPos + item.insertText.length;
+    dismissAutocomplete();
+    setTimeout(() => {
+      ta.selectionStart = ta.selectionEnd = newCursor;
+      ta.focus();
+    }, 0);
+  }, [onChange, dismissAutocomplete]);
 
   const findMatches = useMemo(() => findAllMatches(sceneJs, findQuery), [sceneJs, findQuery]);
 
@@ -199,6 +279,7 @@ export default function SceneEditor({
     if (gutterRef.current) {
       gutterRef.current.scrollTop = ta.scrollTop;
     }
+    setScrollTop(ta.scrollTop);
   }, []);
 
   // Scroll textarea so the current match is visible
@@ -210,7 +291,7 @@ export default function SceneEditor({
     if (!ta) return;
     // Compute line number of the match
     const linesBefore = sceneJs.slice(0, match.start).split("\n").length - 1;
-    const targetScrollTop = linesBefore * 22.1 - ta.clientHeight / 2 + 22.1;
+    const targetScrollTop = linesBefore * EDITOR_LINE_HEIGHT - ta.clientHeight / 2 + EDITOR_LINE_HEIGHT;
     ta.scrollTop = Math.max(0, targetScrollTop);
     syncScroll();
   }, [currentMatchIdx, findMatches, sceneJs, syncScroll]);
@@ -220,9 +301,18 @@ export default function SceneEditor({
     const ta = textareaRef.current;
     if (!ta) return;
     const pos = ta.selectionStart;
-    const lineNum = ta.value.substring(0, pos).split("\n").length - 1;
+    const beforeCursor = ta.value.substring(0, pos);
+    const cursorParts = beforeCursor.split("\n");
+    const lineNum = cursorParts.length - 1;
+    const column = cursorParts[cursorParts.length - 1]?.length ?? 0;
     setCursorLine(lineNum);
-  }, []);
+    onCursorChange?.({
+      line: lineNum + 1,
+      column,
+      selectionStart: ta.selectionStart,
+      selectionEnd: ta.selectionEnd,
+    });
+  }, [onCursorChange]);
 
   /* ── Highlighted HTML ─────────────────────────────────────────── */
   const lines = sceneJs.split("\n");
@@ -230,6 +320,7 @@ export default function SceneEditor({
 
   /* ── Find-match highlight overlay HTML ───────────────────────── */
   const findHighlightRef = useRef<HTMLPreElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const findHighlightHtml = useMemo(() => {
     if (findMatches.length === 0) return "";
     // Build the text with invisible characters except where matches are highlighted
@@ -262,8 +353,8 @@ export default function SceneEditor({
   /* ── Shared text style (keep textarea + overlay pixel-identical) */
   const sharedStyle: React.CSSProperties = {
     fontFamily: "var(--font-mono)",
-    fontSize: 13,
-    lineHeight: "22.1px",  // 13 * 1.7
+    fontSize: EDITOR_FONT_SIZE,
+    lineHeight: `${EDITOR_LINE_HEIGHT}px`,
     padding: "20px 20px 20px 0",
     margin: 0,
     border: "none",
@@ -279,17 +370,10 @@ export default function SceneEditor({
     textareaRef.current?.focus();
   }, []);
 
-  /* ── Listen for cursor changes via interval while focused ───── */
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
   const startCursorTracking = useCallback(() => {
     setIsFocused(true);
+    updateCursorLine();
+    if (textareaRef.current) textareaRef.current.dataset.tabTrapped = "true";
     if (intervalRef.current) return;
     intervalRef.current = setInterval(updateCursorLine, 50);
   }, [updateCursorLine]);
@@ -313,7 +397,7 @@ export default function SceneEditor({
     const ta = textareaRef.current;
     if (!ta) return;
     // Scroll so the error line is roughly centred in the visible area
-    const lineHeight = 22.1;
+    const lineHeight = EDITOR_LINE_HEIGHT;
     const paddingTop = 20;
     const targetScrollTop = paddingTop + errorLineIdx * lineHeight - ta.clientHeight / 2 + lineHeight;
     ta.scrollTop = Math.max(0, targetScrollTop);
@@ -347,13 +431,18 @@ export default function SceneEditor({
     >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: error ? "var(--danger)" : "var(--success)",
-          transition: "background 0.15s ease",
-        }} />
+        <div
+          role="status"
+          aria-label={error ? t("editor.sceneError") : t("editor.sceneValid")}
+          title={error ? t("editor.sceneError") : t("editor.sceneValid")}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: error ? "var(--danger)" : "var(--success)",
+            transition: "background 0.15s ease",
+          }}
+        />
         <span style={{
           fontSize: 12,
           fontWeight: 500,
@@ -442,8 +531,8 @@ export default function SceneEditor({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 26,
-                height: 26,
+                width: 32,
+                height: 32,
                 padding: 0,
                 background: "transparent",
                 border: "1px solid var(--border)",
@@ -464,8 +553,8 @@ export default function SceneEditor({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 26,
-                height: 26,
+                width: 32,
+                height: 32,
                 padding: 0,
                 background: "transparent",
                 border: "1px solid var(--border)",
@@ -485,8 +574,8 @@ export default function SceneEditor({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 26,
-                height: 26,
+                width: 32,
+                height: 32,
                 padding: 0,
                 background: "transparent",
                 border: "1px solid var(--border)",
@@ -526,7 +615,8 @@ export default function SceneEditor({
               title={t("editor.replaceOne")}
               aria-label={t("editor.replaceOne")}
               style={{
-                padding: "4px 10px",
+                padding: "6px 10px",
+                minHeight: 32,
                 background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
@@ -546,7 +636,8 @@ export default function SceneEditor({
               title={t("editor.replaceAll")}
               aria-label={t("editor.replaceAll")}
               style={{
-                padding: "4px 10px",
+                padding: "6px 10px",
+                minHeight: 32,
                 background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
@@ -598,7 +689,7 @@ export default function SceneEditor({
             <div
               key={i}
               style={{
-                height: "22.1px",
+                height: `${EDITOR_LINE_HEIGHT}px`,
                 ...(i === errorLineIdx
                   ? { color: "var(--error, #e05555)", fontWeight: 600 }
                   : i === cursorLine
@@ -617,10 +708,10 @@ export default function SceneEditor({
           <div
             style={{
               position: "absolute",
-              top: 20 + cursorLine * 22.1,
+              top: EDITOR_PADDING_TOP + cursorLine * EDITOR_LINE_HEIGHT,
               left: 0,
               right: 0,
-              height: 22.1,
+              height: EDITOR_LINE_HEIGHT,
               background: "rgba(255, 255, 255, 0.03)",
               pointerEvents: "none",
               zIndex: 0,
@@ -632,10 +723,10 @@ export default function SceneEditor({
             <div
               style={{
                 position: "absolute",
-                top: 20 + errorLineIdx * 22.1,
+                top: EDITOR_PADDING_TOP + errorLineIdx * EDITOR_LINE_HEIGHT,
                 left: 0,
                 right: 0,
-                height: 22.1,
+                height: EDITOR_LINE_HEIGHT,
                 background: "rgba(224, 85, 85, 0.1)",
                 borderBottom: "2px solid rgba(224, 85, 85, 0.5)",
                 pointerEvents: "none",
@@ -667,6 +758,50 @@ export default function SceneEditor({
             />
           )}
 
+          {/* Remote collaborator cursor lines */}
+          {remoteCursors.map((peer) => {
+            if (!peer.cursor) return null;
+            const top = EDITOR_PADDING_TOP + (peer.cursor.line - 1) * EDITOR_LINE_HEIGHT - scrollTop;
+            if (top < -EDITOR_LINE_HEIGHT || top > 800) return null;
+            return (
+              <div
+                key={peer.clientId}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top,
+                  left: 0,
+                  right: 0,
+                  height: EDITOR_LINE_HEIGHT,
+                  borderTop: `1px solid ${peer.color}`,
+                  pointerEvents: "none",
+                  zIndex: 4,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: -9,
+                    padding: "1px 6px",
+                    borderRadius: 999,
+                    background: peer.color,
+                    color: "#101012",
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 700,
+                    maxWidth: 120,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {peer.name}
+                </span>
+              </div>
+            );
+          })}
+
           {/* Syntax-highlighted overlay */}
           <pre
             ref={overlayRef}
@@ -695,12 +830,16 @@ export default function SceneEditor({
             onChange={(e) => {
               onChange(e.target.value);
               updateCursorLine();
+              setTimeout(updateAutocomplete, 0);
             }}
             onScroll={syncScroll}
             onKeyUp={updateCursorLine}
             onMouseUp={updateCursorLine}
             onFocus={startCursorTracking}
-            onBlur={stopCursorTracking}
+            onBlur={() => {
+              stopCursorTracking();
+              dismissAutocomplete();
+            }}
             spellCheck={false}
             aria-label={t("editor.scene")}
             style={{
@@ -724,15 +863,45 @@ export default function SceneEditor({
                 openFindReplace();
                 return;
               }
+              if (acVisible) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setAcIndex((prev) => (prev + 1) % acItems.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setAcIndex((prev) => (prev - 1 + acItems.length) % acItems.length);
+                  return;
+                }
+                if (e.key === "Tab" || e.key === "Enter") {
+                  e.preventDefault();
+                  acceptCompletion(acItems[acIndex]);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  dismissAutocomplete();
+                  return;
+                }
+              }
+              if (e.key === "Escape") {
+                (e.target as HTMLTextAreaElement).dataset.tabTrapped = "false";
+                return;
+              }
               if (e.key === "Tab") {
+                const ta = e.target as HTMLTextAreaElement;
+                if (ta.dataset.tabTrapped === "false") {
+                  ta.dataset.tabTrapped = "true";
+                  return;
+                }
                 e.preventDefault();
-                const target = e.target as HTMLTextAreaElement;
-                const start = target.selectionStart;
-                const end = target.selectionEnd;
-                const val = target.value;
+                const start = ta.selectionStart;
+                const end = ta.selectionEnd;
+                const val = ta.value;
                 onChange(val.substring(0, start) + "  " + val.substring(end));
                 setTimeout(() => {
-                  target.selectionStart = target.selectionEnd = start + 2;
+                  ta.selectionStart = ta.selectionEnd = start + 2;
                   updateCursorLine();
                 }, 0);
               }
@@ -745,7 +914,7 @@ export default function SceneEditor({
               aria-live="polite"
               style={{
                 position: "absolute",
-                top: 20 + (errorLineIdx + 1) * 22.1,
+                top: EDITOR_PADDING_TOP + (errorLineIdx + 1) * EDITOR_LINE_HEIGHT,
                 left: 20,
                 right: 8,
                 zIndex: 4,
@@ -790,6 +959,14 @@ export default function SceneEditor({
               </div>
             </div>
           )}
+
+          {/* Autocomplete popup */}
+          <SceneAutocomplete
+            items={acItems}
+            selectedIndex={acIndex}
+            position={acPosition}
+            onSelect={acceptCompletion}
+          />
         </div>
       </div>
 

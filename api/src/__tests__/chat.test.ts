@@ -32,6 +32,11 @@ vi.mock("../email", () => ({
 }));
 
 import app from "../index";
+import { _resetStores } from "../entitlements";
+
+beforeEach(() => {
+  _resetStores();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -340,6 +345,7 @@ describe("POST /chat — context handling", () => {
         projectInfo: {
           name: "Full Renovation",
         },
+        renovationRoiSummary: "Cost 12000 EUR, net 9000 EUR, estimated value impact 5000 EUR, 10-year ROI +12%.",
       },
     });
     expect(res.status).toBe(200);

@@ -75,6 +75,7 @@ function lastRequestHeaders(): Record<string, string> {
 }
 
 import app from "../index";
+import { _resetStores } from "../entitlements";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,6 +168,7 @@ const SAMPLE_BUILDING_INFO = {
 
 beforeEach(() => {
   fetchSpy.mockReset();
+  _resetStores();
 });
 
 // =====================================================================
@@ -544,6 +546,21 @@ describe("AI acceptance: context injection", () => {
     const reqBody = lastRequestBody();
     expect(reqBody.system).toContain('Project: "Keittiöremontti 2026"');
     expect(reqBody.system).toContain("Täydellinen keittiön uusiminen");
+  });
+
+  it("includes renovation ROI context in the system prompt when provided", async () => {
+    fetchSpy.mockResolvedValueOnce(mockAnthropicResponse("OK"));
+
+    await postChat({
+      messages: [{ role: "user", content: "Kannattaako tämä remontti?" }],
+      currentScene: SAMPLE_SCENE,
+      renovationRoiSummary: "Cost 25000 EUR, best subsidy 3200 EUR, net 21800 EUR, estimated value impact 14000 EUR, 10-year ROI +8%.",
+    });
+
+    const reqBody = lastRequestBody();
+    expect(reqBody.system).toContain("Renovation ROI dashboard:");
+    expect(reqBody.system).toContain("estimated value impact 14000 EUR");
+    expect(reqBody.system).toContain("separate estimate, assumption, and recommendation");
   });
 
   it("sends correct Anthropic API headers", async () => {

@@ -42,6 +42,11 @@ vi.mock("@/components/LocaleProvider", () => ({
         "auth.passwordMedium": "Keskitaso",
         "auth.passwordWeak": "Heikko",
         "auth.passwordStrength": "Salasanan vahvuus",
+        "auth.googleSignIn": "Kirjaudu Googlella",
+        "auth.googleSignInError": "Google-kirjautuminen epaonnistui",
+        "auth.appleSignIn": "Kirjaudu Applella",
+        "auth.appleSignInError": "Apple-kirjautuminen epaonnistui",
+        "auth.orContinueWith": "tai jatka",
         "legal.acceptTerms": "Hyvaksyn kayttohehdot ja tietosuojakaytannon",
         "legal.acceptTermsRequired": "Sinun taytyy hyvaksya kayttoehdot",
         "legal.termsOfService": "kayttohehdot",
@@ -73,10 +78,14 @@ vi.mock("@/hooks/useAnalytics", () => ({
 // Mock api module
 const mockLogin = vi.fn();
 const mockRegister = vi.fn();
+const mockGoogleLogin = vi.fn();
+const mockAppleLogin = vi.fn();
 vi.mock("@/lib/api", () => ({
   api: {
     login: (...args: unknown[]) => mockLogin(...args),
     register: (...args: unknown[]) => mockRegister(...args),
+    googleLogin: (...args: unknown[]) => mockGoogleLogin(...args),
+    appleLogin: (...args: unknown[]) => mockAppleLogin(...args),
   },
   setToken: vi.fn(),
 }));
@@ -114,6 +123,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockLogin.mockReset();
   mockRegister.mockReset();
+  mockGoogleLogin.mockReset();
+  mockAppleLogin.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -149,6 +160,12 @@ describe("LoginForm — login mode", () => {
   it("renders switch-to-register link", () => {
     render(<LoginForm {...defaultProps} />);
     expect(screen.getByText("Ei tilia? Rekisteroidy")).toBeDefined();
+  });
+
+  it("renders Google and Apple OAuth buttons prominently", () => {
+    render(<LoginForm {...defaultProps} />);
+    expect(screen.getByRole("button", { name: /Kirjaudu Googlella/ })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Kirjaudu Applella/ })).toBeDefined();
   });
 
   it("shows pending building address in subtitle", () => {
@@ -358,6 +375,33 @@ describe("LoginForm — form submission", () => {
 
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalledWith("test@test.com", "StrongPass1!", "Test User");
+    });
+  });
+
+  it("uses Apple Sign In popup result to authenticate", async () => {
+    process.env.NEXT_PUBLIC_APPLE_CLIENT_ID = "fi.helscoop.web";
+    mockAppleLogin.mockResolvedValue({ token: "jwt-token", token_expires_at: 9999999999 });
+    Object.defineProperty(window, "AppleID", {
+      configurable: true,
+      value: {
+        auth: {
+          init: vi.fn(),
+          signIn: vi.fn().mockResolvedValue({
+            authorization: { id_token: "apple-id-token" },
+            user: { name: { firstName: "Apple", lastName: "User" }, email: "apple@test.com" },
+          }),
+        },
+      },
+    });
+
+    render(<LoginForm {...defaultProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /Kirjaudu Applella/ }));
+
+    await waitFor(() => {
+      expect(mockAppleLogin).toHaveBeenCalledWith(
+        "apple-id-token",
+        { name: { firstName: "Apple", lastName: "User" }, email: "apple@test.com" },
+      );
     });
   });
 });

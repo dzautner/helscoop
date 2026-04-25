@@ -2,6 +2,7 @@ import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
 import { requirePermission } from "../permissions";
+import { notifyPriceWatchers } from "../price-alerts";
 import {
   KeskoProduct,
   getCachedKeskoProduct,
@@ -51,6 +52,7 @@ router.post("/products/import", async (req, res) => {
   );
   const category = categoryResult.rows[0] || { id: "hardware", display_name: "Hardware", display_name_fi: "Tarvikkeet" };
   const unitPrice = product.unitPrice ?? 0;
+  const hasCampaignPrice = product.regularUnitPrice !== null && product.regularUnitPrice > unitPrice;
   const inStock = product.stockLevel === "in_stock" || product.stockLevel === "low_stock"
     ? true
     : product.stockLevel === "out_of_stock"
@@ -93,14 +95,33 @@ router.post("/products/import", async (req, res) => {
 
   const pricingResult = await query(
     `INSERT INTO pricing (
-       material_id, supplier_id, unit, unit_price, currency, sku, ean, link,
+       material_id, supplier_id, unit, unit_price, regular_unit_price, campaign_label,
+       campaign_ends_at, campaign_detected_at, currency, sku, ean, link,
        is_primary, in_stock, stock_level, store_location, last_checked_at,
        last_scraped_at, last_verified_at
      )
-     VALUES ($1, 'k-rauta', $2, $3, $4, $5, $6, $7, true, $8, $9, $10, $11, now(), now())
+     VALUES ($1, 'k-rauta', $2, $3, $4, $5, $6, CASE WHEN $5::text IS NULL THEN NULL ELSE now() END,
+       $7, $8, $9, $10, true, $11, $12, $13, $14, now(), now())
      ON CONFLICT (material_id, supplier_id) DO UPDATE SET
        unit = EXCLUDED.unit,
+       previous_unit_price = CASE
+         WHEN pricing.unit_price IS DISTINCT FROM EXCLUDED.unit_price THEN pricing.unit_price
+         ELSE pricing.previous_unit_price
+       END,
        unit_price = EXCLUDED.unit_price,
+       regular_unit_price = EXCLUDED.regular_unit_price,
+       campaign_label = EXCLUDED.campaign_label,
+       campaign_ends_at = EXCLUDED.campaign_ends_at,
+       campaign_detected_at = CASE
+         WHEN EXCLUDED.campaign_label IS NOT NULL
+          AND (
+            pricing.campaign_label IS DISTINCT FROM EXCLUDED.campaign_label
+            OR pricing.regular_unit_price IS DISTINCT FROM EXCLUDED.regular_unit_price
+            OR pricing.campaign_ends_at IS DISTINCT FROM EXCLUDED.campaign_ends_at
+          )
+         THEN now()
+         ELSE pricing.campaign_detected_at
+       END,
        currency = EXCLUDED.currency,
        sku = EXCLUDED.sku,
        ean = EXCLUDED.ean,
@@ -113,12 +134,16 @@ router.post("/products/import", async (req, res) => {
        last_scraped_at = now(),
        last_verified_at = now(),
        updated_at = now()
-     RETURNING id, material_id, supplier_id, unit, unit_price, currency, sku, ean, link,
-       is_primary, in_stock, stock_level, store_location, last_checked_at`,
+     RETURNING id, material_id, supplier_id, unit, unit_price, previous_unit_price,
+       regular_unit_price, campaign_label, campaign_ends_at, campaign_detected_at,
+       currency, sku, ean, link, is_primary, in_stock, stock_level, store_location, last_checked_at`,
     [
       product.materialId,
       product.unit,
       unitPrice,
+      hasCampaignPrice ? product.regularUnitPrice : null,
+      hasCampaignPrice ? product.campaignLabel || "K-Rauta campaign" : null,
+      hasCampaignPrice ? product.campaignEndsAt : null,
       product.currency || "EUR",
       product.sku,
       product.ean,
@@ -135,6 +160,17 @@ router.post("/products/import", async (req, res) => {
      VALUES ($1, $2, 'kesko-api')`,
     [pricingResult.rows[0].id, unitPrice],
   );
+
+  await notifyPriceWatchers({
+    materialId: product.materialId,
+    supplierId: "k-rauta",
+    previousUnitPrice: pricingResult.rows[0].previous_unit_price,
+    unitPrice: pricingResult.rows[0].unit_price,
+    regularUnitPrice: pricingResult.rows[0].regular_unit_price,
+    campaignLabel: pricingResult.rows[0].campaign_label,
+    campaignEndsAt: pricingResult.rows[0].campaign_ends_at,
+    source: "kesko-api",
+  });
 
   const material = materialResult.rows[0];
   const pricing = {
@@ -162,6 +198,14 @@ router.post("/products/import", async (req, res) => {
       quantity: 1,
       unit: pricing.unit,
       unit_price: Number(pricing.unit_price),
+      regular_unit_price: pricing.regular_unit_price == null ? null : Number(pricing.regular_unit_price),
+      regular_total: pricing.regular_unit_price == null ? null : Number(pricing.regular_unit_price),
+      campaign_savings: pricing.regular_unit_price == null
+        ? 0
+        : Math.max(0, Number(pricing.regular_unit_price) - Number(pricing.unit_price)),
+      campaign_label: pricing.campaign_label,
+      campaign_ends_at: pricing.campaign_ends_at,
+      campaign_detected_at: pricing.campaign_detected_at,
       total: Number(pricing.unit_price),
       supplier: "K-Rauta",
       link: pricing.link,
@@ -190,7 +234,11 @@ function resolveImportProduct(body: unknown): KeskoProduct | null {
       ean: typeof product.ean === "string" ? product.ean : null,
       sku: typeof product.sku === "string" ? product.sku : null,
       unitPrice: typeof product.unitPrice === "number" ? product.unitPrice : null,
+      regularUnitPrice: typeof product.regularUnitPrice === "number" ? product.regularUnitPrice : null,
       priceText: typeof product.priceText === "string" ? product.priceText : null,
+      regularPriceText: typeof product.regularPriceText === "string" ? product.regularPriceText : null,
+      campaignLabel: typeof product.campaignLabel === "string" ? product.campaignLabel : null,
+      campaignEndsAt: typeof product.campaignEndsAt === "string" ? product.campaignEndsAt : null,
       currency: typeof product.currency === "string" ? product.currency : "EUR",
       unit: typeof product.unit === "string" ? product.unit : "kpl",
       imageUrl: typeof product.imageUrl === "string" ? product.imageUrl : null,
@@ -215,6 +263,12 @@ function validateImportProduct(product: KeskoProduct): string | null {
   if (product.unit.length < 1 || product.unit.length > 24) return "unit is invalid";
   if (product.unitPrice !== null && (!Number.isFinite(product.unitPrice) || product.unitPrice < 0 || product.unitPrice > 100000)) {
     return "unitPrice is invalid";
+  }
+  if (product.regularUnitPrice !== null && (!Number.isFinite(product.regularUnitPrice) || product.regularUnitPrice < 0 || product.regularUnitPrice > 100000)) {
+    return "regularUnitPrice is invalid";
+  }
+  if (product.campaignEndsAt && Number.isNaN(new Date(product.campaignEndsAt).getTime())) {
+    return "campaignEndsAt is invalid";
   }
   if (product.productUrl && !isAllowedUrl(product.productUrl, ["k-rauta.fi", "krauta.fi", "kesko.fi"])) {
     return "productUrl must point to an allowed Kesko or K-Rauta host";

@@ -27,6 +27,11 @@ function ResetPasswordForm() {
     e.preventDefault();
     setError("");
 
+    if (password.length < 8) {
+      setError(t("auth.passwordTooShort"));
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError(t("auth.resetPasswordMismatch"));
       return;
@@ -113,40 +118,71 @@ function ResetPasswordForm() {
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div>
-          <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+          <label htmlFor="reset-password-new" className="label-mono" style={{ display: "block", marginBottom: 8 }}>
             {t("auth.resetPasswordNew")}
           </label>
           <input
+            id="reset-password-new"
             className="input"
             type="password"
             placeholder={t("auth.resetPasswordNewPlaceholder")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            aria-required="true"
+            aria-describedby={error ? "reset-password-error" : undefined}
             minLength={8}
             autoComplete="new-password"
             autoFocus
           />
+          {password.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                {[0, 1, 2].map((i) => {
+                  const strength = password.length >= 12 && /[A-Z]/.test(password) && /\d/.test(password) ? 3
+                    : password.length >= 8 && (/[A-Z]/.test(password) || /\d/.test(password)) ? 2
+                    : password.length >= 8 ? 1 : 0;
+                  return (
+                    <div key={i} style={{
+                      flex: 1,
+                      height: 3,
+                      borderRadius: 2,
+                      background: i < strength
+                        ? strength === 3 ? "var(--success, #4ade80)" : strength === 2 ? "var(--amber, #c4915c)" : "var(--danger, #ef4444)"
+                        : "var(--border, rgba(255,255,255,0.08))",
+                      transition: "background 0.2s",
+                    }} />
+                  );
+                })}
+              </div>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {password.length < 8 ? t("auth.passwordTooShort") : t("auth.passwordStrength")}
+              </span>
+            </div>
+          )}
         </div>
 
         <div>
-          <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+          <label htmlFor="reset-password-confirm" className="label-mono" style={{ display: "block", marginBottom: 8 }}>
             {t("auth.resetPasswordConfirm")}
           </label>
           <input
+            id="reset-password-confirm"
             className="input"
             type="password"
             placeholder={t("auth.resetPasswordConfirmPlaceholder")}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
+            aria-required="true"
+            aria-describedby={error ? "reset-password-error" : undefined}
             minLength={8}
             autoComplete="new-password"
           />
         </div>
 
         {error && (
-          <div style={{
+          <div id="reset-password-error" role="alert" style={{
             padding: "10px 14px",
             borderRadius: "var(--radius-md)",
             background: "var(--danger-dim)",
@@ -190,7 +226,7 @@ export default function ResetPasswordPage() {
   const { t } = useTranslation();
 
   return (
-    <div style={{
+    <main id="main-content" tabIndex={-1} style={{
       minHeight: "100vh",
       display: "flex",
       alignItems: "center",
@@ -198,7 +234,7 @@ export default function ResetPasswordPage() {
       padding: 24,
       background: "var(--bg-primary)",
     }}>
-      <div style={{
+      <nav aria-label="Utility" style={{
         position: "fixed",
         top: 20,
         right: 20,
@@ -208,7 +244,7 @@ export default function ResetPasswordPage() {
       }}>
         <ThemeToggle />
         <LanguageSwitcher />
-      </div>
+      </nav>
 
       <Suspense fallback={
         <div className="anim-up" style={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
@@ -223,6 +259,6 @@ export default function ResetPasswordPage() {
       }>
         <ResetPasswordForm />
       </Suspense>
-    </div>
+    </main>
   );
 }

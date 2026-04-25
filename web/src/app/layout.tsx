@@ -1,17 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ConnectionBanner from "@/components/ConnectionBanner";
+import NotificationCenter from "@/components/NotificationCenter";
+
+const SITE_TITLE = "Helscoop — Suunnittele remonttisi 3D:ssä";
+const SITE_DESCRIPTION =
+  "Suunnittele talosi remontti 3D-mallinnuksella. Näe muutokset reaaliajassa, saa automaattinen materiaaliluettelo ja hinnat K-Raudasta. Ilmainen työkalu suomalaisille kodinrakentajille.";
 
 export const metadata: Metadata = {
   title: {
-    default: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    default: SITE_TITLE,
     template: "%s | Helscoop",
   },
-  description:
-    "Suunnittele talosi remontti 3D-mallinnuksella. Näe muutokset reaaliajassa, saa automaattinen materiaaliluettelo ja hinnat K-Raudasta. Ilmainen työkalu suomalaisille kodinrakentajille.",
+  description: SITE_DESCRIPTION,
   keywords: [
     "remontti",
     "talosuunnittelu",
@@ -37,7 +41,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   openGraph: {
-    title: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    title: SITE_TITLE,
     description:
       "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa. Ilmainen työkalu suomalaisille kodinrakentajille.",
     type: "website",
@@ -47,10 +51,16 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Helscoop — Suunnittele remonttisi 3D:ssä",
+    title: SITE_TITLE,
     description:
       "3D-mallinna talosi, suunnittele remontti ja saa materiaalihinnat reaaliajassa.",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 const jsonLd = {
@@ -92,8 +102,15 @@ export default function RootLayout({
             __html: `(function(){try{var l=localStorage.getItem("helscoop_locale")||"fi";document.documentElement.lang=l}catch(e){}})()`
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if("serviceWorker"in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js")})}`
+          }}
+        />
         {/* Google Identity Services — for Google Sign-In */}
         <script src="https://accounts.google.com/gsi/client" async defer />
+        {/* Apple JS SDK — for Sign in with Apple */}
+        <script src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js" async defer />
         {/* Plausible Analytics — privacy-first, no cookies, GDPR-compliant */}
         <script
           defer
@@ -102,10 +119,14 @@ export default function RootLayout({
         />
       </head>
       <body className="grain">
+        <a className="skip-link" href="#main-content">
+          Siirry sisältöön / Skip to content
+        </a>
         <ThemeProvider>
           <LocaleProvider>
             <ToastProvider>
               <ConnectionBanner />
+              <NotificationCenter />
               {children}
             </ToastProvider>
           </LocaleProvider>

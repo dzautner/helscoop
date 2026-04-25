@@ -34,7 +34,7 @@ export default function PrivacyPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
-      <div className="nav-bar">
+      <nav className="nav-bar" aria-label="Main">
         <div className="nav-inner" style={{ maxWidth: 720 }}>
           <Link href="/" style={{ textDecoration: "none" }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
@@ -47,9 +47,9 @@ export default function PrivacyPage() {
             <LanguageSwitcher />
           </div>
         </div>
-      </div>
+      </nav>
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
         <div className="anim-up">
           <h1 className="heading-display" style={{ fontSize: 36, marginBottom: 8 }}>
             {t("legal.privacyTitle")}
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
             {t("auth.forgotPasswordBack")}
           </Link>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

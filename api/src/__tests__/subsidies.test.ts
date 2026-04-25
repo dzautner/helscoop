@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
 import http from "http";
 import type { AddressInfo } from "net";
-import { estimateEnergySubsidy } from "../routes/subsidies";
+import { estimateEnergySubsidy, OIL_GAS_HEATING_GRANT_CONFIG } from "../routes/subsidies";
 
 const JWT_SECRET = process.env.JWT_SECRET || "helscoop-dev-secret";
 
@@ -105,7 +105,11 @@ describe("estimateEnergySubsidy", () => {
     expect(result.bestAmount).toBe(4000);
     expect(result.netCost).toBe(8400);
     expect(result.programs[0].status).toBe("eligible");
-    expect(result.daysUntilDeadline).toBeGreaterThan(0);
+    expect(result.applicationDeadline).toBe(OIL_GAS_HEATING_GRANT_CONFIG.applicationDeadline);
+    expect(result.completionDeadline).toBe(OIL_GAS_HEATING_GRANT_CONFIG.completionDeadline);
+    expect(result.daysUntilApplicationDeadline).toBeGreaterThan(0);
+    expect(result.programs[0].applicationUrl).toBe(OIL_GAS_HEATING_GRANT_CONFIG.applicationUrl);
+    expect(result.programs[0].warnings.join(" ")).toContain("cannot be claimed");
   });
 
   it("returns 2500 EUR ELY support for oil to other non-fossil heating", () => {
@@ -119,6 +123,96 @@ describe("estimateEnergySubsidy", () => {
 
     expect(result.bestAmount).toBe(2500);
     expect(result.netCost).toBe(6500);
+  });
+
+  it("uses the application deadline, not completion deadline, for the grant countdown", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 10000,
+      currentHeating: "oil",
+      targetHeating: "air_water_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, new Date("2026-05-26T09:00:00.000Z"));
+
+    expect(result.daysUntilApplicationDeadline).toBeLessThan(0);
+    expect(result.daysUntilCompletionDeadline).toBeGreaterThan(0);
+    expect(result.bestAmount).toBe(0);
+    expect(result.programs[0].status).toBe("not_eligible");
+    expect(result.programs[0].warnings).toContain("ELY application deadline has passed.");
+  });
+
+  it("returns not_eligible when switching from oil to oil", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 12400,
+      currentHeating: "oil",
+      targetHeating: "oil",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, now);
+
+    expect(result.programs[0].status).toBe("not_eligible");
+    expect(result.bestAmount).toBe(0);
+    expect(result.programs[0].reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining("non-fossil")]),
+    );
+  });
+
+  it("returns not_eligible when switching from natural_gas to natural_gas", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 10000,
+      currentHeating: "natural_gas",
+      targetHeating: "natural_gas",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, now);
+
+    expect(result.programs[0].status).toBe("not_eligible");
+    expect(result.bestAmount).toBe(0);
+  });
+
+  it("warns when applicantAgeGroup is unknown", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 12000,
+      currentHeating: "oil",
+      targetHeating: "ground_source_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+      applicantAgeGroup: "unknown",
+    }, now);
+
+    const ara = result.programs.find((p) => p.program === "ara_repair_elderly_disabled");
+    expect(ara?.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining("age group is unknown")]),
+    );
+  });
+
+  it("does not warn about age when applicantAgeGroup is provided", () => {
+    const result = estimateEnergySubsidy({
+      totalCost: 12000,
+      currentHeating: "oil",
+      targetHeating: "ground_source_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+      applicantAgeGroup: "under_65",
+    }, now);
+
+    const ara = result.programs.find((p) => p.program === "ara_repair_elderly_disabled");
+    const ageWarnings = (ara?.warnings || []).filter(w => w.includes("age group is unknown"));
+    expect(ageWarnings).toHaveLength(0);
+  });
+
+  it("calculates application deadline days against the official Helsinki timestamp", () => {
+    const utcNow = new Date("2026-04-21T00:00:00.000Z");
+    const result = estimateEnergySubsidy({
+      totalCost: 10000,
+      currentHeating: "oil",
+      targetHeating: "ground_source_heat_pump",
+      buildingType: "omakotitalo",
+      yearRoundResidential: true,
+    }, utcNow);
+
+    expect(result.daysUntilApplicationDeadline).toBe(35);
+    expect(result.daysUntilDeadline).toBe(35);
   });
 
   it("does not deduct ARA/Varke discretionary support from net cost", () => {
@@ -175,6 +269,6 @@ describe("POST /subsidies/energy/estimate", () => {
     expect(body.bestAmount).toBe(4000);
     expect(body.netCost).toBe(8400);
     expect(body.programs[0].status).toBe("eligible");
-    expect(body.programs[0].sourceUrl).toContain("maakaasulammityksesta");
+    expect(body.programs[0].sourceUrl).toBe(OIL_GAS_HEATING_GRANT_CONFIG.gasSourceUrl);
   });
 });

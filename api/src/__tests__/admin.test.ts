@@ -6,6 +6,7 @@
  *   - GET /admin/users/:id (user detail with project count)
  *   - PATCH /admin/users/:id/role (role update)
  *   - GET /admin/stats (dashboard statistics)
+ *   - POST /admin/suppliers/:id/rescrape (supplier refresh marker)
  *   - Auth and permission checks for all endpoints
  */
 
@@ -408,14 +409,43 @@ describe("GET /admin/stats", () => {
 
   it("returns dashboard stats for admin", async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ total: "42" }] } as any) // user count
-      .mockResolvedValueOnce({ rows: [{ total: "15" }] } as any) // project count
+      .mockResolvedValueOnce({ rows: [{ users_total: "42", users_new_30d: "7" }] } as any)
+      .mockResolvedValueOnce({
+        rows: [{
+          projects_total: "15",
+          users_active_24h: "3",
+          users_active_7d: "8",
+          users_active_30d: "12",
+        }],
+      } as any)
+      .mockResolvedValueOnce({ rows: [{ bom_total_value: "12345.67" }] } as any)
+      .mockResolvedValueOnce({
+        rows: [{ total: "100", fresh: "60", aging: "20", stale: "15", never: "5" }],
+      } as any)
+      .mockResolvedValueOnce({
+        rows: [{
+          material_id: "pine",
+          material_name: "Pine",
+          supplier_id: "k-rauta",
+          supplier_name: "K-Rauta",
+          unit_price: "3.50",
+          last_scraped_at: "2026-02-01",
+          days_stale: 80,
+        }],
+      } as any)
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "project-1",
+          name: "Roof refresh",
+          source: "address",
+          created_at: "2026-04-01T00:00:00Z",
+          updated_at: "2026-04-02T00:00:00Z",
+        }],
+      } as any)
       .mockResolvedValueOnce({
         rows: [
           {
             id: "user-new",
-            email: "new@test.com",
-            name: "New User",
             role: "homeowner",
             created_at: "2025-04-01T00:00:00Z",
           },
@@ -437,12 +467,32 @@ describe("GET /admin/stats", () => {
     expect(res.status).toBe(200);
     const body = res.body as {
       user_count: number;
+      users_new_30d: number;
+      users_active_24h: number;
+      users_active_7d: number;
+      users_active_30d: number;
       project_count: number;
+      projects_total: number;
+      bom_total_value: number;
+      price_freshness: { stale_percent: number; alert: boolean };
+      stale_prices: Array<{ unit_price: number; days_stale: number | null }>;
+      recent_projects: Array<{ source: string }>;
       recent_signups: unknown[];
       role_distribution: Array<{ role: string; count: number }>;
     };
     expect(body.user_count).toBe(42);
+    expect(body.users_new_30d).toBe(7);
+    expect(body.users_active_24h).toBe(3);
+    expect(body.users_active_7d).toBe(8);
+    expect(body.users_active_30d).toBe(12);
     expect(body.project_count).toBe(15);
+    expect(body.projects_total).toBe(15);
+    expect(body.bom_total_value).toBe(12345.67);
+    expect(body.price_freshness.stale_percent).toBe(20);
+    expect(body.price_freshness.alert).toBe(false);
+    expect(body.stale_prices[0].unit_price).toBe(3.5);
+    expect(body.stale_prices[0].days_stale).toBe(80);
+    expect(body.recent_projects[0].source).toBe("address");
     expect(body.recent_signups).toHaveLength(1);
     expect(body.role_distribution).toHaveLength(3);
     expect(body.role_distribution[0].role).toBe("homeowner");
@@ -451,14 +501,23 @@ describe("GET /admin/stats", () => {
 
   it("normalizes roles in recent signups", async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ total: "1" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ total: "0" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ users_total: "1", users_new_30d: "1" }] } as any)
+      .mockResolvedValueOnce({
+        rows: [{
+          projects_total: "0",
+          users_active_24h: "0",
+          users_active_7d: "0",
+          users_active_30d: "0",
+        }],
+      } as any)
+      .mockResolvedValueOnce({ rows: [{ bom_total_value: "0" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ total: "0", fresh: "0", aging: "0", stale: "0", never: "0" }] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any)
       .mockResolvedValueOnce({
         rows: [
           {
             id: "legacy-user",
-            email: "legacy@test.com",
-            name: "Legacy",
             role: "user",
             created_at: "2025-04-01T00:00:00Z",
           },
@@ -478,6 +537,53 @@ describe("GET /admin/stats", () => {
     };
     expect(body.recent_signups[0].role).toBe("homeowner");
     expect(body.role_distribution[0].role).toBe("homeowner");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /admin/suppliers/:id/rescrape
+// ---------------------------------------------------------------------------
+describe("POST /admin/suppliers/:id/rescrape", () => {
+  it("rejects unauthenticated requests", async () => {
+    const res = await makeRequest("POST", "/admin/suppliers/k-rauta/rescrape");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects non-admin users", async () => {
+    const token = authToken("user-1", "homeowner");
+    const res = await makeRequest("POST", "/admin/suppliers/k-rauta/rescrape", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("marks a supplier for re-scrape", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "k-rauta", name: "K-Rauta", rescrape_requested_at: "2026-04-22T12:00:00Z" }],
+    } as any);
+
+    const token = authToken("admin-1", "admin");
+    const res = await makeRequest("POST", "/admin/suppliers/k-rauta/rescrape", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("rescrape_requested_at"), ["k-rauta"]);
+    expect(res.body).toMatchObject({
+      ok: true,
+      supplier: { id: "k-rauta", name: "K-Rauta" },
+    });
+  });
+
+  it("returns 404 for unknown supplier", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] } as any);
+
+    const token = authToken("admin-1", "admin");
+    const res = await makeRequest("POST", "/admin/suppliers/missing/rescrape", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(404);
   });
 });
 

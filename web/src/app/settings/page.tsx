@@ -1,21 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { api, setToken, getToken } from "@/lib/api";
+import { useState, useEffect, useRef } from "react";
+import { api, hasAuthSession, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme, DARK_MOODS, type DarkMood } from "@/components/ThemeProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { resetOnboarding } from "@/components/OnboardingTour";
+import { getAmbientSoundEnabled, setAmbientSoundEnabled } from "@/hooks/useAmbientSound";
+import { playSound } from "@/lib/sounds";
 import { Skeleton, SkeletonBlock } from "@/components/Skeleton";
 import Link from "next/link";
+import type { PriceAlertEmailFrequency } from "@/types";
 
 interface UserProfile {
   id: string;
   name: string;
   email: string;
   role: string;
+  email_notifications?: boolean;
+  price_alert_email_frequency?: PriceAlertEmailFrequency;
+  push_notifications?: boolean;
 }
 
 export default function SettingsPage() {
@@ -35,16 +42,27 @@ export default function SettingsPage() {
 
   // Data export
   const [exportingData, setExportingData] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [priceAlertFrequency, setPriceAlertFrequency] = useState<PriceAlertEmailFrequency>("daily");
+  const [pushNotifications, setPushNotifications] = useState(false);
+  const [pushAvailable, setPushAvailable] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
+
+  // Ambient sound
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const deleteBtnRef = useRef<HTMLButtonElement>(null);
 
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { mood, setMood, resolved } = useTheme();
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!hasAuthSession()) {
       window.location.href = "/";
       return;
     }
@@ -54,6 +72,16 @@ export default function SettingsPage() {
         setUser(u);
         setName(u.name || "");
         setEmail(u.email || "");
+        setEmailNotifications(u.email_notifications !== false);
+        setPriceAlertFrequency(u.price_alert_email_frequency || "daily");
+        setPushNotifications(Boolean(u.push_notifications));
+        setPushAvailable(
+          typeof window !== "undefined" &&
+          "Notification" in window &&
+          "serviceWorker" in navigator &&
+          "PushManager" in window,
+        );
+        setSoundEnabled(getAmbientSoundEnabled());
         setLoading(false);
       })
       .catch(() => {
@@ -147,11 +175,117 @@ export default function SettingsPage() {
     setExportingData(false);
   }
 
+  async function handleNotificationToggle(nextValue: boolean) {
+    setSavingNotifications(true);
+    const previous = emailNotifications;
+    setEmailNotifications(nextValue);
+    try {
+      await api.updateNotificationPreferences({
+        email_notifications: nextValue,
+        price_alert_email_frequency: priceAlertFrequency,
+        push_notifications: pushNotifications,
+      });
+      setUser((prev) => prev ? { ...prev, email_notifications: nextValue } : prev);
+      toast(t("settings.notificationsSaved"), "success");
+    } catch (err) {
+      setEmailNotifications(previous);
+      toast(
+        err instanceof Error ? err.message : t("settings.notificationsSaveFailed"),
+        "error"
+      );
+    }
+    setSavingNotifications(false);
+  }
+
+  async function handlePriceAlertFrequency(nextValue: PriceAlertEmailFrequency) {
+    setSavingNotifications(true);
+    const previous = priceAlertFrequency;
+    setPriceAlertFrequency(nextValue);
+    try {
+      await api.updateNotificationPreferences({
+        email_notifications: emailNotifications,
+        price_alert_email_frequency: nextValue,
+        push_notifications: pushNotifications,
+      });
+      setUser((prev) => prev ? { ...prev, price_alert_email_frequency: nextValue } : prev);
+      toast(t("settings.notificationsSaved"), "success");
+    } catch (err) {
+      setPriceAlertFrequency(previous);
+      toast(
+        err instanceof Error ? err.message : t("settings.notificationsSaveFailed"),
+        "error",
+      );
+    }
+    setSavingNotifications(false);
+  }
+
+  function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const output = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i += 1) {
+      output[i] = rawData.charCodeAt(i);
+    }
+    return output.buffer as ArrayBuffer;
+  }
+
+  async function handlePushToggle(nextValue: boolean) {
+    if (!nextValue) {
+      setSavingNotifications(true);
+      const previous = pushNotifications;
+      setPushNotifications(false);
+      try {
+        await api.updateNotificationPreferences({
+          email_notifications: emailNotifications,
+          price_alert_email_frequency: priceAlertFrequency,
+          push_notifications: false,
+        });
+        setUser((prev) => prev ? { ...prev, push_notifications: false } : prev);
+        toast(t("settings.notificationsSaved"), "success");
+      } catch (err) {
+        setPushNotifications(previous);
+        toast(err instanceof Error ? err.message : t("settings.notificationsSaveFailed"), "error");
+      }
+      setSavingNotifications(false);
+      return;
+    }
+
+    setEnablingPush(true);
+    try {
+      const vapid = await api.getPushPublicKey();
+      if (!vapid.configured || !vapid.publicKey) {
+        throw new Error(t("settings.pushNotConfigured"));
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error(t("settings.pushPermissionDenied"));
+      }
+      const registration = await navigator.serviceWorker.register("/push-sw.js");
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToArrayBuffer(vapid.publicKey),
+      });
+      await api.subscribePushNotifications(subscription.toJSON());
+      await api.updateNotificationPreferences({
+        email_notifications: emailNotifications,
+        price_alert_email_frequency: priceAlertFrequency,
+        push_notifications: true,
+      });
+      setPushNotifications(true);
+      setUser((prev) => prev ? { ...prev, push_notifications: true } : prev);
+      toast(t("settings.pushEnabled"), "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t("settings.pushEnableFailed"), "error");
+    }
+    setEnablingPush(false);
+  }
+
   if (loading) {
     return (
       <div style={{ minHeight: "100vh" }}>
         {/* Top bar skeleton */}
-        <div className="nav-bar">
+        <nav className="nav-bar" aria-label="Main">
           <div className="nav-inner" style={{ maxWidth: 720 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <SkeletonBlock width={100} height={20} />
@@ -164,8 +298,8 @@ export default function SettingsPage() {
               <SkeletonBlock width={120} height={32} />
             </div>
           </div>
-        </div>
-        <div style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
+        </nav>
+        <main id="main-content" tabIndex={-1} style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}>
           {/* Title skeleton */}
           <div style={{ marginBottom: 40 }}>
             <SkeletonBlock width={200} height={36} />
@@ -196,7 +330,7 @@ export default function SettingsPage() {
               <Skeleton variant="rect" width={140} height={40} style={{ marginTop: 16 }} />
             </div>
           ))}
-        </div>
+        </main>
       </div>
     );
   }
@@ -204,7 +338,7 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight: "100vh" }}>
       {/* Top bar */}
-      <div className="nav-bar">
+      <nav className="nav-bar" aria-label="Main">
         <div className="nav-inner" style={{ maxWidth: 720 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="heading-display" style={{ fontSize: 20 }}>
@@ -236,9 +370,11 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
-      </div>
+      </nav>
 
-      <div
+      <main
+        id="main-content"
+        tabIndex={-1}
         style={{ maxWidth: 720, margin: "0 auto", padding: "40px 24px 80px" }}
       >
         <div className="anim-up" style={{ marginBottom: 40 }}>
@@ -312,7 +448,7 @@ export default function SettingsPage() {
               <button
                 className="btn btn-primary"
                 type="submit"
-                disabled={savingProfile}
+                disabled={savingProfile || (name === (user?.name || "") && email === (user?.email || ""))}
                 style={{ padding: "11px 24px" }}
               >
                 {savingProfile ? <span className="btn-spinner" /> : t("settings.saveProfile")}
@@ -320,6 +456,61 @@ export default function SettingsPage() {
             </div>
           </form>
         </div>
+
+        {/* Appearance — dark mode mood */}
+        {resolved === "dark" && (
+          <div
+            className="card anim-up settings-card"
+            style={{ marginBottom: 20 }}
+          >
+            <h2
+              className="heading-display"
+              style={{ fontSize: 20, marginBottom: 4 }}
+            >
+              {t("settings.appearance")}
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16 }}>
+              {t("settings.moodDescription")}
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              {(DARK_MOODS as DarkMood[]).map((m) => {
+                const colors: Record<DarkMood, string[]> = {
+                  warm: ["#0b0a09", "#131210", "#1a1816", "#211f1b"],
+                  cool: ["#090a0d", "#10121a", "#171a24", "#1d2030"],
+                  black: ["#000000", "#0a0a0a", "#121212", "#1a1a1a"],
+                };
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setMood(m)}
+                    style={{
+                      flex: 1,
+                      maxWidth: 140,
+                      background: "none",
+                      border: mood === m ? "1px solid var(--amber)" : "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: 8,
+                      cursor: "pointer",
+                      transition: "border-color 0.2s",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+                      {colors[m].map((c, i) => (
+                        <div key={i} style={{ height: 14, background: c }} />
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 11, color: mood === m ? "var(--amber)" : "var(--text-secondary)" }}>
+                        {t(`settings.mood_${m}`)}
+                      </span>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)", opacity: mood === m ? 1 : 0.3 }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Security section */}
         <div
@@ -362,6 +553,8 @@ export default function SettingsPage() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder={t("settings.currentPassword")}
                 required
+                aria-required="true"
+                autoComplete="current-password"
               />
             </div>
             <div>
@@ -380,7 +573,15 @@ export default function SettingsPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder={t("settings.newPassword")}
                 required
+                aria-required="true"
+                autoComplete="new-password"
+                minLength={8}
               />
+              {newPassword.length > 0 && newPassword.length < 8 && (
+                <span style={{ fontSize: 11, color: "var(--danger)", marginTop: 4, display: "block" }}>
+                  {t("settings.passwordTooShort")}
+                </span>
+              )}
             </div>
             <div>
               <label
@@ -398,13 +599,20 @@ export default function SettingsPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder={t("settings.confirmPassword")}
                 required
+                aria-required="true"
+                autoComplete="new-password"
               />
+              {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                <span style={{ fontSize: 11, color: "var(--danger)", marginTop: 4, display: "block" }}>
+                  {t("settings.passwordMismatch")}
+                </span>
+              )}
             </div>
             <div>
               <button
                 className="btn btn-primary"
                 type="submit"
-                disabled={changingPassword}
+                disabled={changingPassword || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
                 style={{ padding: "11px 24px" }}
               >
                 {changingPassword
@@ -415,9 +623,135 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* Onboarding tour section */}
+        {/* Notifications section */}
         <div
           className="card anim-up delay-2 settings-card"
+          style={{ marginBottom: 20 }}
+        >
+          <h2
+            className="heading-display"
+            style={{ fontSize: 20, marginBottom: 4 }}
+          >
+            {t("settings.notifications")}
+          </h2>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 14,
+              marginBottom: 20,
+            }}
+          >
+            {t("settings.notificationsDesc")}
+          </p>
+          <label
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={emailNotifications}
+              disabled={savingNotifications}
+              onChange={(e) => handleNotificationToggle(e.target.checked)}
+            />
+            {t("settings.weeklyDigest")}
+          </label>
+          <div style={{ marginTop: 18 }}>
+            <label
+              htmlFor="settings-price-alert-frequency"
+              className="label-mono"
+              style={{ display: "block", marginBottom: 8 }}
+            >
+              {t("settings.priceAlertFrequency")}
+            </label>
+            <select
+              id="settings-price-alert-frequency"
+              className="input"
+              value={priceAlertFrequency}
+              disabled={savingNotifications}
+              onChange={(e) => handlePriceAlertFrequency(e.target.value as PriceAlertEmailFrequency)}
+            >
+              <option value="daily">{t("settings.frequencyDaily")}</option>
+              <option value="weekly">{t("settings.frequencyWeekly")}</option>
+              <option value="off">{t("settings.frequencyOff")}</option>
+            </select>
+          </div>
+          <label
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+              marginTop: 16,
+              opacity: pushAvailable ? 1 : 0.6,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={pushNotifications}
+              disabled={!pushAvailable || savingNotifications || enablingPush}
+              onChange={(e) => handlePushToggle(e.target.checked)}
+            />
+            {enablingPush ? t("settings.pushEnabling") : t("settings.pushAlerts")}
+          </label>
+          {!pushAvailable && (
+            <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "8px 0 0 28px" }}>
+              {t("settings.pushUnavailable")}
+            </p>
+          )}
+        </div>
+
+        {/* Ambient sound section */}
+        <div
+          className="card anim-up delay-2 settings-card"
+          style={{ marginBottom: 20 }}
+        >
+          <h2
+            className="heading-display"
+            style={{ fontSize: 20, marginBottom: 4 }}
+          >
+            {t("settings.ambientSound")}
+          </h2>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 14,
+              marginBottom: 20,
+            }}
+          >
+            {t("settings.ambientSoundDesc")}
+          </p>
+          <label
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={soundEnabled}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setSoundEnabled(next);
+                setAmbientSoundEnabled(next);
+                if (next) playSound("save");
+              }}
+            />
+            {t("settings.ambientSoundToggle")}
+          </label>
+        </div>
+
+        {/* Onboarding tour section */}
+        <div
+          className="card anim-up delay-3 settings-card"
           style={{ marginBottom: 20 }}
         >
           <h2
@@ -464,7 +798,7 @@ export default function SettingsPage() {
 
         {/* Legal section */}
         <div
-          className="card anim-up delay-3 settings-card"
+          className="card anim-up delay-4 settings-card"
           style={{ marginBottom: 20 }}
         >
           <h2
@@ -593,6 +927,7 @@ export default function SettingsPage() {
           </div>
 
           <button
+            ref={deleteBtnRef}
             className="btn btn-danger"
             onClick={() => setShowDeleteConfirm(true)}
             style={{ padding: "11px 24px" }}
@@ -600,7 +935,7 @@ export default function SettingsPage() {
             {t("settings.deleteAccount")}
           </button>
         </div>
-      </div>
+      </main>
 
       <ConfirmDialog
         open={showDeleteConfirm}
@@ -613,7 +948,10 @@ export default function SettingsPage() {
           setShowDeleteConfirm(false);
           handleDeleteAccount();
         }}
-        onCancel={() => setShowDeleteConfirm(false)}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          deleteBtnRef.current?.focus();
+        }}
       />
     </div>
   );

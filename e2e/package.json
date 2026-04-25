@@ -3,12 +3,14 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
+    "test:local": "node scripts/run-local.mjs",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "report": "playwright show-report"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.2",
     "@playwright/test": "^1.52.0"
   }
 }

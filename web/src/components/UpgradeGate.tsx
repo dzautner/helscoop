@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ export interface PlanFeatures {
 
 export interface PlanConfig {
   tier: PlanTier;
-  name: string;
+  nameKey: string;
   monthlyPrice: number;
   features: PlanFeatures;
 }
@@ -36,7 +36,7 @@ export interface PlanConfig {
 const PLANS: PlanConfig[] = [
   {
     tier: "free",
-    name: "Ilmainen / Free",
+    nameKey: "upgrade.free",
     monthlyPrice: 0,
     features: {
       maxProjects: 3,
@@ -48,7 +48,7 @@ const PLANS: PlanConfig[] = [
   },
   {
     tier: "pro",
-    name: "Pro",
+    nameKey: "upgrade.pro",
     monthlyPrice: 19,
     features: {
       maxProjects: 20,
@@ -60,7 +60,7 @@ const PLANS: PlanConfig[] = [
   },
   {
     tier: "enterprise",
-    name: "Yritys / Enterprise",
+    nameKey: "upgrade.enterprise",
     monthlyPrice: 49,
     features: {
       maxProjects: -1,
@@ -103,13 +103,44 @@ export default function UpgradeGate({
 }: UpgradeGateProps) {
   const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  if (dismissed) return null;
-
-  function handleDismiss() {
+  const handleDismiss = useCallback(() => {
     setDismissed(true);
     onDismiss?.();
-  }
+  }, [onDismiss]);
+
+  useEffect(() => {
+    if (inline || dismissed) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        handleDismiss();
+        return;
+      }
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [inline, dismissed, handleDismiss]);
+
+  if (dismissed) return null;
 
   // Determine headline / description
   const isAiQuota = feature === "aiMessages";
@@ -174,7 +205,7 @@ export default function UpgradeGate({
   ];
 
   const content = (
-    <div style={inline ? {} : card}>
+    <div ref={dialogRef} role={inline ? undefined : "dialog"} aria-modal={inline ? undefined : true} aria-label={headline} style={inline ? {} : card}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
         <div>
@@ -227,7 +258,7 @@ export default function UpgradeGate({
               textAlign: "center",
               color: p.tier === currentPlan ? "var(--amber, #c4915c)" : "inherit",
             }}>
-              {p.tier === "free" ? t("upgrade.free") : p.tier === "pro" ? t("upgrade.pro") : t("upgrade.enterprise")}
+              {t(p.nameKey)}
             </span>
           ))}
         </div>

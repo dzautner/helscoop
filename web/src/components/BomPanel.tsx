@@ -1,15 +1,47 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from "react";
+import { useCursorGlow } from "@/hooks/useCursorGlow";
 import { useTranslation } from "@/components/LocaleProvider";
 import { SkeletonPriceComparison } from "@/components/Skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SubsidyCalculator from "@/components/SubsidyCalculator";
 import WasteEstimatePanel from "@/components/WasteEstimatePanel";
+import RyhtiSubmissionPanel from "@/components/RyhtiSubmissionPanel";
+import MaterialPicker from "@/components/MaterialPicker";
+import BomSavingsPanel, { type BomPriceOverride } from "@/components/BomSavingsPanel";
+import QuoteRequestModal from "@/components/QuoteRequestModal";
+import HouseholdDeductionPanel from "@/components/HouseholdDeductionPanel";
+import RenovationRoiPanel from "@/components/RenovationRoiPanel";
+import RenovationFinancingPanel from "@/components/RenovationFinancingPanel";
+import EuEnergyGrantPrecheckPanel from "@/components/EuEnergyGrantPrecheckPanel";
+import RenovationRoadmapPanel from "@/components/RenovationRoadmapPanel";
+import PhasedRenovationPlannerPanel from "@/components/PhasedRenovationPlannerPanel";
+import KrautaProPartnerPanel from "@/components/KrautaProPartnerPanel";
+import MarketplaceCheckoutPanel from "@/components/MarketplaceCheckoutPanel";
+import RenovationCostIndexPanel from "@/components/RenovationCostIndexPanel";
+import IfcPreviewPanel from "@/components/IfcPreviewPanel";
+import MaterialTrendDashboard from "@/components/MaterialTrendDashboard";
+import BlueprintToScenePanel from "@/components/BlueprintToScenePanel";
+import PhotoEstimatePanel from "@/components/PhotoEstimatePanel";
+import QuantityTakeoffPanel from "@/components/QuantityTakeoffPanel";
+import RoomScanImportPanel from "@/components/RoomScanImportPanel";
+import PermitCheckerPanel from "@/components/PermitCheckerPanel";
+import ShoppingListModal from "@/components/ShoppingListModal";
 import { api } from "@/lib/api";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
+import { detectHeatingGrantOpportunity } from "@/lib/heating-grant-context";
 import { calculateQuote, defaultQuoteConfig } from "@/lib/quote-engine";
+import { buildSavingsRecommendations } from "@/lib/bom-savings";
+import {
+  buildImportedBomItem,
+  matchImportedBomRows,
+  parseBomImportFile,
+  parseBomImportText,
+  type BomImportMode,
+  type BomImportPreviewRow,
+} from "@/lib/bom-import";
 import type { QuoteConfig } from "@/lib/quote-engine";
 import type {
   BomItem,
@@ -23,6 +55,8 @@ import type {
   KeskoProduct,
   KeskoSearchResponse,
   KeskoImportResponse,
+  PriceWatch,
+  ProjectType,
 } from "@/types";
 
 /* ── Localization helpers ──────────────────────────────────── */
@@ -96,6 +130,122 @@ function stockTooltip(
   }
   if (item.link) parts.push(item.link);
   return parts.join(" · ");
+}
+
+type PackageTierId = "basic" | "standard" | "premium";
+
+interface PackageTier {
+  id: PackageTierId;
+  labelKey: string;
+  tone: string;
+}
+
+interface PackageReplacement {
+  fromMaterialId: string;
+  toMaterial: Material;
+  currentCost: number;
+  packageCost: number;
+  locked: boolean;
+}
+
+interface PackageSummary {
+  tier: PackageTier;
+  total: number;
+  delta: number;
+  changedCount: number;
+  replacements: PackageReplacement[];
+}
+
+const PACKAGE_TIERS: PackageTier[] = [
+  { id: "basic", labelKey: "bom.packageBasic", tone: "var(--text-secondary)" },
+  { id: "standard", labelKey: "bom.packageStandard", tone: "var(--amber)" },
+  { id: "premium", labelKey: "bom.packagePremium", tone: "var(--success)" },
+];
+
+function getPrimaryMaterialPrice(material: Material | null | undefined): number {
+  const primary = material?.pricing?.find((p) => p.is_primary) ?? material?.pricing?.[0];
+  return Number(primary?.unit_price ?? 0);
+}
+
+function getMaterialUnit(material: Material | null | undefined, fallback: string): string {
+  const primary = material?.pricing?.find((p) => p.is_primary) ?? material?.pricing?.[0];
+  return material?.design_unit ?? primary?.unit ?? fallback;
+}
+
+function getLineCost(item: BomItem, material: Material | null | undefined): number {
+  const unitPrice = getPrimaryMaterialPrice(material) || Number(item.unit_price ?? 0);
+  return unitPrice * Number(item.quantity || 0);
+}
+
+function getCampaignUnitPrice(item: BomItem): number | null {
+  const regular = Number(item.regular_unit_price ?? 0);
+  const current = Number(item.unit_price ?? 0);
+  return regular > current && current > 0 ? regular : null;
+}
+
+function getCampaignSavings(item: BomItem): number {
+  const explicit = Number(item.campaign_savings ?? 0);
+  if (explicit > 0) return explicit;
+  const regular = getCampaignUnitPrice(item);
+  const current = Number(item.unit_price ?? 0);
+  return regular ? Math.max(0, (regular - current) * Number(item.quantity || 0)) : 0;
+}
+
+function formatCampaignExpiry(
+  endsAt: string | null | undefined,
+  locale: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string | null {
+  if (!endsAt) return null;
+  const end = new Date(endsAt);
+  if (Number.isNaN(end.getTime())) return null;
+  const ms = end.getTime() - Date.now();
+  if (ms <= 0) return t("pricing.campaignEndsToday");
+  const days = Math.ceil(ms / 86_400_000);
+  if (days <= 1) return t("pricing.campaignEndsToday");
+  if (days <= 14) return t("pricing.campaignEndsDays", { count: days });
+  return t("pricing.campaignEndsDate", {
+    date: end.toLocaleDateString(locale === "fi" ? "fi-FI" : locale === "sv" ? "sv-SE" : "en-GB", {
+      day: "numeric",
+      month: "short",
+    }),
+  });
+}
+
+function getReplacementCandidates(
+  item: BomItem,
+  currentMaterial: Material | null,
+  materials: Material[],
+  bomMaterialIds: Set<string>,
+): Material[] {
+  const group = currentMaterial?.substitution_group;
+  const category = currentMaterial?.category_name ?? item.category_name;
+  const currentUnit = getMaterialUnit(currentMaterial, item.unit);
+
+  let candidates = materials.filter((material) => {
+    if (material.id !== item.material_id && bomMaterialIds.has(material.id)) return false;
+    if (group) return material.substitution_group === group;
+    return category != null && material.category_name === category;
+  });
+
+  const sameUnit = candidates.filter((material) => getMaterialUnit(material, item.unit) === currentUnit);
+  if (sameUnit.length >= 2) candidates = sameUnit;
+
+  const priced = candidates.filter((material) => getPrimaryMaterialPrice(material) > 0);
+  return (priced.length > 0 ? priced : candidates).sort(
+    (a, b) => getPrimaryMaterialPrice(a) - getPrimaryMaterialPrice(b),
+  );
+}
+
+function pickPackageMaterial(candidates: Material[], tier: PackageTierId): Material | null {
+  if (candidates.length === 0) return null;
+  if (tier === "basic") return candidates[0];
+  if (tier === "premium") return candidates[candidates.length - 1];
+  return candidates[Math.round((candidates.length - 1) / 2)];
+}
+
+function formatPackageCurrency(amount: number, locale: string): string {
+  return `${Math.round(amount).toLocaleString(locale, { maximumFractionDigits: 0 })} €`;
 }
 
 /* ── Unit conversion helpers ───────────────────────────────── */
@@ -255,6 +405,18 @@ interface CategorySlice {
   color: string;
 }
 
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+  const clampedEnd = Math.min(endAngle, startAngle + 359.999);
+  const startRad = ((clampedEnd - 90) * Math.PI) / 180;
+  const endRad = ((startAngle - 90) * Math.PI) / 180;
+  const x1 = cx + r * Math.cos(endRad);
+  const y1 = cy + r * Math.sin(endRad);
+  const x2 = cx + r * Math.cos(startRad);
+  const y2 = cy + r * Math.sin(startRad);
+  const largeArc = clampedEnd - startAngle > 180 ? 1 : 0;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
+}
+
 function CostBreakdownChart({
   bom,
   materials,
@@ -265,6 +427,7 @@ function CostBreakdownChart({
   total: number;
 }) {
   const { t, locale } = useTranslation();
+  const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
 
   const slices = useMemo<CategorySlice[]>(() => {
     if (total <= 0) return [];
@@ -291,14 +454,21 @@ function CostBreakdownChart({
 
   if (slices.length === 0) return null;
 
-  let cumDeg = 0;
-  const stops: string[] = [];
-  for (const s of slices) {
-    const deg = (s.pct / 100) * 360;
-    stops.push(`${s.color} ${cumDeg}deg ${cumDeg + deg}deg`);
-    cumDeg += deg;
-  }
-  const gradient = `conic-gradient(${stops.join(", ")})`;
+  const svgSize = 140;
+  const cx = svgSize / 2;
+  const cy = svgSize / 2;
+  const outerR = 62;
+  const strokeW = 22;
+  const r = outerR - strokeW / 2;
+  const hovered = slices.find((s) => s.name === hoveredSlice);
+
+  let cumAngle = 0;
+  const arcs = slices.map((s) => {
+    const startAngle = cumAngle;
+    const sweep = (s.pct / 100) * 360;
+    cumAngle += sweep;
+    return { ...s, startAngle, sweep };
+  });
 
   return (
     <div
@@ -325,60 +495,89 @@ function CostBreakdownChart({
           alignItems: "center",
         }}
       >
-        {/* Donut */}
-        <div
-          role="img"
-          aria-label={t('bom.donutChartAriaLabel', {
-            categories: slices.map((s) => `${s.name} ${s.pct.toFixed(0)}%`).join(', '),
-          })}
-          style={{
-            width: 100,
-            height: 100,
-            borderRadius: "50%",
-            background: gradient,
-            position: "relative",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{ position: "relative", width: svgSize, height: svgSize }}>
+          <svg
+            width={svgSize}
+            height={svgSize}
+            viewBox={`0 0 ${svgSize} ${svgSize}`}
+            role="img"
+            aria-label={t('bom.donutChartAriaLabel', {
+              categories: slices.map((s) => `${s.name} ${s.pct.toFixed(0)}%`).join(', '),
+            })}
+          >
+            {arcs.map((arc) => (
+              <path
+                key={arc.name}
+                d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.sweep)}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={strokeW}
+                strokeLinecap="butt"
+                onMouseEnter={() => setHoveredSlice(arc.name)}
+                onMouseLeave={() => setHoveredSlice(null)}
+                style={{
+                  opacity: hoveredSlice && hoveredSlice !== arc.name ? 0.35 : 1,
+                  transform: hoveredSlice === arc.name ? "scale(1.04)" : "scale(1)",
+                  transformOrigin: "center",
+                  transition: "opacity 0.15s ease, transform 0.15s ease",
+                  cursor: "pointer",
+                }}
+              />
+            ))}
+          </svg>
           <div
             style={{
               position: "absolute",
-              inset: 18,
-              borderRadius: "50%",
-              background: "var(--bg-tertiary)",
+              inset: 0,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
+              pointerEvents: "none",
             }}
           >
-            <span
-              className="heading-display"
-              style={{ fontSize: 14, lineHeight: 1.1, color: "var(--text-primary)" }}
-            >
-              {total.toLocaleString(locale, { maximumFractionDigits: 0 })}
-            </span>
-            <span style={{ fontSize: 9, color: "var(--text-muted)" }}>&euro;</span>
+            {hovered ? (
+              <>
+                <span style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.2, textAlign: "center", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {hovered.name}
+                </span>
+                <span className="heading-display" style={{ fontSize: 14, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                  {hovered.total.toLocaleString(locale, { maximumFractionDigits: 0 })}&euro;
+                </span>
+                <span style={{ fontSize: 9, color: "var(--text-muted)" }}>{hovered.pct.toFixed(0)}%</span>
+              </>
+            ) : (
+              <>
+                <span className="heading-display" style={{ fontSize: 16, lineHeight: 1.1, color: "var(--text-primary)" }}>
+                  {total.toLocaleString(locale, { maximumFractionDigits: 0 })}
+                </span>
+                <span style={{ fontSize: 9, color: "var(--text-muted)" }}>&euro;</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Legend */}
         <div style={{ display: "flex", flexDirection: "column", gap: 5, width: "100%" }}>
           {slices.map((s) => (
             <div
               key={s.name}
+              onMouseEnter={() => setHoveredSlice(s.name)}
+              onMouseLeave={() => setHoveredSlice(null)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 fontSize: 11,
+                cursor: "pointer",
+                opacity: hoveredSlice && hoveredSlice !== s.name ? 0.5 : 1,
+                transition: "opacity 0.15s ease",
               }}
             >
               <span
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: "50%",
+                  borderRadius: "2px",
                   background: s.color,
                   flexShrink: 0,
                 }}
@@ -416,12 +615,10 @@ function Sparkline({
   data,
   width = 80,
   height = 24,
-  color = "var(--text-muted)",
 }: {
   data: number[];
   width?: number;
   height?: number;
-  color?: string;
 }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
@@ -430,20 +627,33 @@ function Sparkline({
   const padY = 2;
   const usableH = height - padY * 2;
 
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * width;
-      const y = padY + usableH - ((v - min) / range) * usableH;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * width,
+    y: padY + usableH - ((v - min) / range) * usableH,
+  }));
+
+  const linePoints = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const fillPath = `M ${pts[0].x},${pts[0].y} ` +
+    pts.slice(1).map((p) => `L ${p.x},${p.y}`).join(" ") +
+    ` L ${width},${height} L 0,${height} Z`;
+
+  const trending = data[data.length - 1] > data[0] ? "up" : data[data.length - 1] < data[0] ? "down" : "stable";
+  const strokeColor = trending === "down" ? "var(--success, #8bc48b)" : trending === "up" ? "var(--danger, #e05555)" : "var(--amber, #e5a04b)";
+  const gradId = `sparkGrad-${Math.random().toString(36).slice(2, 8)}`;
 
   return (
     <svg width={width} height={height} aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={fillPath} fill={`url(#${gradId})`} />
       <polyline
-        points={points}
+        points={linePoints}
         fill="none"
-        stroke={color}
+        stroke={strokeColor}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -837,9 +1047,10 @@ function PriceComparisonPopup({
               {priceData.prices.map((price, idx) => {
                 const isCheapest = idx === 0;
                 const unitPrice = parseFloat(price.unit_price);
+                const regularUnitPrice = Number(price.regular_unit_price ?? 0);
+                const hasCampaignPrice = regularUnitPrice > unitPrice;
                 const spark = sparklineData.get(price.supplier_id);
                 const trend = computeTrend(priceHistory, price.supplier_id, 30);
-                const sparkColor = supplierColors.get(price.supplier_id) || "var(--text-muted)";
                 const priceStockLevel = normalizeStockLevel(price.stock_level);
                 const priceStock = stockMeta(priceStockLevel, t);
                 const priceStockTooltip = stockTooltip(price, t, locale);
@@ -884,6 +1095,11 @@ function PriceComparisonPopup({
                             {t('pricing.primary')}
                           </span>
                         )}
+                        {hasCampaignPrice && (
+                          <span className="badge badge-forest" style={{ fontSize: 10, padding: "2px 8px" }}>
+                            {price.campaign_label || t("pricing.campaignActive")}
+                          </span>
+                        )}
                         {/* Trend badge */}
                         {trend.direction !== "stable" && (
                           <span
@@ -915,16 +1131,23 @@ function PriceComparisonPopup({
                             }}
                             title={t("pricing.showTrend")}
                           >
-                            <Sparkline data={spark} width={60} height={20} color={sparkColor} />
+                            <Sparkline data={spark} width={60} height={20} />
                           </div>
                         )}
-                        <span style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: isCheapest ? "var(--success)" : "var(--text-primary)",
-                        }}>
-                          {unitPrice.toFixed(2)} &euro;
+                        <span style={{ display: "grid", justifyItems: "end", lineHeight: 1.1 }}>
+                          {hasCampaignPrice && (
+                            <s style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)" }}>
+                              {regularUnitPrice.toFixed(2)} &euro;
+                            </s>
+                          )}
+                          <span style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: isCheapest || hasCampaignPrice ? "var(--success)" : "var(--text-primary)",
+                          }}>
+                            {unitPrice.toFixed(2)} &euro;
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -1185,6 +1408,18 @@ function BomItemCard({
   onCompare,
   onNavigate,
   onFocusIndex,
+  isPackageLocked = false,
+  isPriceWatched = false,
+  isPriceWatchBusy = false,
+  hasSubstitutionSuggestion = false,
+  onTogglePackageLock,
+  onTogglePriceWatch,
+  onOpenMaterialPicker,
+  onUpdateNote,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragTarget = false,
 }: {
   item: BomItem;
   materials: Material[];
@@ -1196,6 +1431,18 @@ function BomItemCard({
   onCompare: (id: string, name: string) => void;
   onNavigate: (direction: "up" | "down" | "next") => void;
   onFocusIndex: (index: number) => void;
+  isPackageLocked?: boolean;
+  isPriceWatched?: boolean;
+  isPriceWatchBusy?: boolean;
+  hasSubstitutionSuggestion?: boolean;
+  onTogglePackageLock?: (materialId: string) => void;
+  onTogglePriceWatch?: (item: BomItem) => void;
+  onOpenMaterialPicker: (materialId: string) => void;
+  onUpdateNote?: (materialId: string, note: string) => void;
+  onDragStart?: (index: number) => void;
+  onDragOver?: (index: number) => void;
+  onDragEnd?: () => void;
+  isDragTarget?: boolean;
 }) {
   const { t } = useTranslation();
   const [localQty, setLocalQty] = useState(String(item.quantity));
@@ -1294,13 +1541,19 @@ function BomItemCard({
         break;
       case "Enter":
         e.preventDefault();
-        // Focus the quantity input for editing
-        if (inputRef.current) {
+        if (e.shiftKey && inputRef.current) {
           inputRef.current.focus();
           inputRef.current.select();
           setIsEditing(true);
           setPrevQty(localQty);
+        } else {
+          onOpenMaterialPicker(item.material_id);
         }
+        break;
+      case "m":
+      case "M":
+        e.preventDefault();
+        onOpenMaterialPicker(item.material_id);
         break;
       case "Delete":
       case "Backspace":
@@ -1336,21 +1589,49 @@ function BomItemCard({
   const stockLevel = normalizeStockLevel(item.stock_level);
   const stock = stockMeta(stockLevel, t);
   const stockTooltipText = stockTooltip(item, t, locale);
+  const regularCampaignPrice = getCampaignUnitPrice(item);
+  const currentUnitPrice = Number(item.unit_price || 0);
+  const campaignSavings = getCampaignSavings(item);
+  const campaignExpiry = formatCampaignExpiry(item.campaign_ends_at, locale, t);
 
   return (
     <div
       ref={cardRef}
-      className={`bom-item-card${isFocused ? ' bom-item-focused' : ''}`}
+      className={`bom-item-card${isFocused ? ' bom-item-focused' : ''}${isDragTarget ? ' bom-drag-target' : ''}`}
       tabIndex={0}
       role="row"
       aria-label={t('editor.bomItemRow', { name: materialName, qty: localQty, total: Number(item.total || 0).toFixed(2) })}
       data-bom-index={index}
+      draggable={!!onDragStart}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart?.(index);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        onDragOver?.(index);
+      }}
+      onDragEnd={() => onDragEnd?.()}
       onClick={() => onCompare(item.material_id, materialName)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onOpenMaterialPicker(item.material_id);
+      }}
       onFocus={() => onFocusIndex(index)}
       onKeyDown={handleCardKeyDown}
     >
       <div className="bom-item-header">
         <div className="bom-item-info">
+          {onDragStart && (
+            <span className="bom-drag-handle" aria-hidden="true" onMouseDown={(e) => e.stopPropagation()}>
+              <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor" opacity="0.3">
+                <circle cx="2" cy="2" r="1.2" /><circle cx="6" cy="2" r="1.2" />
+                <circle cx="2" cy="7" r="1.2" /><circle cx="6" cy="7" r="1.2" />
+                <circle cx="2" cy="12" r="1.2" /><circle cx="6" cy="12" r="1.2" />
+              </svg>
+            </span>
+          )}
           {item.image_url ? (
             <img
               src={item.image_url}
@@ -1362,17 +1643,66 @@ function BomItemCard({
           )}
           <strong className="bom-item-name">{materialName}</strong>
         </div>
-        <button
-          className="bom-remove-btn"
-          tabIndex={-1}
-          aria-label={t('editor.removeMaterial', { name: materialName })}
-          onClick={(e) => { e.stopPropagation(); onRequestRemove(item.material_id); }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div className="bom-item-actions">
+          {onTogglePackageLock && (
+            <button
+              className="bom-package-lock-btn"
+              data-locked={isPackageLocked}
+              tabIndex={-1}
+              aria-pressed={isPackageLocked}
+              aria-label={t(isPackageLocked ? 'bom.packageUnlock' : 'bom.packageLock', { name: materialName })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePackageLock(item.material_id);
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isPackageLocked ? (
+                  <>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </>
+                ) : (
+                  <>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                  </>
+                )}
+              </svg>
+            </button>
+          )}
+          {onTogglePriceWatch && (
+            <button
+              className="bom-package-lock-btn"
+              data-locked={isPriceWatched}
+              tabIndex={-1}
+              disabled={isPriceWatchBusy}
+              aria-pressed={isPriceWatched}
+              aria-label={t(isPriceWatched ? "priceAlerts.stopWatching" : "priceAlerts.watchMaterial", { name: materialName })}
+              title={t(isPriceWatched ? "priceAlerts.stopWatching" : "priceAlerts.watchMaterial", { name: materialName })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePriceWatch(item);
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill={isPriceWatched ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </button>
+          )}
+          <button
+            className="bom-remove-btn"
+            tabIndex={-1}
+            aria-label={t('editor.removeMaterial', { name: materialName })}
+            onClick={(e) => { e.stopPropagation(); onRequestRemove(item.material_id); }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="bom-item-qty-row">
         <input
@@ -1391,7 +1721,15 @@ function BomItemCard({
           aria-label={t('editor.quantityFor', { name: materialName })}
         />
         <span className="bom-item-unit">
-          {localizeUnit(item.unit, t)} x {Number(item.unit_price || 0).toFixed(2)}
+          {localizeUnit(item.unit, t)} x{" "}
+          {regularCampaignPrice ? (
+            <>
+              <s className="bom-item-regular-price">{regularCampaignPrice.toFixed(2)}</s>{" "}
+              <strong className="bom-item-sale-price">{currentUnitPrice.toFixed(2)}</strong>
+            </>
+          ) : (
+            currentUnitPrice.toFixed(2)
+          )}
         </span>
         <span
           title={stockTooltipText}
@@ -1405,10 +1743,30 @@ function BomItemCard({
             flexShrink: 0,
           }}
         />
-        <span className="bom-item-total">
+        <button
+          type="button"
+          className="bom-item-total bom-item-cost-badge"
+          title={t("materialPicker.openFor", { name: materialName })}
+          aria-label={t("materialPicker.openFor", { name: materialName })}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenMaterialPicker(item.material_id);
+          }}
+        >
           {Number(item.total || 0).toFixed(2)}
-        </span>
+        </button>
       </div>
+      {regularCampaignPrice && campaignSavings > 0 && (
+        <div className="bom-campaign-callout">
+          <span>
+            {t("pricing.campaignSaveNow", { amount: campaignSavings.toFixed(2) })}
+          </span>
+          <strong>
+            {item.campaign_label || t("pricing.campaignActive")}
+            {campaignExpiry ? ` · ${campaignExpiry}` : ""}
+          </strong>
+        </div>
+      )}
       {/* Purchasable quantity hint — shown when conversion differs from design */}
       {(() => {
         const mat = materials.find((m) => m.id === item.material_id);
@@ -1470,12 +1828,27 @@ function BomItemCard({
           </svg>
         </div>
       )}
-      {stockLevel === "out_of_stock" && (
+      {onUpdateNote && (
+        <input
+          type="text"
+          className="bom-item-note"
+          placeholder={t("bom.addNote")}
+          defaultValue={item.note || ""}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={(e) => onUpdateNote(item.material_id, e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        />
+      )}
+      {(stockLevel === "out_of_stock" || hasSubstitutionSuggestion) && (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onCompare(item.material_id, materialName);
+            if (hasSubstitutionSuggestion) {
+              onOpenMaterialPicker(item.material_id);
+            } else {
+              onCompare(item.material_id, materialName);
+            }
           }}
           style={{
             marginTop: 6,
@@ -1490,7 +1863,7 @@ function BomItemCard({
             fontFamily: "var(--font-body)",
           }}
         >
-          {t("bom.alternativeAvailable")}
+          {hasSubstitutionSuggestion ? t("bom.substituteAvailable") : t("bom.alternativeAvailable")}
         </button>
       )}
     </div>
@@ -1534,6 +1907,7 @@ function generateBomCsv(
     t('bom.csvTotal'),
     t('bom.csvSupplier'),
     t('bom.csvCategory'),
+    t('bom.csvNote'),
   ];
 
   const rows = bom.map((item) => {
@@ -1556,6 +1930,7 @@ function generateBomCsv(
       formatNumber(item.total ?? 0),
       escapeCsvField(supplier, sep),
       escapeCsvField(category, sep),
+      escapeCsvField(item.note || '', sep),
     ].join(sep);
   });
 
@@ -1579,31 +1954,64 @@ export default function BomPanel({
   materials,
   onAdd,
   onAddImported,
+  onImportBom,
+  onReplaceMaterial,
+  onApplySupplierPrice,
   onRemove,
   onUpdateQty,
+  onUpdateNote,
+  onReorder,
   style,
   sceneJs,
   projectName,
+  projectDescription,
   buildingInfo,
   projectId,
+  projectType,
+  unitCount,
+  householdDeductionJoint = false,
+  onHouseholdDeductionJointChange,
+  onApplyScene,
+  referencePhotosSlot,
 }: {
   bom: BomItem[];
   materials: Material[];
   onAdd: (materialId: string, qty: number) => void;
   onAddImported?: (item: BomItem, material: Material) => void;
+  onImportBom?: (items: BomItem[], mode: BomImportMode) => void;
+  onReplaceMaterial?: (fromMaterialId: string, toMaterialId: string, options?: { undo?: boolean; source?: string }) => void;
+  onApplySupplierPrice?: (override: BomPriceOverride) => void;
   onRemove: (materialId: string) => void;
   onUpdateQty: (materialId: string, qty: number) => void;
+  onUpdateNote?: (materialId: string, note: string) => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
   style?: React.CSSProperties;
   /** Scene script for extracting material declarations */
   sceneJs?: string;
   /** Project name for export filenames */
   projectName?: string;
+  /** Project description used to prefill contractor quote scope */
+  projectDescription?: string;
   /** Address-derived building context for subsidy eligibility defaults */
   buildingInfo?: BuildingInfo | null;
   /** Project ID used by API-backed cost add-ons such as waste estimates */
   projectId?: string;
+  /** Project mode used for housing-cooperative BOM totals */
+  projectType?: ProjectType;
+  /** Housing-cooperative unit count for building-wide totals */
+  unitCount?: number | null;
+  /** Whether the household deduction calculator should use two claimants */
+  householdDeductionJoint?: boolean;
+  /** Persist household deduction claimant mode on the project */
+  onHouseholdDeductionJointChange?: (joint: boolean) => void;
+  /** Apply generated scene code from blueprint/floor-plan tooling */
+  onApplyScene?: (sceneJs: string) => void;
+  /** Optional project-level house photo gallery shown above BOM tools */
+  referencePhotosSlot?: ReactNode;
 }) {
+  const glow = useCursorGlow();
   const [compareMaterial, setCompareMaterial] = useState<{ id: string; name: string } | null>(null);
+  const [materialPickerId, setMaterialPickerId] = useState<string | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
   const [keskoMode, setKeskoMode] = useState(false);
   const [keskoProducts, setKeskoProducts] = useState<KeskoProduct[]>([]);
@@ -1619,6 +2027,19 @@ export default function BomPanel({
   const [focusedBomIndex, setFocusedBomIndex] = useState(-1);
   const [searchFocused, setSearchFocused] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [activePackage, setActivePackage] = useState<PackageTierId>("standard");
+  const [showShoppingList, setShowShoppingList] = useState(false);
+  const [packageDelta, setPackageDelta] = useState<number | null>(null);
+  const [packageFlashKey, setPackageFlashKey] = useState(0);
+  const [lockedPackageMaterials, setLockedPackageMaterials] = useState<Set<string>>(() => new Set());
+  const [quoteRequestOpen, setQuoteRequestOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<BomImportPreviewRow[]>([]);
+  const [importMode, setImportMode] = useState<BomImportMode>("merge");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importDragging, setImportDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const { t, locale } = useTranslation();
 
   // Navigate between BOM item rows
@@ -1645,7 +2066,70 @@ export default function BomPanel({
   }, [bom.length]);
 
   const total = bom.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const campaignSavingsTotal = bom.reduce((sum, item) => sum + getCampaignSavings(item), 0);
+  const activeCampaignCount = bom.filter((item) => getCampaignUnitPrice(item) && getCampaignSavings(item) > 0).length;
+  const taloyhtioUnitCount = projectType === "taloyhtio"
+    ? Math.max(1, Math.floor(Number(unitCount ?? buildingInfo?.units ?? 1) || 1))
+    : 1;
+  const taloyhtioBuildingTotal = total * taloyhtioUnitCount;
   const animatedTotal = useAnimatedNumber(total);
+  const bomTotalAnnouncement = t("editor.bomTotalAnnouncement", {
+    count: bom.length,
+    items: bom.length === 1 ? t("editor.bomItemSingular") : t("editor.bomItemPlural"),
+    total: total.toLocaleString(locale, {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 0,
+    }),
+  });
+  const heatingGrantOpportunity = useMemo(() => detectHeatingGrantOpportunity({
+    sceneJs,
+    bom,
+    materials,
+    buildingInfo,
+  }), [sceneJs, bom, materials, buildingInfo]);
+  const packageSummaries = useMemo<PackageSummary[]>(() => {
+    const materialMap = new Map(materials.map((material) => [material.id, material]));
+    const bomMaterialIds = new Set(bom.map((item) => item.material_id));
+
+    return PACKAGE_TIERS.map((tier) => {
+      let tierTotal = 0;
+      let changedCount = 0;
+      const replacements: PackageReplacement[] = [];
+
+      for (const item of bom) {
+        const currentMaterial = materialMap.get(item.material_id) ?? null;
+        const currentCost = getLineCost(item, currentMaterial);
+        const locked = lockedPackageMaterials.has(item.material_id);
+        const candidates = getReplacementCandidates(item, currentMaterial, materials, bomMaterialIds);
+        const picked = locked ? currentMaterial : pickPackageMaterial(candidates, tier.id);
+        const toMaterial = picked ?? currentMaterial;
+        const packageCost = getLineCost(item, toMaterial);
+
+        tierTotal += packageCost;
+        if (toMaterial && toMaterial.id !== item.material_id && !locked) changedCount += 1;
+        if (toMaterial) {
+          replacements.push({
+            fromMaterialId: item.material_id,
+            toMaterial,
+            currentCost,
+            packageCost,
+            locked,
+          });
+        }
+      }
+
+      return {
+        tier,
+        total: tierTotal,
+        delta: tierTotal - total,
+        changedCount,
+        replacements,
+      };
+    });
+  }, [bom, lockedPackageMaterials, materials, total]);
+  const hasPackageChoices = packageSummaries.some((summary) => summary.changedCount > 0);
+  const activePackageSummary = packageSummaries.find((summary) => summary.tier.id === activePackage);
   const stockSummary = useMemo(() => {
     const levels = bom.map((item) => normalizeStockLevel(item.stock_level));
     return {
@@ -1655,6 +2139,90 @@ export default function BomPanel({
       known: levels.filter((level) => level !== "unknown").length,
     };
   }, [bom]);
+  const materialTrendSignature = useMemo(() => {
+    return bom
+      .map((item) => `${item.material_id}:${item.quantity}:${item.unit_price ?? ""}:${item.total ?? ""}`)
+      .join("|");
+  }, [bom]);
+  const substitutionSuggestionIds = useMemo(() => {
+    return new Set(
+      buildSavingsRecommendations(bom, materials)
+        .filter((recommendation) =>
+          recommendation.type === "material_substitution" ||
+          recommendation.type === "seasonal_stock"
+        )
+        .map((recommendation) => recommendation.materialId),
+    );
+  }, [bom, materials]);
+  const [priceWatches, setPriceWatches] = useState<PriceWatch[]>([]);
+  const [priceWatchBusyId, setPriceWatchBusyId] = useState<string | null>(null);
+  const priceWatchByMaterial = useMemo(() => {
+    return new Map(priceWatches.map((watch) => [watch.material_id, watch]));
+  }, [priceWatches]);
+
+  const togglePackageLock = useCallback((materialId: string) => {
+    setLockedPackageMaterials((prev) => {
+      const next = new Set(prev);
+      if (next.has(materialId)) next.delete(materialId);
+      else next.add(materialId);
+      return next;
+    });
+  }, []);
+
+  const applyPackage = useCallback((tierId: PackageTierId) => {
+    const summary = packageSummaries.find((candidate) => candidate.tier.id === tierId);
+    if (!summary || !onReplaceMaterial) return;
+
+    for (const replacement of summary.replacements) {
+      if (replacement.locked || replacement.fromMaterialId === replacement.toMaterial.id) continue;
+      onReplaceMaterial(replacement.fromMaterialId, replacement.toMaterial.id);
+    }
+
+    setActivePackage(tierId);
+    setPackageDelta(summary.delta);
+    setPackageFlashKey((key) => key + 1);
+  }, [onReplaceMaterial, packageSummaries]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setPriceWatches([]);
+      return;
+    }
+    let cancelled = false;
+    api.getPriceWatches(projectId)
+      .then((watches) => {
+        if (!cancelled) setPriceWatches(watches);
+      })
+      .catch(() => {
+        if (!cancelled) setPriceWatches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const togglePriceWatch = useCallback(async (item: BomItem) => {
+    if (!projectId) return;
+    const existing = priceWatchByMaterial.get(item.material_id);
+    setPriceWatchBusyId(item.material_id);
+    try {
+      if (existing) {
+        await api.deletePriceWatch(existing.id);
+        setPriceWatches((prev) => prev.filter((watch) => watch.id !== existing.id));
+      } else {
+        const watch = await api.upsertPriceWatch({
+          project_id: projectId,
+          material_id: item.material_id,
+          watch_any_decrease: true,
+          notify_email: true,
+          notify_push: false,
+        });
+        setPriceWatches((prev) => [watch, ...prev.filter((candidate) => candidate.material_id !== item.material_id)]);
+      }
+    } finally {
+      setPriceWatchBusyId(null);
+    }
+  }, [priceWatchByMaterial, projectId]);
 
   // Extract scene material names that are not yet in the BOM
   const unmatchedSceneMaterials = useMemo(() => {
@@ -1846,12 +2414,125 @@ export default function BomPanel({
     }
   }, [onAddImported, t]);
 
+  const openBomImportPreview = useCallback((rows: ReturnType<typeof parseBomImportText>) => {
+    if (rows.length === 0) {
+      setImportError(t("bom.importNoRows"));
+      return;
+    }
+    setImportPreview(matchImportedBomRows(rows, materials));
+    setImportError(null);
+  }, [materials, t]);
+
+  const handleBomImportFile = useCallback(async (file: File) => {
+    try {
+      openBomImportPreview(await parseBomImportFile(file));
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : t("bom.importFailed"));
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [openBomImportPreview, t]);
+
+  const handleBomPaste = useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+    const text = event.clipboardData.getData("text/plain");
+    if (!text || (!text.includes("\n") && !text.trim().startsWith("[") && !text.trim().startsWith("{"))) return;
+
+    try {
+      const rows = parseBomImportText(text);
+      if (rows.length === 0) return;
+      event.preventDefault();
+      openBomImportPreview(rows);
+    } catch {
+      // Let ordinary paste continue if the clipboard is not tabular BOM data.
+    }
+  }, [openBomImportPreview]);
+
+  const unresolvedImportCount = importPreview.filter((row) => !row.matchedMaterialId).length;
+  const resolvedImportCount = importPreview.length - unresolvedImportCount;
+
+  const handleBomImportConfirm = useCallback(() => {
+    if (!onImportBom || unresolvedImportCount > 0) return;
+    const items = importPreview.flatMap((row) => {
+      const material = materials.find((candidate) => candidate.id === row.matchedMaterialId);
+      return material ? [buildImportedBomItem(row.imported, material)] : [];
+    });
+    if (items.length === 0) return;
+    onImportBom(items, importMode);
+    setImportPreview([]);
+    setImportError(null);
+  }, [importMode, importPreview, materials, onImportBom, unresolvedImportCount]);
+
   return (
     <div
-      className="editor-bom-panel"
+      className="editor-bom-panel panel-glow"
+      data-panel="bom"
       data-tour="bom-panel"
-      style={style}
+      style={{ position: "relative", ...style }}
+      ref={glow.ref}
+      onMouseMove={glow.onMouseMove}
+      onMouseLeave={glow.onMouseLeave}
+      onPaste={handleBomPaste}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("application/x-helscoop-material-id")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          return;
+        }
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          setImportDragging(true);
+        }
+      }}
+      onDragLeave={() => setImportDragging(false)}
+      onDrop={(event) => {
+        const moodBoardMaterialId = event.dataTransfer.getData("application/x-helscoop-material-id");
+        if (moodBoardMaterialId) {
+          event.preventDefault();
+          setImportDragging(false);
+          if (!bom.some((item) => item.material_id === moodBoardMaterialId)) {
+            onAdd(moodBoardMaterialId, 1);
+          }
+          return;
+        }
+        const file = event.dataTransfer.files[0];
+        if (!file) return;
+        event.preventDefault();
+        setImportDragging(false);
+        void handleBomImportFile(file);
+      }}
     >
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="bom-total-a11y-announcer"
+      >
+        {bomTotalAnnouncement}
+      </div>
+      {importDragging && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 8,
+            zIndex: 20,
+            pointerEvents: "none",
+            border: "2px dashed var(--amber)",
+            borderRadius: "var(--radius-lg)",
+            background: "rgba(229, 160, 75, 0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--amber)",
+            fontWeight: 700,
+          }}
+        >
+          {t("bom.importDrop")}
+        </div>
+      )}
+      {referencePhotosSlot}
       <div style={{
         padding: "16px 20px",
         borderBottom: "1px solid var(--border)",
@@ -1859,9 +2540,47 @@ export default function BomPanel({
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{t('editor.materialList')}</h3>
-          <span className="label-mono" style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            {t('editor.bomRowCount', { count: bom.length, suffix: bom.length === 1 ? '' : (locale === 'fi' ? 'a' : 's') })}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt,.json,.xlsx"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleBomImportFile(file);
+              }}
+            />
+            <button
+              className="bom-print-btn no-print"
+              onClick={() => fileInputRef.current?.click()}
+              title={t('bom.importBom')}
+              aria-label={t('bom.importBom')}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text-muted)", display: "inline-flex" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </button>
+            <button
+              className="bom-print-btn no-print"
+              onClick={() => window.print()}
+              title={t('editor.printBom')}
+              aria-label={t('editor.printBom')}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text-muted)", display: "inline-flex" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+            </button>
+            <span className="label-mono no-print" style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              {t('editor.bomRowCount', { count: bom.length, suffix: bom.length === 1 ? '' : (locale === 'fi' ? 'a' : 's') })}
+            </span>
+          </div>
         </div>
         <div style={{
           padding: "14px 16px",
@@ -1884,6 +2603,154 @@ export default function BomPanel({
             )}
           </div>
         </div>
+        {projectType === "taloyhtio" && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "12px 14px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid rgba(229,160,75,0.28)",
+              background: "rgba(229,160,75,0.08)",
+              display: "grid",
+              gap: 6,
+              fontSize: 12,
+            }}
+          >
+            <div className="label-mono" style={{ fontSize: 10, color: "var(--amber)" }}>
+              {t("taloyhtio.bomMultiplier")}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              <div>
+                <div style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("taloyhtio.perUnit")}</div>
+                <strong>{Math.round(total).toLocaleString(locale)} &euro;</strong>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("taloyhtio.unitCount")}</div>
+                <strong>{taloyhtioUnitCount}</strong>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("taloyhtio.buildingTotal")}</div>
+                <strong>{Math.round(taloyhtioBuildingTotal).toLocaleString(locale)} &euro;</strong>
+              </div>
+            </div>
+          </div>
+        )}
+        {importError && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 10,
+              padding: "8px 10px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              background: "rgba(239, 68, 68, 0.08)",
+              color: "var(--danger)",
+              fontSize: 12,
+            }}
+          >
+            {importError}
+          </div>
+        )}
+        {projectId && onImportBom && (
+          <PhotoEstimatePanel
+            projectId={projectId}
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            onImportBom={onImportBom}
+          />
+        )}
+        {projectId && onImportBom && (
+          <QuantityTakeoffPanel
+            projectId={projectId}
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            onImportBom={onImportBom}
+          />
+        )}
+        {projectId && (onImportBom || onApplyScene) && (
+          <RoomScanImportPanel
+            projectId={projectId}
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            currentSceneJs={sceneJs}
+            onApplyScene={onApplyScene}
+            onImportBom={onImportBom}
+          />
+        )}
+        {onApplyScene && (
+          <BlueprintToScenePanel
+            projectName={projectName}
+            buildingInfo={buildingInfo}
+            onApplyScene={onApplyScene}
+          />
+        )}
+        <PermitCheckerPanel buildingInfo={buildingInfo} />
+        {bom.length > 0 && (
+          <div className="package-switcher" data-has-choices={hasPackageChoices}>
+            <div className="package-switcher-head">
+              <div>
+                <div className="label-mono package-switcher-label">{t("bom.packageSwitcher")}</div>
+                <div className="package-switcher-desc">
+                  {hasPackageChoices ? t("bom.packageSwitcherDesc") : t("bom.packageNoAlternatives")}
+                </div>
+              </div>
+              {packageDelta !== null && (
+                <div
+                  key={packageFlashKey}
+                  className="package-delta-flash"
+                  data-positive={packageDelta > 0}
+                >
+                  {packageDelta > 0 ? "+" : ""}
+                  {formatPackageCurrency(packageDelta, locale)}
+                </div>
+              )}
+            </div>
+
+            <div className="package-tier-grid" role="radiogroup" aria-label={t("bom.packageSwitcher")}>
+              {packageSummaries.map((summary) => {
+                const isActive = activePackage === summary.tier.id;
+                const isDisabled = !onReplaceMaterial || summary.changedCount === 0;
+                return (
+                  <button
+                    key={summary.tier.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    className="package-tier-card"
+                    data-active={isActive}
+                    disabled={isDisabled}
+                    onClick={() => applyPackage(summary.tier.id)}
+                  >
+                    <span className="package-tier-name" style={{ color: summary.tier.tone }}>
+                      {t(summary.tier.labelKey)}
+                    </span>
+                    <span className="package-tier-total">
+                      {formatPackageCurrency(summary.total, locale)}
+                    </span>
+                    <span className="package-tier-delta" data-positive={summary.delta > 0}>
+                      {summary.delta > 0 ? "+" : ""}
+                      {formatPackageCurrency(summary.delta, locale)}
+                    </span>
+                    <span className="package-tier-changes">
+                      {t("bom.packageChanges", { count: summary.changedCount })}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activePackageSummary && (
+              <div className="package-switcher-foot">
+                <span>
+                  {t("bom.packageLocked", { count: lockedPackageMaterials.size })}
+                </span>
+                <span>
+                  {t("bom.packageCurrent")}: {t(activePackageSummary.tier.labelKey)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
         {bom.length > 0 && (
           <div
             style={{
@@ -1949,6 +2816,12 @@ export default function BomPanel({
             {t("bom.stockWarning", { count: stockSummary.outOfStock })}
           </div>
         )}
+        {campaignSavingsTotal > 0 && (
+          <div className="bom-campaign-summary" title={t("pricing.campaignSummaryTooltip")}>
+            <span>{t("pricing.campaignSummary", { count: activeCampaignCount })}</span>
+            <strong>-{campaignSavingsTotal.toFixed(2)} &euro;</strong>
+          </div>
+        )}
         {totalSavings > 0 && (
           <div
             title={t('pricing.savingsTooltip')}
@@ -1976,17 +2849,140 @@ export default function BomPanel({
             </span>
           </div>
         )}
+        {bom.length > 0 && projectId && (
+          <MaterialTrendDashboard projectId={projectId} bomSignature={materialTrendSignature} />
+        )}
+        {bom.length > 0 && (
+          <BomSavingsPanel
+            bom={bom}
+            materials={materials}
+            onApplySupplierPrice={onApplySupplierPrice}
+            onReplaceMaterial={onReplaceMaterial}
+            onCompareMaterial={(id, name) => setCompareMaterial({ id, name })}
+            onOpenMaterialPicker={(id) => {
+              if (onReplaceMaterial) setMaterialPickerId(id);
+            }}
+          />
+        )}
         {bom.length > 0 && total > 0 && (
           <CostBreakdownChart bom={bom} materials={materials} total={total} />
         )}
         {bom.length > 0 && (
           <QuoteSummary bom={bom} materials={materials} />
         )}
-        {bom.length > 0 && total > 0 && (
-          <SubsidyCalculator totalCost={total} buildingInfo={buildingInfo} />
+        {bom.length > 0 && (
+          <RenovationCostIndexPanel />
+        )}
+        {bom.length > 0 && (
+          <HouseholdDeductionPanel
+            bom={bom}
+            materials={materials}
+            coupleMode={householdDeductionJoint}
+            onCoupleModeChange={onHouseholdDeductionJointChange || (() => undefined)}
+          />
+        )}
+        {bom.length > 0 && (
+          <PhasedRenovationPlannerPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            projectName={projectName}
+            projectDescription={projectDescription}
+            coupleMode={householdDeductionJoint}
+            onCoupleModeChange={onHouseholdDeductionJointChange || (() => undefined)}
+          />
+        )}
+        {bom.length > 0 && (
+          <RenovationRoiPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            coupleMode={householdDeductionJoint}
+          />
+        )}
+        {bom.length > 0 && (
+          <RenovationFinancingPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+          />
+        )}
+        {bom.length > 0 && projectId && (
+          <MarketplaceCheckoutPanel
+            projectId={projectId}
+            bom={bom}
+            materials={materials}
+          />
+        )}
+        {bom.length > 0 && (
+          <KrautaProPartnerPanel
+            bom={bom}
+            materials={materials}
+            projectName={projectName}
+            projectDescription={projectDescription}
+          />
+        )}
+        {bom.length > 0 && (
+          <EuEnergyGrantPrecheckPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            totalCost={total}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setQuoteRequestOpen(true)}
+          disabled={bom.length === 0 || !projectId}
+          aria-label={t("quoteRequest.open")}
+          title={bom.length === 0 ? t("quoteRequest.emptyDisabled") : t("quoteRequest.open")}
+          style={{
+            marginTop: 10,
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "9px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: bom.length === 0 || !projectId ? "var(--text-muted)" : "var(--bg-primary)",
+            background: bom.length === 0 || !projectId ? "var(--bg-tertiary)" : "var(--amber)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            cursor: bom.length === 0 || !projectId ? "not-allowed" : "pointer",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+          </svg>
+          {t("quoteRequest.open")}
+        </button>
+        {bom.length > 0 && total > 0 && heatingGrantOpportunity.shouldShow && (
+          <SubsidyCalculator
+            totalCost={total}
+            buildingInfo={buildingInfo}
+            triggeredByScene={heatingGrantOpportunity.triggeredByScene}
+            detectedTargetHeating={heatingGrantOpportunity.detectedTargetHeating}
+          />
         )}
         {bom.length > 0 && projectId && (
           <WasteEstimatePanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
+        )}
+        {projectId && (
+          <IfcPreviewPanel projectId={projectId} projectName={projectName} />
+        )}
+        {projectId && (
+          <RyhtiSubmissionPanel projectId={projectId} bomCount={bom.length} buildingInfo={buildingInfo} />
+        )}
+        {bom.length > 0 && (
+          <RenovationRoadmapPanel
+            bom={bom}
+            materials={materials}
+            buildingInfo={buildingInfo}
+            projectName={projectName}
+            projectDescription={projectDescription}
+          />
         )}
         {bom.length > 0 && (
           <button
@@ -2034,7 +3030,55 @@ export default function BomPanel({
             {t('bom.exportCsv')}
           </button>
         )}
+        {bom.length > 0 && (
+          <button
+            onClick={() => setShowShoppingList(true)}
+            aria-label={t('shoppingList.title')}
+            style={{
+              marginTop: 6,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "var(--font-body)",
+              color: "var(--text-secondary)",
+              background: "var(--bg-tertiary)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-secondary)";
+              e.currentTarget.style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--bg-tertiary)";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            {t('shoppingList.title')}
+          </button>
+        )}
       </div>
+
+      {showShoppingList && (
+        <ShoppingListModal
+          bom={bom}
+          materials={materials}
+          projectName={projectName}
+          onClose={() => setShowShoppingList(false)}
+        />
+      )}
 
       {/* Scene material sync banner */}
       {unmatchedSceneMaterials.length > 0 && unmatchedSceneMaterials.some((u) => u.matched) && (
@@ -2103,7 +3147,7 @@ export default function BomPanel({
             <button
               className="bom-empty-cta"
               onClick={() => {
-                const searchInput = document.querySelector<HTMLInputElement>('[placeholder="' + t('pricing.searchMaterials') + '"]');
+                const searchInput = document.querySelector<HTMLInputElement>('[data-bom-search]');
                 if (searchInput) searchInput.focus();
               }}
             >
@@ -2127,6 +3171,26 @@ export default function BomPanel({
               onCompare={(id, name) => setCompareMaterial({ id, name })}
               onNavigate={(dir) => handleBomNavigate(idx, dir)}
               onFocusIndex={setFocusedBomIndex}
+              isPackageLocked={lockedPackageMaterials.has(item.material_id)}
+              isPriceWatched={priceWatchByMaterial.has(item.material_id)}
+              isPriceWatchBusy={priceWatchBusyId === item.material_id}
+              hasSubstitutionSuggestion={substitutionSuggestionIds.has(item.material_id)}
+              onTogglePackageLock={togglePackageLock}
+              onTogglePriceWatch={projectId ? togglePriceWatch : undefined}
+              onOpenMaterialPicker={(id) => {
+                if (onReplaceMaterial) setMaterialPickerId(id);
+              }}
+              onUpdateNote={onUpdateNote}
+              onDragStart={onReorder ? setDragFrom : undefined}
+              onDragOver={onReorder ? setDragOver : undefined}
+              onDragEnd={onReorder ? () => {
+                if (dragFrom !== null && dragOver !== null && dragFrom !== dragOver) {
+                  onReorder(dragFrom, dragOver);
+                }
+                setDragFrom(null);
+                setDragOver(null);
+              } : undefined}
+              isDragTarget={dragOver === idx}
             />
           ))
         )}
@@ -2195,6 +3259,8 @@ export default function BomPanel({
                 }
               }}
               placeholder={t('pricing.searchMaterials')}
+              aria-label={t('pricing.searchMaterials')}
+              data-bom-search
               style={{
                 width: "100%",
                 padding: keskoMode ? "7px 86px 7px 28px" : "7px 8px 7px 28px",
@@ -2411,6 +3477,11 @@ export default function BomPanel({
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                        {product.regularUnitPrice != null && product.unitPrice != null && product.regularUnitPrice > product.unitPrice && (
+                          <s style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-muted)" }}>
+                            {product.regularUnitPrice.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                          </s>
+                        )}
                         <span style={{
                           fontFamily: "var(--font-mono)",
                           fontSize: 12,
@@ -2420,6 +3491,11 @@ export default function BomPanel({
                         }}>
                           {product.unitPrice != null ? `${product.unitPrice.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : "--"}
                         </span>
+                        {product.campaignLabel && (
+                          <span className="badge badge-forest" style={{ fontSize: 9, padding: "1px 6px" }}>
+                            {product.campaignLabel}
+                          </span>
+                        )}
                         <span style={{ fontSize: 9, color: "var(--text-muted)" }}>
                           {localizeUnit(product.unit, t)} · {t("pricing.vatNote")}
                         </span>
@@ -2634,6 +3710,180 @@ export default function BomPanel({
           )}
         </div>
       </div>
+
+      {importPreview.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bom-import-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 120,
+            background: "rgba(0,0,0,0.62)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: "min(760px, 100%)",
+              maxHeight: "82vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <h3 id="bom-import-title" style={{ margin: 0, fontSize: 16 }}>{t("bom.importPreview")}</h3>
+                <p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: 12 }}>
+                  {t("bom.importMatched", { resolved: resolvedImportCount, total: importPreview.length })}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setImportPreview([])}
+                aria-label={t("dialog.close")}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: 16, borderBottom: "1px solid var(--border)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {(["merge", "replace"] as BomImportMode[]).map((mode) => (
+                <label
+                  key={mode}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="bom-import-mode"
+                    checked={importMode === mode}
+                    onChange={() => setImportMode(mode)}
+                  />
+                  {t(mode === "merge" ? "bom.importMerge" : "bom.importReplace")}
+                </label>
+              ))}
+              {unresolvedImportCount > 0 && (
+                <span className="badge badge-warning">
+                  {t("bom.importUnmatched", { count: unresolvedImportCount })}
+                </span>
+              )}
+            </div>
+
+            <div style={{ overflow: "auto", padding: 16 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.importedRow")}</th>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.quantity")}</th>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.matchedMaterial")}</th>
+                    <th style={{ textAlign: "left", padding: "8px", color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{t("bom.confidence")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ fontWeight: 600 }}>{row.imported.materialKey}</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                          {t("bom.row")} {row.imported.rowNumber}
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)", fontFamily: "var(--font-mono)" }}>
+                        {row.imported.quantity} {row.imported.unit}
+                      </td>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+                        <select
+                          className="input"
+                          value={row.matchedMaterialId ?? ""}
+                          onChange={(event) => {
+                            const value = event.target.value || null;
+                            setImportPreview((prev) =>
+                              prev.map((candidate) =>
+                                candidate.id === row.id
+                                  ? { ...candidate, matchedMaterialId: value, confidence: value ? 100 : 0 }
+                                  : candidate
+                              )
+                            );
+                          }}
+                          aria-label={t("bom.matchedMaterial")}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: 12 }}
+                        >
+                          <option value="">{t("bom.chooseMaterial")}</option>
+                          {materials.map((material) => (
+                            <option key={material.id} value={material.id}>
+                              {getLocalizedMaterialName(material, locale)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+                        <span className={`badge ${row.matchedMaterialId ? "badge-forest" : "badge-warning"}`}>
+                          {row.matchedMaterialId ? `${row.confidence}%` : t("bom.unmatched")}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ padding: 16, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setImportPreview([])}>
+                {t("dialog.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={unresolvedImportCount > 0 || !onImportBom}
+                onClick={handleBomImportConfirm}
+              >
+                {t("bom.importApply")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(() => {
+        const pickerItem = materialPickerId ? bom.find((item) => item.material_id === materialPickerId) : null;
+        if (!pickerItem || !onReplaceMaterial) return null;
+        return (
+          <MaterialPicker
+            currentMaterialId={pickerItem.material_id}
+            bomItem={pickerItem}
+            materials={materials}
+            disabledMaterialIds={new Set(bom.map((item) => item.material_id).filter((id) => id !== pickerItem.material_id))}
+            onClose={() => setMaterialPickerId(null)}
+            onSelect={(toMaterialId) => onReplaceMaterial(pickerItem.material_id, toMaterialId)}
+          />
+        );
+      })()}
+
+      {projectId && (
+        <QuoteRequestModal
+          open={quoteRequestOpen}
+          projectId={projectId}
+          projectName={projectName || t("project.emptyTitle")}
+          projectDescription={projectDescription}
+          buildingInfo={buildingInfo}
+          bom={bom}
+          totalCost={total}
+          onClose={() => setQuoteRequestOpen(false)}
+        />
+      )}
 
       {/* Price comparison popup */}
       {compareMaterial && (

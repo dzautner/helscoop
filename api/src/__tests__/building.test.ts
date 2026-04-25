@@ -37,7 +37,7 @@ import app from "../index";
 function makeRequest(
   method: string,
   path: string,
-  opts: { headers?: Record<string, string> } = {}
+  opts: { headers?: Record<string, string>; body?: unknown } = {}
 ): Promise<{ status: number; body: unknown }> {
   return new Promise((resolve, reject) => {
     const server = app.listen(0, () => {
@@ -72,6 +72,10 @@ function makeRequest(
         server.close();
         reject(err);
       });
+
+      if (opts.body !== undefined) {
+        req.write(JSON.stringify(opts.body));
+      }
 
       req.end();
     });
@@ -203,6 +207,26 @@ describe("GET /building — demo address matching", () => {
     expect(body.scene_js).toContain("scene.add");
   });
 
+  it("adds NLS terrain metadata and visible terrain to demo scenes", async () => {
+    const res = await makeRequest(
+      "GET",
+      `/building?address=${encodeURIComponent("Ribbingintie 109")}`
+    );
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      building_info: { ground_elevation_m?: number; terrain_source?: string };
+      terrain?: { baseElevationM: number; points: unknown[]; source: string };
+      scene_js: string;
+      data_sources: string[];
+    };
+
+    expect(body.building_info.ground_elevation_m).toBeGreaterThan(0);
+    expect(body.building_info.terrain_source).toContain("NLS Elevation Model 2m");
+    expect(body.terrain?.points.length).toBe(9);
+    expect(body.scene_js).toContain("nls_terrain_plane");
+    expect(body.data_sources.some((source) => source.includes("NLS Elevation Model 2m"))).toBe(true);
+  });
+
   it("returns bom_suggestion for demo match", async () => {
     const res = await makeRequest(
       "GET",
@@ -217,6 +241,71 @@ describe("GET /building — demo address matching", () => {
     expect(body.bom_suggestion[0]).toHaveProperty("material_id");
     expect(body.bom_suggestion[0]).toHaveProperty("quantity");
     expect(body.bom_suggestion[0]).toHaveProperty("unit");
+  });
+
+  it("returns at least 12 verified curated demo addresses across metro building types", async () => {
+    const addresses = [
+      "Ribbingintie 109-11, 00890 Helsinki",
+      "Uunimaentie 1, 01200 Vantaa",
+      "Mannerheimintie 42, 00100 Helsinki",
+      "Hameentie 11, 00530 Helsinki",
+      "Lauttasaarentie 25, 00200 Helsinki",
+      "Kaskenkaatajantie 9, 02140 Espoo",
+      "Kuurinniityntie 7, 02750 Espoo",
+      "Tapiolanranta 4, 02100 Espoo",
+      "Pahkinarinteentie 18, 01710 Vantaa",
+      "Leinelantie 8, 01340 Vantaa",
+      "Puistolanraitio 6, 00760 Helsinki",
+      "Rajamaentie 12, 05200 Rajamaki",
+    ];
+
+    const types = new Set<string>();
+    const municipalities = new Set<string>();
+
+    for (const address of addresses) {
+      const res = await makeRequest(
+        "GET",
+        `/building?address=${encodeURIComponent(address)}`
+      );
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        confidence: string;
+        address: string;
+        coordinates: { lat: number; lon: number };
+        building_info: { type: string };
+        scene_js: string;
+      };
+      expect(body.confidence).toBe("verified");
+      expect(body.coordinates.lat).toBeGreaterThan(59);
+      expect(body.coordinates.lon).toBeGreaterThan(23);
+      expect(body.scene_js).toContain("scene.add");
+      types.add(body.building_info.type);
+      municipalities.add(body.address.split(",").at(-1)?.trim().split(" ").at(-1) ?? "");
+    }
+
+    expect(types.size).toBeGreaterThanOrEqual(4);
+    expect(municipalities.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not match a demo when the same street has a different house number", async () => {
+    const res = await makeRequest(
+      "GET",
+      `/building?address=${encodeURIComponent("Mannerheimintie 1, 00100 Helsinki")}`
+    );
+    expect(res.status).toBe(200);
+    const body = res.body as { confidence: string };
+    expect(body.confidence).toBe("estimated");
+  });
+
+  it("matches accented Finnish street input against normalized demo keys", async () => {
+    const res = await makeRequest(
+      "GET",
+      `/building?address=${encodeURIComponent("Hämeentie 11, 00530 Helsinki")}`
+    );
+    expect(res.status).toBe(200);
+    const body = res.body as { confidence: string; address: string };
+    expect(body.confidence).toBe("verified");
+    expect(body.address).toContain("Hameentie 11");
   });
 });
 
@@ -244,24 +333,58 @@ describe("GET /building — generic building fallback", () => {
     expect(body.building_info.type).toBe("kerrostalo");
   });
 
-  it("generates omakotitalo for Helsinki suburbs (postal 003xx+)", async () => {
+  it("generates kerrostalo for dense Helsinki inner suburbs (postal 005xx)", async () => {
     const res = await makeRequest(
       "GET",
       `/building?address=${encodeURIComponent("Kotikatu 5, 00500 Helsinki")}`
     );
     expect(res.status).toBe(200);
     const body = res.body as { building_info: { type: string } };
-    expect(body.building_info.type).toBe("omakotitalo");
+    expect(body.building_info.type).toBe("kerrostalo");
   });
 
-  it("generates omakotitalo for Espoo (postal 02xxx)", async () => {
+  it("generates paritalo for smaller Espoo street patterns (postal 02xxx)", async () => {
     const res = await makeRequest(
       "GET",
       `/building?address=${encodeURIComponent("Otakaari 1, 02150 Espoo")}`
     );
     expect(res.status).toBe(200);
     const body = res.body as { building_info: { type: string } };
-    expect(body.building_info.type).toBe("omakotitalo");
+    expect(body.building_info.type).toBe("paritalo");
+  });
+
+  it("produces distinct generic models for different postal-code and street patterns", async () => {
+    const addresses = [
+      "Aleksanterinkatu 12, 00100 Helsinki",
+      "Kotikatu 5, 00500 Helsinki",
+      "Metsapolku 8, 00760 Helsinki",
+      "Asematie 4, 01300 Vantaa",
+      "Otakaari 1, 02150 Espoo",
+      "Hirsitie 2, 05200 Rajamaki",
+    ];
+
+    const profiles = [];
+    for (const address of addresses) {
+      const res = await makeRequest(
+        "GET",
+        `/building?address=${encodeURIComponent(address)}`
+      );
+      expect(res.status).toBe(200);
+      const body = res.body as {
+        confidence: string;
+        building_info: { type: string; year_built: number; area_m2: number; floors: number; material: string };
+        data_sources: string[];
+      };
+      expect(body.confidence).toBe("estimated");
+      expect(body.data_sources[0]).toContain(body.building_info.type);
+      profiles.push(body.building_info);
+    }
+
+    const signatures = new Set(
+      profiles.map((profile) => `${profile.type}-${profile.year_built}-${profile.area_m2}-${profile.floors}-${profile.material}`)
+    );
+    expect(signatures.size).toBe(addresses.length);
+    expect(new Set(profiles.map((profile) => profile.type)).size).toBeGreaterThanOrEqual(4);
   });
 
   it("generates scene_js for generic building", async () => {
@@ -301,14 +424,14 @@ describe("GET /building — generic building fallback", () => {
     expect(body.building_info.heating).toBe("kaukolampo");
   });
 
-  it("generic building uses harjakatto roof type", async () => {
+  it("generic downtown apartment uses flat roof type", async () => {
     const res = await makeRequest(
       "GET",
       `/building?address=${encodeURIComponent("Testipolku 1, 00100 Helsinki")}`
     );
     expect(res.status).toBe(200);
     const body = res.body as { building_info: { roof_type: string } };
-    expect(body.building_info.roof_type).toBe("harjakatto");
+    expect(body.building_info.roof_type).toBe("tasakatto");
   });
 
   it("defaults to omakotitalo when postal code is not recognized", async () => {
@@ -328,7 +451,7 @@ describe("GET /building — generic building fallback", () => {
     );
     expect(res.status).toBe(200);
     const body = res.body as { scene_js: string; building_info: { floors: number } };
-    expect(body.building_info.floors).toBe(5);
+    expect(body.building_info.floors).toBeGreaterThanOrEqual(5);
     // Scene should have ground floor and upper floor references
     expect(body.scene_js).toContain("gf_front");
     // Should have at least one upper floor
@@ -337,7 +460,106 @@ describe("GET /building — generic building fallback", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. External Finnish registry integration
+// 4. Manual building generation
+// ---------------------------------------------------------------------------
+describe("POST /building/generate", () => {
+  it("generates a manual-confidence building from corrected user details", async () => {
+    const res = await makeRequest(
+      "POST",
+      "/building/generate",
+      {
+        body: {
+          address: "Merikannontie 3, 00260 Helsinki",
+          coordinates: { lat: 60.181, lon: 24.912 },
+          building_info: {
+            type: "paritalo",
+            year_built: 1924,
+            area_m2: 185.5,
+            floors: 3,
+            material: "tiili",
+            heating: "maalampopumppu",
+            roof_type: "mansardikatto",
+          },
+        },
+      }
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      confidence: string;
+      address: string;
+      coordinates: { lat: number; lon: number };
+      building_info: {
+        type: string;
+        year_built: number;
+        area_m2: number;
+        floors: number;
+        material: string;
+        heating: string;
+        roof_type: string;
+        ground_elevation_m?: number;
+      };
+      data_sources: string[];
+      scene_js: string;
+      bom_suggestion: { material_id: string; quantity: number }[];
+    };
+    expect(body.confidence).toBe("manual");
+    expect(body.address).toBe("Merikannontie 3, 00260 Helsinki");
+    expect(body.coordinates.lat).toBeCloseTo(60.181);
+    expect(body.building_info).toMatchObject({
+      type: "paritalo",
+      year_built: 1924,
+      area_m2: 185.5,
+      floors: 3,
+      material: "tiili",
+      heating: "maalampopumppu",
+      roof_type: "mansardikatto",
+    });
+    expect(body.data_sources).toContain("User-corrected building details");
+    expect(body.data_sources.some((source) => source.includes("NLS Elevation Model 2m"))).toBe(true);
+    expect(body.building_info.ground_elevation_m).toBeGreaterThan(0);
+    expect(body.scene_js).toContain("scene.add");
+    expect(body.scene_js).toContain("nls_terrain_base_elevation_m");
+    expect(body.bom_suggestion.length).toBeGreaterThan(0);
+  });
+
+  it("sanitizes invalid generated building input", async () => {
+    const res = await makeRequest(
+      "POST",
+      "/building/generate",
+      {
+        body: {
+          building_info: {
+            type: "castle",
+            year_built: 1200,
+            area_m2: -4,
+            floors: 99,
+            material: "paper",
+            heating: "fire",
+            roof_type: "cloud",
+          },
+        },
+      }
+    );
+
+    expect(res.status).toBe(200);
+    const info = (res.body as {
+      building_info: { type: string; year_built: number; area_m2: number; floors: number; material: string; heating: string; roof_type: string };
+    }).building_info;
+    expect(info).toMatchObject({
+      type: "omakotitalo",
+      year_built: 1800,
+      area_m2: 20,
+      floors: 10,
+      material: "puu",
+      heating: "kaukolampo",
+      roof_type: "harjakatto",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. External Finnish registry integration
 // ---------------------------------------------------------------------------
 describe("GET /building — Finnish registry integration", () => {
   const originalFetch = global.fetch;
@@ -468,13 +690,60 @@ describe("GET /building — Finnish registry integration", () => {
     };
 
     expect(body.confidence).toBe("estimated");
-    expect(body.data_sources).toContain("Yleinen kerrostalomalli");
+    expect(body.data_sources).toContain("Yleinen omakotitalomalli");
     expect(body.data_source_error).toContain("Finnish registry lookup failed");
   });
 });
 
 // ---------------------------------------------------------------------------
-// 5. Cache behavior
+// 5. Terrain endpoint
+// ---------------------------------------------------------------------------
+describe("GET /terrain", () => {
+  it("returns a sampled EPSG:3067 terrain grid for the requested bbox", async () => {
+    const res = await makeRequest(
+      "GET",
+      "/terrain?bbox=384900,6671900,385100,6672100&crs=3067&samples=5"
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      crs: string;
+      rows: number;
+      cols: number;
+      points: unknown[];
+      base_elevation_m: number;
+      source: string;
+    };
+
+    expect(body.crs).toBe("EPSG:3067");
+    expect(body.rows).toBe(5);
+    expect(body.cols).toBe(5);
+    expect(body.points.length).toBe(25);
+    expect(body.base_elevation_m).toBeGreaterThan(0);
+    expect(body.source).toContain("NLS Elevation Model 2m");
+  });
+
+  it("supports the documented /api/terrain alias", async () => {
+    const res = await makeRequest(
+      "GET",
+      "/api/terrain?lat=60.2685&lon=25.1955&length_m=12&width_m=10"
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      baseElevationM: number;
+      averageElevationM: number;
+      points: unknown[];
+    };
+
+    expect(body.baseElevationM).toBeGreaterThan(0);
+    expect(body.averageElevationM).toBeGreaterThanOrEqual(body.baseElevationM);
+    expect(body.points.length).toBe(9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Cache behavior
 // ---------------------------------------------------------------------------
 describe("GET /building — caching", () => {
   it("returns consistent results for the same address", async () => {

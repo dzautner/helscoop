@@ -7,6 +7,10 @@ interface SharedProject {
   name: string;
   description: string;
   thumbnail_url?: string | null;
+  share_preview?: {
+    kind?: string;
+    after_image?: string;
+  } | null;
 }
 
 async function fetchSharedProject(token: string): Promise<SharedProject | null> {
@@ -40,7 +44,9 @@ export async function generateMetadata({
   const description =
     project.description ||
     "Remonttiprojekti suunniteltu Helscoopilla \u2014 3D-mallinnus, materiaalit ja kustannusarvio.";
-  const ogImage = project.thumbnail_url || "https://helscoop.fi/og-default.png";
+  const ogImage = project.share_preview?.kind === "before_after" && project.share_preview.after_image
+    ? `${API_URL}/shared/${encodeURIComponent(token)}/og-image`
+    : project.thumbnail_url || "https://helscoop.fi/og-default.png";
 
   return {
     title,

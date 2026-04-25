@@ -1,9 +1,11 @@
 const webpack = require("webpack");
+const path = require("path");
 const { withSentryConfig } = require("@sentry/nextjs");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  outputFileTracingRoot: path.join(__dirname),
   experimental: {
     viewTransition: true,
   },

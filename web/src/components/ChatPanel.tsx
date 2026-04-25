@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { api } from "@/lib/api";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { api, ApiError } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useCursorGlow } from "@/hooks/useCursorGlow";
+import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import type { ChatMessage, BomItem } from "@/types";
+import { buildSavingsRecommendations } from "@/lib/bom-savings";
+import { countSceneAddCalls } from "@/lib/scene-a11y";
+import { interpretScene } from "@/lib/scene-interpreter";
+import type { ChatMessage, BomItem, Material, ProjectImage } from "@/types";
 
 interface ChatContextBuildingInfo {
   address?: string;
@@ -29,26 +34,95 @@ function shouldGroup(current: ChatMessage, prev: ChatMessage | undefined): boole
   return current.role === prev.role;
 }
 
+interface DiffLine {
+  type: "add" | "remove" | "context";
+  content: string;
+}
+
+function computeSimpleDiff(oldText: string, newText: string): DiffLine[] {
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
+  const result: DiffLine[] = [];
+  const maxLen = Math.max(oldLines.length, newLines.length);
+  const contextWindow = 2;
+  const changed = new Set<number>();
+
+  for (let i = 0; i < maxLen; i++) {
+    if (i >= oldLines.length || i >= newLines.length || oldLines[i] !== newLines[i]) {
+      for (let j = Math.max(0, i - contextWindow); j <= Math.min(maxLen - 1, i + contextWindow); j++) {
+        changed.add(j);
+      }
+    }
+  }
+
+  let lastShown = -2;
+  for (let i = 0; i < maxLen; i++) {
+    if (!changed.has(i)) continue;
+    if (i > lastShown + 1 && lastShown >= 0) {
+      result.push({ type: "context", content: "···" });
+    }
+    lastShown = i;
+
+    const oldLine = i < oldLines.length ? oldLines[i] : undefined;
+    const newLine = i < newLines.length ? newLines[i] : undefined;
+
+    if (oldLine === newLine) {
+      result.push({ type: "context", content: oldLine! });
+    } else {
+      if (oldLine !== undefined) result.push({ type: "remove", content: oldLine });
+      if (newLine !== undefined) result.push({ type: "add", content: newLine });
+    }
+  }
+
+  if (result.length === 0) {
+    result.push({ type: "context", content: "(no changes)" });
+  }
+  return result;
+}
+
 export default function ChatPanel({
+  projectId,
   sceneJs,
   onApplyCode,
   bom,
+  materials,
   projectName,
   projectDescription,
   buildingInfo,
+  renovationRoiSummary,
+  referenceImages,
+  onMessageCountChange,
 }: {
+  projectId?: string;
   sceneJs: string;
   onApplyCode: (code: string) => void;
   bom?: BomItem[];
+  materials?: Material[];
   projectName?: string;
   projectDescription?: string;
   buildingInfo?: ChatContextBuildingInfo;
+  renovationRoiSummary?: string;
+  referenceImages?: ProjectImage[];
+  onMessageCountChange?: (count: number) => void;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const glow = useCursorGlow();
+  const chatStorageKey = projectId ? `helscoop-chat-${projectId}` : null;
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === "undefined" || !chatStorageKey) return [];
+    try {
+      const stored = localStorage.getItem(chatStorageKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    if (!chatStorageKey || messages.length === 0) return;
+    try { localStorage.setItem(chatStorageKey, JSON.stringify(messages.slice(-50))); } catch {}
+  }, [messages, chatStorageKey]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [skipConfirm, setSkipConfirm] = useState(false);
+  const [diffExpandedIdx, setDiffExpandedIdx] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -57,6 +131,11 @@ export default function ChatPanel({
   const { toast } = useToast();
   const { t } = useTranslation();
   const { track } = useAnalytics();
+  const { play: playSound } = useAmbientSound();
+
+  useEffect(() => {
+    onMessageCountChange?.(messages.length);
+  }, [messages.length, onMessageCountChange]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -82,6 +161,12 @@ export default function ChatPanel({
   }, [input, autoResizeTextarea]);
 
   function handleApplyClick(code: string) {
+    const result = interpretScene(code);
+    if (result.error) {
+      toast(t("editor.aiValidationFailed"), "error");
+      track("chat_code_validation_failed", {} as Record<string, never>);
+      return;
+    }
     track("chat_code_applied", {} as Record<string, never>);
     if (skipConfirm) {
       onApplyCode(code);
@@ -115,14 +200,39 @@ export default function ChatPanel({
         unit: item.unit,
         total: item.total || (item.unit_price || 0) * item.quantity,
       }));
+      const substitutionSuggestions = bom && materials?.length
+        ? buildSavingsRecommendations(bom, materials)
+          .filter((recommendation) => recommendation.type === "material_substitution" || recommendation.type === "seasonal_stock")
+          .slice(0, 5)
+          .map((recommendation) => ({
+            material: recommendation.materialName,
+            materialId: recommendation.materialId,
+            substitute: recommendation.toMaterialName,
+            substituteId: recommendation.toMaterialId,
+            savings: Math.round(recommendation.savingsAmount),
+            savingsPercent: Math.round(recommendation.savingsPercent),
+            reason: recommendation.reason,
+            stockLevel: recommendation.stockLevel ?? null,
+          }))
+        : undefined;
       const reply = await api.chat(newMessages, sceneJs, {
         bomSummary,
+        substitutionSuggestions,
         buildingInfo,
         projectInfo: { name: projectName, description: projectDescription },
-      });
-      setMessages([...newMessages, reply]);
+        renovationRoiSummary,
+        projectId,
+      }) as ChatMessage & { credits?: { cost: number; balance: number } };
+      if (reply.credits && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("helscoop:credits-updated", { detail: reply.credits }));
+      }
+      setMessages([...newMessages, { role: reply.role, content: reply.content }]);
+      playSound("chatReply");
     } catch (err) {
-      toast(err instanceof Error ? err.message : t('toast.aiError'), "error");
+      const message = err instanceof ApiError && err.status === 402
+        ? t("credits.insufficient")
+        : err instanceof Error ? err.message : t('toast.aiError');
+      toast(message, "error");
       setMessages([
         ...newMessages,
         { role: "assistant", content: t('editor.chatError') },
@@ -136,16 +246,8 @@ export default function ChatPanel({
     return match ? match[1].trim() : null;
   }
 
-  /** Count scene.add calls in code to show preview hint */
-  const countSceneObjects = useMemo(() => {
-    return (code: string): number => {
-      const matches = code.match(/scene\.add\(/g);
-      return matches ? matches.length : 0;
-    };
-  }, []);
-
   return (
-    <div className="chat-embedded">
+    <div className="chat-embedded panel-glow" ref={glow.ref} onMouseMove={glow.onMouseMove} onMouseLeave={glow.onMouseLeave}>
       {/* Messages area - expands when there are messages */}
       {expanded && messages.length > 0 && (
         <div className="chat-messages-area">
@@ -159,13 +261,20 @@ export default function ChatPanel({
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
-          <div className="chat-messages-scroll" role="log" aria-label={t('editor.chatMessages')}>
+          <div
+            className="chat-messages-scroll"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+            aria-label={t('editor.chatMessages')}
+          >
             {messages.map((msg, i) => {
               const code = msg.role === "assistant" ? extractCode(msg.content) : null;
               const textContent = msg.content
                 .replace(/```(?:javascript|js)?\n[\s\S]*?```/g, "")
                 .trim();
               const grouped = shouldGroup(msg, messages[i - 1]);
+              const codeObjectCount = code ? countSceneAddCalls(code) : 0;
 
               return (
                 <div
@@ -187,20 +296,48 @@ export default function ChatPanel({
                   <div className="chat-msg-content">
                     {textContent && <span>{textContent}</span>}
                     {code && (
-                      <div className="chat-apply-bar">
-                        <button
-                          className="chat-apply-btn"
-                          onClick={() => handleApplyClick(code)}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          {t('editor.applyToScene')}
-                        </button>
-                        <span className="chat-apply-hint">
-                          {countSceneObjects(code)} {countSceneObjects(code) === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
-                        </span>
-                      </div>
+                      <>
+                        <div className="chat-apply-bar">
+                          <button
+                            className="chat-apply-btn"
+                            onClick={() => handleApplyClick(code)}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            {t('editor.applyToScene')}
+                          </button>
+                          <button
+                            className="chat-diff-btn"
+                            onClick={() => setDiffExpandedIdx(diffExpandedIdx === i ? null : i)}
+                            aria-expanded={diffExpandedIdx === i}
+                            title={t('editor.previewDiff')}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 3v18M3 12h18" />
+                            </svg>
+                            {t('editor.previewDiff')}
+                          </button>
+                          <span className="chat-apply-hint">
+                            {codeObjectCount} {codeObjectCount === 1 ? t('editor.objectSingular') : t('editor.objectPlural')}
+                          </span>
+                        </div>
+                        {diffExpandedIdx === i && (
+                          <div className="chat-diff-preview" role="region" aria-label={t('editor.diffPreview')}>
+                            {computeSimpleDiff(sceneJs, code).map((line, li) => (
+                              <div
+                                key={li}
+                                className={`chat-diff-line chat-diff-${line.type}`}
+                              >
+                                <span className="chat-diff-marker">
+                                  {line.type === "add" ? "+" : line.type === "remove" ? "−" : " "}
+                                </span>
+                                {line.content}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -238,8 +375,8 @@ export default function ChatPanel({
         </button>
       )}
 
-      {/* Suggestion chips when empty */}
-      {messages.length === 0 && !loading && (
+      {/* Suggestion chips — visible when input is empty */}
+      {!input && !loading && (
         <div style={{
           display: "flex",
           gap: 6,
@@ -272,7 +409,7 @@ export default function ChatPanel({
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-        <textarea
+          <textarea
           ref={inputRef}
           className="chat-input"
           value={input}
@@ -292,8 +429,13 @@ export default function ChatPanel({
           placeholder={messages.length === 0 ? t('editor.describeChange') : t('editor.continueConversation')}
           disabled={loading}
           aria-label={t('editor.chatInputLabel')}
-        />
-        <button
+          />
+          {referenceImages && referenceImages.length > 0 && (
+            <div className="chat-reference-photo-context" aria-label={`${referenceImages.length} reference photos available to AI chat`}>
+              {referenceImages.length} house photo{referenceImages.length === 1 ? "" : "s"} attached to AI context
+            </div>
+          )}
+          <button
           className="chat-send-btn"
           onClick={send}
           disabled={loading || !input.trim()}
@@ -321,8 +463,7 @@ export default function ChatPanel({
         cancelText={t('editor.cancel') || "Cancel"}
         onConfirm={handleConfirmApply}
         onCancel={() => setPendingCode(null)}
-      />
-      {pendingCode !== null && (
+      >
         <div className="chat-skip-confirm">
           <input
             type="checkbox"
@@ -335,7 +476,7 @@ export default function ChatPanel({
             {t('editor.dontAskAgain') || "Don't ask again this session"}
           </label>
         </div>
-      )}
+      </ConfirmDialog>
     </div>
   );
 }
