@@ -5,6 +5,7 @@ import type { Project, Template } from "@/types";
 
 const mockGetProjects = vi.fn();
 const mockGetTemplates = vi.fn();
+const mockRecordTemplateUse = vi.fn();
 const mockCreateProject = vi.fn();
 const mockDeleteProject = vi.fn();
 const mockDuplicateProject = vi.fn();
@@ -47,6 +48,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getProjects: (...args: unknown[]) => mockGetProjects(...args),
     getTemplates: (...args: unknown[]) => mockGetTemplates(...args),
+    recordTemplateUse: (...args: unknown[]) => mockRecordTemplateUse(...args),
     createProject: (...args: unknown[]) => mockCreateProject(...args),
     deleteProject: (...args: unknown[]) => mockDeleteProject(...args),
     duplicateProject: (...args: unknown[]) => mockDuplicateProject(...args),
@@ -175,6 +177,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetProjects.mockResolvedValue(mockProjects);
   mockGetTemplates.mockResolvedValue(mockTemplatesData);
+  mockRecordTemplateUse.mockResolvedValue({ ok: true, id: "t1", use_count: 1 });
   mockAggregateBOM.mockResolvedValue({
     project_ids: ["p1", "p2"],
     project_count: 2,

@@ -528,9 +528,24 @@ export interface TerrainFootprintSample {
 export interface Template {
   id: string;
   name: string;
+  name_fi?: string | null;
+  name_en?: string | null;
   description: string;
-  icon: string;
-  estimated_cost: number;
+  description_fi?: string | null;
+  description_en?: string | null;
+  category?: "sauna" | "garage" | "shed" | "terrace" | "other" | string;
+  icon?: string | null;
+  thumbnail_url?: string | null;
+  estimated_cost: number | null;
+  difficulty?: "beginner" | "intermediate" | "advanced" | string;
+  area_m2?: number | null;
+  is_featured?: boolean;
+  is_community?: boolean;
+  author_id?: string | null;
+  author_name?: string | null;
+  use_count?: number;
+  created_at?: string;
+  updated_at?: string;
   scene_js: string;
   bom: { material_id: string; quantity: number; unit: string }[];
 }
