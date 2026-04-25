@@ -30,17 +30,37 @@ export default function GalleryPage() {
   const [projects, setProjects] = useState<GalleryProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [filtersReady, setFiltersReady] = useState(false);
   const [q, setQ] = useState("");
   const [projectType, setProjectType] = useState<ProjectType | "">("");
   const [costRange, setCostRange] = useState<GalleryCostRange | "">("");
   const [region, setRegion] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [renovationType, setRenovationType] = useState("");
   const [material, setMaterial] = useState("");
   const [cloningId, setCloningId] = useState<string | null>(null);
   const deferredQ = useDeferredValue(q);
   const deferredRegion = useDeferredValue(region);
+  const deferredPostalCode = useDeferredValue(postalCode);
+  const deferredRenovationType = useDeferredValue(renovationType);
   const deferredMaterial = useDeferredValue(material);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialProjectType = params.get("project_type") ?? "";
+    const initialCostRange = params.get("cost_range") ?? "";
+    setQ(params.get("q") ?? "");
+    setProjectType(initialProjectType === "omakotitalo" || initialProjectType === "taloyhtio" ? initialProjectType : "");
+    setCostRange(initialCostRange === "under-5k" || initialCostRange === "5k-15k" || initialCostRange === "15k-50k" || initialCostRange === "50k-plus" ? initialCostRange : "");
+    setRegion(params.get("region") ?? "");
+    setPostalCode((params.get("postal_code") ?? "").replace(/[^\d]/g, "").slice(0, 5));
+    setRenovationType(params.get("renovation_type") ?? "");
+    setMaterial(params.get("material") ?? "");
+    setFiltersReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filtersReady) return;
     let active = true;
     setLoading(true);
     setError(false);
@@ -49,6 +69,8 @@ export default function GalleryPage() {
       project_type: projectType,
       cost_range: costRange,
       region: deferredRegion.trim(),
+      postal_code: deferredPostalCode.trim(),
+      renovation_type: deferredRenovationType.trim(),
       material: deferredMaterial.trim(),
       limit: 36,
     })
@@ -57,7 +79,7 @@ export default function GalleryPage() {
         setProjects(result.projects);
         track("gallery_viewed", {
           result_count: result.projects.length,
-          has_query: Boolean(deferredQ.trim() || deferredRegion.trim() || deferredMaterial.trim()),
+          has_query: Boolean(deferredQ.trim() || deferredRegion.trim() || deferredPostalCode.trim() || deferredRenovationType.trim() || deferredMaterial.trim()),
           project_type: projectType || undefined,
           cost_range: costRange || undefined,
         });
@@ -71,7 +93,7 @@ export default function GalleryPage() {
     return () => {
       active = false;
     };
-  }, [costRange, deferredMaterial, deferredQ, deferredRegion, projectType, track]);
+  }, [costRange, deferredMaterial, deferredPostalCode, deferredQ, deferredRegion, deferredRenovationType, filtersReady, projectType, track]);
 
   async function cloneProject(project: GalleryProject) {
     setCloningId(project.id);
@@ -125,6 +147,19 @@ export default function GalleryPage() {
           <input value={region} onChange={(event) => setRegion(event.target.value)} placeholder="Espoo, Uusimaa..." />
         </label>
         <label>
+          Postal code
+          <input
+            value={postalCode}
+            onChange={(event) => setPostalCode(event.target.value.replace(/[^\d]/g, "").slice(0, 5))}
+            placeholder="00330"
+            inputMode="numeric"
+          />
+        </label>
+        <label>
+          Renovation type
+          <input value={renovationType} onChange={(event) => setRenovationType(event.target.value)} placeholder="roof, facade, sauna..." />
+        </label>
+        <label>
           Material
           <input value={material} onChange={(event) => setMaterial(event.target.value)} placeholder="lumber, insulation..." />
         </label>
@@ -133,7 +168,7 @@ export default function GalleryPage() {
       <section className="gallery-results" aria-live="polite">
         <div className="gallery-results-head">
           <span>{loading ? "Loading projects..." : `${projects.length} published projects`}</span>
-          {(deferredQ || projectType || costRange || deferredRegion || deferredMaterial) && (
+          {(deferredQ || projectType || costRange || deferredRegion || deferredPostalCode || deferredRenovationType || deferredMaterial) && (
             <button
               type="button"
               onClick={() => {
@@ -141,6 +176,8 @@ export default function GalleryPage() {
                 setProjectType("");
                 setCostRange("");
                 setRegion("");
+                setPostalCode("");
+                setRenovationType("");
                 setMaterial("");
               }}
             >
@@ -182,7 +219,7 @@ export default function GalleryPage() {
               <div className="gallery-card-body">
                 <div className="gallery-card-meta">
                   <span>{projectTypeLabel(project.project_type)}</span>
-                  <span>{project.region || "Finland"}</span>
+                  <span>{project.postal_code_area || project.region || "Finland"}</span>
                 </div>
                 <h2>
                   <Link

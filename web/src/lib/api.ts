@@ -13,6 +13,7 @@ import type {
   MarketplaceOrder,
   MarketplaceSupplierCheckoutInput,
   MaterialSubstitutionResponse,
+  NeighborhoodInsightsResponse,
   AppNotification,
   ProjectVersionCompareResponse,
   ProjectVersionsResponse,
@@ -146,8 +147,17 @@ export interface GalleryProjectFilters {
   q?: string;
   project_type?: ProjectType | "";
   region?: string;
+  postal_code?: string;
+  renovation_type?: string;
   material?: string;
   cost_range?: GalleryCostRange | "";
+  limit?: number;
+}
+
+export interface NeighborhoodInsightsFilters {
+  postal_code: string;
+  project_type?: ProjectType | "";
+  exclude_project_id?: string;
   limit?: number;
 }
 
@@ -366,6 +376,8 @@ export const api = {
     if (filters.q) params.set("q", filters.q);
     if (filters.project_type) params.set("project_type", filters.project_type);
     if (filters.region) params.set("region", filters.region);
+    if (filters.postal_code) params.set("postal_code", filters.postal_code);
+    if (filters.renovation_type) params.set("renovation_type", filters.renovation_type);
     if (filters.material) params.set("material", filters.material);
     if (filters.cost_range) params.set("cost_range", filters.cost_range);
     if (filters.limit) params.set("limit", String(filters.limit));
@@ -376,6 +388,14 @@ export const api = {
     apiFetch(`/gallery/projects/${encodeURIComponent(id)}`),
   cloneGalleryProject: (id: string): Promise<Project & { cloned_from_project_id?: string }> =>
     apiFetch(`/gallery/projects/${encodeURIComponent(id)}/clone`, { method: "POST" }),
+  getNeighborhoodInsights: (filters: NeighborhoodInsightsFilters): Promise<NeighborhoodInsightsResponse> => {
+    const params = new URLSearchParams();
+    params.set("postal_code", filters.postal_code);
+    if (filters.project_type) params.set("project_type", filters.project_type);
+    if (filters.exclude_project_id) params.set("exclude_project_id", filters.exclude_project_id);
+    if (filters.limit) params.set("limit", String(filters.limit));
+    return apiFetch(`/gallery/neighborhood-insights?${params.toString()}`);
+  },
   createProject: (data: {
     name: string;
     description?: string;

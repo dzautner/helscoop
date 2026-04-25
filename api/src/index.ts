@@ -300,6 +300,14 @@ const galleryCostExpression = `(
   * CASE WHEN p.project_type = 'taloyhtio' THEN GREATEST(COALESCE(p.unit_count, 1), 1) ELSE 1 END
 )`;
 
+const galleryPostalCodeExpression = `substring(COALESCE(
+  NULLIF(p.building_info->>'postal_code', ''),
+  NULLIF(p.building_info->>'postalCode', ''),
+  NULLIF(p.building_info->>'postinumero', ''),
+  p.building_info->>'address',
+  ''
+) from '([0-9]{5})')`;
+
 const gallerySelectFields = `
   p.id, p.name, p.description, p.thumbnail_url, p.share_token,
   p.is_public, p.published_at, p.created_at, p.updated_at, p.project_type,
@@ -307,6 +315,7 @@ const gallerySelectFields = `
   COALESCE(p.gallery_clone_count, 0)::int AS clone_count,
   u.name AS owner_name,
   COALESCE(p.building_info->>'municipality', p.building_info->>'city', p.building_info->>'region', 'Finland') AS region,
+  ${galleryPostalCodeExpression} AS postal_code_area,
   ${galleryCostExpression} AS estimated_cost,
   (SELECT COUNT(*)::int FROM project_views pv WHERE pv.project_id = p.id) AS view_count,
   ARRAY(
@@ -332,6 +341,26 @@ function normalizeGalleryLimit(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return 24;
   return Math.min(parsed, 60);
+}
+
+function normalizePostalCodeParam(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const match = value.match(/\b\d{5}\b/);
+  return match?.[0] ?? "";
+}
+
+function normalizeShortTextParam(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/<[^>]*>/g, "").trim().slice(0, maxLength);
+}
+
+function publicGalleryWhere(): string[] {
+  return [
+    "p.is_public = true",
+    "p.deleted_at IS NULL",
+    "COALESCE(p.gallery_status, 'approved') = 'approved'",
+    "p.share_token IS NOT NULL",
+  ];
 }
 
 app.post("/auth/login", authLimiter, async (req, res) => {
@@ -798,21 +827,16 @@ app.use("/building", buildingLimiter, buildingLimiterAuthenticated, buildingRout
 
 // Public inspiration gallery — browse opt-in published projects without auth.
 app.get("/gallery/projects", publicLimiter, async (req, res) => {
-  const where = [
-    "p.is_public = true",
-    "p.deleted_at IS NULL",
-    "COALESCE(p.gallery_status, 'approved') = 'approved'",
-    "p.share_token IS NOT NULL",
-  ];
+  const where = publicGalleryWhere();
   const params: unknown[] = [];
   const addParam = (value: unknown) => {
     params.push(value);
     return `$${params.length}`;
   };
 
-  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const q = normalizeShortTextParam(req.query.q, 120);
   if (q) {
-    const needle = addParam(`%${q.slice(0, 120)}%`);
+    const needle = addParam(`%${q}%`);
     where.push(`(
       p.name ILIKE ${needle}
       OR COALESCE(p.description, '') ILIKE ${needle}
@@ -828,14 +852,40 @@ app.get("/gallery/projects", publicLimiter, async (req, res) => {
     )`);
   }
 
+  const postalCode = normalizePostalCodeParam(req.query.postal_code ?? req.query.postalCode);
+  if (postalCode) {
+    where.push(`${galleryPostalCodeExpression} = ${addParam(postalCode)}`);
+  }
+
+  const renovationType = normalizeShortTextParam(req.query.renovation_type ?? req.query.renovationType, 80);
+  if (renovationType) {
+    const needle = addParam(`%${renovationType}%`);
+    where.push(`(
+      COALESCE(p.description, '') ILIKE ${needle}
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(p.tags, ARRAY[]::text[])) project_tag(tag)
+        WHERE project_tag.tag ILIKE ${needle}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM project_bom pbr
+        JOIN materials mr ON pbr.material_id = mr.id
+        JOIN categories cr ON mr.category_id = cr.id
+        WHERE pbr.project_id = p.id
+          AND (mr.name ILIKE ${needle} OR cr.display_name ILIKE ${needle})
+      )
+    )`);
+  }
+
   const projectType = typeof req.query.project_type === "string" ? req.query.project_type : "";
   if (projectType === "omakotitalo" || projectType === "taloyhtio") {
     where.push(`p.project_type = ${addParam(projectType)}`);
   }
 
-  const region = typeof req.query.region === "string" ? req.query.region.trim() : "";
+  const region = normalizeShortTextParam(req.query.region, 80);
   if (region) {
-    const needle = addParam(`%${region.slice(0, 80)}%`);
+    const needle = addParam(`%${region}%`);
     where.push(`(
       COALESCE(p.building_info->>'municipality', '') ILIKE ${needle}
       OR COALESCE(p.building_info->>'city', '') ILIKE ${needle}
@@ -844,10 +894,10 @@ app.get("/gallery/projects", publicLimiter, async (req, res) => {
     )`);
   }
 
-  const material = typeof req.query.material === "string" ? req.query.material.trim() : "";
+  const material = normalizeShortTextParam(req.query.material, 80);
   if (material) {
-    const needle = addParam(`%${material.slice(0, 80)}%`);
-    const tag = addParam(material.slice(0, 80));
+    const needle = addParam(`%${material}%`);
+    const tag = addParam(material);
     where.push(`EXISTS (
       SELECT 1
       FROM project_bom pbm
@@ -885,6 +935,95 @@ app.get("/gallery/projects", publicLimiter, async (req, res) => {
   );
 
   res.json({ projects: result.rows });
+});
+
+app.get("/gallery/neighborhood-insights", publicLimiter, async (req, res) => {
+  const postalCode = normalizePostalCodeParam(req.query.postal_code ?? req.query.postalCode);
+  if (!postalCode) {
+    return res.status(400).json({ error: "postal_code must include a 5 digit Finnish postal code" });
+  }
+
+  const where = publicGalleryWhere();
+  const params: unknown[] = [];
+  const addParam = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  where.push(`${galleryPostalCodeExpression} = ${addParam(postalCode)}`);
+
+  const projectType = typeof req.query.project_type === "string" ? req.query.project_type : "";
+  if (projectType === "omakotitalo" || projectType === "taloyhtio") {
+    where.push(`p.project_type = ${addParam(projectType)}`);
+  }
+
+  const excludeProjectId = normalizeShortTextParam(req.query.exclude_project_id ?? req.query.excludeProjectId, 80);
+  if (excludeProjectId) {
+    where.push(`p.id <> ${addParam(excludeProjectId)}`);
+  }
+
+  const whereSql = where.join(" AND ");
+  const sharedParams = [...params];
+  const similarParams = [...sharedParams, normalizeGalleryLimit(req.query.limit)];
+  const similarLimit = `$${similarParams.length}`;
+  const [stats, renovationTypes, materials, similar] = await Promise.all([
+    query(
+      `SELECT
+         COUNT(*)::int AS project_count,
+         COUNT(*) FILTER (WHERE COALESCE(p.published_at, p.updated_at) >= date_trunc('year', now()))::int AS projects_this_year,
+         COALESCE(ROUND(AVG(${galleryCostExpression})::numeric), 0)::float AS average_cost
+       FROM projects p
+       WHERE ${whereSql}`,
+      sharedParams,
+    ),
+    query(
+      `SELECT project_tag.tag AS type, COUNT(*)::int AS count
+       FROM projects p
+       CROSS JOIN LATERAL unnest(COALESCE(p.tags, ARRAY[]::text[])) project_tag(tag)
+       WHERE ${whereSql}
+         AND project_tag.tag <> ''
+       GROUP BY project_tag.tag
+       ORDER BY count DESC, project_tag.tag ASC
+       LIMIT 6`,
+      sharedParams,
+    ),
+    query(
+      `SELECT COALESCE(c.display_name, m.name) AS name, COUNT(DISTINCT p.id)::int AS project_count
+       FROM projects p
+       JOIN project_bom pb ON pb.project_id = p.id
+       JOIN materials m ON pb.material_id = m.id
+       JOIN categories c ON m.category_id = c.id
+       WHERE ${whereSql}
+       GROUP BY COALESCE(c.display_name, m.name)
+       ORDER BY project_count DESC, name ASC
+       LIMIT 6`,
+      sharedParams,
+    ),
+    query(
+      `SELECT ${gallerySelectFields}, ${costBandExpression()} AS cost_band
+       FROM projects p
+       JOIN users u ON u.id = p.user_id
+       WHERE ${whereSql}
+       ORDER BY COALESCE(p.published_at, p.updated_at) DESC, p.updated_at DESC
+       LIMIT ${similarLimit}`,
+      similarParams,
+    ),
+  ]);
+
+  const projectCount = Number(stats.rows[0]?.project_count ?? 0);
+  res.json({
+    postal_code_area: postalCode,
+    project_type: projectType === "omakotitalo" || projectType === "taloyhtio" ? projectType : null,
+    project_count: projectCount,
+    projects_this_year: Number(stats.rows[0]?.projects_this_year ?? 0),
+    average_cost: Number(stats.rows[0]?.average_cost ?? 0),
+    renovation_types: renovationTypes.rows,
+    popular_materials: materials.rows.map((row) => ({
+      ...row,
+      share_pct: projectCount > 0 ? Math.round((Number(row.project_count) / projectCount) * 100) : 0,
+    })),
+    similar_projects: similar.rows,
+  });
 });
 
 app.get("/gallery/projects/:id", publicLimiter, async (req, res) => {

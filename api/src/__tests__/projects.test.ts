@@ -1207,6 +1207,80 @@ describe("GET /gallery/projects", () => {
     expect(mockQuery.mock.calls[0][0]).toContain("p.is_public = true");
     expect(mockQuery.mock.calls[0][1]).toContain("%sauna%");
   });
+
+  it("filters public gallery cards by postal code and renovation type", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", name: "00330 roof plan", postal_code_area: "00330", material_highlights: [] }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/gallery/projects?postal_code=00330&renovation_type=roof");
+
+    expect(res.status).toBe(200);
+    expect((res.body as { projects: Array<{ postal_code_area: string }> }).projects[0].postal_code_area).toBe("00330");
+    expect(mockQuery.mock.calls[0][0]).toContain("postal_code");
+    expect(mockQuery.mock.calls[0][1]).toContain("00330");
+    expect(mockQuery.mock.calls[0][1]).toContain("%roof%");
+  });
+});
+
+describe("GET /gallery/neighborhood-insights", () => {
+  it("requires a Finnish postal code", async () => {
+    const res = await makeRequest("GET", "/gallery/neighborhood-insights?postal_code=helsinki");
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns aggregate neighborhood insights from published projects", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ project_count: 4, projects_this_year: 2, average_cost: 8400 }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ type: "roof", count: 3 }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ name: "Peltikatto", project_count: 3 }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "gallery-1", name: "Similar roof", postal_code_area: "00330", material_highlights: [] }],
+      command: "SELECT",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("GET", "/gallery/neighborhood-insights?postal_code=00330&project_type=omakotitalo&limit=3");
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      postal_code_area: string;
+      project_count: number;
+      popular_materials: Array<{ name: string; share_pct: number }>;
+      similar_projects: Array<{ name: string }>;
+    };
+    expect(body.postal_code_area).toBe("00330");
+    expect(body.project_count).toBe(4);
+    expect(body.popular_materials[0]).toMatchObject({ name: "Peltikatto", share_pct: 75 });
+    expect(body.similar_projects[0].name).toBe("Similar roof");
+    expect(mockQuery).toHaveBeenCalledTimes(4);
+    expect(mockQuery.mock.calls[0][1]).toContain("00330");
+  });
 });
 
 describe("POST /gallery/projects/:id/clone", () => {

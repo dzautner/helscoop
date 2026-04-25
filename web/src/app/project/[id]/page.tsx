@@ -22,6 +22,7 @@ import SharePresentationPanel from "@/components/SharePresentationPanel";
 import ScenarioRenderPanel from "@/components/ScenarioRenderPanel";
 import ProjectVersionPanel from "@/components/ProjectVersionPanel";
 import LayerPanel from "@/components/LayerPanel";
+import NeighborhoodInsightsPanel from "@/components/NeighborhoodInsightsPanel";
 import AssemblyGuidePanel from "@/components/AssemblyGuidePanel";
 import ConstructionTimelapsePanel from "@/components/ConstructionTimelapsePanel";
 import GuidedRenovationWizard from "@/components/GuidedRenovationWizard";
@@ -366,6 +367,7 @@ export default function ProjectPage() {
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showVersionPanel, setShowVersionPanel] = useState(false);
   const [showEnergyDashboard, setShowEnergyDashboard] = useState(false);
+  const [showNeighborhoodInsights, setShowNeighborhoodInsights] = useState(false);
   const [showDaylightPanel, setShowDaylightPanel] = useState(false);
   const [photoOverlay, setPhotoOverlay] = useState<PhotoOverlayState | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -4355,6 +4357,18 @@ export default function ProjectPage() {
             </button>
             <button
               className="viewport-toolbar-btn"
+              data-active={showNeighborhoodInsights}
+              onClick={() => setShowNeighborhoodInsights((v) => !v)}
+              title={t("neighborhood.toolbarLabel")}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 21s7-4.4 7-11a7 7 0 0 0-14 0c0 6.6 7 11 7 11z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </svg>
+              {t("neighborhood.toolbarLabel")}
+            </button>
+            <button
+              className="viewport-toolbar-btn"
               data-active={showDaylightPanel}
               onClick={() => setShowDaylightPanel((v) => !v)}
               title={t('editor.daylightTitle')}
@@ -4714,6 +4728,15 @@ export default function ProjectPage() {
               materials={materials}
               bom={bom}
               onClose={() => setShowEnergyDashboard(false)}
+            />
+          )}
+
+          {showNeighborhoodInsights && (
+            <NeighborhoodInsightsPanel
+              projectId={projectId}
+              buildingInfo={project?.building_info ?? null}
+              projectType={project?.project_type}
+              onClose={() => setShowNeighborhoodInsights(false)}
             />
           )}
 
