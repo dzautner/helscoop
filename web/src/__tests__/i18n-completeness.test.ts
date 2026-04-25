@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import fs from "fs";
+import path from "path";
 import {
   getTranslation,
   detectLocale,
@@ -25,10 +27,6 @@ const LOCALES: Locale[] = ["fi", "en", "sv"];
 // The module exports getTranslation but not the object directly, so we
 // parse the keys by importing the file as a module and evaluating it.
 // Instead, we use a pragmatic approach: import the ts source at test time.
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const fs = await import("fs");
-const path = await import("path");
 
 const i18nSource = fs.readFileSync(
   path.resolve(__dirname, "../lib/i18n.ts"),
@@ -330,14 +328,16 @@ describe("structural consistency", () => {
     const mismatches: string[] = [];
     for (const { key, value } of fiEntries) {
       if (typeof value !== "string") continue;
-      const fiParams = [...value.matchAll(paramPattern)].map((m) => m[1]).sort();
+      const fiParams = Array.from(value.matchAll(paramPattern))
+        .map((m) => m[1])
+        .sort();
       if (fiParams.length === 0) continue;
 
       const enValue = tEn(key);
       // If en returns the key itself, the key is missing — skip (covered above)
       if (enValue === key) continue;
 
-      const enParams = [...enValue.matchAll(paramPattern)]
+      const enParams = Array.from(enValue.matchAll(paramPattern))
         .map((m) => m[1])
         .sort();
       if (JSON.stringify(fiParams) !== JSON.stringify(enParams)) {
