@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { PhotoOverlayState } from "@/types";
+import type { MoodBoardState, PhotoOverlayState } from "@/types";
 
 /**
  * Fields that can be auto-saved. Each key maps to a saveable project field.
@@ -10,6 +10,7 @@ export interface SaveableFields {
   scene_js: string;
   bom: { material_id: string; quantity: number; unit: string }[];
   photo_overlay?: PhotoOverlayState | null;
+  mood_board?: MoodBoardState | null;
 }
 
 export interface AutoSaveCallbacks {
@@ -17,6 +18,8 @@ export interface AutoSaveCallbacks {
   onSaveProject: (dirty: Partial<Pick<SaveableFields, "name" | "description" | "scene_js" | "photo_overlay">>) => Promise<void>;
   /** Called when BOM has changed. */
   onSaveBom: (bom: SaveableFields["bom"]) => Promise<void>;
+  /** Called when mood board layout/content has changed. */
+  onSaveMoodBoard?: (moodBoard: SaveableFields["mood_board"]) => Promise<void>;
   /** Called when scene_js changed and save succeeded, to capture a new thumbnail. */
   onSaveThumbnail: () => Promise<void>;
   /** Called on save status transitions. */
@@ -64,6 +67,10 @@ function bomEquals(
 
 function photoOverlayEquals(a: PhotoOverlayState | null | undefined, b: PhotoOverlayState | null | undefined): boolean {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function moodBoardEquals(a: MoodBoardState | null | undefined, b: MoodBoardState | null | undefined): boolean {
+  return JSON.stringify(a ?? { items: [] }) === JSON.stringify(b ?? { items: [] });
 }
 
 /**
@@ -136,12 +143,14 @@ export function useAutoSave(
       }
 
       const bomChanged = !bomEquals(current.bom, saved.bom);
+      const moodBoardChanged = !moodBoardEquals(current.mood_board, saved.mood_board);
 
       return {
         projectDirty: hasProjectChanges ? projectDirty : null,
         bomChanged,
+        moodBoardChanged,
         sceneChanged,
-        hasAnyChanges: hasProjectChanges || bomChanged,
+        hasAnyChanges: hasProjectChanges || bomChanged || moodBoardChanged,
       };
     },
     []
@@ -155,7 +164,7 @@ export function useAutoSave(
 
     const current = { ...currentRef.current };
     const saved = savedRef.current;
-    const { projectDirty, bomChanged, sceneChanged, hasAnyChanges } =
+    const { projectDirty, bomChanged, moodBoardChanged, sceneChanged, hasAnyChanges } =
       computeDirtyFields(current, saved);
 
     if (!hasAnyChanges) {
@@ -175,6 +184,9 @@ export function useAutoSave(
       }
       if (bomChanged) {
         promises.push(cbRef.current.onSaveBom(current.bom));
+      }
+      if (moodBoardChanged && cbRef.current.onSaveMoodBoard) {
+        promises.push(cbRef.current.onSaveMoodBoard(current.mood_board ?? { items: [] }));
       }
 
       await Promise.all(promises);

@@ -10,6 +10,7 @@ import { useTranslation } from "@/components/LocaleProvider";
 import SceneEditor from "@/components/SceneEditor";
 import BomPanel, { matchSceneMaterial } from "@/components/BomPanel";
 import EnergyDashboard from "@/components/EnergyDashboard";
+import MoodBoardPanel from "@/components/MoodBoardPanel";
 import MaterialPicker from "@/components/MaterialPicker";
 import type { BomPriceOverride } from "@/components/BomSavingsPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -78,7 +79,7 @@ import type { KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EditorStatusBar from "@/components/EditorStatusBar";
 import type { SaveStatus } from "@/components/SaveStatusIndicator";
-import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary, ProjectImage } from "@/types";
+import type { Material, BomItem, Project, ProjectVersionSnapshot, ProjectPriceChangeSummary, ProjectImage, MoodBoardState } from "@/types";
 import type { PhotoOverlayState } from "@/types";
 import type { GuidedRenovationPlan, RenovationWizardState, WizardStepId } from "@/lib/renovation-wizard";
 import type { ViewportAssemblyGuideState, ViewportCameraState, ViewportMaterialSelection, ViewportPresentationApi } from "@/components/Viewport3D";
@@ -180,7 +181,7 @@ scene.add(wall4, { material: "lumber", color: [0.85, 0.75, 0.55] });
 const HISTORY_LIMIT = 50;
 const MOBILE_EDITOR_QUERY = "(max-width: 768px)";
 
-type MobileEditorPanel = "viewport" | "chat" | "bom" | "code" | "params" | "docs";
+type MobileEditorPanel = "viewport" | "chat" | "mood" | "bom" | "code" | "params" | "docs";
 type MobilePanelSize = "normal" | "expanded" | "minimized";
 
 interface GeometryBomUpdateState {
@@ -262,6 +263,10 @@ function buildProjectVersionSnapshot(fields: {
   };
 }
 
+function normalizeMoodBoardState(value: Project["mood_board"]): MoodBoardState {
+  return value && Array.isArray(value.items) ? value : { items: [] };
+}
+
 function hydrateSnapshotBom(snapshot: ProjectVersionSnapshot, materials: Material[]): BomItem[] {
   return snapshot.bom.map((item) => {
     const material = materials.find((candidate) => candidate.id === item.material_id);
@@ -318,6 +323,7 @@ export default function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bom, setBom] = useState<BomItem[]>([]);
+  const [moodBoard, setMoodBoard] = useState<MoodBoardState>({ items: [] });
   const [manualBomOverrideIds, setManualBomOverrideIds] = useState<Set<string>>(() => new Set());
   const [geometryBomUpdate, setGeometryBomUpdate] = useState<GeometryBomUpdateState | null>(null);
   const [surfacePickerMaterialId, setSurfacePickerMaterialId] = useState<string | null>(null);
@@ -347,6 +353,7 @@ export default function ProjectPage() {
   const [showCode, setShowCode] = useState(false);
   const [editorMode, setEditorMode] = useState<"simple" | "advanced">("simple");
   const [showGuidedWizard, setShowGuidedWizard] = useState(false);
+  const [showMoodBoard, setShowMoodBoard] = useState(false);
   const [showBom, setShowBom] = useState(true);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
@@ -636,7 +643,9 @@ export default function ProjectPage() {
           setShareExpiresAt(proj.share_token_expires_at ?? null);
         }
         const initialPhotoOverlay = normalizePhotoOverlayState(proj.photo_overlay);
+        const initialMoodBoard = normalizeMoodBoardState(proj.mood_board);
         setPhotoOverlay(initialPhotoOverlay);
+        setMoodBoard(initialMoodBoard);
         setParamPresets(proj.param_presets || []);
         const initialScene = proj.scene_js || DEFAULT_SCENE;
         setOriginalSceneJs(proj.original_scene_js || initialScene);
@@ -667,6 +676,7 @@ export default function ProjectPage() {
             unit: b.unit,
           })),
           photo_overlay: initialPhotoOverlay,
+          mood_board: initialMoodBoard,
         });
         setTimeout(() => {
           initialLoadDoneRef.current = true;
@@ -727,8 +737,9 @@ export default function ProjectPage() {
       scene_js: sceneJs,
       bom: bomForSave,
       photo_overlay: photoOverlay,
+      mood_board: moodBoard,
     }),
-    [projectName, projectDesc, sceneJs, bomForSave, photoOverlay]
+    [projectName, projectDesc, sceneJs, bomForSave, photoOverlay, moodBoard]
   );
   const currentVersionSnapshot = useMemo(
     () => buildProjectVersionSnapshot({
@@ -747,6 +758,9 @@ export default function ProjectPage() {
       },
       onSaveBom: async (items: SaveableFields["bom"]) => {
         await api.saveBOM(projectId, items, collaborationClientIdRef.current);
+      },
+      onSaveMoodBoard: async (nextMoodBoard: SaveableFields["mood_board"]) => {
+        await api.saveMoodBoard(projectId, nextMoodBoard, collaborationClientIdRef.current);
       },
       onSaveThumbnail: async () => {
         const thumbDataUrl = captureThumbRef.current?.();
@@ -1514,9 +1528,14 @@ export default function ProjectPage() {
       setMobilePanelSize(panel === "viewport" ? "minimized" : "normal");
       if (panel === "chat") markChat();
       if (panel === "bom") setShowBom(true);
+      if (panel === "mood") {
+        setShowMoodBoard(true);
+        setShowCode(false);
+      }
       if (panel === "code") {
         if (!showCode) markCodeEditor();
         setShowCode(true);
+        setShowMoodBoard(false);
       }
       if (panel === "params") setShowParams(true);
       if (panel === "docs") setShowDocs(true);
@@ -1527,6 +1546,7 @@ export default function ProjectPage() {
   const mobilePanelOrder = useMemo<MobileEditorPanel[]>(() => [
     "viewport",
     "chat",
+    "mood",
     "bom",
     ...(isAdvancedMode ? (["code"] as MobileEditorPanel[]) : []),
     ...(isAdvancedMode && sceneParams.length > 0 ? (["params"] as MobileEditorPanel[]) : []),
@@ -1574,9 +1594,19 @@ export default function ProjectPage() {
     setShowCode((visible) => {
       const next = !visible;
       if (isMobileEditor) setActiveMobilePanel(next ? "code" : "viewport");
+      if (next) setShowMoodBoard(false);
       return next;
     });
   }, [isMobileEditor, markCodeEditor, showCode]);
+
+  const toggleMoodBoardPanel = useCallback(() => {
+    setShowMoodBoard((visible) => {
+      const next = !visible;
+      if (next) setShowCode(false);
+      if (isMobileEditor) setActiveMobilePanel(next ? "mood" : "viewport");
+      return next;
+    });
+  }, [isMobileEditor]);
 
   const toggleDocsPanel = useCallback(() => {
     setEditorMode("advanced");
@@ -1854,12 +1884,13 @@ export default function ProjectPage() {
         scene_js: snapshot.scene_js || DEFAULT_SCENE,
         bom: snapshot.bom,
         photo_overlay: photoOverlay,
+        mood_board: moodBoard,
       });
       pushHistory(snapshot.scene_js || DEFAULT_SCENE);
       setViewportKey((key) => key + 1);
       toast(t("versions.restoreSuccess"), "success");
     },
-    [materials, photoOverlay, pushHistory, queueSceneAnnouncement, setSavedSnapshot, t, toast],
+    [materials, moodBoard, photoOverlay, pushHistory, queueSceneAnnouncement, setSavedSnapshot, t, toast],
   );
 
   useEffect(() => {
@@ -1869,15 +1900,17 @@ export default function ProjectPage() {
       return;
     }
     if ((activeMobilePanel === "code" && !showCode) ||
+      (activeMobilePanel === "mood" && !showMoodBoard) ||
       (activeMobilePanel === "params" && !showParams) ||
       (activeMobilePanel === "docs" && !showDocs)) {
       setActiveMobilePanel("viewport");
     }
-  }, [activeMobilePanel, isMobileEditor, showCode, showDocs, showParams]);
+  }, [activeMobilePanel, isMobileEditor, showCode, showDocs, showMoodBoard, showParams]);
 
   /* ── Keyboard shortcuts ──────────────────────────────────────── */
   const closeAllPanels = useCallback(() => {
     setShowCode(false);
+    setShowMoodBoard(false);
     setShowShortcutsHelp(false);
     setShowExportMenu(false);
     setShowHeaderMenu(false);
@@ -2518,6 +2551,17 @@ export default function ProjectPage() {
     },
     [materials, track, playSound]
   );
+
+  const addMoodMaterialToBom = useCallback((materialId: string) => {
+    if (bom.some((item) => item.material_id === materialId)) {
+      setShowBom(true);
+      toast(locale === "fi" ? "Materiaali on jo materiaalilistalla" : "Material is already in the BOM", "info");
+      return;
+    }
+    addBomItem(materialId, 1);
+    setShowBom(true);
+    toast(locale === "fi" ? "Tunnelmataulun materiaali lisätty BOMiin" : "Mood board material added to BOM", "success");
+  }, [addBomItem, bom, locale, toast]);
 
   const addImportedBomItem = useCallback(
     (item: BomItem, material: Material) => {
@@ -3769,7 +3813,7 @@ export default function ProjectPage() {
               flex: 1,
               minHeight: 0,
               padding: 8,
-              paddingBottom: showCode ? 0 : 8,
+              paddingBottom: showCode || showMoodBoard ? 0 : 8,
             }}
           >
             <ErrorBoundary
@@ -4465,6 +4509,19 @@ export default function ProjectPage() {
               {t('editor.resetCamera')}
             </button>
             <span className="viewport-toolbar-sep" />
+            <button
+              className="viewport-toolbar-btn"
+              data-active={showMoodBoard}
+              onClick={toggleMoodBoardPanel}
+              title={locale === "fi" ? "Tunnelmataulu" : "Mood board"}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                <path d="M15 5l4 4" />
+              </svg>
+              {locale === "fi" ? "Tunnelma" : "Mood"}
+            </button>
             {isAdvancedMode && (
               <button
                 className="viewport-toolbar-btn"
@@ -4825,16 +4882,28 @@ export default function ProjectPage() {
                 label:
                   id === "viewport" ? t("editor.scene") :
                   id === "chat" ? t("editor.assistant") :
+                  id === "mood" ? (locale === "fi" ? "Tunnelma" : "Mood") :
                   id === "bom" ? t("editor.materialList") :
                   id === "code" ? (locale === "fi" ? "Koodi" : "Code") :
                   id === "params" ? t("editor.params") :
                   t("editor.docs") || "Docs",
                 badge:
                   id === "chat" ? chatMessageCount || undefined :
+                  id === "mood" ? moodBoard.items.length || undefined :
                   id === "bom" ? bom.length || undefined :
                   id === "params" ? sceneParams.length :
                   undefined,
               }))}
+            />
+          )}
+
+          {showMoodBoard && (
+            <MoodBoardPanel
+              board={moodBoard}
+              materials={materials}
+              bomMaterialIds={new Set(bom.map((item) => item.material_id))}
+              onChange={setMoodBoard}
+              onAddMaterialToBom={addMoodMaterialToBom}
             />
           )}
 

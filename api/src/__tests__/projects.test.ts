@@ -836,6 +836,48 @@ describe("PUT /projects/:id", () => {
   });
 });
 
+describe("PUT /projects/:id/mood-board", () => {
+  it("persists a normalized mood board", async () => {
+    const mood_board = {
+      items: [
+        { id: "note-1", type: "note", x: 24, y: 32, width: 200, height: 120, text: "Warm timber" },
+        { id: "mat-1", type: "material", x: 80, y: 90, material_id: "material-1" },
+      ],
+    };
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ mood_board, updated_at: "2026-04-25T00:00:00.000Z" }],
+      command: "UPDATE",
+      rowCount: 1,
+      oid: 0,
+      fields: [],
+    });
+
+    const res = await makeRequest("PUT", "/projects/proj-1/mood-board", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { mood_board },
+    });
+
+    expect(res.status).toBe(200);
+    expect((res.body as { ok: boolean }).ok).toBe(true);
+    expect(mockQuery.mock.calls[0][0]).toContain("mood_board = $1::jsonb");
+    const saved = JSON.parse(mockQuery.mock.calls[0][1][0] as string);
+    expect(saved.items).toHaveLength(2);
+    expect(saved.items[0]).toMatchObject({ type: "note", text: "Warm timber" });
+    expect(mockQuery.mock.calls[0][1][1]).toBe("proj-1");
+    expect(mockQuery.mock.calls[0][1][2]).toBe("user-1");
+  });
+
+  it("rejects invalid mood board payloads", async () => {
+    const res = await makeRequest("PUT", "/projects/proj-1/mood-board", {
+      headers: { Authorization: `Bearer ${authToken("user-1")}` },
+      body: { mood_board: { items: [{ id: "bad", type: "video", x: 0, y: 0 }] } },
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
 // --------------------------------------------------------------------------
 // DELETE /projects/:id
 // --------------------------------------------------------------------------

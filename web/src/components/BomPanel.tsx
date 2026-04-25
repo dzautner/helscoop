@@ -2475,6 +2475,11 @@ export default function BomPanel({
       onMouseLeave={glow.onMouseLeave}
       onPaste={handleBomPaste}
       onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("application/x-helscoop-material-id")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          return;
+        }
         if (event.dataTransfer.types.includes("Files")) {
           event.preventDefault();
           setImportDragging(true);
@@ -2482,6 +2487,15 @@ export default function BomPanel({
       }}
       onDragLeave={() => setImportDragging(false)}
       onDrop={(event) => {
+        const moodBoardMaterialId = event.dataTransfer.getData("application/x-helscoop-material-id");
+        if (moodBoardMaterialId) {
+          event.preventDefault();
+          setImportDragging(false);
+          if (!bom.some((item) => item.material_id === moodBoardMaterialId)) {
+            onAdd(moodBoardMaterialId, 1);
+          }
+          return;
+        }
         const file = event.dataTransfer.files[0];
         if (!file) return;
         event.preventDefault();

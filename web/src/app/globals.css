@@ -4242,6 +4242,273 @@ select:focus {
   box-shadow: var(--shadow-depth-2), inset 0 1px 0 rgba(229, 160, 75, 0.08);
 }
 
+.mood-board-panel {
+  height: 300px;
+  flex-shrink: 0;
+  margin: 0 8px 8px;
+  border: 1px solid var(--glass-float-border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(229, 160, 75, 0.07), transparent 34%),
+    var(--glass-mid);
+  backdrop-filter: var(--glass-mid-blur);
+  -webkit-backdrop-filter: var(--glass-mid-blur);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-depth-2);
+}
+
+.mood-board-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mood-board-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.mood-board-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.mood-board-header p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mood-board-total {
+  min-width: 150px;
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius-md);
+  background: var(--amber-glow);
+  padding: 8px 10px;
+  align-self: flex-start;
+}
+
+.mood-board-total span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mood-board-total strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.mood-board-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.mood-board-toolbar select,
+.mood-board-toolbar input[type="color"] {
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.mood-board-toolbar select {
+  min-width: 190px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.mood-board-toolbar input[type="color"] {
+  width: 38px;
+  padding: 2px;
+}
+
+.mood-board-toolbar .btn {
+  white-space: nowrap;
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.mood-board-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background-color: var(--bg-tertiary);
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.mood-board-hint {
+  position: sticky;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  width: fit-content;
+  margin: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-primary) 84%, transparent);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.mood-board-empty {
+  position: absolute;
+  inset: 46px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mood-board-empty strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.mood-board-empty span {
+  margin-top: 6px;
+  max-width: 320px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mood-board-card {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-subtle);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mood-board-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.mood-board-card:active {
+  cursor: grabbing;
+}
+
+.mood-board-card[data-selected="true"] {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-color: var(--amber-border);
+}
+
+.mood-board-card strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.mood-board-card span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.mood-board-card em {
+  width: fit-content;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--amber-glow);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.mood-board-swatch,
+.mood-board-color {
+  height: 70px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.mood-board-swatch img,
+.mood-board-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mood-board-photo {
+  min-height: 92px;
+  border-radius: var(--radius-md);
+}
+
+.mood-board-color {
+  min-height: 54px;
+}
+
+.mood-board-bom-btn {
+  min-height: 28px;
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius-sm);
+  background: var(--amber-glow);
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mood-board-bom-btn:disabled {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.mood-board-card textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 /* Embedded chat */
 .chat-embedded {
   flex-shrink: 0;
@@ -7920,6 +8187,7 @@ select:focus {
 
   .editor-page[data-mobile-panel]:not([data-mobile-panel="chat"]) .chat-embedded,
   .editor-page[data-mobile-panel]:not([data-mobile-panel="code"]) .editor-code-panel,
+  .editor-page[data-mobile-panel]:not([data-mobile-panel="mood"]) .mood-board-panel,
   .editor-page[data-mobile-panel]:not([data-mobile-panel="bom"]) .editor-bom-panel,
   .editor-page[data-mobile-panel]:not([data-mobile-panel="params"]) .scene-params-panel,
   .editor-page[data-mobile-panel]:not([data-mobile-panel="docs"]) .scene-docs-panel {
@@ -7927,7 +8195,8 @@ select:focus {
   }
 
   .editor-page[data-mobile-panel="chat"] .chat-embedded,
-  .editor-page[data-mobile-panel="code"] .editor-code-panel {
+  .editor-page[data-mobile-panel="code"] .editor-code-panel,
+  .editor-page[data-mobile-panel="mood"] .mood-board-panel {
     display: flex;
     flex-direction: column;
     height: var(--mobile-active-panel-height) !important;
@@ -7935,6 +8204,51 @@ select:focus {
     padding: 8px;
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+  }
+
+  .editor-page[data-mobile-panel="mood"] .mood-board-panel {
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .editor-page[data-mobile-panel="mood"] .mood-board-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .editor-page[data-mobile-panel="mood"] .mood-board-toolbar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    order: 3;
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
+    background: var(--bg-secondary);
+  }
+
+  .editor-page[data-mobile-panel="mood"] .mood-board-canvas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 8px;
+    padding: 10px;
+    background-size: 16px 16px;
+  }
+
+  .editor-page[data-mobile-panel="mood"] .mood-board-card {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    min-height: 112px;
+    touch-action: pan-y;
+  }
+
+  .editor-page[data-mobile-panel="mood"] .mood-board-hint,
+  .editor-page[data-mobile-panel="mood"] .mood-board-empty {
+    grid-column: 1 / -1;
+    position: static;
+    margin: 0;
   }
 
   .editor-page[data-mobile-panel="chat"] .chat-messages-area {
