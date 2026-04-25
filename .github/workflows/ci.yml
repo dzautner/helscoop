@@ -11,6 +11,7 @@ env:
   REGISTRY: ghcr.io
   API_IMAGE: ghcr.io/${{ github.repository }}/api
   WEB_IMAGE: ghcr.io/${{ github.repository }}/web
+  SCRAPER_IMAGE: ghcr.io/${{ github.repository }}/scraper
 
 jobs:
   test-api:
@@ -94,9 +95,36 @@ jobs:
         working-directory: web
         run: npm run build
 
+  test-scraper:
+    name: Scraper Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scraper/package-lock.json
+
+      - name: Install dependencies
+        working-directory: scraper
+        run: npm ci
+
+      - name: Audit dependencies
+        working-directory: scraper
+        run: npm audit --audit-level=moderate
+
+      - name: Type check
+        working-directory: scraper
+        run: npm run typecheck
+
+      - name: Run unit tests
+        working-directory: scraper
+        run: npm test
+
   build-images:
     name: Build Docker Images
-    needs: [test-api, test-web]
+    needs: [test-api, test-web, test-scraper]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -161,6 +189,27 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://helscoop-api.fly.dev' }}
 
+      - name: Docker metadata (Scraper)
+        id: meta-scraper
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.SCRAPER_IMAGE }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build & push Scraper image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./scraper
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-scraper.outputs.tags }}
+          labels: ${{ steps.meta-scraper.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+
   deploy-staging:
     name: Deploy to Staging
     needs: [build-images]
@@ -217,7 +266,7 @@ jobs:
 
   auto-merge:
     name: Auto Merge
-    needs: [test-api, test-web, build-images]
+    needs: [test-api, test-web, test-scraper, build-images]
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     permissions:

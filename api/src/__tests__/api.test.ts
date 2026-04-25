@@ -153,15 +153,20 @@ describe("Scraper", () => {
     expect(fs.existsSync(scraperPath)).toBe(true);
   });
 
-  it("scraper has required imports", async () => {
+  it("scraper wires database runner to side-effect-free parser", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const scraperPath = path.resolve(__dirname, "../../../scraper/src/scrape.ts");
-    const src = fs.readFileSync(scraperPath, "utf-8");
+    const parserPath = path.resolve(__dirname, "../../../scraper/src/parsing.ts");
+    const scraperSrc = fs.readFileSync(scraperPath, "utf-8");
+    const parserSrc = fs.readFileSync(parserPath, "utf-8");
 
-    expect(src).toContain("cheerio");
-    expect(src).toContain("pg");
-    expect(src).toContain("scrape_runs");
+    expect(scraperSrc).toContain("pg");
+    expect(scraperSrc).toContain("scrape_runs");
+    expect(scraperSrc).toContain("./parsing");
+    expect(parserSrc).toContain("cheerio");
+    expect(parserSrc).toContain("extractPrice");
+    expect(parserSrc).toContain("extractStock");
   });
 });
 

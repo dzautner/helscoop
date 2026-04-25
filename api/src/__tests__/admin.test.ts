@@ -104,6 +104,7 @@ function makeRequest(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockQuery.mockReset();
   mockQuery.mockResolvedValue({ rows: [], command: "", rowCount: 0, oid: 0, fields: [] });
 });
 
