@@ -14,6 +14,7 @@ import ViewportContextMenu, { type ContextMenuItem } from "@/components/Viewport
 import ScreenshotPopover from "@/components/ScreenshotPopover";
 import { shortcutLabel } from "@/lib/shortcut-label";
 import { getPresentationPreset, type PresentationPresetId } from "@/lib/presentation-export";
+import { downloadDataUrl } from "@/lib/download";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ViewCube from "@/components/ViewCube";
 import Minimap from "@/components/Minimap";
@@ -2799,10 +2800,7 @@ export default function Viewport3D({
     ctx.textAlign = "right";
     ctx.textBaseline = "bottom";
     ctx.fillText("helscoop.fi", canvas.width - fontSize, canvas.height - fontSize * 0.6);
-    const link = document.createElement("a");
-    link.download = "helscoop-screenshot.png";
-    link.href = offscreen.toDataURL("image/png");
-    link.click();
+    downloadDataUrl(offscreen.toDataURL("image/png"), "helscoop-screenshot.png");
   }, []);
 
   const contextMenuItems: ContextMenuItem[] = [

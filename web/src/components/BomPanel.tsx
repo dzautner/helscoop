@@ -29,6 +29,7 @@ import RoomScanImportPanel from "@/components/RoomScanImportPanel";
 import PermitCheckerPanel from "@/components/PermitCheckerPanel";
 import ShoppingListModal from "@/components/ShoppingListModal";
 import { api } from "@/lib/api";
+import { downloadBlob } from "@/lib/download";
 import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import { interpretScene, extractSceneMaterials } from "@/lib/scene-interpreter";
 import { detectHeatingGrantOpportunity } from "@/lib/heating-grant-context";
@@ -1943,12 +1944,7 @@ function generateBomCsv(
 /** Trigger a browser download of a CSV string */
 function downloadCsv(csv: string, filename: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, filename);
 }
 
 export default function BomPanel({

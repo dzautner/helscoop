@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { downloadDataUrl } from "@/lib/download";
 import type { ViewportPresentationApi } from "@/components/Viewport3D";
 
 export interface ArModification {
@@ -34,13 +35,6 @@ function safeFileName(name: string): string {
     .replace(/\s+/g, "-")
     .replace(/[^a-zA-Z0-9_-]/g, "")
     .toLowerCase() || "helscoop-ar";
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = filename;
-  link.click();
 }
 
 function drawCover(

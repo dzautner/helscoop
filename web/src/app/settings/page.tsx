@@ -10,6 +10,7 @@ import { useTheme, DARK_MOODS, type DarkMood } from "@/components/ThemeProvider"
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { resetOnboarding } from "@/components/OnboardingTour";
 import { getAmbientSoundEnabled, setAmbientSoundEnabled } from "@/hooks/useAmbientSound";
+import { downloadBlob } from "@/lib/download";
 import { playSound } from "@/lib/sounds";
 import { Skeleton, SkeletonBlock } from "@/components/Skeleton";
 import Link from "next/link";
@@ -158,13 +159,8 @@ export default function SettingsPage() {
     try {
       const data = await api.exportData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const date = new Date().toISOString().split("T")[0];
-      a.download = `helscoop_data_export_${date}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `helscoop_data_export_${date}.json`);
       toast(t("settings.dataExported"), "success");
     } catch (err) {
       toast(

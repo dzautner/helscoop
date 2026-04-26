@@ -12,6 +12,7 @@ import {
   type PresentationPresetId,
 } from "@/lib/presentation-export";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { downloadDataUrl } from "@/lib/download";
 import type { BomItem } from "@/types";
 import type { ViewportPresentationApi } from "@/components/Viewport3D";
 
@@ -22,13 +23,6 @@ interface SharePresentationPanelProps {
   captureApiRef: React.MutableRefObject<ViewportPresentationApi | null>;
   onCopySuccess: () => void;
   onCopyError: () => void;
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = dataUrl;
-  link.click();
 }
 
 export default function SharePresentationPanel({
