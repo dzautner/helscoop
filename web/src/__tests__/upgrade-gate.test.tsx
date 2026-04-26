@@ -74,10 +74,10 @@ describe("UpgradeGate", () => {
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
-  it("navigates to /pricing on CTA click", () => {
+  it("navigates to /pro on CTA click", () => {
     render(<UpgradeGate feature="premiumExport" requiredPlan="pro" currentPlan="free" />);
     fireEvent.click(screen.getByText("upgrade.ctaPro"));
-    expect(window.location.href).toBe("/pricing");
+    expect(window.location.href).toBe("/pro");
   });
 
   it("renders feature comparison table header", () => {
