@@ -44,6 +44,7 @@ import {
 } from "@/lib/scene-geometry-bom";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import { safeGetLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
 import {
   calculateSurfaceAnnualHeatLossKwh,
@@ -3743,14 +3744,14 @@ export default function ProjectPage() {
             <button
               className="btn btn-ghost save-failure-btn"
               onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(sceneJs);
+                const copiedToClipboard = await copyTextToClipboard(sceneJs);
+                if (copiedToClipboard) {
                   setClipboardCopied(true);
                   toast(t('editor.saveFailedCopied'), "success");
                   setTimeout(() => setClipboardCopied(false), 2000);
-                } catch {
-                  toast(t('toast.copyFailed'), "error");
+                  return;
                 }
+                toast(t('toast.copyFailed'), "error");
               }}
             >
               {clipboardCopied ? t('editor.saveFailedCopied') : t('editor.saveFailedCopy')}
@@ -5421,14 +5422,14 @@ export default function ProjectPage() {
                 className="btn btn-primary"
                 onClick={async () => {
                   const url = `${window.location.origin}/shared/${shareToken}`;
-                  try {
-                    await navigator.clipboard.writeText(url);
+                  const copiedToClipboard = await copyTextToClipboard(url);
+                  if (copiedToClipboard) {
                     setShareCopied(true);
                     toast(t('toast.linkCopied'), "success");
                     setTimeout(() => setShareCopied(false), 2000);
-                  } catch {
-                    toast(t('toast.copyFailed'), "error");
+                    return;
                   }
+                  toast(t('toast.copyFailed'), "error");
                 }}
                 style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
               >

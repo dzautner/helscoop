@@ -11,6 +11,7 @@ import {
   sanitizePresentationFilename,
   type PresentationPresetId,
 } from "@/lib/presentation-export";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { ViewportPresentationApi } from "@/components/Viewport3D";
 import type { SharePreviewState } from "@/types";
 
@@ -227,15 +228,15 @@ export default function BeforeAfterSharePanel({
     const saved = savedPreview ? { preview: savedPreview, token: shareToken } : await generateAndSavePreview();
     if (!saved) return;
     const url = buildBeforeAfterShareUrl(window.location.origin, saved.token);
-    try {
-      await navigator.clipboard.writeText(url);
+    const copiedToClipboard = await copyTextToClipboard(url);
+    if (copiedToClipboard) {
       setCopied(true);
       onCopySuccess();
       track("before_after_share_link_copied", { project_id: projectId });
       window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      onCopyError();
+      return;
     }
+    onCopyError();
   }
 
   async function downloadComparison() {

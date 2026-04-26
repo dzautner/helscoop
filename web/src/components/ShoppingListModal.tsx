@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { BomItem, Material } from "@/types";
 
 interface ShoppingListModalProps {
@@ -69,7 +70,7 @@ export default function ShoppingListModal({
     [localeTag],
   );
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     const lines: string[] = [];
     if (projectName) lines.push(projectName);
     lines.push("─".repeat(40));
@@ -83,7 +84,7 @@ export default function ShoppingListModal({
     }
     lines.push("");
     lines.push(`${t("shoppingList.grandTotal")}: ${formatPrice(grandTotal)}`);
-    navigator.clipboard.writeText(lines.join("\n"));
+    await copyTextToClipboard(lines.join("\n"));
   }, [supplierGroups, grandTotal, projectName, formatPrice, t]);
 
   const handlePrint = useCallback(() => {

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 /* ── DSL function definitions ──────────────────────────────── */
 
@@ -266,11 +267,11 @@ export default function SceneApiReference({
   const [activeSection, setActiveSection] = useState<Section>("primitives");
   const { t } = useTranslation();
 
-  const copyToClipboard = (code: string) => {
+  const copyToClipboard = async (code: string) => {
     if (onInsertCode) {
       onInsertCode(code);
     } else {
-      navigator.clipboard.writeText(code);
+      await copyTextToClipboard(code);
     }
   };
 
