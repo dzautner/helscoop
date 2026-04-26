@@ -46,9 +46,6 @@ jobs:
         working-directory: api
         run: npm ci
 
-      - name: Link node_modules for migration script
-        run: ln -s ${{ github.workspace }}/api/node_modules ${{ github.workspace }}/db/node_modules
-
       - name: Run migrations
         working-directory: api
         run: npm run db:migrate
@@ -122,9 +119,75 @@ jobs:
         working-directory: scraper
         run: npm test
 
+  test-e2e:
+    name: Browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: helscoop
+          POSTGRES_PASSWORD: helscoop_dev
+          POSTGRES_DB: helscoop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helscoop -d helscoop"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      E2E_DATABASE_URL: postgres://helscoop:helscoop_dev@localhost:5432/helscoop
+      E2E_API_PORT: "3051"
+      E2E_WEB_PORT: "3052"
+      TEST_API_URL: http://localhost:3051
+      TEST_WEB_URL: http://localhost:3052
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full browser E2E suite
+        working-directory: e2e
+        run: npm run test:local
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   build-images:
     name: Build Docker Images
-    needs: [test-api, test-web, test-scraper]
+    needs: [test-api, test-web, test-scraper, test-e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -266,7 +329,7 @@ jobs:
 
   auto-merge:
     name: Auto Merge
-    needs: [test-api, test-web, test-scraper, build-images]
+    needs: [test-api, test-web, test-scraper, test-e2e, build-images]
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     permissions:
