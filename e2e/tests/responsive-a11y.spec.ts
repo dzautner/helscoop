@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, expectMainViewportVisible } from "./helpers";
 
 const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
@@ -105,14 +105,14 @@ test.describe("Responsive Layout — Editor", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForLoadState("networkidle");
 
-    // Canvas (3D viewport) should be visible
-    const canvas = page.locator("canvas");
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // The main 3D viewport should be visible. The page also renders helper
+    // canvases for the orientation cube/minimap, so avoid global canvas queries.
+    await expectMainViewportVisible(page);
 
     // The right sidebar (BOM panel, chat, or code editor) should exist
     const sidebarContent = page.locator(".editor-code-panel")
       .or(page.locator('[data-tour="viewport"]'))
-      .or(page.locator("canvas"));
+      .or(page.getByRole("heading", { name: /materiaalilista|material list/i }));
     await expect(sidebarContent.first()).toBeVisible({ timeout: 5_000 });
 
     // No horizontal scroll
@@ -129,12 +129,10 @@ test.describe("Responsive Layout — Editor", () => {
     await page.goto(`/project/${projectId}`);
     await page.waitForLoadState("networkidle");
 
-    // The page should render — at minimum we should see some content
-    await expect(
-      page.locator("canvas")
-        .or(page.getByText(/responsive test/i))
-        .first()
-    ).toBeVisible({ timeout: 15_000 });
+    // The page should render with the mobile editor shell and active scene.
+    await expectMainViewportVisible(page);
+    await expect(page.getByRole("tablist", { name: /editor mobile panels/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("tab", { name: /scene/i })).toBeVisible();
 
     // No horizontal overflow
     const hasHorizontalScroll = await page.evaluate(() => {

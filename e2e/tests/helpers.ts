@@ -81,6 +81,7 @@ export async function loginViaUI(
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: /kirjaudu|sign in/i }).click({ force: true });
+  await expect(page.getByText(/omat projektit|my projects/i)).toBeVisible({ timeout: 15_000 });
 }
 
 export async function createProjectViaAPI(
@@ -126,7 +127,7 @@ export function mainViewportCanvas(page: Page): Locator {
   return page.locator('canvas[data-engine^="three.js"][aria-hidden="true"]');
 }
 
-export async function expectMainViewportVisible(page: Page, timeout = 15_000): Promise<void> {
+export async function expectMainViewportVisible(page: Page, timeout = 30_000): Promise<void> {
   await expect(mainViewportCanvas(page)).toBeVisible({ timeout });
 }
 
