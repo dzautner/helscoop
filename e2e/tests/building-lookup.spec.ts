@@ -73,14 +73,30 @@ test.describe("Building Lookup & Import", () => {
     await dismissOnboarding(page);
 
     const addressInput = page.locator('[data-tour="address-input"] input').first();
-    await addressInput.fill("Ribbingintie 109-11, 00890 Helsinki");
-    await page
-      .getByRole("button", { name: /hae|search/i })
+    const searchButton = page
+      .locator('[data-tour="address-input"]')
       .first()
-      .click({ force: true });
+      .getByRole("button", { name: /hae|search/i });
+    await addressInput.scrollIntoViewIfNeeded();
+    await addressInput.fill("Ribbingintie 109-11, 00890 Helsinki");
+    await expect(addressInput).toHaveValue("Ribbingintie 109-11, 00890 Helsinki");
+    await expect(searchButton).toBeEnabled({ timeout: 5_000 });
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          response.url().includes("/building?") &&
+          response.ok(),
+        { timeout: 15_000 }
+      ),
+      searchButton.click(),
+    ]);
 
     await expect(
-      page.getByText(/omakotitalo|detached house/i)
+      page
+        .locator(".address-result-glow, [class*='address-result']")
+        .filter({ hasText: /omakotitalo|detached house/i })
+        .first()
     ).toBeVisible({ timeout: 15_000 });
 
     const importBtn = page.getByRole("button", {
