@@ -9,6 +9,7 @@ import { getAuthCookieToken } from "./session-cookie";
 
 const COLORS = ["#e5a04b", "#7ab3e0", "#8bc48b", "#d4a0e0", "#f0b86a", "#e07a7a"];
 const MAX_SCENE_BYTES = 512 * 1024;
+const MAX_MESSAGE_BYTES = MAX_SCENE_BYTES + 16 * 1024;
 
 interface AuthPayload {
   id?: string;
@@ -70,6 +71,10 @@ function safeName(value: unknown, fallback: string): string {
   return cleaned || fallback;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function tokenDisplayName(payload: AuthPayload | null, suppliedName: string | null): string {
   if (suppliedName) return suppliedName;
   if (payload?.email) return payload.email.split("@")[0] || "Helscoop user";
@@ -118,7 +123,11 @@ function toPeer(client: CollaborationClient): CollaborationPeer {
 
 function sendJson(socket: WebSocket, payload: object): void {
   if (socket.readyState !== WebSocket.OPEN) return;
-  socket.send(JSON.stringify({ ...payload, sentAt: new Date().toISOString() }));
+  try {
+    socket.send(JSON.stringify({ ...payload, sentAt: new Date().toISOString() }));
+  } catch (err) {
+    logger.warn({ err }, "Failed to send collaboration message");
+  }
 }
 
 function broadcastToRoom(projectId: string, payload: object, exceptClientId?: string): void {
@@ -143,6 +152,19 @@ function removeClient(client: CollaborationClient): void {
     projectId: client.projectId,
     clientId: client.clientId,
   });
+}
+
+function rawDataByteLength(raw: RawData): number {
+  if (Array.isArray(raw)) return raw.reduce((total, chunk) => total + chunk.byteLength, 0);
+  if (typeof raw === "string") return Buffer.byteLength(raw);
+  return raw.byteLength;
+}
+
+function rawDataToString(raw: RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
+  if (typeof raw === "string") return raw;
+  if (raw instanceof ArrayBuffer) return Buffer.from(raw).toString("utf8");
+  return raw.toString("utf8");
 }
 
 async function authorizeProjectAccess(projectId: string, token: string | null, shareToken: string | null) {
@@ -180,11 +202,27 @@ async function authorizeProjectAccess(projectId: string, token: string | null, s
 }
 
 function handleClientMessage(client: CollaborationClient, raw: RawData): void {
-  let message: Record<string, unknown>;
+  if (rawDataByteLength(raw) > MAX_MESSAGE_BYTES) {
+    sendJson(client.socket, { type: "error", error: "Collaboration message exceeds maximum size of 528 KB" });
+    return;
+  }
+
+  let parsed: unknown;
   try {
-    message = JSON.parse(raw.toString()) as Record<string, unknown>;
+    parsed = JSON.parse(rawDataToString(raw));
   } catch {
     sendJson(client.socket, { type: "error", error: "Invalid collaboration message" });
+    return;
+  }
+
+  if (!isRecord(parsed)) {
+    sendJson(client.socket, { type: "error", error: "Invalid collaboration message" });
+    return;
+  }
+
+  const message = parsed;
+  if (typeof message.type !== "string") {
+    sendJson(client.socket, { type: "error", error: "Invalid collaboration message type" });
     return;
   }
 
@@ -281,7 +319,14 @@ async function handleConnection(socket: WebSocket, req: http.IncomingMessage): P
     peer: toPeer(client),
   }, clientId);
 
-  socket.on("message", (raw) => handleClientMessage(client, raw));
+  socket.on("message", (raw) => {
+    try {
+      handleClientMessage(client, raw);
+    } catch (err) {
+      logger.warn({ err, projectId }, "Failed to handle collaboration message");
+      sendJson(socket, { type: "error", error: "Collaboration message failed" });
+    }
+  });
   socket.on("close", () => removeClient(client));
   socket.on("error", (err) => {
     logger.warn({ err, projectId }, "Collaboration socket error");

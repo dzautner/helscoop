@@ -149,4 +149,76 @@ describe("collaboration websocket server", () => {
       sourceName: "Alice",
     });
   });
+
+  it("rejects malformed non-object messages without breaking the room", async () => {
+    const alice = await connectClient(port, "project-1", "Alice");
+    const bob = await connectClient(port, "project-1", "Bob");
+    sockets.push(alice.socket, bob.socket);
+
+    const bobSeesInvalidPayload = waitForMessage<{ type: string; error: string }>(
+      bob.socket,
+      (message) => message.type === "error",
+    );
+
+    bob.socket.send("null");
+
+    await expect(bobSeesInvalidPayload).resolves.toMatchObject({
+      type: "error",
+      error: "Invalid collaboration message",
+    });
+
+    const bobSeesInvalidType = waitForMessage<{ type: string; error: string }>(
+      bob.socket,
+      (message) => message.type === "error",
+    );
+
+    bob.socket.send(JSON.stringify({ type: 42 }));
+
+    await expect(bobSeesInvalidType).resolves.toMatchObject({
+      type: "error",
+      error: "Invalid collaboration message type",
+    });
+
+    const aliceSeesCursor = waitForMessage<{ type: string; peer: { name: string; cursor: { line: number; column: number } } }>(
+      alice.socket,
+      (message) => message.type === "cursor:update",
+    );
+
+    bob.socket.send(JSON.stringify({ type: "cursor:update", cursor: { line: 7, column: 4 } }));
+
+    await expect(aliceSeesCursor).resolves.toMatchObject({
+      type: "cursor:update",
+      peer: { name: "Bob", cursor: { line: 7, column: 4 } },
+    });
+  });
+
+  it("rejects oversized frames before parsing and keeps the client connected", async () => {
+    const alice = await connectClient(port, "project-1", "Alice");
+    const bob = await connectClient(port, "project-1", "Bob");
+    sockets.push(alice.socket, bob.socket);
+
+    const bobSeesOversized = waitForMessage<{ type: string; error: string }>(
+      bob.socket,
+      (message) => message.type === "error",
+    );
+
+    bob.socket.send("x".repeat(529 * 1024));
+
+    await expect(bobSeesOversized).resolves.toMatchObject({
+      type: "error",
+      error: "Collaboration message exceeds maximum size of 528 KB",
+    });
+
+    const aliceSeesPresence = waitForMessage<{ type: string; peer: { name: string } }>(
+      alice.socket,
+      (message) => message.type === "presence:update",
+    );
+
+    bob.socket.send(JSON.stringify({ type: "presence:update", name: "Bobby" }));
+
+    await expect(aliceSeesPresence).resolves.toMatchObject({
+      type: "presence:update",
+      peer: { name: "Bobby" },
+    });
+  });
 });
