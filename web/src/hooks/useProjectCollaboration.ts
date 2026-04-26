@@ -55,6 +55,123 @@ interface UseProjectCollaborationOptions {
   onBomUpdate?: (event: CollaborationBomUpdateEvent) => void;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === "string";
+}
+
+function isCursor(value: unknown): value is CollaborationCursor {
+  if (!isRecord(value)) return false;
+  return (
+    isFiniteNumber(value.line) &&
+    isFiniteNumber(value.column) &&
+    (value.selectionStart === undefined || isFiniteNumber(value.selectionStart)) &&
+    (value.selectionEnd === undefined || isFiniteNumber(value.selectionEnd))
+  );
+}
+
+function isPeer(value: unknown): value is CollaborationPeer {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.clientId === "string" &&
+    typeof value.name === "string" &&
+    typeof value.color === "string" &&
+    typeof value.connectedAt === "string" &&
+    (value.cursor === null || isCursor(value.cursor))
+  );
+}
+
+function isBomItem(value: unknown): value is CollaborationBomUpdateEvent["items"][number] {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.material_id === "string" &&
+    isFiniteNumber(value.quantity) &&
+    typeof value.unit === "string"
+  );
+}
+
+export function parseIncomingCollaborationMessage(raw: unknown): IncomingMessage | null {
+  if (typeof raw !== "string") return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(parsed) || typeof parsed.type !== "string") return null;
+
+  switch (parsed.type) {
+    case "welcome":
+      if (!isPeer(parsed.self) || !Array.isArray(parsed.peers) || !parsed.peers.every(isPeer)) return null;
+      return { type: "welcome", self: parsed.self, peers: parsed.peers };
+
+    case "presence:join":
+    case "presence:update":
+    case "cursor:update":
+      if (!isPeer(parsed.peer)) return null;
+      return { type: parsed.type, peer: parsed.peer };
+
+    case "presence:leave":
+      if (typeof parsed.clientId !== "string") return null;
+      return { type: "presence:leave", clientId: parsed.clientId };
+
+    case "project:update":
+      if (
+        typeof parsed.projectId !== "string" ||
+        !isRecord(parsed.patch) ||
+        !isOptionalString(parsed.updated_at) ||
+        !isOptionalString(parsed.sourceClientId) ||
+        !isOptionalString(parsed.sourceName)
+      ) {
+        return null;
+      }
+      return {
+        type: "project:update",
+        projectId: parsed.projectId,
+        patch: parsed.patch,
+        updated_at: parsed.updated_at,
+        sourceClientId: parsed.sourceClientId,
+        sourceName: parsed.sourceName,
+      };
+
+    case "bom:update":
+      if (
+        typeof parsed.projectId !== "string" ||
+        !Array.isArray(parsed.items) ||
+        !parsed.items.every(isBomItem) ||
+        !isFiniteNumber(parsed.count) ||
+        !isOptionalString(parsed.sourceClientId) ||
+        !isOptionalString(parsed.sourceName)
+      ) {
+        return null;
+      }
+      return {
+        type: "bom:update",
+        projectId: parsed.projectId,
+        items: parsed.items,
+        count: parsed.count,
+        sourceClientId: parsed.sourceClientId,
+        sourceName: parsed.sourceName,
+      };
+
+    case "error":
+      if (!isOptionalString(parsed.error)) return null;
+      return { type: "error", error: parsed.error };
+
+    default:
+      return null;
+  }
+}
+
 function buildWebSocketUrl(projectId: string, token: string | null, shareToken: string | null, displayName: string | null): string {
   const url = new URL(API_URL, typeof window === "undefined" ? "http://localhost" : window.location.origin);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -103,8 +220,13 @@ export function useProjectCollaboration({
   const sendMessage = useCallback((payload: Record<string, unknown>) => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-    socket.send(JSON.stringify(payload));
-    return true;
+    try {
+      socket.send(JSON.stringify(payload));
+      return true;
+    } catch {
+      setStatus("error");
+      return false;
+    }
   }, []);
 
   const flushCursor = useCallback(() => {
@@ -159,12 +281,8 @@ export function useProjectCollaboration({
       socket.onopen = () => setStatus("connected");
       socket.onerror = () => setStatus("error");
       socket.onmessage = (event) => {
-        let message: IncomingMessage;
-        try {
-          message = JSON.parse(event.data) as IncomingMessage;
-        } catch {
-          return;
-        }
+        const message = parseIncomingCollaborationMessage(event.data);
+        if (!message) return;
 
         if (message.type === "welcome") {
           clientIdRef.current = message.self.clientId;
@@ -194,6 +312,11 @@ export function useProjectCollaboration({
         if (message.type === "bom:update") {
           if (message.sourceClientId === clientIdRef.current) return;
           onBomUpdateRef.current?.(message);
+          return;
+        }
+
+        if (message.type === "error") {
+          setStatus("error");
         }
       };
 
