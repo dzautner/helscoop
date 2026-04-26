@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useToast } from "@/components/ToastProvider";
+import { copyImageBlobToClipboard, copyTextToClipboard } from "@/lib/clipboard";
 
 interface ScreenshotPopoverProps {
   /** Base64 data URL of the captured screenshot */
@@ -73,24 +74,25 @@ export default function ScreenshotPopover({
   const handleCopyToClipboard = useCallback(async () => {
     if (!imageDataUrl) return;
     try {
-      // Convert data URL to blob
       const res = await fetch(imageDataUrl);
       const blob = await res.blob();
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
-      ]);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback: try to copy as text (some browsers don't support ClipboardItem)
-      try {
-        await navigator.clipboard.writeText(imageDataUrl);
+      const copiedImage = await copyImageBlobToClipboard(blob);
+      if (copiedImage) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch {
-        toast(t('toast.copyFailed'), "error");
+        return;
       }
+    } catch {
+      // Fall through to the text fallback below.
     }
+
+    const copiedDataUrl = await copyTextToClipboard(imageDataUrl);
+    if (copiedDataUrl) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+    toast(t('toast.copyFailed'), "error");
   }, [imageDataUrl, toast, t]);
 
   if (!imageDataUrl) return null;

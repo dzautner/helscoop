@@ -9,6 +9,7 @@ import {
   type PhasedRenovationPhase,
   type PhasedRenovationYear,
 } from "@/lib/phased-renovation";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { BomItem, BuildingInfo, Material } from "@/types";
 
 interface PhasedRenovationPlannerPanelProps {
@@ -206,9 +207,8 @@ export default function PhasedRenovationPlannerPanel({
 
   const copyHandoff = async () => {
     const text = formatPhasedRenovationPlan(plan, activeLocale === "sv" ? "en" : activeLocale);
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
-    }
+    const copiedToClipboard = await copyTextToClipboard(text);
+    if (!copiedToClipboard) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };

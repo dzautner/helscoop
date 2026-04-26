@@ -11,6 +11,7 @@ import {
   sanitizePresentationFilename,
   type PresentationPresetId,
 } from "@/lib/presentation-export";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { BomItem } from "@/types";
 import type { ViewportPresentationApi } from "@/components/Viewport3D";
 
@@ -53,15 +54,15 @@ export default function SharePresentationPanel({
 
   const copyPresentationUrl = async () => {
     if (!presentationUrl) return;
-    try {
-      await navigator.clipboard.writeText(presentationUrl);
+    const copiedToClipboard = await copyTextToClipboard(presentationUrl);
+    if (copiedToClipboard) {
       setCopied(true);
       onCopySuccess();
       track("presentation_link_copied", { preset: selectedPreset });
       window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      onCopyError();
+      return;
     }
+    onCopyError();
   };
 
   const downloadRender = () => {

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { api } from "@/lib/api";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   buildKrautaProPackage,
   formatKrautaProPackage,
@@ -124,9 +125,8 @@ export default function KrautaProPartnerPanel({
 
   const copyPackage = async () => {
     const text = formatKrautaProPackage(plan, projectName, activeLocale === "fi" ? "fi" : "en");
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
-    }
+    const copiedToClipboard = await copyTextToClipboard(text);
+    if (!copiedToClipboard) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };

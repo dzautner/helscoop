@@ -9,6 +9,7 @@ import {
   recognizeBlueprintFromMetadata,
   type BlueprintRecognitionResult,
 } from "@/lib/blueprint-to-scene";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { BuildingInfo } from "@/types";
 
 const COPY = {
@@ -153,7 +154,7 @@ export default function BlueprintToScenePanel({
   projectName?: string;
   onApplyScene?: (sceneJs: string) => void;
 }) {
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const { toast } = useToast();
   const { track } = useAnalytics();
   const inputId = useId();
@@ -212,15 +213,23 @@ export default function BlueprintToScenePanel({
   }
 
   async function copyScene() {
-    if (!result || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(result.sceneJs);
+    if (!result) return;
+    const copiedToClipboard = await copyTextToClipboard(result.sceneJs);
+    if (!copiedToClipboard) {
+      toast(t("toast.copyFailed"), "error");
+      return;
+    }
     setCopied("scene");
     toast(labels.copied, "success");
   }
 
   async function copyHandoff() {
-    if (!result || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(formatBlueprintHandoff(result));
+    if (!result) return;
+    const copiedToClipboard = await copyTextToClipboard(formatBlueprintHandoff(result));
+    if (!copiedToClipboard) {
+      toast(t("toast.copyFailed"), "error");
+      return;
+    }
     setCopied("handoff");
     toast(labels.handoffCopied, "success");
   }

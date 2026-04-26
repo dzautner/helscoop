@@ -7,6 +7,7 @@ import {
   formatRoadmapHandoff,
   type RoadmapPhase,
 } from "@/lib/renovation-roadmap";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import type { BomItem, BuildingInfo, Material } from "@/types";
 import type { LocalizedText } from "@/lib/permit-checker";
 
@@ -139,7 +140,8 @@ export default function RenovationRoadmapPanel({
   if (bom.length === 0) return null;
 
   const copyHandoff = async () => {
-    await navigator.clipboard.writeText(formatRoadmapHandoff(roadmap, roadmapLocale === "sv" ? "en" : roadmapLocale));
+    const copiedToClipboard = await copyTextToClipboard(formatRoadmapHandoff(roadmap, roadmapLocale === "sv" ? "en" : roadmapLocale));
+    if (!copiedToClipboard) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };

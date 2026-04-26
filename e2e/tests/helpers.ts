@@ -46,8 +46,10 @@ export async function setAuthToken(page: Page, token: string): Promise<void> {
     localStorage.setItem("helscoop_onboarding_completed", "true");
   };
   await page.addInitScript(seedSession, token);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(1500);
+  await page.goto("/", { waitUntil: "commit" });
+  await page
+    .waitForFunction(() => document.readyState !== "loading", undefined, { timeout: 10_000 })
+    .catch(() => {});
 
   const isLoggedIn = await page
     .getByText(/omat projektit|my projects/i)
@@ -61,8 +63,10 @@ export async function setAuthToken(page: Page, token: string): Promise<void> {
       .catch(() => false);
     if (hasLoginForm) {
       await page.evaluate(seedSession, token);
-      await page.goto("/", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1500);
+      await page.goto("/", { waitUntil: "commit" });
+      await page
+        .waitForFunction(() => document.readyState !== "loading", undefined, { timeout: 10_000 })
+        .catch(() => {});
     }
   }
 }
