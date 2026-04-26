@@ -308,8 +308,7 @@ export default function UpgradeGate({
             cursor: "pointer",
           }}
           onClick={() => {
-            // TODO: navigate to /pricing once payment integration is added
-            window.location.href = "/pricing";
+            window.location.href = "/pro";
           }}
         >
           {ctaLabel}
