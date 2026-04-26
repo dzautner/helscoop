@@ -41,13 +41,12 @@ export async function loginUser(
 }
 
 export async function setAuthToken(page: Page, token: string): Promise<void> {
-  await page.goto("/");
-  await page.evaluate((t) => {
+  const seedSession = (t: string) => {
     if (t) localStorage.setItem("helscoop_session_active", "true");
     localStorage.setItem("helscoop_onboarding_completed", "true");
-  }, token);
-  await page.reload();
-  await page.waitForLoadState("networkidle");
+  };
+  await page.addInitScript(seedSession, token);
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
 
   const isLoggedIn = await page
@@ -61,11 +60,8 @@ export async function setAuthToken(page: Page, token: string): Promise<void> {
       .isVisible({ timeout: 2000 })
       .catch(() => false);
     if (hasLoginForm) {
-      await page.evaluate((t) => {
-        if (t) localStorage.setItem("helscoop_session_active", "true");
-      }, token);
-      await page.reload();
-      await page.waitForLoadState("networkidle");
+      await page.evaluate(seedSession, token);
+      await page.goto("/", { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1500);
     }
   }
@@ -76,12 +72,11 @@ export async function loginViaUI(
   email: string,
   password: string
 ): Promise<void> {
-  await page.goto("/");
-  await page.evaluate(() => {
+  const dismissOnboarding = () => {
     localStorage.setItem("helscoop_onboarding_completed", "true");
-  });
-  await page.reload();
-  await page.waitForLoadState("networkidle");
+  };
+  await page.addInitScript(dismissOnboarding);
+  await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);

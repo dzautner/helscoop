@@ -543,6 +543,10 @@ describe("exhaustive i18n key parity", () => {
     "settings.accountDeleted", "settings.accountDeleteFailed",
     "settings.dataExported", "settings.dataExportFailed", "settings.backToProjects",
     "settings.notifications", "settings.notificationsDesc", "settings.weeklyDigest",
+    "settings.priceAlertFrequency", "settings.frequencyDaily", "settings.frequencyWeekly",
+    "settings.frequencyOff", "settings.pushAlerts", "settings.pushEnabling",
+    "settings.pushUnavailable", "settings.pushNotConfigured", "settings.pushPermissionDenied",
+    "settings.pushEnabled", "settings.pushEnableFailed",
     "settings.notificationsSaved", "settings.notificationsSaveFailed",
     // pricing
     "pricing.compareTitle", "pricing.supplier", "pricing.unitPrice", "pricing.buyLink",

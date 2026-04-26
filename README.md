@@ -25,11 +25,13 @@ npm run test:local
 
 `npm run test:local` starts `docker compose up -d db`, waits for the `helscoop` database, runs API migrations, then launches the API and web Playwright web servers. The default database URL is `postgres://helscoop:helscoop_dev@localhost:5433/helscoop`, matching `docker-compose.yml`.
 
-Override the database when needed:
+Override the database when needed. When `E2E_DATABASE_URL` is set, the runner skips Docker and uses that existing database directly:
 
 ```
 E2E_DATABASE_URL=postgres://user:pass@localhost:5433/db npm run test:local -- tests/auth.spec.ts
 ```
+
+If you want to use the default database URL without starting Docker, set `E2E_SKIP_DOCKER=1`.
 
 ### Keyboard Shortcuts
 

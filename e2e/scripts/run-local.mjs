@@ -6,7 +6,12 @@ import { fileURLToPath } from "node:url";
 
 const e2eDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(e2eDir, "..");
-const databaseUrl = process.env.E2E_DATABASE_URL || "postgres://helscoop:helscoop_dev@localhost:5433/helscoop";
+const defaultDatabaseUrl = "postgres://helscoop:helscoop_dev@localhost:5433/helscoop";
+const databaseUrl = process.env.E2E_DATABASE_URL || defaultDatabaseUrl;
+const shouldStartDockerDb =
+  !process.env.E2E_DATABASE_URL &&
+  process.env.E2E_SKIP_DOCKER !== "1" &&
+  process.env.E2E_USE_DOCKER_DB !== "0";
 const apiPort = process.env.E2E_API_PORT || "3051";
 const webPort = process.env.E2E_WEB_PORT || "3052";
 const apiUrl = process.env.TEST_API_URL || `http://localhost:${apiPort}`;
@@ -81,11 +86,15 @@ async function main() {
   requirePath("web/node_modules/.bin/next", "Run `cd web && npm ci`.");
   requirePath("e2e/node_modules/.bin/playwright", "Run `cd e2e && npm ci`.");
 
-  console.log("Starting docker compose Postgres service...");
-  await run("docker", ["compose", "up", "-d", "db"]);
+  if (shouldStartDockerDb) {
+    console.log("Starting docker compose Postgres service...");
+    await run("docker", ["compose", "up", "-d", "db"]);
 
-  console.log("Waiting for Postgres readiness...");
-  await waitForDb();
+    console.log("Waiting for Postgres readiness...");
+    await waitForDb();
+  } else {
+    console.log(`Using existing Postgres database: ${databaseUrl}`);
+  }
 
   console.log("Applying API migrations...");
   await run("npm", ["--prefix", "api", "run", "db:migrate"], {
