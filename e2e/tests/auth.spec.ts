@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { loginViaUI } from "./helpers";
 
 const API_URL = process.env.TEST_API_URL || "http://localhost:3001";
 
@@ -114,14 +115,14 @@ test.describe("Authentication", () => {
     const res = await page.request.post(`${API_URL}/auth/register`, {
       data: { email, password: testPassword, name: "Persist Test" },
     });
-    await res.json();
+    expect(res.ok()).toBe(true);
 
-    await page.goto("/");
-    await page.evaluate(() => {
-      localStorage.setItem("helscoop_session_active", "true");
-      localStorage.setItem("helscoop_onboarding_completed", "true");
-    });
-    await page.reload();
+    await loginViaUI(page, email, testPassword);
+    await expect(
+      page.getByText(/omat projektit|my projects/i)
+    ).toBeVisible({ timeout: 15_000 });
+
+    await page.reload({ waitUntil: "domcontentloaded" });
 
     await expect(
       page.getByText(/omat projektit|my projects/i)
