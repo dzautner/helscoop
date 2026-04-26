@@ -5837,24 +5837,30 @@ const translations = {
 type Translations = typeof translations;
 type TranslationTree = Translations[Locale];
 
-/** Resolve a dot-notated key like 'auth.login' from the translations object */
-function resolve(obj: Record<string, unknown>, path: string): string {
+/** Resolve a dot-notated key like 'auth.login' from a translation tree. */
+function resolve(obj: Record<string, unknown>, path: string): string | undefined {
   const parts = path.split('.');
   let current: unknown = obj;
   for (const part of parts) {
     if (current && typeof current === 'object' && part in (current as Record<string, unknown>)) {
       current = (current as Record<string, unknown>)[part];
     } else {
-      return path;
+      return undefined;
     }
   }
-  return typeof current === 'string' ? current : path;
+  return typeof current === 'string' ? current : undefined;
 }
 
 export function getTranslation(locale: Locale) {
   const tree = translations[locale] as unknown as Record<string, unknown>;
+  const englishTree = translations.en as unknown as Record<string, unknown>;
+  const finnishTree = translations.fi as unknown as Record<string, unknown>;
   return function t(key: string, params?: Record<string, string | number>): string {
-    let value = resolve(tree, key);
+    let value =
+      resolve(tree, key) ??
+      (locale !== 'en' ? resolve(englishTree, key) : undefined) ??
+      (locale !== 'fi' ? resolve(finnishTree, key) : undefined) ??
+      key;
     if (params) {
       for (const [k, v] of Object.entries(params)) {
         value = value.replace(`{{${k}}}`, String(v));

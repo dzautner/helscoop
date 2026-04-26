@@ -212,6 +212,7 @@ describe("getTranslation — English (en)", () => {
 describe("fallback — missing keys return the key itself", () => {
   const tFi = getTranslation("fi");
   const tEn = getTranslation("en");
+  const tSv = getTranslation("sv");
 
   it("returns the key for a completely nonexistent top-level namespace", () => {
     expect(tFi("nonexistent.key")).toBe("nonexistent.key");
@@ -235,6 +236,11 @@ describe("fallback — missing keys return the key itself", () => {
 
   it("returns the key for an empty string key", () => {
     expect(tFi("")).toBe("");
+  });
+
+  it("falls back to English when Swedish copy is incomplete", () => {
+    expect(tSv("bomAggregate.title")).toBe("Combine project materials");
+    expect(tSv("photoEstimate.title")).toBe("Estimate renovation from photos");
   });
 });
 
