@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/sounds", () => ({
   playSound: vi.fn(),
@@ -11,6 +11,10 @@ import { renderHook, act } from "@testing-library/react";
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("getAmbientSoundEnabled", () => {
@@ -27,6 +31,14 @@ describe("getAmbientSoundEnabled", () => {
     localStorage.setItem("helscoop_ambient_sound", "false");
     expect(getAmbientSoundEnabled()).toBe(false);
   });
+
+  it("returns false when localStorage reads are blocked", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    expect(getAmbientSoundEnabled()).toBe(false);
+  });
 });
 
 describe("setAmbientSoundEnabled", () => {
@@ -39,6 +51,14 @@ describe("setAmbientSoundEnabled", () => {
     setAmbientSoundEnabled(false);
     expect(localStorage.getItem("helscoop_ambient_sound")).toBe("false");
   });
+
+  it("does not throw when localStorage writes are blocked", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    expect(() => setAmbientSoundEnabled(true)).not.toThrow();
+  });
 });
 
 describe("useAmbientSound", () => {
@@ -50,6 +70,16 @@ describe("useAmbientSound", () => {
   it("does not play when sound is disabled", () => {
     const { result } = renderHook(() => useAmbientSound());
     act(() => { result.current.play("save"); });
+    expect(playSound).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when localStorage reads are blocked during playback", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+    const { result } = renderHook(() => useAmbientSound());
+
+    expect(() => act(() => { result.current.play("save"); })).not.toThrow();
     expect(playSound).not.toHaveBeenCalled();
   });
 

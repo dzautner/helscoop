@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getTranslation, detectLocale, persistLocale } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
@@ -25,6 +25,10 @@ function mockLocalStorage(data: Record<string, string> = {}) {
     key: vi.fn((i: number) => Object.keys(store)[i] ?? null),
   };
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ---------------------------------------------------------------------------
 // 1. Locale detection
@@ -102,18 +106,19 @@ describe("detectLocale", () => {
 // ---------------------------------------------------------------------------
 
 describe("persistLocale", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("stores locale in localStorage", () => {
-    const ls = mockLocalStorage();
-    vi.stubGlobal("localStorage", ls);
     persistLocale("en");
-    expect(ls.setItem).toHaveBeenCalledWith("helscoop_locale", "en");
+    expect(localStorage.getItem("helscoop_locale")).toBe("en");
   });
 
   it("overwrites previous locale", () => {
-    const ls = mockLocalStorage({ helscoop_locale: "fi" });
-    vi.stubGlobal("localStorage", ls);
+    localStorage.setItem("helscoop_locale", "fi");
     persistLocale("en");
-    expect(ls.setItem).toHaveBeenCalledWith("helscoop_locale", "en");
+    expect(localStorage.getItem("helscoop_locale")).toBe("en");
   });
 });
 

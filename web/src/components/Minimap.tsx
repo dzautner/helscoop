@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 
 const MINIMAP_W = 200;
 const MINIMAP_H = 140;
@@ -31,7 +32,7 @@ export default function Minimap({ sceneRef, cameraRef, controlsRef, sceneBoundsR
   const offsetRef = useRef(new THREE.Vector3());
 
   useEffect(() => {
-    const saved = localStorage.getItem("helscoop-minimap-visible");
+    const saved = safeGetLocalStorageItem("helscoop-minimap-visible");
     if (saved !== null) setVisible(saved !== "false");
 
     const handleKey = (e: KeyboardEvent) => {
@@ -41,7 +42,7 @@ export default function Minimap({ sceneRef, cameraRef, controlsRef, sceneBoundsR
         e.preventDefault();
         setVisible((v) => {
           const next = !v;
-          localStorage.setItem("helscoop-minimap-visible", String(next));
+          safeSetLocalStorageItem("helscoop-minimap-visible", String(next));
           return next;
         });
       }

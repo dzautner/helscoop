@@ -43,6 +43,7 @@ import {
   type SceneGeometryMetrics,
 } from "@/lib/scene-geometry-bom";
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
 import {
   calculateSurfaceAnnualHeatLossKwh,
@@ -441,8 +442,11 @@ export default function ProjectPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [bomWidth, setBomWidth] = useState(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("helscoop_bom_width");
-      if (saved) return clampBomWidth(parseInt(saved, 10));
+      const saved = safeGetLocalStorageItem("helscoop_bom_width");
+      if (saved) {
+        const parsed = Number.parseInt(saved, 10);
+        if (Number.isFinite(parsed)) return clampBomWidth(parsed);
+      }
     }
     return 340;
   });
@@ -1102,7 +1106,7 @@ export default function ProjectPage() {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       setBomWidth((w) => {
-        localStorage.setItem("helscoop_bom_width", String(w));
+        safeSetLocalStorageItem("helscoop_bom_width", String(w));
         return w;
       });
     };
@@ -1130,7 +1134,7 @@ export default function ProjectPage() {
       document.removeEventListener("touchend", onEnd);
       document.removeEventListener("touchcancel", onEnd);
       setBomWidth((w) => {
-        localStorage.setItem("helscoop_bom_width", String(w));
+        safeSetLocalStorageItem("helscoop_bom_width", String(w));
         return w;
       });
     };

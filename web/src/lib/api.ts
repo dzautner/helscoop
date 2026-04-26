@@ -46,6 +46,7 @@ import type {
   Template,
   SharePreviewState,
 } from "@/types";
+import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const SESSION_ACTIVE_KEY = "helscoop_session_active";
@@ -62,46 +63,33 @@ let tokenExpiresAt: number | null = null;
 // Background refresh timer handle — see scheduleProactiveRefresh() below.
 let _refreshTimerId: ReturnType<typeof setTimeout> | null = null;
 
-function hasStorage(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return typeof window.localStorage !== "undefined";
-  } catch {
-    return false;
-  }
-}
-
 function clearLegacyTokenStorage(): void {
-  if (!hasStorage()) return;
-  localStorage.removeItem(LEGACY_TOKEN_KEY);
-  localStorage.removeItem(LEGACY_TOKEN_EXPIRES_KEY);
+  safeRemoveLocalStorageItem(LEGACY_TOKEN_KEY);
+  safeRemoveLocalStorageItem(LEGACY_TOKEN_EXPIRES_KEY);
 }
 
 function persistSessionHint(expiresAt?: number | null): void {
-  if (!hasStorage()) return;
   clearLegacyTokenStorage();
-  localStorage.setItem(SESSION_ACTIVE_KEY, "true");
+  safeSetLocalStorageItem(SESSION_ACTIVE_KEY, "true");
   if (expiresAt) {
-    localStorage.setItem(SESSION_EXPIRES_KEY, String(expiresAt));
+    safeSetLocalStorageItem(SESSION_EXPIRES_KEY, String(expiresAt));
   } else {
-    localStorage.removeItem(SESSION_EXPIRES_KEY);
+    safeRemoveLocalStorageItem(SESSION_EXPIRES_KEY);
   }
 }
 
 function clearSessionHint(): void {
-  if (!hasStorage()) return;
   clearLegacyTokenStorage();
-  localStorage.removeItem(SESSION_ACTIVE_KEY);
-  localStorage.removeItem(SESSION_EXPIRES_KEY);
+  safeRemoveLocalStorageItem(SESSION_ACTIVE_KEY);
+  safeRemoveLocalStorageItem(SESSION_EXPIRES_KEY);
 }
 
 function loadSessionExpiryHint(): number | null {
-  if (!hasStorage()) return tokenExpiresAt;
-  const raw = localStorage.getItem(SESSION_EXPIRES_KEY);
+  const raw = safeGetLocalStorageItem(SESSION_EXPIRES_KEY);
   if (!raw) return tokenExpiresAt;
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed)) {
-    localStorage.removeItem(SESSION_EXPIRES_KEY);
+    safeRemoveLocalStorageItem(SESSION_EXPIRES_KEY);
     return tokenExpiresAt;
   }
   tokenExpiresAt = parsed;
@@ -127,9 +115,8 @@ export function getToken(): string | null {
 
 export function hasAuthSession(): boolean {
   if (token) return true;
-  if (!hasStorage()) return false;
   clearLegacyTokenStorage();
-  if (localStorage.getItem(SESSION_ACTIVE_KEY) !== "true") return false;
+  if (safeGetLocalStorageItem(SESSION_ACTIVE_KEY) !== "true") return false;
   const expiresAt = loadSessionExpiryHint();
   if (expiresAt && expiresAt <= Math.floor(Date.now() / 1000)) {
     clearSessionHint();

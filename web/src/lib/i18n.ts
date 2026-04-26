@@ -1,3 +1,5 @@
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
+
 export type Locale = 'fi' | 'en' | 'sv';
 
 const translations = {
@@ -5966,7 +5968,7 @@ export function getTranslation(locale: Locale) {
 
 export function detectLocale(): Locale {
   if (typeof window === 'undefined') return 'fi';
-  const stored = localStorage.getItem('helscoop_locale');
+  const stored = safeGetLocalStorageItem('helscoop_locale');
   if (stored === 'fi' || stored === 'en' || stored === 'sv') return stored;
   const browserLang = navigator.language.toLowerCase();
   if (browserLang.startsWith('en')) return 'en';
@@ -5975,5 +5977,5 @@ export function detectLocale(): Locale {
 }
 
 export function persistLocale(locale: Locale) {
-  localStorage.setItem('helscoop_locale', locale);
+  safeSetLocalStorageItem('helscoop_locale', locale);
 }

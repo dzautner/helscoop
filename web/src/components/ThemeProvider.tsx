@@ -8,6 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 
 type ThemeChoice = "dark" | "light" | "auto";
 export type DarkMood = "warm" | "cool" | "black";
@@ -50,11 +51,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [prefersDark, setPrefersDark] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as ThemeChoice | null;
+    const stored = safeGetLocalStorageItem(STORAGE_KEY) as ThemeChoice | null;
     if (stored && CYCLE.includes(stored)) {
       setThemeState(stored);
     }
-    const storedMood = localStorage.getItem(MOOD_KEY) as DarkMood | null;
+    const storedMood = safeGetLocalStorageItem(MOOD_KEY) as DarkMood | null;
     if (storedMood && DARK_MOODS.includes(storedMood)) {
       setMoodState(storedMood);
     }
@@ -79,19 +80,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((t: ThemeChoice) => {
     setThemeState(t);
-    localStorage.setItem(STORAGE_KEY, t);
+    safeSetLocalStorageItem(STORAGE_KEY, t);
   }, []);
 
   const setMood = useCallback((m: DarkMood) => {
     setMoodState(m);
-    localStorage.setItem(MOOD_KEY, m);
+    safeSetLocalStorageItem(MOOD_KEY, m);
   }, []);
 
   const toggle = useCallback(() => {
     setThemeState((prev) => {
       const idx = CYCLE.indexOf(prev);
       const next = CYCLE[(idx + 1) % CYCLE.length];
-      localStorage.setItem(STORAGE_KEY, next);
+      safeSetLocalStorageItem(STORAGE_KEY, next);
       return next;
     });
   }, []);
