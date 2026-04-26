@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
@@ -75,6 +75,11 @@ beforeEach(() => {
   mockToast.mockReset();
   mockTrack.mockReset();
   mockChat.mockReset();
+  localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 
@@ -426,6 +431,58 @@ describe("ChatPanel — localStorage persistence", () => {
     render(<ChatPanel {...defaultProps} projectId="proj-2" />);
     expect(screen.getByText("hello")).toBeInTheDocument();
     expect(screen.getByText("world")).toBeInTheDocument();
+  });
+
+  it("ignores and clears invalid stored messages instead of crashing", () => {
+    localStorage.setItem("helscoop-chat-broken", JSON.stringify({ role: "user", content: "not an array" }));
+
+    render(<ChatPanel {...defaultProps} projectId="broken" />);
+
+    expect(screen.getByLabelText("editor.chatInputLabel")).toBeInTheDocument();
+    expect(localStorage.getItem("helscoop-chat-broken")).toBeNull();
+  });
+
+  it("filters malformed stored message entries", () => {
+    localStorage.setItem(
+      "helscoop-chat-partial",
+      JSON.stringify([
+        { role: "user", content: "keep me" },
+        { role: "assistant", content: 42 },
+        { role: "system", content: "drop me" },
+      ]),
+    );
+
+    render(<ChatPanel {...defaultProps} projectId="partial" />);
+
+    expect(screen.getByText("keep me")).toBeInTheDocument();
+    expect(screen.queryByText("drop me")).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("helscoop-chat-partial")!)).toEqual([{ role: "user", content: "keep me" }]);
+  });
+
+  it("survives unavailable localStorage", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    render(<ChatPanel {...defaultProps} projectId="blocked" />);
+
+    expect(screen.getByLabelText("editor.chatInputLabel")).toBeInTheDocument();
+  });
+
+  it("reloads chat history when projectId changes without leaking the previous project", async () => {
+    localStorage.setItem("helscoop-chat-proj-a", JSON.stringify([{ role: "user", content: "project a" }]));
+    localStorage.setItem("helscoop-chat-proj-b", JSON.stringify([{ role: "assistant", content: "project b" }]));
+
+    const { rerender } = render(<ChatPanel {...defaultProps} projectId="proj-a" />);
+    expect(screen.getByText("project a")).toBeInTheDocument();
+
+    rerender(<ChatPanel {...defaultProps} projectId="proj-b" />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("project a")).not.toBeInTheDocument();
+      expect(screen.getByText("project b")).toBeInTheDocument();
+    });
+    expect(JSON.parse(localStorage.getItem("helscoop-chat-proj-b")!)).toEqual([{ role: "assistant", content: "project b" }]);
   });
 
   it("does not persist when projectId is not set", async () => {

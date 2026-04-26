@@ -9,6 +9,7 @@ import { useCursorGlow } from "@/hooks/useCursorGlow";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { buildSavingsRecommendations } from "@/lib/bom-savings";
+import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
 import { interpretScene } from "@/lib/scene-interpreter";
 import type { ChatMessage, BomItem, Material, ProjectImage } from "@/types";
@@ -80,6 +81,42 @@ function computeSimpleDiff(oldText: string, newText: string): DiffLine[] {
   return result;
 }
 
+function isStoredChatMessage(value: unknown): value is ChatMessage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<ChatMessage>;
+  return (
+    (candidate.role === "user" || candidate.role === "assistant") &&
+    typeof candidate.content === "string"
+  );
+}
+
+function loadStoredChatMessages(storageKey: string | null): ChatMessage[] {
+  if (!storageKey) return [];
+  const stored = safeGetLocalStorageItem(storageKey);
+  if (!stored) return [];
+
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) {
+      safeRemoveLocalStorageItem(storageKey);
+      return [];
+    }
+
+    const messages = parsed.filter(isStoredChatMessage);
+    if (messages.length !== parsed.length) {
+      if (messages.length > 0) {
+        safeSetLocalStorageItem(storageKey, JSON.stringify(messages.slice(-50)));
+      } else {
+        safeRemoveLocalStorageItem(storageKey);
+      }
+    }
+    return messages.slice(-50);
+  } catch {
+    safeRemoveLocalStorageItem(storageKey);
+    return [];
+  }
+}
+
 export default function ChatPanel({
   projectId,
   sceneJs,
@@ -107,16 +144,24 @@ export default function ChatPanel({
 }) {
   const glow = useCursorGlow();
   const chatStorageKey = projectId ? `helscoop-chat-${projectId}` : null;
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (typeof window === "undefined" || !chatStorageKey) return [];
-    try {
-      const stored = localStorage.getItem(chatStorageKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadStoredChatMessages(chatStorageKey));
+  const loadedChatStorageKeyRef = useRef(chatStorageKey);
+  const skipNextPersistRef = useRef(false);
+
   useEffect(() => {
+    if (loadedChatStorageKeyRef.current === chatStorageKey) return;
+    loadedChatStorageKeyRef.current = chatStorageKey;
+    skipNextPersistRef.current = true;
+    setMessages(loadStoredChatMessages(chatStorageKey));
+  }, [chatStorageKey]);
+
+  useEffect(() => {
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
     if (!chatStorageKey || messages.length === 0) return;
-    try { localStorage.setItem(chatStorageKey, JSON.stringify(messages.slice(-50))); } catch {}
+    safeSetLocalStorageItem(chatStorageKey, JSON.stringify(messages.slice(-50)));
   }, [messages, chatStorageKey]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
