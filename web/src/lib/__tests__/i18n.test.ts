@@ -238,9 +238,9 @@ describe("fallback — missing keys return the key itself", () => {
     expect(tFi("")).toBe("");
   });
 
-  it("falls back to English when Swedish copy is incomplete", () => {
-    expect(tSv("bomAggregate.title")).toBe("Combine project materials");
-    expect(tSv("photoEstimate.title")).toBe("Estimate renovation from photos");
+  it("uses Swedish copy for advanced project tools", () => {
+    expect(tSv("bomAggregate.title")).toBe("Kombinera projektmaterial");
+    expect(tSv("photoEstimate.title")).toBe("Uppskatta renovering från foton");
   });
 });
 
@@ -414,6 +414,7 @@ describe("exhaustive i18n key parity", () => {
     "brand.featureAI", "brand.featureAIDesc",
     // search
     "search.sectionLabel", "search.title", "search.subtitle", "search.placeholder",
+    "search.loading",
     "search.searching", "search.searchButton", "search.createFromBuilding",
     "search.creatingProject", "search.createError", "search.notFound",
     "search.type", "search.yearBuilt", "search.area", "search.floors", "search.material",

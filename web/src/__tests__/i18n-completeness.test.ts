@@ -92,19 +92,18 @@ describe("i18n key completeness", () => {
     const inFiNotEn = fiKeys.filter((k) => !enSet.has(k));
     const inEnNotFi = enKeys.filter((k) => !fiSet.has(k));
 
-    it("every Finnish key exists in English (tolerance: 20)", () => {
-      // Log missing keys for visibility but allow a small gap for in-progress work
+    it("every Finnish key exists in English", () => {
       if (inFiNotEn.length > 0) {
         console.warn("Keys in fi but not en:", inFiNotEn);
       }
-      expect(inFiNotEn.length).toBeLessThanOrEqual(20);
+      expect(inFiNotEn).toEqual([]);
     });
 
-    it("every English key exists in Finnish (tolerance: 20)", () => {
+    it("every English key exists in Finnish", () => {
       if (inEnNotFi.length > 0) {
         console.warn("Keys in en but not fi:", inEnNotFi);
       }
-      expect(inEnNotFi.length).toBeLessThanOrEqual(20);
+      expect(inEnNotFi).toEqual([]);
     });
   });
 
@@ -112,19 +111,18 @@ describe("i18n key completeness", () => {
     const inFiNotSv = fiKeys.filter((k) => !svSet.has(k));
     const inSvNotFi = svKeys.filter((k) => !fiSet.has(k));
 
-    it("every Finnish key exists in Swedish (tolerance: 110)", () => {
+    it("every Finnish key exists in Swedish", () => {
       if (inFiNotSv.length > 0) {
         console.warn("Keys in fi but not sv:", inFiNotSv);
       }
-      // Swedish may lag behind; allow a wider tolerance
-      expect(inFiNotSv.length).toBeLessThanOrEqual(110);
+      expect(inFiNotSv).toEqual([]);
     });
 
-    it("every Swedish key exists in Finnish (tolerance: 20)", () => {
+    it("every Swedish key exists in Finnish", () => {
       if (inSvNotFi.length > 0) {
         console.warn("Keys in sv but not fi:", inSvNotFi);
       }
-      expect(inSvNotFi.length).toBeLessThanOrEqual(20);
+      expect(inSvNotFi).toEqual([]);
     });
   });
 
@@ -133,9 +131,7 @@ describe("i18n key completeness", () => {
     const enNs = Object.keys(translations.en as Record<string, unknown>).sort();
     const svNs = Object.keys(translations.sv as Record<string, unknown>).sort();
     expect(enNs).toEqual(fiNs);
-    // sv may be missing bomAggregate, bulkActions, photoEstimate
-    const svMissing = fiNs.filter((n) => !svNs.includes(n));
-    expect(svMissing.length).toBeLessThanOrEqual(5);
+    expect(svNs).toEqual(fiNs);
   });
 });
 
