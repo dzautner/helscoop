@@ -60,6 +60,24 @@ describe("setToken / getToken", () => {
     expect(localStorage.getItem("helscoop_token")).toBeNull();
     expect(localStorage.getItem("helscoop_token_expires_at")).toBeNull();
   });
+
+  it("keeps in-memory auth usable when localStorage is blocked", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    expect(() => setToken("memory-token", Math.floor(Date.now() / 1000) + 3600)).not.toThrow();
+    expect(getToken()).toBe("memory-token");
+    expect(hasAuthSession()).toBe(true);
+    expect(() => setToken(null)).not.toThrow();
+    expect(hasAuthSession()).toBe(false);
+  });
 });
 
 describe("blob-backed downloads", () => {

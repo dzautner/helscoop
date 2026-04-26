@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getTranslation, detectLocale, persistLocale } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("getTranslation", () => {
@@ -67,6 +71,15 @@ describe("detectLocale", () => {
     Object.defineProperty(navigator, "language", { value: "en-US", writable: true, configurable: true });
     expect(detectLocale()).toBe("en");
   });
+
+  it("falls back to browser language when localStorage is blocked", () => {
+    Object.defineProperty(navigator, "language", { value: "sv-FI", writable: true, configurable: true });
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    expect(detectLocale()).toBe("sv");
+  });
 });
 
 describe("persistLocale", () => {
@@ -84,5 +97,13 @@ describe("persistLocale", () => {
     persistLocale("fi");
     persistLocale("en");
     expect(localStorage.getItem("helscoop_locale")).toBe("en");
+  });
+
+  it("does not throw when localStorage is blocked", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    expect(() => persistLocale("en")).not.toThrow();
   });
 });

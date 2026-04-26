@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { hasAuthSession } from "@/lib/api";
+import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const STORAGE_KEY = "helscoop_onboarding_completed";
@@ -100,15 +101,15 @@ function computeTooltipPosition(
 
 export function isOnboardingCompleted(): boolean {
   if (typeof window === "undefined") return true;
-  return localStorage.getItem(STORAGE_KEY) === "true";
+  return safeGetLocalStorageItem(STORAGE_KEY) === "true";
 }
 
 export function resetOnboarding(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  safeRemoveLocalStorageItem(STORAGE_KEY);
 }
 
 function completeOnboarding(): void {
-  localStorage.setItem(STORAGE_KEY, "true");
+  safeSetLocalStorageItem(STORAGE_KEY, "true");
 }
 
 /** Welcome modal shown on first visit */

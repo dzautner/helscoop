@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, renderHook } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ThemeProvider, useTheme, DARK_MOODS } from "@/components/ThemeProvider";
@@ -27,6 +27,10 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
     })),
   });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function TestConsumer() {
@@ -126,6 +130,16 @@ describe("ThemeProvider", () => {
     expect(screen.getByTestId("mood").textContent).toBe("black");
   });
 
+  it("renders with defaults when localStorage reads are blocked", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    render(<ThemeProvider><TestConsumer /></ThemeProvider>);
+    expect(screen.getByTestId("theme").textContent).toBe("dark");
+    expect(screen.getByTestId("mood").textContent).toBe("warm");
+  });
+
   it("sets data-theme attribute on document", () => {
     render(<ThemeProvider><TestConsumer /></ThemeProvider>);
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
@@ -150,6 +164,20 @@ describe("ThemeProvider", () => {
       screen.getByTestId("toggle").click();
     });
     expect(localStorage.getItem("helscoop-theme")).toBe("light");
+  });
+
+  it("theme changes still work when localStorage writes are blocked", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    render(<ThemeProvider><TestConsumer /></ThemeProvider>);
+    act(() => {
+      screen.getByTestId("set-light").click();
+      screen.getByTestId("set-mood-cool").click();
+    });
+    expect(screen.getByTestId("theme").textContent).toBe("light");
+    expect(screen.getByTestId("mood").textContent).toBe("cool");
   });
 
   it("responds to system preference changes", () => {

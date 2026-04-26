@@ -274,4 +274,16 @@ describe("isOnboardingCompleted / resetOnboarding", () => {
     resetOnboarding();
     expect(isOnboardingCompleted()).toBe(false);
   });
+
+  it("does not throw when localStorage is blocked", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new DOMException("localStorage blocked", "SecurityError");
+    });
+
+    expect(isOnboardingCompleted()).toBe(false);
+    expect(() => resetOnboarding()).not.toThrow();
+  });
 });
