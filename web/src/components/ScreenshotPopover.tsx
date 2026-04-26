@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/components/LocaleProvider";
 import { useToast } from "@/components/ToastProvider";
 import { copyImageBlobToClipboard, copyTextToClipboard } from "@/lib/clipboard";
+import { downloadDataUrl } from "@/lib/download";
 
 interface ScreenshotPopoverProps {
   /** Base64 data URL of the captured screenshot */
@@ -65,10 +66,7 @@ export default function ScreenshotPopover({
     if (!imageDataUrl) return;
     const safeName = (projectName || "screenshot").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "");
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const link = document.createElement("a");
-    link.download = `helscoop-${safeName}-${timestamp}.png`;
-    link.href = imageDataUrl;
-    link.click();
+    downloadDataUrl(imageDataUrl, `helscoop-${safeName}-${timestamp}.png`);
   }, [imageDataUrl, projectName]);
 
   const handleCopyToClipboard = useCallback(async () => {

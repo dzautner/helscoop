@@ -12,6 +12,7 @@ import {
   type TimelapseCameraMode,
   type TimelapseSpeed,
 } from "@/lib/construction-timelapse";
+import { downloadBlob } from "@/lib/download";
 import type { AssemblyGuide } from "@/lib/assembly-guide";
 
 interface ConstructionTimelapsePanelProps {
@@ -46,15 +47,7 @@ function fileSafe(value: string): string {
 
 function downloadTextFile(text: string, filename: string, mimeType: string) {
   const blob = new Blob([text], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  downloadBlob(blob, filename);
 }
 
 function cameraModeLabel(mode: TimelapseCameraMode): string {

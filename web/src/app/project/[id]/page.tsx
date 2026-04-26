@@ -45,6 +45,7 @@ import {
 import { replaceSceneMaterialReferences } from "@/lib/scene-materials";
 import { safeGetLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { downloadBlob, downloadDataUrl } from "@/lib/download";
 import { countSceneAddCalls } from "@/lib/scene-a11y";
 import {
   calculateSurfaceAnnualHeatLossKwh,
@@ -570,10 +571,7 @@ export default function ProjectPage() {
     }
     try {
       const dataUrl = await composePhotoOverlayExport(modelFrame, photoOverlay);
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `${projectName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "_") || "helscoop"}_photo_overlay.png`;
-      link.click();
+      downloadDataUrl(dataUrl, `${projectName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "_") || "helscoop"}_photo_overlay.png`);
       toast(t("photoOverlay.exported"), "success");
       track("project_exported", { format: "photo_overlay_png" });
       playSound("exportDone");
@@ -2441,12 +2439,7 @@ export default function ProjectPage() {
               exportedAt: new Date().toISOString(),
             };
             const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${projectName.replace(/\s+/g, '_')}.helscoop`;
-            a.click();
-            URL.revokeObjectURL(url);
+            downloadBlob(blob, `${projectName.replace(/\s+/g, '_')}.helscoop`);
             toast(t("toast.projectExported"), "success");
             playSound("exportDone");
           } catch (err) {
@@ -3575,12 +3568,7 @@ export default function ProjectPage() {
                       track("bom_exported", { format: "json" });
                       const res = await api.exportBOM(projectId);
                       const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `bom_${projectId}.json`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      downloadBlob(blob, `bom_${projectId}.json`);
                       toast(t('toast.bomExported'), "success");
                       playSound("exportDone");
                     } catch (err) {
@@ -3633,12 +3621,7 @@ export default function ProjectPage() {
                         exportedAt: new Date().toISOString(),
                       };
                       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `${projectName.replace(/\s+/g, '_')}.helscoop`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      downloadBlob(blob, `${projectName.replace(/\s+/g, '_')}.helscoop`);
                       toast(t('toast.projectExported'), "success");
                       playSound("exportDone");
                     } catch (err) {

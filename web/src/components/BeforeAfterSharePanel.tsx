@@ -12,6 +12,7 @@ import {
   type PresentationPresetId,
 } from "@/lib/presentation-export";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { downloadDataUrl } from "@/lib/download";
 import type { ViewportPresentationApi } from "@/components/Viewport3D";
 import type { SharePreviewState } from "@/types";
 
@@ -39,13 +40,6 @@ function nextFrame(): Promise<void> {
     }
     setTimeout(resolve, 0);
   });
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = dataUrl;
-  link.click();
 }
 
 function loadImage(dataUrl: string): Promise<HTMLImageElement> {

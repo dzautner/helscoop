@@ -47,6 +47,7 @@ import type {
   SharePreviewState,
 } from "@/types";
 import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
+import { downloadBlob } from "@/lib/download";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const SESSION_ACTIVE_KEY = "helscoop_session_active";
@@ -123,21 +124,6 @@ export function hasAuthSession(): boolean {
     return false;
   }
   return true;
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  // Keep the object URL alive long enough for browser download managers and
-  // Playwright's download observer to resolve the blob-backed navigation.
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {

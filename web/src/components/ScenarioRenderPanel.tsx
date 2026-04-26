@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "rea
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useToast } from "@/components/ToastProvider";
 import { useTranslation } from "@/components/LocaleProvider";
+import { downloadDataUrl } from "@/lib/download";
 import {
   PRESENTATION_PRESETS,
   sanitizePresentationFilename,
@@ -130,13 +131,6 @@ function nextFrame(): Promise<void> {
     }
     setTimeout(resolve, 0);
   });
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = dataUrl;
-  link.click();
 }
 
 function loadImage(dataUrl: string): Promise<HTMLImageElement> {

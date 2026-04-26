@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { useTranslation } from "@/components/LocaleProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getPresentationPreset } from "@/lib/presentation-export";
+import { downloadBlob } from "@/lib/download";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import BeforeAfterComparison from "@/components/BeforeAfterComparison";
 import type { BomItem, Project, SharedProjectComment } from "@/types";
@@ -45,13 +46,8 @@ function exportBomCsv(
 
   const csv = '\uFEFF' + headers.map((h) => escapeCsvField(h, sep)).join(sep) + '\n' + rows.join('\n') + '\n';
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
   const safe = projectName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40);
-  a.download = `helscoop-bom-${safe}-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `helscoop-bom-${safe}-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 function Viewport3DLoading() {

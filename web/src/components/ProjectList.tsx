@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api, logout } from "@/lib/api";
+import { downloadBlob } from "@/lib/download";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectCard, SkeletonBlock } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -405,14 +406,7 @@ export default function ProjectList({
     ];
     const csv = rows.map((row) => row.map(escape).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `helscoop_combined_bom_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    downloadBlob(blob, `helscoop_combined_bom_${new Date().toISOString().slice(0, 10)}.csv`);
     toast(t("bomAggregate.exported"), "success");
   }
 
