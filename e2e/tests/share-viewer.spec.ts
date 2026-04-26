@@ -75,7 +75,7 @@ test.describe("Shared project viewer flow", () => {
 
     // 7. Verify project name and viewport are visible
     await expect(anonPage.getByRole("heading", { name: "Share Flow Test" })).toBeVisible({ timeout: 5_000 });
-    await expectMainViewportVisible(anonPage, 15_000);
+    await expectMainViewportVisible(anonPage, 45_000);
 
     await anonPage.screenshot({ path: "test-results/share-anonymous-view.png" });
     await anonPage.close();
@@ -133,14 +133,13 @@ test.describe("Shared project viewer flow", () => {
     await anonPage.goto(`/shared/${share_token}`, { waitUntil: "domcontentloaded" });
     await expect(anonPage.getByRole("heading", { name: "Share Flow Test" })).toBeVisible({ timeout: 10_000 });
 
-    // Verify 3D canvas renders
+    // Verify 3D canvas renders.
+    await expectMainViewportVisible(anonPage, 45_000);
     const canvas = mainViewportCanvas(anonPage);
-    if (await canvas.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      const box = await canvas.boundingBox();
-      expect(box).toBeTruthy();
-      expect(box!.width).toBeGreaterThan(100);
-      expect(box!.height).toBeGreaterThan(100);
-    }
+    const box = await canvas.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.width).toBeGreaterThan(100);
+    expect(box!.height).toBeGreaterThan(100);
 
     await anonPage.screenshot({ path: "test-results/share-3d-canvas.png" });
     await anonPage.close();

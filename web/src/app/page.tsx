@@ -20,9 +20,20 @@ export default function Home() {
   const { t } = useTranslation();
 
   useEffect(() => {
+    let cancelled = false;
     if (hasAuthSession()) {
-      api.me().then(() => setLoggedIn(true)).catch(() => setToken(null));
+      api.me()
+        .then(() => {
+          if (!cancelled) setLoggedIn(true);
+        })
+        .catch(() => {
+          if (!cancelled) setToken(null);
+        });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleCreateFromBuilding(building: BuildingResult) {
