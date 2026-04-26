@@ -31,6 +31,7 @@ describe("useDraftRecovery", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
@@ -68,6 +69,19 @@ describe("useDraftRecovery", () => {
     const { result } = renderHook(() =>
       useDraftRecovery(null, SAVED, SAVED, onRestore)
     );
+    expect(result.current.hasDraft).toBe(false);
+  });
+
+  it("continues when localStorage reads are blocked", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    const onRestore = vi.fn();
+    const { result } = renderHook(() =>
+      useDraftRecovery(PROJECT_ID, SAVED, SAVED, onRestore)
+    );
+
     expect(result.current.hasDraft).toBe(false);
   });
 
@@ -195,6 +209,31 @@ describe("useDraftRecovery", () => {
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
   });
 
+  it("continues when localStorage writes are blocked", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+    const onRestore = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ current, saved }) =>
+        useDraftRecovery(PROJECT_ID, current, saved, onRestore),
+      { initialProps: { current: SAVED, saved: SAVED } }
+    );
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    rerender({ current: EDITED, saved: SAVED });
+
+    await act(async () => {
+      vi.advanceTimersByTime(DRAFT_DEBOUNCE_MS + 100);
+    });
+
+    expect(onRestore).not.toHaveBeenCalled();
+  });
+
   it("clears localStorage immediately (no debounce) when currentScript reverts to savedScript", async () => {
     localStorage.setItem(DRAFT_KEY, EDITED);
     const onRestore = vi.fn();
@@ -215,6 +254,24 @@ describe("useDraftRecovery", () => {
 
     // The removal should happen synchronously (no timer advance needed)
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it("continues when localStorage removals are blocked", () => {
+    localStorage.setItem(DRAFT_KEY, EDITED);
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+    const onRestore = vi.fn();
+    const { result } = renderHook(() =>
+      useDraftRecovery(PROJECT_ID, SAVED, SAVED, onRestore)
+    );
+
+    act(() => {
+      result.current.discard();
+      result.current.clearDraft();
+    });
+
+    expect(result.current.hasDraft).toBe(false);
   });
 
   // ── projectId change ──────────────────────────────────────────────────────

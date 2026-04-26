@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
 
 const DRAFT_DEBOUNCE_MS = 2000;
 
@@ -41,17 +42,13 @@ export function useDraftRecovery(
     if (!projectId) return;
     initialCheckDoneRef.current = false;
 
-    try {
-      const stored = localStorage.getItem(draftKey(projectId));
-      if (stored && stored !== savedScript) {
-        draftContentRef.current = stored;
-        setHasDraft(true);
-      } else {
-        draftContentRef.current = null;
-        setHasDraft(false);
-      }
-    } catch {
-      // localStorage may be unavailable (private browsing, quota, etc.)
+    const stored = safeGetLocalStorageItem(draftKey(projectId));
+    if (stored && stored !== savedScript) {
+      draftContentRef.current = stored;
+      setHasDraft(true);
+    } else {
+      draftContentRef.current = null;
+      setHasDraft(false);
     }
 
     // Mark initial check as done after a tick so the debounced save
@@ -69,21 +66,13 @@ export function useDraftRecovery(
     // If the current script matches the saved version, clear the draft
     if (currentScript === savedScript) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      try {
-        localStorage.removeItem(draftKey(projectId));
-      } catch {
-        // ignore
-      }
+      safeRemoveLocalStorageItem(draftKey(projectId));
       return;
     }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      try {
-        localStorage.setItem(draftKey(projectId), currentScript);
-      } catch {
-        // quota exceeded or unavailable — silently ignore
-      }
+      safeSetLocalStorageItem(draftKey(projectId), currentScript);
     }, DRAFT_DEBOUNCE_MS);
 
     return () => {
@@ -101,11 +90,7 @@ export function useDraftRecovery(
 
   const discard = useCallback(() => {
     if (projectId) {
-      try {
-        localStorage.removeItem(draftKey(projectId));
-      } catch {
-        // ignore
-      }
+      safeRemoveLocalStorageItem(draftKey(projectId));
     }
     draftContentRef.current = null;
     setHasDraft(false);
@@ -113,11 +98,7 @@ export function useDraftRecovery(
 
   const clearDraft = useCallback(() => {
     if (projectId) {
-      try {
-        localStorage.removeItem(draftKey(projectId));
-      } catch {
-        // ignore
-      }
+      safeRemoveLocalStorageItem(draftKey(projectId));
     }
     draftContentRef.current = null;
     setHasDraft(false);
