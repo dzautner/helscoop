@@ -10,17 +10,18 @@ test.use({ baseURL: process.env.TEST_WEB_URL || "http://localhost:3052" });
 
 /** Dismiss onboarding overlay so the real page is interactive. */
 async function dismissOnboarding(page: Page) {
-  await page.evaluate(() => {
+  const markCompleted = () => {
     localStorage.setItem("helscoop_onboarding_completed", "true");
-  });
+  };
+  await page.addInitScript(markCompleted);
+  await page.evaluate(markCompleted).catch(() => {});
 }
 
-/** Navigate to landing and dismiss onboarding, wait for idle. */
+/** Navigate to landing with onboarding already dismissed. */
 async function goToLanding(page: Page) {
-  await page.goto("/");
   await dismissOnboarding(page);
-  await page.reload();
-  await page.waitForLoadState("networkidle");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#main-content")).toBeVisible({ timeout: 10_000 });
 }
 
 /** Register a user via the API and return the token. */
@@ -300,8 +301,7 @@ test.describe("Registration flow", () => {
     await page.evaluate(() => {
       localStorage.setItem("helscoop_session_active", "true");
     });
-    await page.reload();
-    await page.waitForLoadState("networkidle");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     // Should see the project list (i.e. logged in)
     await expect(
@@ -413,10 +413,8 @@ test.describe("Login flow", () => {
     } else {
       // Fallback: clear the non-secret session hint manually.
       await page.evaluate(() => localStorage.removeItem("helscoop_session_active"));
-      await page.reload();
+      await page.goto("/", { waitUntil: "domcontentloaded" });
     }
-
-    await page.waitForLoadState("networkidle");
 
     // Should be back on the landing/login page
     await expect(page.locator('input[type="email"]')).toBeVisible({
@@ -453,10 +451,8 @@ test.describe("Password reset", () => {
   });
 
   test("submit email -> shows confirmation message", async ({ page }) => {
-    await page.goto("/forgot-password");
     await dismissOnboarding(page);
-    await page.reload();
-    await page.waitForLoadState("networkidle");
+    await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
 
     const emailInput = page.locator('input[type="email"]');
     await expect(emailInput).toBeVisible({ timeout: 10_000 });

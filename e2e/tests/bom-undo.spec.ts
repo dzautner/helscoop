@@ -49,7 +49,8 @@ test.describe("BOM item removal — undo toast flow", () => {
     await expect(osbRow).toBeVisible({ timeout: 5_000 });
 
     // Remove the pine item by clicking its remove button
-    const removeBtn = page.locator('button.bom-remove-btn, button[aria-label*="poista" i], button[aria-label*="remove" i]').first();
+    await framingRow.hover();
+    const removeBtn = framingRow.locator('button.bom-remove-btn, button[aria-label*="poista" i], button[aria-label*="remove" i]').first();
     await expect(removeBtn).toBeVisible({ timeout: 3_000 });
     await removeBtn.click();
 
@@ -104,7 +105,8 @@ test.describe("BOM item removal — undo toast flow", () => {
     await expect(framingRow).toBeVisible({ timeout: 5_000 });
 
     // Remove item
-    const removeBtn = page.locator('button.bom-remove-btn, button[aria-label*="poista" i], button[aria-label*="remove" i]').first();
+    await framingRow.hover();
+    const removeBtn = framingRow.locator('button.bom-remove-btn, button[aria-label*="poista" i], button[aria-label*="remove" i]').first();
     await expect(removeBtn).toBeVisible({ timeout: 3_000 });
     await removeBtn.click();
 

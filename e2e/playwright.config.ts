@@ -40,7 +40,7 @@ export default defineConfig({
     {
       command: `npx tsx src/index.ts`,
       cwd: "../api",
-      port: API_PORT,
+      url: `${process.env.TEST_API_URL}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       env: {
@@ -56,7 +56,7 @@ export default defineConfig({
     {
       command: `npx next dev -p ${WEB_PORT}`,
       cwd: "../web",
-      port: WEB_PORT,
+      url: process.env.TEST_WEB_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: {

@@ -26,6 +26,7 @@ test.describe("Building Lookup & Import", () => {
 
     await page
       .getByRole("button", { name: /hae|search/i })
+      .first()
       .click({ force: true });
 
     await expect(
@@ -54,6 +55,7 @@ test.describe("Building Lookup & Import", () => {
 
     await page
       .getByRole("button", { name: /hae|search/i })
+      .first()
       .click({ force: true });
 
     await expect(
@@ -74,6 +76,7 @@ test.describe("Building Lookup & Import", () => {
     await addressInput.fill("Ribbingintie 109-11, 00890 Helsinki");
     await page
       .getByRole("button", { name: /hae|search/i })
+      .first()
       .click({ force: true });
 
     await expect(
