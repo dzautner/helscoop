@@ -2,6 +2,7 @@ import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
 import { requirePermission } from "../permissions";
+import { extractBuildingAreaM2, parseBuildingInfo } from "../building-info";
 
 const router = Router();
 
@@ -43,20 +44,6 @@ interface AggregatedItem {
     estimated_savings_eur: number;
     note: string;
   } | null;
-}
-
-function extractAreaM2(buildingInfo: unknown): number | null {
-  if (typeof buildingInfo === "string") {
-    try {
-      return extractAreaM2(JSON.parse(buildingInfo));
-    } catch {
-      return null;
-    }
-  }
-  if (!buildingInfo || typeof buildingInfo !== "object") return null;
-  const rawArea = (buildingInfo as { area_m2?: unknown }).area_m2;
-  const area = Number(rawArea);
-  return Number.isFinite(area) && area > 0 ? area : null;
 }
 
 function normalizeProjectIds(input: unknown): string[] {
@@ -203,7 +190,7 @@ router.post("/aggregate", requireAuth, requirePermission("project:read_own"), as
     bom_rows: string | number;
   }) => {
     const estimatedCost = roundMoney(Number(project.estimated_cost) || 0);
-    const areaM2 = extractAreaM2(project.building_info);
+    const areaM2 = extractBuildingAreaM2(parseBuildingInfo(project.building_info)) ?? null;
     return {
       id: project.id,
       name: project.name,
