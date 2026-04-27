@@ -1,128 +1,152 @@
-import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, apiUrl, expectMainViewportVisible } from "./helpers";
+import { test, expect, type Page } from "@playwright/test";
+import {
+  createProjectViaAPI,
+  expectBomPanelVisible,
+  loginViaUI,
+  openProjectEditor,
+  registerUser,
+  saveBomViaAPI,
+} from "./helpers";
+
+const SCENE_JS = 'scene.add(box(6,0.2,4), {material:"foundation"});';
+
+async function createProject(page: Page, token: string, name: string): Promise<string> {
+  return createProjectViaAPI(page, token, { name, scene_js: SCENE_JS });
+}
+
+function bomSave(page: Page, projectId: string) {
+  return page.waitForResponse(
+    (response) =>
+      response.request().method() === "PUT" &&
+      response.url().includes(`/projects/${projectId}/bom`) &&
+      response.ok(),
+    { timeout: 15_000 },
+  );
+}
+
+function bomRow(page: Page, material: RegExp) {
+  return page.locator(".bom-item-card").filter({ hasText: material }).first();
+}
+
+async function openBomProject(page: Page, projectId: string) {
+  await openProjectEditor(page, projectId);
+  await expectBomPanelVisible(page);
+}
 
 test.describe("BOM Panel — Item CRUD", () => {
   let user: { email: string; password: string; name: string; token: string };
-  let projectId: string;
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     user = await registerUser(page, `bom-crud-${Date.now()}`);
-
-    const res = await page.request.post(apiUrl("/projects"), {
-      headers: { Authorization: `Bearer ${user.token}` },
-      data: {
-        name: "BOM CRUD Test",
-        scene_js: 'scene.add(box(6,0.2,4), {material:"foundation"});',
-      },
-    });
-    projectId = (await res.json()).id;
     await page.close();
   });
 
-  test("add a material to the BOM from the material search", async ({ page }) => {
+  test("adds a material to the BOM from the material catalog", async ({ page }) => {
+    const projectId = await createProject(page, user.token, "BOM Add Test");
     await loginViaUI(page, user.email, user.password);
-    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openBomProject(page, projectId);
 
-    const addBtn = page.getByRole("button", { name: /lisää|add material/i });
-    if (await addBtn.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      await addBtn.click();
+    const materialCard = page.locator(".material-browse-card").filter({ hasText: /48x148/i }).first();
+    await materialCard.scrollIntoViewIfNeeded();
+    await expect(materialCard).toBeVisible({ timeout: 10_000 });
+    await materialCard.click();
 
-      const searchInput = page.getByPlaceholder(/hae materiaali|search material/i);
-      if (await searchInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await searchInput.fill("48x98");
-        await page.waitForTimeout(500);
+    const quantityInput = materialCard.locator('input[type="number"]');
+    await expect(quantityInput).toBeVisible({ timeout: 5_000 });
+    await quantityInput.fill("3");
 
-        const result = page.getByText(/48x98/i).first();
-        if (await result.isVisible({ timeout: 5000 }).catch(() => false)) {
-          await result.click();
-          await page.waitForTimeout(500);
+    const save = bomSave(page, projectId);
+    await materialCard.locator("button", { hasText: /lisää|add/i }).click();
+    await save;
 
-          await expect(page.getByText(/48x98/i).first()).toBeVisible({ timeout: 5000 });
-        }
-      }
-    }
-
-    await page.screenshot({ path: "test-results/bom-add-material.png" });
+    const row = bomRow(page, /48x148/i);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row.locator(".bom-item-qty-input")).toHaveValue("3");
   });
 
-  test("edit BOM item quantity inline", async ({ page }) => {
+  test("edits BOM item quantity inline and persists the change", async ({ page }) => {
+    const projectId = await createProject(page, user.token, "BOM Quantity Test");
+    await saveBomViaAPI(page, user.token, projectId, [
+      { material_id: "pine_48x98_c24", quantity: 10, unit: "jm" },
+    ]);
+
     await loginViaUI(page, user.email, user.password);
-    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openBomProject(page, projectId);
 
-    const qtyInput = page.locator('input[type="number"]').first();
-    if (await qtyInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const before = await qtyInput.inputValue();
-      const newQty = String(parseInt(before || "1") + 15);
-      await qtyInput.fill(newQty);
-      await qtyInput.press("Tab");
-      await page.waitForTimeout(1000);
+    const row = bomRow(page, /48\s*x?\s*98|runkopuu|framing timber/i);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    const quantityInput = row.locator(".bom-item-qty-input");
+    const totalBefore = await row.locator(".bom-item-total").textContent();
 
-      const qtyAfter = page.locator('input[type="number"]').first();
-      await expect(qtyAfter).toHaveValue(newQty, { timeout: 5000 });
-    }
+    const save = bomSave(page, projectId);
+    await quantityInput.fill("25");
+    await quantityInput.blur();
+    await save;
 
-    await page.screenshot({ path: "test-results/bom-edit-qty.png" });
+    await expect(quantityInput).toHaveValue("25");
+    await expect(row.locator(".bom-item-total")).not.toHaveText(totalBefore || "", { timeout: 5_000 });
   });
 
-  test("remove a BOM item and verify it disappears", async ({ page }) => {
+  test("removes a BOM item and leaves the remaining items intact", async ({ page }) => {
+    const projectId = await createProject(page, user.token, "BOM Remove Test");
+    await saveBomViaAPI(page, user.token, projectId, [
+      { material_id: "pine_48x98_c24", quantity: 10, unit: "jm" },
+      { material_id: "osb_9mm", quantity: 5, unit: "m2" },
+    ]);
+
     await loginViaUI(page, user.email, user.password);
-    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openBomProject(page, projectId);
 
-    const bomItems = page.locator('[data-testid="bom-item"], [class*="bom-row"], [class*="bom-item"]');
-    const countBefore = await bomItems.count().catch(() => 0);
+    const framingRow = bomRow(page, /48\s*x?\s*98|runkopuu|framing timber/i);
+    const osbRow = bomRow(page, /osb/i);
+    await expect(framingRow).toBeVisible({ timeout: 10_000 });
+    await expect(osbRow).toBeVisible({ timeout: 10_000 });
 
-    if (countBefore > 0) {
-      const removeBtn = page.locator('button[aria-label*="poista" i], button[aria-label*="remove" i], button[aria-label*="delete" i]').first();
-      if (await removeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await removeBtn.click();
-        await page.waitForTimeout(1500);
-
-        const countAfter = await bomItems.count().catch(() => 0);
-        expect(countAfter).toBeLessThan(countBefore);
-      }
+    await framingRow.scrollIntoViewIfNeeded();
+    await framingRow.hover();
+    const removeButton = framingRow.locator(".bom-remove-btn");
+    await expect(removeButton).toBeVisible({ timeout: 5_000 });
+    const save = bomSave(page, projectId);
+    await removeButton.click();
+    const confirmButton = page.locator("button").filter({
+      hasText: /delete|poista|remove|radera|kyllä|yes|vahvista|confirm/i,
+    });
+    if (await confirmButton.first().isVisible({ timeout: 1_500 }).catch(() => false)) {
+      await confirmButton.first().click();
     }
+    await expect(framingRow).not.toBeVisible({ timeout: 5_000 });
+    await expect(osbRow).toBeVisible({ timeout: 5_000 });
+    await save;
 
-    await page.screenshot({ path: "test-results/bom-remove-item.png" });
+    await openBomProject(page, projectId);
+    await expect(bomRow(page, /48\s*x?\s*98|runkopuu|framing timber/i)).not.toBeVisible({ timeout: 5_000 });
+    await expect(bomRow(page, /osb/i)).toBeVisible({ timeout: 5_000 });
   });
 
-  test("BOM total cost updates after quantity change", async ({ page }) => {
+  test("updates visible item and panel totals after quantity change", async ({ page }) => {
+    const projectId = await createProject(page, user.token, "BOM Total Test");
+    await saveBomViaAPI(page, user.token, projectId, [
+      { material_id: "pine_48x148_c24", quantity: 2, unit: "jm" },
+    ]);
+
     await loginViaUI(page, user.email, user.password);
-    await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openBomProject(page, projectId);
 
-    const totalEl = page.getByText(/yhteensä|total/i).first();
-    const initialTotal = await totalEl.textContent().catch(() => null);
+    const row = bomRow(page, /48\s*x?\s*148/i);
+    await expect(row).toBeVisible({ timeout: 10_000 });
 
-    const qtyInput = page.locator('input[type="number"]').first();
-    if (await qtyInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const current = await qtyInput.inputValue();
-      const newQty = String(parseInt(current || "1") + 10);
-      await qtyInput.fill(newQty);
-      await qtyInput.press("Tab");
-      await page.waitForTimeout(1500);
+    const itemTotal = row.locator(".bom-item-total");
+    const itemTotalBefore = await itemTotal.textContent();
+    const panelTextBefore = await page.locator(".editor-bom-panel").textContent();
 
-      const updatedTotal = await totalEl.textContent().catch(() => null);
-      if (initialTotal && updatedTotal) {
-        expect(updatedTotal).not.toBe(initialTotal);
-      }
-    }
+    const save = bomSave(page, projectId);
+    await row.locator(".bom-item-qty-input").fill("20");
+    await row.locator(".bom-item-qty-input").blur();
+    await save;
 
-    await page.screenshot({ path: "test-results/bom-total-update.png" });
+    await expect(itemTotal).not.toHaveText(itemTotalBefore || "", { timeout: 5_000 });
+    const panelTextAfter = await page.locator(".editor-bom-panel").textContent();
+    expect(panelTextAfter).not.toBe(panelTextBefore);
   });
 });

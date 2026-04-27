@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, saveBomViaAPI } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, openProjectEditor, saveBomViaAPI } from "./helpers";
 
 const framingMaterialPattern = /48\s*x?\s*98|framing timber|runkopuu/i;
 const osbMaterialPattern = /osb.*9\s*mm/i;
@@ -26,9 +26,7 @@ test.describe("BOM item removal — undo toast flow", () => {
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await openProjectEditor(page, projectId);
 
     // Open BOM panel if not visible
     const bomToggle = page.locator('button[aria-label*="BOM" i], button[aria-label*="materiaali" i], button[data-tooltip*="BOM" i]');
@@ -66,7 +64,6 @@ test.describe("BOM item removal — undo toast flow", () => {
 
     // Click undo
     await undoButton.first().click();
-    await page.waitForTimeout(500);
 
     // Verify the item is restored — both items should be visible again
     await expect(page.locator(".bom-item-card").filter({ hasText: framingMaterialPattern }).first()).toBeVisible({ timeout: 5_000 });
@@ -85,9 +82,7 @@ test.describe("BOM item removal — undo toast flow", () => {
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await openProjectEditor(page, projectId);
 
     // Open BOM panel
     const bomToggle = page.locator('button[aria-label*="BOM" i], button[aria-label*="materiaali" i], button[data-tooltip*="BOM" i]');

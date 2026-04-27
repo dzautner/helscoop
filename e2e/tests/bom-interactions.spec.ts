@@ -5,6 +5,7 @@ import {
   setAuthToken,
   createProjectViaAPI,
   deleteProjectViaAPI,
+  openProjectEditor,
 } from "./helpers";
 
 /**
@@ -25,15 +26,7 @@ async function loginAndNavigateToProject(
 ): Promise<void> {
   const token = await loginUser(page, email, password);
   await setAuthToken(page, token);
-  await page.goto(`/project/${projectId}`);
-  await page.waitForLoadState("networkidle");
-  // Wait for the editor layout to be ready (canvas or BOM panel)
-  await page
-    .locator(".editor-bom-panel, canvas[data-engine^='three.js'][aria-hidden='true']")
-    .first()
-    .waitFor({ state: "visible", timeout: 20_000 });
-  // Extra settle time for React hydration and material fetches
-  await page.waitForTimeout(1500);
+  await openProjectEditor(page, projectId, 20_000);
 }
 
 /** Ensure the BOM panel is visible — toggle it on if needed. */
