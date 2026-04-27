@@ -3519,6 +3519,7 @@ export default function ProjectPage() {
                   {t("permitPack.exportMenu")}
                 </button>
                 <button
+                  role="menuitem"
                   className="btn btn-ghost"
                   disabled={exportingFormat !== null}
                   onClick={async () => {
