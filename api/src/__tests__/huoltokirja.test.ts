@@ -235,6 +235,27 @@ describe("GET /huoltokirja/generate", () => {
     expect(doc.buildingInfo).toEqual({});
   });
 
+  it("uses empty building info when stored building_info JSON is malformed", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "p-bad-info", name: "Bad Metadata", building_info: "{not valid json" }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/huoltokirja/generate?projectId=p-bad-info", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+
+    const doc = res.body as {
+      projectName: string;
+      buildingInfo: Record<string, unknown>;
+      components: unknown[];
+    };
+    expect(doc.projectName).toBe("Bad Metadata");
+    expect(doc.buildingInfo).toEqual({});
+    expect(doc.components).toEqual([]);
+  });
+
   it("parses Finnish-keyed building_info correctly", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{

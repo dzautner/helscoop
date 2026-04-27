@@ -350,6 +350,20 @@ describe("GET /carbon/calculate — building area", () => {
     expect(body.limitKg).toBe(68000);
   });
 
+  it("uses default area when stringified building_info is malformed", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: "{not valid json" }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/carbon/calculate?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+    const body = res.body as { limitKg: number };
+    expect(body.limitKg).toBe(96000);
+  });
+
   it("falls back to legacy 'area' field when area_m2 is absent", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "proj-1", building_info: { area: 150 } }],

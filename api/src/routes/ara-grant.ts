@@ -2,6 +2,7 @@ import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
 import { calculateEnergyClass } from "../energy-class";
+import { cleanString, extractBuildingAreaM2, parseBuildingInfo, positiveNumber } from "../building-info";
 
 const router = Router();
 
@@ -76,14 +77,7 @@ router.get("/package", async (req, res) => {
 
   const project = projectResult.rows[0];
 
-  // Parse building info
-  let buildingInfo: Record<string, unknown> = {};
-  if (project.building_info) {
-    buildingInfo =
-      typeof project.building_info === "string"
-        ? JSON.parse(project.building_info)
-        : project.building_info;
-  }
+  const buildingInfo = parseBuildingInfo(project.building_info);
 
   // Fetch BOM items with pricing
   const bomResult = await query(
@@ -143,10 +137,10 @@ router.get("/package", async (req, res) => {
 
   const energyResult = calculateEnergyClass(
     {
-      year_built: buildingInfo.year_built as number | undefined,
-      heating: buildingInfo.heating as string | undefined,
-      area_m2: (buildingInfo.area_m2 ?? buildingInfo.area) as number | undefined,
-      type: buildingInfo.type as string | undefined,
+      year_built: positiveNumber(buildingInfo.year_built ?? buildingInfo.yearBuilt),
+      heating: cleanString(buildingInfo.heating),
+      area_m2: extractBuildingAreaM2(buildingInfo),
+      type: cleanString(buildingInfo.type),
     },
     bom,
   );
