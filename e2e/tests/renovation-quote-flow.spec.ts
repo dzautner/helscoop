@@ -1,5 +1,53 @@
-import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, saveBomViaAPI, apiUrl, expectMainViewportVisible } from "./helpers";
+import { test, expect, type Page } from "@playwright/test";
+import {
+  apiUrl,
+  createProjectViaAPI,
+  dismissOnboarding,
+  expectBomPanelVisible,
+  loginViaUI,
+  openProjectEditor,
+  readObjectCount,
+  registerUser,
+  saveBomViaAPI,
+} from "./helpers";
+
+const BASIC_SCENE = 'scene.add(box(6,0.2,4), {material:"foundation"});';
+const BOM_ITEMS = [{ material_id: "pine_48x98_c24", quantity: 50, unit: "jm" }];
+
+function waitForBomSave(page: Page, projectId?: string) {
+  return page.waitForResponse(
+    (response) => {
+      if (response.request().method() !== "PUT" || !response.ok()) return false;
+      const url = new URL(response.url());
+      if (projectId) return url.pathname === `/projects/${projectId}/bom`;
+      return /^\/projects\/[^/]+\/bom$/.test(url.pathname);
+    },
+    { timeout: 15_000 },
+  );
+}
+
+async function createSeededQuoteProject(
+  page: Page,
+  token: string,
+  name: string,
+  bomItems = BOM_ITEMS,
+): Promise<string> {
+  const projectId = await createProjectViaAPI(page, token, {
+    name,
+    scene_js: BASIC_SCENE,
+  });
+  await saveBomViaAPI(page, token, projectId, bomItems);
+  return projectId;
+}
+
+async function openQuoteProject(page: Page, projectId: string) {
+  await openProjectEditor(page, projectId);
+  await expectBomPanelVisible(page);
+}
+
+function bomRow(page: Page, material: RegExp) {
+  return page.locator(".bom-item-card").filter({ hasText: material }).first();
+}
 
 test.describe("Complete renovation quote flow", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -13,166 +61,148 @@ test.describe("Complete renovation quote flow", () => {
   test("address search → building data → project creation → BOM → export", async ({ page }) => {
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
+    await dismissOnboarding(page);
 
-    // 1. Enter a Finnish address in the address search
     const addressInput = page.locator('[data-tour="address-input"] input').first();
-    if (await addressInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await addressInput.fill("Ribbingintie 109");
-      await page.waitForTimeout(500);
-      await addressInput.press("Enter");
-      await page.waitForTimeout(3000);
+    const searchButton = page
+      .locator('[data-tour="address-input"]')
+      .first()
+      .getByRole("button", { name: /hae|search/i });
+    await expect(addressInput).toBeVisible({ timeout: 10_000 });
+    await addressInput.fill("Ribbingintie 109-11, 00890 Helsinki");
+    await expect(searchButton).toBeEnabled({ timeout: 5_000 });
 
-      // 2. Verify building data result appears
-      const resultCard = page.locator('.address-result-glow, [class*="address-result"]').first();
-      if (await resultCard.isVisible({ timeout: 10_000 }).catch(() => false)) {
-        // Verify building info shows type/year/area
-        const resultText = await resultCard.textContent();
-        expect(resultText).toBeTruthy();
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          response.url().includes("/building?") &&
+          response.ok(),
+        { timeout: 15_000 },
+      ),
+      searchButton.click(),
+    ]);
 
-        // 3. Click create project
-        const createBtn = resultCard.getByRole("button", { name: /luo projekti|create|aloita/i });
-        if (await createBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-          await createBtn.click();
-          await page.waitForTimeout(3000);
-          await page.waitForLoadState("networkidle");
+    const resultCard = page
+      .locator('.address-result-glow, [class*="address-result"]')
+      .filter({ hasText: /Ribbingintie|omakotitalo|detached house/i })
+      .first();
+    await expect(resultCard).toBeVisible({ timeout: 15_000 });
+    await expect(resultCard).toContainText(/omakotitalo|detached house|single-family home/i);
 
-          // Should redirect to project page
-          await expect(page).toHaveURL(/\/project\//, { timeout: 15_000 });
+    const createBtn = resultCard.getByRole("button", { name: /luo projekti|create project|create from building|aloita/i });
+    await expect(createBtn).toBeEnabled({ timeout: 5_000 });
 
-          // 4. Verify 3D scene renders
-          await expectMainViewportVisible(page);
+    const createProjectResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/projects" &&
+        response.ok(),
+      { timeout: 15_000 },
+    );
+    const saveBomResponse = waitForBomSave(page);
 
-          // 5. Verify BOM panel has items
-          const bomList = page.locator('[role="list"][aria-label*="Material"], [role="list"][aria-label*="Materiaali"]');
-          if (await bomList.isVisible({ timeout: 10_000 }).catch(() => false)) {
-            const bomItems = bomList.locator('[role="listitem"]');
-            const itemCount = await bomItems.count().catch(() => 0);
-            expect(itemCount).toBeGreaterThan(0);
-          }
+    await createBtn.click();
+    const project = await (await createProjectResponse).json();
+    await saveBomResponse;
+    await page.waitForURL(new RegExp(`/project/${project.id}`), { timeout: 20_000 });
 
-          await page.screenshot({ path: "test-results/reno-flow-project.png" });
-        }
-      }
-    }
+    await openProjectEditor(page, project.id);
+    const objectCount = await readObjectCount(page, 15_000);
+    expect(objectCount).toBeGreaterThanOrEqual(10);
+
+    await expectBomPanelVisible(page);
+    const bomItems = page.locator(".bom-item-card");
+    await expect(bomItems.first()).toBeVisible({ timeout: 10_000 });
+    expect(await bomItems.count()).toBeGreaterThan(0);
+
+    await page.screenshot({ path: "test-results/reno-flow-project.png" });
 
     await page.screenshot({ path: "test-results/reno-flow-address.png" });
   });
 
   test("BOM editing updates cost totals", async ({ page }) => {
-    // Create project with BOM via API
-    const projectId = await createProjectViaAPI(page, user.token, {
-      name: "BOM Edit Test",
-      scene_js: 'scene.add(box(6,0.2,4), {material:"foundation"});',
-    });
-    await saveBomViaAPI(page, user.token, projectId, [
-      { material_id: "pine_48x98_c24", quantity: 50, unit: "jm" },
-    ]);
+    const projectId = await createSeededQuoteProject(page, user.token, "BOM Edit Test");
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openQuoteProject(page, projectId);
 
-    // Find the BOM row quantity input and change it.
-    const bomRow = page.locator(".bom-item-card").first();
-    await bomRow.scrollIntoViewIfNeeded();
-    const qtyInput = bomRow.locator(".bom-item-qty-input");
-    if (await qtyInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const totalBefore = await bomRow.locator(".bom-item-total").textContent().catch(() => "");
-      await qtyInput.fill("100");
-      await qtyInput.press("Tab");
-      await expect(qtyInput).toHaveValue("100", { timeout: 5_000 });
+    const row = bomRow(page, /48\s*x?\s*98|runkopuu|framing timber/i);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await row.scrollIntoViewIfNeeded();
 
-      const totalAfter = await bomRow.locator(".bom-item-total").textContent().catch(() => "");
-      if (totalBefore && totalAfter) {
-        expect(totalAfter).not.toBe(totalBefore);
-      }
-    }
+    const qtyInput = row.locator(".bom-item-qty-input");
+    await expect(qtyInput).toHaveValue("50");
+    const totalBefore = await row.locator(".bom-item-total").textContent();
+
+    const save = waitForBomSave(page, projectId);
+    await qtyInput.fill("100");
+    await qtyInput.blur();
+    await save;
+
+    await expect(qtyInput).toHaveValue("100", { timeout: 5_000 });
+    await expect(row.locator(".bom-item-total")).not.toHaveText(totalBefore || "", { timeout: 5_000 });
+
+    const projectResponse = await page.request.get(apiUrl(`/projects/${projectId}`), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    });
+    expect(projectResponse.status()).toBe(200);
+    const project = await projectResponse.json();
+    const savedItem = project.bom.find((item: { material_id: string }) => item.material_id === "pine_48x98_c24");
+    expect(Number(savedItem?.quantity)).toBe(100);
 
     await page.screenshot({ path: "test-results/reno-flow-bom-edit.png" });
   });
 
   test("PDF export triggers download", async ({ page }) => {
-    const projectId = await createProjectViaAPI(page, user.token, {
-      name: "Export Test",
-      scene_js: 'scene.add(box(4,3,5), {material:"lumber"});',
-    });
-    await saveBomViaAPI(page, user.token, projectId, [
-      { material_id: "lumber_48x98", quantity: 20, unit: "jm" },
-    ]);
+    const projectId = await createSeededQuoteProject(page, user.token, "PDF Export Test");
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openQuoteProject(page, projectId);
 
-    // Open export menu
     const exportBtn = page.locator('[data-tour="export-btn"] button').first();
-    if (await exportBtn.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      await exportBtn.click();
-      await page.waitForTimeout(500);
+    await expect(exportBtn).toBeEnabled({ timeout: 15_000 });
+    await exportBtn.click();
 
-      // Click PDF
-      const pdfItem = page.locator('[role="menuitem"]').filter({ hasText: /pdf/i });
-      if (await pdfItem.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        const downloadPromise = page.waitForEvent("download", { timeout: 15_000 }).catch(() => null);
-        await pdfItem.click();
-        const download = await downloadPromise;
-        if (download) {
-          expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
-        }
-      }
-    }
+    const pdfItem = page.getByRole("menuitem", { name: /^PDF$/i });
+    await expect(pdfItem).toBeVisible({ timeout: 5_000 });
+
+    const pdfResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/projects/${projectId}/pdf`) &&
+        response.status() === 200,
+      { timeout: 15_000 },
+    );
+    const downloadPromise = page.waitForEvent("download", { timeout: 15_000 });
+
+    await pdfItem.click();
+    const [pdfResponse, download] = await Promise.all([pdfResponsePromise, downloadPromise]);
+    expect(pdfResponse.headers()["content-type"]).toContain("application/pdf");
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
 
     await page.screenshot({ path: "test-results/reno-flow-export-pdf.png" });
   });
 
   test("CSV export triggers download", async ({ page }) => {
-    const projectId = await createProjectViaAPI(page, user.token, {
-      name: "CSV Export Test",
-      scene_js: 'scene.add(box(4,3,5), {material:"lumber"});',
-    });
-    await saveBomViaAPI(page, user.token, projectId, [
-      { material_id: "lumber_48x98", quantity: 20, unit: "jm" },
-    ]);
+    const projectId = await createSeededQuoteProject(page, user.token, "CSV Export Test");
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openQuoteProject(page, projectId);
 
-    // Try the BOM panel CSV button
-    const bomCsvBtn = page.locator('button[aria-label*="csv" i], button[aria-label*="lataa" i]').first();
-    if (await bomCsvBtn.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      const downloadPromise = page.waitForEvent("download", { timeout: 10_000 }).catch(() => null);
-      await bomCsvBtn.click();
-      const download = await downloadPromise;
-      if (download) {
-        expect(download.suggestedFilename()).toMatch(/\.csv$/i);
-      }
-    } else {
-      // Fallback: try export menu CSV
-      const exportBtn = page.locator('[data-tour="export-btn"] button').first();
-      if (await exportBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        await exportBtn.click();
-        await page.waitForTimeout(500);
-        const csvItem = page.getByText(/csv/i).first();
-        if (await csvItem.isVisible({ timeout: 3_000 }).catch(() => false)) {
-          const downloadPromise = page.waitForEvent("download", { timeout: 10_000 }).catch(() => null);
-          await csvItem.click();
-          const download = await downloadPromise;
-          if (download) {
-            expect(download.suggestedFilename()).toMatch(/\.csv$/i);
-          }
-        }
-      }
-    }
+    const exportBtn = page.locator('[data-tour="export-btn"] button').first();
+    await expect(exportBtn).toBeEnabled({ timeout: 15_000 });
+    await exportBtn.click();
+
+    const csvItem = page.getByRole("menuitem", { name: /^CSV$/i });
+    await expect(csvItem).toBeVisible({ timeout: 5_000 });
+
+    const downloadPromise = page.waitForEvent("download", { timeout: 10_000 });
+    await csvItem.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.csv$/i);
 
     await page.screenshot({ path: "test-results/reno-flow-export-csv.png" });
   });
@@ -186,21 +216,13 @@ test.describe("Complete renovation quote flow", () => {
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openQuoteProject(page, projectId);
 
-    // Check for empty state
-    const emptyState = page.locator('.bom-empty, [class*="bom-empty"]');
-    if (await emptyState.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      const emptyTitle = page.locator('.bom-empty-title');
-      await expect(emptyTitle).toBeVisible({ timeout: 5_000 });
-
-      // CTA button should be visible
-      const emptyCta = page.locator('.bom-empty-cta');
-      await expect(emptyCta).toBeVisible({ timeout: 5_000 });
-    }
+    const emptyState = page.locator(".bom-empty").first();
+    await expect(emptyState).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(".bom-item-card")).toHaveCount(0);
+    await expect(page.locator(".bom-empty-title")).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator(".bom-empty-cta")).toBeVisible({ timeout: 5_000 });
 
     await page.screenshot({ path: "test-results/reno-flow-empty-bom.png" });
   });
