@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
+import { extractBuildingAreaM2, parseBuildingInfo } from "../building-info";
 
 const router = Router();
 
@@ -58,20 +59,10 @@ router.get("/calculate", async (req, res) => {
 
   const project = projectResult.rows[0];
 
-  // Extract building area from building_info if available
+  // Extract building area from building_info, preferring schema key area_m2.
   let buildingAreaM2 = 120; // default for typical Finnish single-family
-  if (project.building_info) {
-    const info =
-      typeof project.building_info === "string"
-        ? JSON.parse(project.building_info)
-        : project.building_info;
-    // building_info stores area as area_m2 (see building.ts BuildingInfo interface).
-    // Fall back to legacy "area" field for old projects.
-    const rawArea = info.area_m2 ?? info.area;
-    if (rawArea != null && typeof rawArea === "number" && Number.isFinite(rawArea) && rawArea > 0) {
-      buildingAreaM2 = rawArea;
-    }
-  }
+  const areaFromProject = extractBuildingAreaM2(parseBuildingInfo(project.building_info));
+  if (areaFromProject) buildingAreaM2 = areaFromProject;
 
   // Fetch BOM items with CO₂ factors
   const bomResult = await query(

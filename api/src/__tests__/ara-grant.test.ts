@@ -417,4 +417,26 @@ describe("GET /ara-grant/package — package generation", () => {
     expect(body.costEstimate.totalWithVat).toBe(0);
     expect(body.eligibility).toBe(false);
   });
+
+  it("uses safe defaults when building_info JSON is malformed", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proj-1", building_info: "{not valid json" }],
+    } as never);
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("GET", "/ara-grant/package?projectId=proj-1", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+    });
+    expect(res.status).toBe(200);
+
+    const body = res.body as {
+      energyClassBefore: string;
+      costEstimate: { items: unknown[]; totalWithoutVat: number };
+      eligibility: boolean;
+    };
+    expect(body.energyClassBefore).toBe("E");
+    expect(body.costEstimate.items).toEqual([]);
+    expect(body.costEstimate.totalWithoutVat).toBe(0);
+    expect(body.eligibility).toBe(false);
+  });
 });

@@ -11,6 +11,7 @@
 import { Router } from "express";
 import { query } from "../db";
 import { requireAuth } from "../auth";
+import { cleanString, extractBuildingAreaM2, parseBuildingInfo, positiveNumber } from "../building-info";
 import {
   getScheduleForCategory,
   type MaintenanceSchedule,
@@ -145,20 +146,13 @@ router.get("/generate", async (req, res) => {
       [projectId],
     );
 
-    // Parse building_info (stored as JSONB in the database)
-    let buildingInfo: HuoltokirjaBuildingInfo = {};
-    if (project.building_info) {
-      const raw =
-        typeof project.building_info === "string"
-          ? JSON.parse(project.building_info)
-          : project.building_info;
-      buildingInfo = {
-        address: raw.address ?? raw.osoite ?? undefined,
-        buildingType: raw.buildingType ?? raw.kayttotarkoitus ?? undefined,
-        yearBuilt: raw.yearBuilt ?? raw.valmistumisvuosi ?? undefined,
-        area: raw.area ?? raw.kerrosala ?? undefined,
-      };
-    }
+    const rawBuildingInfo = parseBuildingInfo(project.building_info);
+    const buildingInfo: HuoltokirjaBuildingInfo = {
+      address: cleanString(rawBuildingInfo.address ?? rawBuildingInfo.osoite),
+      buildingType: cleanString(rawBuildingInfo.buildingType ?? rawBuildingInfo.kayttotarkoitus),
+      yearBuilt: positiveNumber(rawBuildingInfo.yearBuilt ?? rawBuildingInfo.year_built ?? rawBuildingInfo.valmistumisvuosi),
+      area: extractBuildingAreaM2(rawBuildingInfo),
+    };
 
     // Map BOM rows to huoltokirja components
     const components: HuoltokirjaComponent[] = bomResult.rows.map((row) => {
