@@ -279,26 +279,37 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     environment: staging
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
     steps:
+      - name: Check Fly token
+        id: fly-token
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping staging deploy because FLY_API_TOKEN is not configured."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.fly-token.outputs.configured == 'true'
 
       - name: Install Fly CLI
+        if: steps.fly-token.outputs.configured == 'true'
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy API to staging
+        if: steps.fly-token.outputs.configured == 'true'
         run: flyctl deploy --config deploy/fly.api.toml --image ${{ env.API_IMAGE }}:sha-${GITHUB_SHA::7}
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Run database migrations
+        if: steps.fly-token.outputs.configured == 'true'
         run: flyctl ssh console --config deploy/fly.api.toml -C "node dist/migrate.js" || true
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy Web to staging
+        if: steps.fly-token.outputs.configured == 'true'
         run: flyctl deploy --config deploy/fly.web.toml --image ${{ env.WEB_IMAGE }}:sha-${GITHUB_SHA::7}
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   deploy-production:
     name: Deploy to Production
@@ -306,26 +317,37 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     environment: production
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
     steps:
+      - name: Check Fly token
+        id: fly-token
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping production deploy because FLY_API_TOKEN is not configured."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.fly-token.outputs.configured == 'true'
 
       - name: Install Fly CLI
+        if: steps.fly-token.outputs.configured == 'true'
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy API to production
+        if: steps.fly-token.outputs.configured == 'true'
         run: flyctl deploy --config deploy/fly.api.toml --image ${{ env.API_IMAGE }}:${{ github.ref_name }}
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Run database migrations
+        if: steps.fly-token.outputs.configured == 'true'
         run: flyctl ssh console --config deploy/fly.api.toml -C "node dist/migrate.js" || true
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy Web to production
+        if: steps.fly-token.outputs.configured == 'true'
         run: flyctl deploy --config deploy/fly.web.toml --image ${{ env.WEB_IMAGE }}:${{ github.ref_name }}
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   auto-merge:
     name: Auto Merge
