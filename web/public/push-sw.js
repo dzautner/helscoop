@@ -1,3 +1,15 @@
+function safeNotificationPath(value) {
+  if (typeof value !== "string" || !value.trim()) return "/";
+
+  try {
+    const url = new URL(value, self.location.origin);
+    if (url.origin !== self.location.origin) return "/";
+    return `${url.pathname}${url.search}${url.hash}` || "/";
+  } catch {
+    return "/";
+  }
+}
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
@@ -20,11 +32,12 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+  const url = safeNotificationPath(event.notification.data?.url);
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ("focus" in client && client.url.endsWith(url)) return client.focus();
+        const clientPath = safeNotificationPath(client.url);
+        if ("focus" in client && clientPath === url) return client.focus();
       }
       return clients.openWindow(url);
     }),
