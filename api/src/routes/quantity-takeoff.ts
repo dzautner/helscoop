@@ -9,6 +9,7 @@ import {
   deductCreditsForFeature,
   type InsufficientCreditsBody,
 } from "../entitlements";
+import { extractBuildingAreaM2, parseBuildingInfo as parseSharedBuildingInfo } from "../building-info";
 
 const router = Router();
 
@@ -104,15 +105,13 @@ function positiveNumber(value: unknown): number | undefined {
 }
 
 function parseBuildingInfo(value: unknown): BuildingContext {
-  if (typeof value === "string") {
-    try {
-      return parseBuildingInfo(JSON.parse(value));
-    } catch {
-      return {};
-    }
-  }
-  if (!value || typeof value !== "object") return {};
-  return value as BuildingContext;
+  const parsed = parseSharedBuildingInfo(value);
+  const normalized = { ...parsed } as BuildingContext;
+  const areaM2 = extractBuildingAreaM2(parsed);
+  if (areaM2 !== undefined) normalized.area_m2 = areaM2;
+  const floors = positiveNumber(parsed.floors);
+  if (floors !== undefined) normalized.floors = floors;
+  return normalized;
 }
 
 function normalizeText(value: string): string {

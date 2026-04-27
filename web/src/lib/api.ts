@@ -208,7 +208,6 @@ let refreshPromise: Promise<boolean> | null = null;
  */
 async function refreshAccessToken(): Promise<boolean> {
   const t = getToken();
-  if (!t && !hasAuthSession()) return false;
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -336,7 +335,7 @@ async function apiFetch(path: string, opts?: RequestInit) {
 
     // On 401 for a non-auth endpoint, attempt a single token refresh
     if (res.status === 401 && !isAuthEndpoint) {
-      const refreshed = hasAuthSession() ? await refreshOnce() : false;
+      const refreshed = await refreshOnce();
       if (refreshed) {
         // Retry the original request with the new token
         const retryHeaders: Record<string, string> = {

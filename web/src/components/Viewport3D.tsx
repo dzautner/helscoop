@@ -1625,10 +1625,15 @@ export default function Viewport3D({
       fillLightRef.current = null;
       groundMeshRef.current = null;
 
+      scene.clear();
+      renderer.setAnimationLoop(null);
       renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      renderer.forceContextLoss();
+      if (renderer.domElement.parentElement) {
+        renderer.domElement.parentElement.removeChild(renderer.domElement);
       }
+      renderer.domElement.width = 0;
+      renderer.domElement.height = 0;
 
       rendererRef.current = null;
       sceneRef.current = null;

@@ -16,6 +16,7 @@ import {
   type RoomScanFileInput,
   type RoomScanImportOptions,
 } from "../room-scan-parser";
+import { extractBuildingAreaM2, parseBuildingInfo as parseSharedBuildingInfo } from "../building-info";
 
 const router = Router();
 
@@ -52,15 +53,13 @@ function positiveNumber(value: unknown): number | undefined {
 }
 
 function parseBuildingInfo(value: unknown): RoomScanBuildingContext {
-  if (typeof value === "string") {
-    try {
-      return parseBuildingInfo(JSON.parse(value));
-    } catch {
-      return {};
-    }
-  }
-  if (!value || typeof value !== "object") return {};
-  return value as RoomScanBuildingContext;
+  const parsed = parseSharedBuildingInfo(value);
+  const normalized = { ...parsed } as RoomScanBuildingContext;
+  const areaM2 = extractBuildingAreaM2(parsed);
+  if (areaM2 !== undefined) normalized.area_m2 = areaM2;
+  const floors = positiveNumber(parsed.floors);
+  if (floors !== undefined) normalized.floors = floors;
+  return normalized;
 }
 
 function normalizeScans(input: unknown): RoomScanFileInput[] {
