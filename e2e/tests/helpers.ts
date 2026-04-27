@@ -135,6 +135,18 @@ export async function expectMainViewportVisible(page: Page, timeout = 30_000): P
   await expect(mainViewportCanvas(page)).toBeVisible({ timeout });
 }
 
+export async function openProjectEditor(page: Page, projectId: string, timeout = 30_000): Promise<void> {
+  await page.goto(`/project/${projectId}`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByLabel(/project name/i)).toBeVisible({ timeout });
+  await expectMainViewportVisible(page, timeout);
+}
+
+export async function expectBomPanelVisible(page: Page, timeout = 15_000): Promise<Locator> {
+  const panel = page.locator('[data-testid="bom-panel"], .editor-bom-panel').first();
+  await expect(panel).toBeVisible({ timeout });
+  return panel;
+}
+
 export function objectCountStatus(page: Page, pattern: RegExp = /[1-9]\d*\s*(objects|objektia)/i): Locator {
   return page.locator(".viewport-status, .editor-status-segment").filter({ hasText: pattern }).first();
 }

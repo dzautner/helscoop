@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { apiUrl, createProjectViaAPI, loginViaUI, registerUser, saveBomViaAPI, expectMainViewportVisible } from "./helpers";
+import { apiUrl, createProjectViaAPI, loginViaUI, openProjectEditor, registerUser, saveBomViaAPI } from "./helpers";
 
 test.describe("PDF Export", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -44,9 +44,7 @@ test.describe("PDF Export", () => {
   test("PDF export button triggers download in editor", async ({ page }) => {
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openProjectEditor(page, projectId);
 
     const exportTrigger = page.locator('[data-tour="export-btn"] button').first();
     await expect(exportTrigger).toBeEnabled({ timeout: 15_000 });

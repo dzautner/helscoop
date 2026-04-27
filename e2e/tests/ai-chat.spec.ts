@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { registerUser, loginViaUI, createProjectViaAPI, expectMainViewportVisible } from "./helpers";
+import { registerUser, loginViaUI, createProjectViaAPI, expectObjectCount, openProjectEditor } from "./helpers";
 
 test.describe("AI Chat — message, response, and apply flow", () => {
   let user: { email: string; password: string; name: string; token: string };
@@ -18,10 +18,8 @@ test.describe("AI Chat — message, response, and apply flow", () => {
   test("send message, receive response with code, apply to scene", async ({ page }) => {
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openProjectEditor(page, projectId);
+    await expectObjectCount(page, 1);
 
     // 1. Verify chat input is visible
     const chatInput = page.locator(".chat-input, textarea[aria-label]").last();
@@ -35,62 +33,46 @@ test.describe("AI Chat — message, response, and apply flow", () => {
     // 3. Verify user message appears in chat
     await expect(page.getByText("Add a pitched roof to the building")).toBeVisible({ timeout: 5_000 });
 
-    // 4. Wait for AI response (shimmer bar should appear, then response)
-    await page.waitForTimeout(5000);
-
-    // 5. Verify AI response with code
+    // 4. Verify AI response with code and apply it.
     const aiResponse = page.locator(".chat-msg-ai .chat-msg-content").last();
     await expect(aiResponse).toBeVisible({ timeout: 30_000 });
-    const responseText = await aiResponse.textContent();
-    expect(responseText).toBeTruthy();
+    await expect(aiResponse).toContainText(/roof|katto|scene\.add/i, { timeout: 30_000 });
 
-    // 6. Look for Apply button
     const applyBtn = page.locator(".chat-apply-btn").first();
-    if (await applyBtn.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      await applyBtn.click();
+    await expect(applyBtn).toBeVisible({ timeout: 10_000 });
+    await applyBtn.click();
 
-      // Handle confirmation dialog if it appears
-      const confirmDialog = page.locator('[role="dialog"]');
-      if (await confirmDialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        const confirmBtn = confirmDialog.getByRole("button", { name: /apply|käytä/i });
-        if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          await confirmBtn.click();
-        }
-      }
-
-      await page.waitForTimeout(2000);
+    const confirmDialog = page.locator('[role="dialog"]');
+    if (await confirmDialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await confirmDialog.getByRole("button", { name: /apply|aseta|käytä|tillämpa/i }).click();
     }
 
+    await expectObjectCount(page, 3, 20_000);
     await page.screenshot({ path: "test-results/ai-chat-response.png" });
   });
 
   test("suggestion chips populate chat input", async ({ page }) => {
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openProjectEditor(page, projectId);
 
     // Find suggestion chips
     const chips = page.locator(".chat-suggestion-chip");
-    const chipCount = await chips.count().catch(() => 0);
+    await expect(chips.first()).toBeVisible({ timeout: 10_000 });
 
-    if (chipCount > 0) {
-      const chipText = await chips.first().textContent();
-      expect(chipText).toBeTruthy();
+    const chipText = await chips.first().textContent();
+    expect(chipText).toBeTruthy();
 
-      // Click the chip
-      await chips.first().click();
+    // Click the chip
+    await chips.first().click();
 
-      // Verify input is populated
-      const chatInput = page.locator(".chat-input, textarea[aria-label]").last();
-      const inputValue = await chatInput.inputValue();
-      expect(inputValue).toBe(chipText);
+    // Verify input is populated
+    const chatInput = page.locator(".chat-input, textarea[aria-label]").last();
+    const inputValue = await chatInput.inputValue();
+    expect(inputValue).toBe(chipText);
 
-      // Input should be focused
-      await expect(chatInput).toBeFocused();
-    }
+    // Input should be focused
+    await expect(chatInput).toBeFocused();
 
     await page.screenshot({ path: "test-results/ai-chat-chips.png" });
   });
@@ -98,10 +80,7 @@ test.describe("AI Chat — message, response, and apply flow", () => {
   test("chat error shows error message", async ({ page }) => {
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openProjectEditor(page, projectId);
 
     // Intercept the chat API to simulate failure
     await page.route("**/chat", (route) => {
@@ -113,12 +92,10 @@ test.describe("AI Chat — message, response, and apply flow", () => {
     const sendBtn = page.locator('.chat-send-btn, button[aria-label*="lähetä" i], button[aria-label*="send" i]').last();
     await sendBtn.click();
 
-    // Wait for error response
-    await page.waitForTimeout(3000);
-
     // Check for error toast or error message in chat
     const errorIndicator = page.locator('[role="alert"], .chat-msg-ai .chat-msg-content, [class*="toast"]').last();
     await expect(errorIndicator).toBeVisible({ timeout: 10_000 });
+    await expect(errorIndicator).toContainText(/wrong|error|virhe|pieleen|failed/i);
 
     await page.screenshot({ path: "test-results/ai-chat-error.png" });
   });
@@ -126,30 +103,22 @@ test.describe("AI Chat — message, response, and apply flow", () => {
   test("chat message history persists across page navigation", async ({ page }) => {
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
-    await expectMainViewportVisible(page);
+    await openProjectEditor(page, projectId);
 
     // Send a message
     const chatInput = page.locator(".chat-input, textarea[aria-label]").last();
     await chatInput.fill("Add a window to the wall");
     const sendBtn = page.locator('.chat-send-btn, button[aria-label*="lähetä" i], button[aria-label*="send" i]').last();
     await sendBtn.click();
-    await page.waitForTimeout(5000);
+    await expect(page.getByText("Add a window to the wall")).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator(".chat-msg-ai .chat-msg-content").last()).toBeVisible({ timeout: 30_000 });
 
     // Navigate away and back
     await page.goto("/");
-    await page.waitForTimeout(1000);
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
+    await openProjectEditor(page, projectId);
 
     // Verify previous messages are still visible
-    const previousMsg = page.getByText("Add a window to the wall");
-    if (await previousMsg.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      expect(true).toBe(true);
-    }
+    await expect(page.getByText("Add a window to the wall")).toBeVisible({ timeout: 10_000 });
 
     await page.screenshot({ path: "test-results/ai-chat-persistence.png" });
   });
