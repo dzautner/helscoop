@@ -116,10 +116,24 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// 1. Database failure handling in routes with try/catch
+// 1. Database failure handling in explicit and generic route error paths
 // ---------------------------------------------------------------------------
 
-describe("database failure in routes with explicit error handling", () => {
+describe("database failure handling", () => {
+  it("GET /projects forwards async DB failures to the generic error handler", async () => {
+    mockQuery.mockRejectedValueOnce(new Error("connection pool exhausted at pg:5432"));
+
+    const res = await makeRequest("GET", "/projects", {
+      headers: AUTH,
+    });
+
+    expect(res.status).toBe(500);
+    const body = res.body as { error: string };
+    expect(body.error).toBe("Internal server error");
+    expect(body.error).not.toContain("pool");
+    expect(body.error).not.toContain("5432");
+  });
+
   it("PUT /auth/password returns 500 with generic message on DB failure", async () => {
     // First query (user lookup) fails
     mockQuery.mockRejectedValueOnce(new Error("connection pool exhausted at pg:5432"));
