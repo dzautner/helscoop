@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { api, hasAuthSession, setToken } from "@/lib/api";
+import { api, setToken } from "@/lib/api";
 import { useToast } from "@/components/ToastProvider";
 import { SkeletonProjectEditor } from "@/components/Skeleton";
 import { useTranslation } from "@/components/LocaleProvider";
@@ -636,10 +636,6 @@ export default function ProjectPage() {
   }, [queueSceneAnnouncement, toast, t]);
 
   useEffect(() => {
-    if (!hasAuthSession()) {
-      router.push("/");
-      return;
-    }
     Promise.all([api.getProject(projectId), api.getMaterials()])
       .then(([proj, mats]) => {
         setProject(proj);
@@ -708,7 +704,6 @@ export default function ProjectPage() {
   }, [projectId, router, toast, t]);
 
   useEffect(() => {
-    if (!hasAuthSession()) return;
     let cancelled = false;
     api.getProjectImages(projectId)
       .then((result) => {
@@ -723,7 +718,6 @@ export default function ProjectPage() {
   }, [projectId]);
 
   useEffect(() => {
-    if (!hasAuthSession()) return;
     let cancelled = false;
     api.getProjectPriceChange(projectId)
       .then((summary) => {

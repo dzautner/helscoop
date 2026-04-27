@@ -198,6 +198,42 @@ describe("refresh endpoint returns 401", () => {
   });
 });
 
+describe("cookie-backed refresh without local session hint", () => {
+  it("attempts refresh after 401 even when the in-memory token and local hint are absent", async () => {
+    setToken(null);
+    const now = Math.floor(Date.now() / 1000);
+    let refreshAttempts = 0;
+
+    fetchMock.mockImplementation(async (url: string, opts?: RequestInit) => {
+      const urlStr = url.toString();
+      const authHeader = (opts?.headers as Record<string, string>)?.Authorization || "";
+
+      if (urlStr.includes("/auth/refresh")) {
+        refreshAttempts++;
+        expect(authHeader).toBe("");
+        return jsonResponse(200, {
+          token: "cookie-refreshed-token",
+          token_expires_at: now + 900,
+        });
+      }
+
+      if (urlStr.includes("/projects") && authHeader.includes("cookie-refreshed-token")) {
+        return jsonResponse(200, [{ id: "p1", name: "Recovered" }]);
+      }
+
+      if (urlStr.includes("/projects")) {
+        return jsonResponse(401, { error: "Cookie token expired" }, "Unauthorized");
+      }
+
+      return jsonResponse(500, { error: "Unexpected" });
+    });
+
+    await expect(api.getProjects()).resolves.toEqual([{ id: "p1", name: "Recovered" }]);
+    expect(refreshAttempts).toBe(1);
+    expect(getToken()).toBe("cookie-refreshed-token");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 4. Proactive refresh when token is about to expire
 // ---------------------------------------------------------------------------

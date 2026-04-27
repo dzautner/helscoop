@@ -135,6 +135,10 @@ function scanDataUrl(text: string) {
   return `data:model/vnd.usd;base64,${Buffer.from(text).toString("base64")}`;
 }
 
+function jsonScanDataUrl(value: unknown) {
+  return `data:application/json;base64,${Buffer.from(JSON.stringify(value)).toString("base64")}`;
+}
+
 async function usdzDataUrl(text: string) {
   const zip = new JSZip();
   zip.file("RoomPlanExport.usda", text);
@@ -265,5 +269,42 @@ describe("POST /room-scan/projects/:projectId/import", () => {
     expect(body.source_detail).toContain("RoomPlanExport.usda");
     expect(body.quality.parser).toBe("roomplan_text");
     expect(body.rooms).toHaveLength(2);
+  });
+
+  it("uses shared building area fallbacks when exact scan geometry is unavailable", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "proj-1",
+          name: "Fallback scan",
+          building_info: { kerrosala: "96,5", floors: 1, type: "omakotitalo" },
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: materialRows } as never);
+
+    const res = await makeRequest("POST", "/room-scan/projects/proj-1/import", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: {
+        scans: [{
+          name: "fallback-roomplan.json",
+          mime_type: "application/json",
+          size: 200,
+          data_url: jsonScanDataUrl({ rooms: [], walls: [], openings: [] }),
+        }],
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      floor_area_m2: number;
+      quality: { parser: string; warnings: string[] };
+      bom_suggestions: { material_id: string; quantity: number }[];
+    };
+    expect(body.quality.parser).toBe("fallback");
+    expect(body.quality.warnings.join(" ")).toContain("building area");
+    expect(body.floor_area_m2).toBeGreaterThan(95);
+    expect(body.floor_area_m2).toBeLessThan(98);
+    expect(body.bom_suggestions.map((item) => item.material_id)).toContain("osb_18mm");
+    expect(body.bom_suggestions.every((item) => item.quantity > 0)).toBe(true);
   });
 });

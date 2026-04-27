@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { inflateSync } from "node:zlib";
 import { registerUser, loginViaUI, createProjectViaAPI, mainViewportCanvas } from "./helpers";
 
@@ -113,7 +113,7 @@ function decodePng(buffer: Buffer): DecodedPng {
 }
 
 async function expectCanvasToHaveRenderedContent(canvas: Locator) {
-  const image = decodePng(await canvas.screenshot());
+  const image = decodePng(await captureCanvasPng(canvas));
   const totalPixels = image.width * image.height;
   const stride = Math.max(1, Math.floor(totalPixels / 10_000));
   const quantizedColors = new Set<string>();
@@ -144,6 +144,26 @@ async function expectCanvasToHaveRenderedContent(canvas: Locator) {
   expect(maxLuma - minLuma).toBeGreaterThan(10);
 }
 
+async function captureCanvasPng(canvas: Locator): Promise<Buffer> {
+  const dataUrl = await canvas.evaluate(async (node) => {
+    const target = node as HTMLCanvasElement;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    return target.toDataURL("image/png");
+  });
+  expect(dataUrl.startsWith("data:image/png;base64,")).toBe(true);
+  return Buffer.from(dataUrl.replace(/^data:image\/png;base64,/, ""), "base64");
+}
+
+async function openProjectViewport(page: Page, projectId: string, renderDelayMs = 1_000): Promise<Locator> {
+  await page.goto(`/project/${projectId}`, { waitUntil: "domcontentloaded" });
+  const canvas = mainViewportCanvas(page);
+  await expect(canvas).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(renderDelayMs);
+  return canvas;
+}
+
 test.describe("3D Viewport — Visual Regression", () => {
   let user: { email: string; password: string; name: string; token: string };
 
@@ -161,12 +181,7 @@ test.describe("3D Viewport — Visual Regression", () => {
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(3000);
-    await page.waitForLoadState("networkidle");
-
-    const canvas = mainViewportCanvas(page);
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    const canvas = await openProjectViewport(page, projectId, 1_500);
 
     const box = await canvas.boundingBox();
     expect(box).toBeTruthy();
@@ -202,12 +217,7 @@ scene.add(wall4, { material: "lumber" });
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(4000);
-    await page.waitForLoadState("networkidle");
-
-    const canvas = mainViewportCanvas(page);
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    const canvas = await openProjectViewport(page, projectId, 1_500);
     await page.screenshot({ path: "test-results/vr-complex-scene.png" });
     await expectCanvasToHaveRenderedContent(canvas);
   });
@@ -220,15 +230,10 @@ scene.add(wall4, { material: "lumber" });
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(3000);
-    await page.waitForLoadState("networkidle");
-
-    const canvas = mainViewportCanvas(page);
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    const canvas = await openProjectViewport(page, projectId, 1_500);
 
     // Take solid-mode baseline
-    const solidScreenshot = await canvas.screenshot();
+    const solidScreenshot = await captureCanvasPng(canvas);
 
     // Toggle wireframe mode
     const wireframeBtn = page.locator('button[aria-label*="wireframe" i], button[aria-label*="rautalanka" i], button[data-tooltip*="wireframe" i]');
@@ -237,7 +242,7 @@ scene.add(wall4, { material: "lumber" });
       await page.waitForTimeout(1500);
 
       // Take wireframe screenshot
-      const wireframeScreenshot = await canvas.screenshot();
+      const wireframeScreenshot = await captureCanvasPng(canvas);
 
       // Compare — wireframe should look different
       expect(Buffer.compare(solidScreenshot, wireframeScreenshot)).not.toBe(0);
@@ -254,15 +259,10 @@ scene.add(wall4, { material: "lumber" });
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(3000);
-    await page.waitForLoadState("networkidle");
-
-    const canvas = mainViewportCanvas(page);
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    const canvas = await openProjectViewport(page, projectId, 1_500);
 
     // Take default angle baseline
-    const defaultScreenshot = await canvas.screenshot();
+    const defaultScreenshot = await captureCanvasPng(canvas);
 
     // Try camera preset buttons (front, side, top)
     const cameraPresets = page.locator('button[aria-label*="camera" i], button[data-tooltip*="front" i], button[data-tooltip*="edestä" i]');
@@ -270,7 +270,7 @@ scene.add(wall4, { material: "lumber" });
       await cameraPresets.first().click();
       await page.waitForTimeout(1500);
 
-      const presetScreenshot = await canvas.screenshot();
+      const presetScreenshot = await captureCanvasPng(canvas);
       expect(Buffer.compare(defaultScreenshot, presetScreenshot)).not.toBe(0);
     }
 
@@ -292,12 +292,7 @@ scene.add(result, { material: "lumber" });
 
     await loginViaUI(page, user.email, user.password);
     await page.getByText(/omat projektit|my projects/i).waitFor({ state: "visible", timeout: 15_000 });
-    await page.goto(`/project/${projectId}`);
-    await page.waitForTimeout(4000);
-    await page.waitForLoadState("networkidle");
-
-    const canvas = mainViewportCanvas(page);
-    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    const canvas = await openProjectViewport(page, projectId, 1_500);
     await page.screenshot({ path: "test-results/vr-boolean-ops.png" });
     await expectCanvasToHaveRenderedContent(canvas);
   });

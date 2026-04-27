@@ -189,4 +189,37 @@ describe("POST /quantity-takeoff/projects/:projectId/analyze", () => {
       bomLineCount: body.bom_suggestions.length,
     }));
   });
+
+  it("infers drawing scale from shared building area fallbacks", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "proj-1",
+          name: "Legacy metadata project",
+          building_info: JSON.stringify({ floorAreaM2: "160,5", floors: "2", type: "omakotitalo" }),
+        }],
+      } as never)
+      .mockResolvedValueOnce({ rows: materialRows } as never);
+
+    const res = await makeRequest("POST", "/quantity-takeoff/projects/proj-1/analyze", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: {
+        drawings: [drawing],
+        options: {
+          floor_label: "1. kerros",
+          notes: "no explicit dimensions provided",
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      drawing_context: { floor_area_m2: number; scale_source: string };
+      bom_suggestions: { quantity: number }[];
+    };
+    expect(body.drawing_context.scale_source).toBe("building_area");
+    expect(body.drawing_context.floor_area_m2).toBeGreaterThan(79);
+    expect(body.drawing_context.floor_area_m2).toBeLessThan(81);
+    expect(body.bom_suggestions.every((item) => item.quantity > 0)).toBe(true);
+  });
 });

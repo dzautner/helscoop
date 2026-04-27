@@ -152,13 +152,12 @@ scene.add(roof2, { material: "roofing", color: [0.35, 0.32, 0.30] });
     });
     const project = await res.json();
 
-    await page.goto(`/project/${project.id}`);
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`/project/${project.id}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel(/project name/i)).toHaveValue("Error Test", { timeout: 15_000 });
 
     // Should show error indicator
     await expect(
       page.getByText(/virhe|error/i).first()
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
