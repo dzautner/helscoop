@@ -215,4 +215,86 @@ describe("POST /bom/aggregate", () => {
       { project_id: "p1", project_name: "Sauna", quantity: 40, total: 110 },
     ]);
   });
+
+  it("uses shared building area fallbacks for legacy and Finnish project metadata", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "p1",
+            name: "Legacy area",
+            building_info: { area: 125 },
+            estimated_cost: "250",
+            bom_rows: 0,
+          },
+          {
+            id: "p2",
+            name: "Floor area",
+            building_info: JSON.stringify({ floorAreaM2: "80,5" }),
+            estimated_cost: "161",
+            bom_rows: 0,
+          },
+          {
+            id: "p3",
+            name: "Finnish area",
+            building_info: { kerrosala: 50 },
+            estimated_cost: "75",
+            bom_rows: 0,
+          },
+        ],
+      } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/bom/aggregate", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { project_ids: ["p1", "p2", "p3"] },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      projects: Array<{ id: string; area_m2: number | null; cost_per_m2: number | null }>;
+    };
+    expect(body.projects).toEqual([
+      expect.objectContaining({ id: "p1", area_m2: 125, cost_per_m2: 2 }),
+      expect.objectContaining({ id: "p2", area_m2: 80.5, cost_per_m2: 2 }),
+      expect.objectContaining({ id: "p3", area_m2: 50, cost_per_m2: 1.5 }),
+    ]);
+  });
+
+  it("keeps aggregate summaries available when stored building_info is malformed", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "p1",
+            name: "Bad Metadata",
+            building_info: "{not valid json",
+            estimated_cost: "250",
+            bom_rows: 0,
+          },
+          {
+            id: "p2",
+            name: "Missing Metadata",
+            building_info: null,
+            estimated_cost: "180",
+            bom_rows: 0,
+          },
+        ],
+      } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    const res = await makeRequest("POST", "/bom/aggregate", {
+      headers: { Authorization: `Bearer ${authToken()}` },
+      body: { project_ids: ["p1", "p2"] },
+    });
+
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      projects: Array<{ id: string; area_m2: number | null; cost_per_m2: number | null }>;
+    };
+    expect(body.projects).toEqual([
+      expect.objectContaining({ id: "p1", area_m2: null, cost_per_m2: null }),
+      expect.objectContaining({ id: "p2", area_m2: null, cost_per_m2: null }),
+    ]);
+  });
 });
