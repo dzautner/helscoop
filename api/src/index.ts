@@ -1,3 +1,4 @@
+import "express-async-errors";
 import * as Sentry from "@sentry/node";
 import http from "http";
 import express from "express";
